@@ -1,0 +1,2904 @@
+/* Tokens and base layout */
+.etch-fonts-admin {
+    --etch-surface: #ffffff;
+    --etch-surface-soft: #f6f7f7;
+    --etch-surface-muted: #f0f0f1;
+    --etch-border: #dcdcde;
+    --etch-border-strong: #8c8f94;
+    --etch-text: #1d2327;
+    --etch-text-muted: #50575e;
+    --etch-accent: var(--wp-admin-theme-color, #2271b1);
+    --etch-accent-soft: #f0f6fc;
+    --etch-success: #00a32a;
+    --etch-success-soft: #f0f6fc;
+    --etch-warning: #996800;
+    --etch-warning-soft: #fcf9e8;
+    --etch-danger: #d63638;
+    --etch-space-1: 4px;
+    --etch-space-2: 8px;
+    --etch-space-3: 12px;
+    --etch-space-4: 16px;
+    --etch-space-5: 20px;
+    --etch-space-6: 24px;
+    --etch-space-7: 28px;
+    --etch-radius-card: 6px;
+    --etch-radius-control: 4px;
+    --etch-radius-pill: 999px;
+    --etch-control-height: 36px;
+    --etch-button-height: 36px;
+    --etch-button-height-small: 28px;
+    --etch-pill-height: 22px;
+    --etch-pill-padding-x: 12px;
+    --etch-panel-gap: 16px;
+    --etch-card-padding: 20px;
+    --etch-card-padding-tight: 16px;
+    --etch-sidebar-width: 300px;
+    --etch-shadow-card: none;
+    --etch-shadow-focus: 0 0 0 1px var(--etch-accent);
+    --etch-action-cluster-width: 344px;
+    max-width: 1360px;
+    color: var(--etch-text);
+}
+
+.etch-fonts-admin *,
+.etch-fonts-admin *::before,
+.etch-fonts-admin *::after {
+    box-sizing: border-box;
+}
+
+.etch-fonts-admin [hidden] {
+    display: none !important;
+}
+
+.etch-fonts-shell {
+    display: grid;
+    gap: var(--etch-space-4);
+}
+
+.etch-fonts-shell > * {
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-admin h1,
+.etch-fonts-admin h2,
+.etch-fonts-admin h3,
+.etch-fonts-admin p {
+    color: inherit;
+}
+
+.etch-fonts-eyebrow,
+.etch-fonts-metric-label,
+.etch-fonts-metric-meta,
+.etch-fonts-status-label,
+.etch-fonts-field-label,
+.etch-fonts-field-label-row,
+.etch-fonts-muted,
+.etch-fonts-log-time {
+    color: var(--etch-text-muted);
+}
+
+.etch-fonts-eyebrow,
+.etch-fonts-field-label,
+.etch-fonts-field-label-row {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.etch-fonts-hero,
+.etch-fonts-card,
+.etch-fonts-metric,
+.etch-fonts-status-card,
+.etch-fonts-role-box,
+.etch-fonts-code-card,
+.etch-fonts-search-card,
+.etch-fonts-font-card,
+.etch-fonts-selected-card,
+/* Preview scenes */
+.etch-fonts-preview-canvas {
+    background: var(--etch-surface);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    box-shadow: var(--etch-shadow-card);
+}
+
+.etch-fonts-hero,
+.etch-fonts-overview-card {
+    display: grid;
+    gap: var(--etch-space-3);
+    padding: var(--etch-card-padding);
+}
+
+.etch-fonts-hero-main,
+.etch-fonts-overview-head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.etch-fonts-hero-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.etch-fonts-hero-copy h1 {
+    font-size: clamp(26px, 3.5vw, 36px);
+    line-height: 1.08;
+    margin: 0;
+}
+
+.etch-fonts-hero-text {
+    color: var(--etch-text-muted);
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0;
+    max-width: 580px;
+}
+
+.etch-fonts-hero-actions,
+.etch-fonts-actions,
+.etch-fonts-role-actions,
+.etch-fonts-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-3);
+    align-items: center;
+}
+
+.etch-fonts-hero-copy {
+    flex: 1 1 480px;
+    max-width: 640px;
+    min-width: 0;
+}
+
+.etch-fonts-hero-actions form,
+.etch-fonts-actions form,
+.etch-fonts-role-actions form,
+.etch-fonts-settings-actions form {
+    display: flex;
+}
+
+.etch-fonts-overview-settings {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-overview-disclosure {
+    margin-top: 0;
+}
+
+.etch-fonts-overview-advanced {
+    margin-top: var(--etch-space-3);
+    padding: var(--etch-card-padding-tight);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface-soft);
+}
+
+.etch-fonts-diagnostics-grid {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.etch-fonts-diagnostic-item {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.etch-fonts-diagnostic-label {
+    color: var(--etch-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.etch-fonts-diagnostic-value {
+    font-size: 13px;
+    line-height: 1.5;
+    min-width: 0;
+}
+
+.etch-fonts-overview-head {
+    justify-content: flex-start;
+}
+
+.etch-fonts-metrics {
+    display: grid;
+    gap: var(--etch-space-2);
+    grid-template-columns: repeat(4, minmax(132px, 1fr));
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-metric {
+    display: grid;
+    gap: 4px;
+    background: var(--etch-surface-soft);
+    min-height: auto;
+    padding: 12px 14px;
+}
+
+.etch-fonts-metric-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.etch-fonts-metric-label {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0;
+}
+
+.etch-fonts-metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    margin: 0;
+}
+
+.etch-fonts-metric-meta {
+    display: none;
+}
+
+.etch-fonts-help-wrap {
+    display: inline-flex;
+    align-items: center;
+}
+
+.etch-fonts-help-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--etch-border-strong);
+    border-radius: 999px;
+    background: var(--etch-surface-soft);
+    color: var(--etch-text-muted);
+    cursor: help;
+    line-height: 1;
+}
+
+.etch-fonts-help-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 700;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-transform: lowercase;
+}
+
+.etch-fonts-help-button[aria-expanded="true"] {
+    border-color: var(--etch-accent);
+    color: var(--etch-accent);
+}
+
+.etch-fonts-help-tooltip-layer {
+    position: fixed;
+    z-index: 100001;
+    max-width: min(320px, calc(100vw - 24px));
+    padding: 10px 12px;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    color: var(--etch-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    pointer-events: none;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.etch-fonts-toast-stack {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 100000;
+    display: grid;
+    gap: var(--etch-space-2);
+    pointer-events: none;
+    justify-items: end;
+}
+
+.etch-fonts-toast {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--etch-space-3);
+    align-items: start;
+    width: min(360px, calc(100vw - 32px));
+    min-width: 0;
+    padding: 12px 12px 12px 14px;
+    border: 1px solid var(--etch-border);
+    border-left: 4px solid var(--etch-accent);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.etch-fonts-toast.is-success {
+    border-left-color: var(--etch-success);
+}
+
+.etch-fonts-toast.is-error {
+    border-left-color: var(--etch-danger);
+}
+
+.etch-fonts-toast-message {
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.etch-fonts-toast-dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--etch-text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.etch-fonts-toast-dismiss:hover,
+.etch-fonts-toast-dismiss:focus {
+    background: var(--etch-surface-muted);
+}
+
+.etch-fonts-toast.is-leaving {
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+.etch-fonts-card {
+    padding: var(--etch-card-padding);
+}
+
+.etch-fonts-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--etch-space-3);
+    margin-bottom: var(--etch-space-3);
+}
+
+.etch-fonts-card-head--tight {
+    margin-bottom: 12px;
+}
+
+.etch-fonts-card-head--compact {
+    margin-bottom: var(--etch-space-2);
+}
+
+.etch-fonts-card-head h2,
+.etch-fonts-card-head h3 {
+    margin: 0;
+}
+
+.etch-fonts-card-head p {
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0;
+    max-width: 640px;
+}
+
+.etch-fonts-section-heading {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.etch-fonts-section-title-row {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+
+.etch-fonts-section-title {
+    margin: 0;
+}
+
+.etch-fonts-section-copy {
+    color: var(--etch-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 0;
+    max-width: 540px;
+}
+
+.etch-fonts-subpanel-head {
+    margin-bottom: var(--etch-space-2);
+}
+
+.etch-fonts-subpanel-head--with-action {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    flex-wrap: wrap;
+}
+
+.etch-fonts-system-grid,
+.etch-fonts-import-grid {
+    display: grid;
+    gap: var(--etch-panel-gap);
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-system-grid {
+    align-items: start;
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+}
+
+.etch-fonts-system-statuses {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-status-card {
+    display: grid;
+    gap: 6px;
+    min-height: 0;
+    padding: 14px;
+}
+
+.etch-fonts-status-card.is-success {
+    background: var(--etch-success-soft);
+}
+
+.etch-fonts-status-card.is-warning {
+    background: var(--etch-warning-soft);
+}
+
+.etch-fonts-status-card.is-accent {
+    background: var(--etch-accent-soft);
+}
+
+.etch-fonts-status-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 0;
+}
+
+.etch-fonts-status-copy {
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.etch-fonts-settings-panel,
+.etch-fonts-code-card {
+    background: var(--etch-surface);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    padding: var(--etch-card-padding-tight);
+}
+
+.etch-fonts-settings-head {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: flex-start;
+    margin-bottom: var(--etch-space-3);
+}
+
+.etch-fonts-settings-head p,
+.etch-fonts-settings-actions p {
+    margin: 0;
+}
+
+.etch-fonts-settings-link {
+    margin: var(--etch-space-2) 0 0;
+}
+
+.etch-fonts-settings-link a {
+    color: var(--etch-accent);
+    text-decoration: none;
+}
+
+.etch-fonts-settings-link a:hover,
+.etch-fonts-settings-link a:focus {
+    text-decoration: underline;
+}
+
+.etch-fonts-settings-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-settings-actions {
+    align-items: center;
+    column-gap: var(--etch-space-4);
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    margin-top: var(--etch-space-3);
+    row-gap: var(--etch-space-3);
+}
+
+.etch-fonts-settings-actions .etch-fonts-muted {
+    flex: 1 1 240px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.etch-fonts-settings-panel--import {
+    display: grid;
+    gap: var(--etch-space-3);
+    margin-bottom: var(--etch-space-2);
+    padding: 0 0 var(--etch-space-3);
+    border: 0;
+    border-bottom: 1px solid var(--etch-border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.etch-fonts-settings-panel--import .etch-fonts-settings-head {
+    display: block;
+    margin-bottom: 0;
+}
+
+.etch-fonts-import-key-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    margin-bottom: var(--etch-space-2);
+}
+
+.etch-fonts-import-key-title-row h4 {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.3;
+}
+
+.etch-fonts-import-key-copy p {
+    margin: 0;
+}
+
+.etch-fonts-settings-panel--import .etch-fonts-settings-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    flex-wrap: wrap;
+    margin-top: 0;
+}
+
+.etch-fonts-settings-panel--import .etch-fonts-settings-link {
+    margin: 0;
+}
+
+.etch-fonts-disclosure {
+    margin-top: var(--etch-space-3);
+}
+
+.etch-fonts-inline-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    line-height: 1.2;
+    padding-left: 0;
+    padding-right: 0;
+    text-decoration: none;
+}
+
+.etch-fonts-code,
+.etch-fonts-kbd,
+.etch-fonts-output {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.etch-fonts-code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.etch-fonts-role-grid,
+.etch-fonts-grid-two {
+    display: grid;
+    gap: var(--etch-space-4);
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-role-box {
+    padding: var(--etch-card-padding-tight);
+    background: var(--etch-surface-soft);
+}
+
+.etch-fonts-role-box h3 {
+    margin: 0;
+}
+
+.etch-fonts-role-box-head {
+    margin-bottom: var(--etch-space-2);
+}
+
+.etch-fonts-role-fields {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.etch-fonts-stack-field {
+    display: grid;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-field-label-row {
+    align-items: center;
+    color: var(--etch-text-muted);
+    display: inline-flex;
+    gap: 6px;
+    margin-bottom: 0;
+    min-width: 0;
+}
+
+.etch-fonts-field-label-text {
+    display: inline-block;
+}
+
+.etch-fonts-stack-field input,
+.etch-fonts-stack-field select,
+.etch-fonts-inline-field input,
+.etch-fonts-inline-field select,
+.etch-fonts-toolbar input,
+.etch-fonts-settings-panel input {
+    width: 100%;
+    min-height: var(--etch-control-height);
+    border-radius: var(--etch-radius-control);
+    border: 1px solid var(--etch-border-strong);
+    padding: 0 var(--etch-space-4);
+    background: var(--etch-surface);
+    font-size: 16px;
+    line-height: 1.2;
+}
+
+.etch-fonts-stack-field select,
+.etch-fonts-inline-field select,
+.etch-fonts-admin select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.25L6 5.75L10.5 1.25' stroke='%235d6b79' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 16px center;
+    background-repeat: no-repeat;
+    background-size: 12px 8px;
+    cursor: pointer;
+    line-height: 1.2;
+    padding-right: 44px;
+}
+
+.etch-fonts-role-toolbar {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-3);
+    justify-content: space-between;
+    margin-top: var(--etch-space-2);
+}
+
+.etch-fonts-role-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-role-stacks {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-role-stack {
+    align-items: center;
+    display: inline-flex;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-role-stack-label {
+    color: var(--etch-text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.etch-fonts-role-advanced-panel {
+    display: grid;
+    gap: var(--etch-space-3);
+    margin-top: var(--etch-space-3);
+    padding: var(--etch-card-padding-tight);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface-soft);
+}
+
+.etch-fonts-system-details-panel {
+    padding: var(--etch-card-padding-tight);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface);
+}
+
+.etch-fonts-studio-switcher {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-studio-tab,
+.etch-fonts-preview-tab,
+.etch-fonts-code-tab {
+    align-items: center;
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    border-radius: var(--etch-radius-control);
+    box-shadow: none;
+    color: #2c3338;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 500;
+    justify-content: center;
+    min-height: var(--etch-button-height);
+    padding: 0 14px;
+    text-decoration: none;
+}
+
+.etch-fonts-studio-tab.is-active,
+.etch-fonts-preview-tab.is-active,
+.etch-fonts-code-tab.is-active {
+    background: var(--etch-accent-soft);
+    border-color: var(--etch-accent);
+    color: var(--etch-accent);
+    font-weight: 600;
+}
+
+.etch-fonts-studio-panel {
+    display: none;
+    min-width: 0;
+}
+
+.etch-fonts-studio-panel.is-active {
+    display: block;
+}
+
+.etch-fonts-code-card--embedded {
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.etch-fonts-disclosure-button {
+    position: relative;
+}
+
+.etch-fonts-disclosure-button::after {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-left: 10px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: translateY(-1px) rotate(45deg);
+    transition: transform 0.14s ease;
+}
+
+.etch-fonts-disclosure-button[aria-expanded="true"]::after {
+    transform: translateY(3px) rotate(-135deg);
+}
+
+.etch-fonts-disclosure-button--preview {
+    flex: 0 0 auto;
+}
+
+.etch-fonts-disclosure-button--inline {
+    padding-right: 0;
+    text-decoration: none;
+}
+
+.etch-fonts-kbd {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--etch-space-2);
+    min-height: 26px;
+    max-width: 100%;
+    padding: 0 10px;
+    border-radius: var(--etch-radius-pill);
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    color: #2c3338;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.etch-fonts-preview-canvas {
+    padding: var(--etch-card-padding-tight);
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+    margin-bottom: var(--etch-space-3);
+}
+
+.etch-fonts-preview-scene {
+    display: none;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-preview-scene.is-active {
+    display: grid;
+}
+
+.etch-fonts-preview-scene[hidden] {
+    display: none !important;
+}
+
+.etch-fonts-preview-showcase {
+    display: grid;
+    gap: var(--etch-space-4);
+}
+
+.etch-fonts-preview-scene-head {
+    display: grid;
+    gap: var(--etch-space-1);
+}
+
+.etch-fonts-preview-specimen-board {
+    display: grid;
+    gap: clamp(18px, 3vw, 32px);
+    grid-template-columns: minmax(132px, 0.28fr) minmax(260px, 0.88fr) minmax(340px, 1fr);
+    padding: clamp(22px, 3vw, 32px);
+    background: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-specimen-rail {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+}
+
+.etch-fonts-preview-specimen-glyph {
+    font-size: clamp(72px, calc(var(--etch-preview-base, 32px) * 2.5), 104px);
+    line-height: 0.9;
+    letter-spacing: -0.06em;
+}
+
+.etch-fonts-preview-specimen-key {
+    display: grid;
+    gap: 4px;
+}
+
+.etch-fonts-preview-specimen-key-label,
+.etch-fonts-preview-specimen-copy-label,
+.etch-fonts-font-preview-caption,
+.etch-fonts-font-preview-copy-label {
+    color: #8c8f94;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.etch-fonts-preview-specimen-key-value {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.etch-fonts-preview-specimen-scale {
+    display: grid;
+    align-content: start;
+    gap: 18px;
+}
+
+.etch-fonts-preview-specimen-scale-item {
+    line-height: 1.05;
+    margin: 0;
+}
+
+.etch-fonts-preview-specimen-scale-item--1 {
+    font-size: clamp(42px, calc(var(--etch-preview-base, 32px) * 1.58), 58px);
+    font-weight: 700;
+    letter-spacing: -0.05em;
+}
+
+.etch-fonts-preview-specimen-scale-item--2 {
+    font-size: clamp(33px, calc(var(--etch-preview-base, 32px) * 1.26), 42px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+
+.etch-fonts-preview-specimen-scale-item--3 {
+    font-size: clamp(27px, calc(var(--etch-preview-base, 32px) * 1.02), 34px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+
+.etch-fonts-preview-specimen-scale-item--4 {
+    font-size: clamp(22px, calc(var(--etch-preview-base, 32px) * 0.84), 28px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.etch-fonts-preview-specimen-scale-item--5 {
+    font-size: clamp(18px, calc(var(--etch-preview-base, 32px) * 0.68), 22px);
+    font-weight: 700;
+}
+
+.etch-fonts-preview-specimen-scale-item--6 {
+    font-size: clamp(16px, calc(var(--etch-preview-base, 32px) * 0.58), 18px);
+    font-weight: 700;
+}
+
+.etch-fonts-preview-specimen-copy {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+}
+
+.etch-fonts-preview-specimen-copy-row {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(88px, 100px) minmax(0, 1fr);
+    align-items: start;
+}
+
+.etch-fonts-preview-specimen-copy-body {
+    min-width: 0;
+}
+
+.etch-fonts-preview-specimen-copy-row p,
+.etch-fonts-preview-specimen-copy-row blockquote {
+    color: #50575e;
+    margin: 0;
+}
+
+.etch-fonts-preview-specimen-lead {
+    color: var(--etch-text);
+    font-size: clamp(20px, calc(var(--etch-preview-base, 32px) * 0.7), 24px);
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.etch-fonts-preview-specimen-body-large {
+    font-size: clamp(16px, calc(var(--etch-preview-base, 32px) * 0.5), 18px);
+    line-height: 1.6;
+}
+
+.etch-fonts-preview-specimen-body {
+    font-size: clamp(14px, calc(var(--etch-preview-base, 32px) * 0.44), 16px);
+    line-height: 1.65;
+}
+
+.etch-fonts-preview-specimen-quote {
+    color: var(--etch-text);
+    font-size: clamp(20px, calc(var(--etch-preview-base, 32px) * 0.72), 26px);
+    font-weight: 700;
+    line-height: 1.35;
+    padding: 0;
+    border: 0;
+}
+
+.etch-fonts-preview-specimen-caps {
+    color: var(--etch-text);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.etch-fonts-preview-specimen-small {
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.etch-fonts-preview-specimen-tiny {
+    color: var(--etch-text);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.etch-fonts-preview-support-grid {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.etch-fonts-preview-support-card {
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+    background: #fff;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    min-width: 0;
+}
+
+.etch-fonts-preview-support-label {
+    color: #8c8f94;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.etch-fonts-preview-support-title {
+    color: var(--etch-text);
+    font-size: clamp(24px, calc(var(--etch-preview-base, 32px) * 0.86), 32px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.06;
+    margin: 0;
+}
+
+.etch-fonts-preview-support-copy {
+    color: var(--etch-text-muted);
+    font-size: clamp(15px, calc(var(--etch-preview-base, 32px) * 0.5), 18px);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.etch-fonts-preview-support-meta {
+    align-items: center;
+    border-top: 1px solid var(--etch-border);
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 12px;
+}
+
+.etch-fonts-preview-support-meta span {
+    color: var(--etch-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.etch-fonts-preview-support-meta strong {
+    color: var(--etch-text);
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.etch-fonts-preview-support-stats {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.etch-fonts-preview-support-stat {
+    display: grid;
+    gap: 4px;
+    padding: 14px;
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-support-stat span {
+    color: var(--etch-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.etch-fonts-preview-support-stat strong {
+    color: var(--etch-text);
+    font-size: clamp(20px, calc(var(--etch-preview-base, 32px) * 0.76), 28px);
+    line-height: 1;
+}
+
+.etch-fonts-preview-card-board {
+    display: grid;
+    gap: var(--etch-space-3);
+    padding: 4px 0 0;
+}
+
+.etch-fonts-preview-card-gallery {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.etch-fonts-preview-card-frame {
+    display: grid;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--etch-border);
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(29, 35, 39, 0.04);
+}
+
+.etch-fonts-preview-card-media {
+    align-items: center;
+    background: linear-gradient(180deg, #464646 0%, #363636 100%);
+    display: flex;
+    justify-content: center;
+    min-height: 168px;
+}
+
+.etch-fonts-preview-card-media .dashicons {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 44px;
+    height: 44px;
+    width: 44px;
+}
+
+.etch-fonts-preview-card-body {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+    padding: 24px;
+}
+
+.etch-fonts-preview-card-label,
+.etch-fonts-preview-reading-label {
+    color: #8c8f94;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.etch-fonts-preview-card-title {
+    color: var(--etch-text);
+    font-size: clamp(28px, calc(var(--etch-preview-base, 32px) * 0.98), 38px);
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    line-height: 0.98;
+    margin: 0;
+}
+
+.etch-fonts-preview-card-subtitle {
+    color: var(--etch-text);
+    font-size: clamp(18px, calc(var(--etch-preview-base, 32px) * 0.62), 24px);
+    line-height: 1.12;
+    margin: 0;
+}
+
+.etch-fonts-preview-card-copy {
+    color: var(--etch-text-muted);
+    font-size: clamp(14px, calc(var(--etch-preview-base, 32px) * 0.46), 17px);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 28ch;
+}
+
+.etch-fonts-preview-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-start;
+    margin-top: auto;
+    padding-top: 4px;
+}
+
+.etch-fonts-preview-card-actions .button {
+    min-width: 108px;
+    pointer-events: none;
+}
+
+.etch-fonts-preview-reading-sheet {
+    display: grid;
+    gap: 18px;
+    padding: 24px;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-reading-head {
+    display: grid;
+    gap: 8px;
+}
+
+.etch-fonts-preview-reading-title {
+    color: var(--etch-text);
+    font-size: clamp(30px, calc(var(--etch-preview-base, 32px) * 1.02), 38px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.04;
+    margin: 0;
+}
+
+.etch-fonts-preview-reading-lead {
+    color: var(--etch-text);
+    font-size: clamp(18px, calc(var(--etch-preview-base, 32px) * 0.62), 22px);
+    line-height: 1.5;
+    margin: 0;
+    max-width: 48ch;
+}
+
+.etch-fonts-preview-reading-layout {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(180px, 0.7fr);
+}
+
+.etch-fonts-preview-reading-copy {
+    display: grid;
+    gap: 14px;
+}
+
+.etch-fonts-preview-reading-copy p {
+    color: var(--etch-text-muted);
+    font-size: 15px;
+    line-height: 1.72;
+    margin: 0;
+}
+
+.etch-fonts-preview-reading-aside {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-reading-aside-title {
+    color: var(--etch-text);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.etch-fonts-preview-ui-shell {
+    display: grid;
+    gap: 14px;
+    padding: 20px;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-ui-topbar {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--etch-border);
+}
+
+.etch-fonts-preview-ui-topbar-label {
+    color: #8c8f94;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.etch-fonts-preview-ui-topbar-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--etch-accent-soft);
+    color: var(--etch-accent);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.etch-fonts-preview-ui-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: minmax(0, 1.05fr) minmax(220px, 0.95fr);
+}
+
+.etch-fonts-preview-ui-panel {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-ui-title {
+    color: var(--etch-text);
+    font-size: clamp(26px, calc(var(--etch-preview-base, 32px) * 0.88), 32px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.02;
+    margin: 0;
+}
+
+.etch-fonts-preview-ui-copy {
+    color: var(--etch-text-muted);
+    font-size: 14px;
+    line-height: 1.65;
+    margin: 0;
+}
+
+.etch-fonts-preview-ui-list {
+    display: grid;
+    gap: 10px;
+}
+
+.etch-fonts-preview-ui-list-row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-ui-list-row span {
+    color: var(--etch-text-muted);
+    font-size: 13px;
+}
+
+.etch-fonts-preview-ui-list-row strong {
+    color: var(--etch-text);
+    font-size: 14px;
+    line-height: 1.2;
+}
+
+.etch-fonts-preview-scene-title {
+    font-size: clamp(22px, calc(var(--etch-preview-base, 32px) * 0.9), 30px);
+    line-height: 1.15;
+    margin: 0;
+}
+
+.etch-fonts-preview-overline,
+.etch-fonts-preview-meta,
+.etch-fonts-preview-ui-label {
+    color: var(--etch-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.etch-fonts-preview-overline {
+    letter-spacing: 0.08em;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.etch-fonts-preview-sheet {
+    display: grid;
+    gap: var(--etch-space-3);
+    padding: var(--etch-space-4);
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-divider {
+    border-top: 1px solid var(--etch-border);
+}
+
+.etch-fonts-preview-lede,
+.etch-fonts-preview-copy,
+.etch-fonts-preview-card-copy,
+.etch-fonts-preview-reading p,
+.etch-fonts-preview-ui-input,
+.etch-fonts-font-preview-copy {
+    font-size: var(--etch-preview-base, 32px);
+    line-height: 1.45;
+    margin: 0;
+}
+
+.etch-fonts-preview-lede {
+    font-size: clamp(19px, calc(var(--etch-preview-base, 32px) * 0.72), 26px);
+    line-height: 1.35;
+}
+
+.etch-fonts-preview-copy,
+.etch-fonts-preview-card-copy,
+.etch-fonts-preview-reading p,
+.etch-fonts-preview-ui-input,
+.etch-fonts-font-preview-copy {
+    font-size: clamp(15px, calc(var(--etch-preview-base, 32px) * 0.5), 19px);
+}
+
+.etch-fonts-preview-card-sample,
+.etch-fonts-font-preview-card,
+.etch-fonts-preview-ui-block {
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    padding: var(--etch-space-4);
+}
+
+.etch-fonts-preview-subheading {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    font-size: clamp(18px, calc(var(--etch-preview-base, 32px) * 0.66), 22px);
+    line-height: 1.2;
+    margin: 0;
+}
+
+.etch-fonts-preview-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--etch-pill-height);
+    padding: 0 var(--etch-pill-padding-x);
+    border-radius: var(--etch-radius-pill);
+    background: var(--etch-surface-muted);
+    color: var(--etch-text-muted);
+    font-size: 12px;
+}
+
+.etch-fonts-preview-card-title,
+.etch-fonts-preview-reading-title {
+    font-size: clamp(20px, calc(var(--etch-preview-base, 32px) * 0.92), 30px);
+    line-height: 1.15;
+    margin: 0;
+}
+
+.etch-fonts-preview-card-footer,
+.etch-fonts-preview-ui-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+    align-items: center;
+}
+
+.etch-fonts-preview-reading {
+    display: grid;
+    gap: var(--etch-space-3);
+    padding: var(--etch-space-4);
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-reading-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.etch-fonts-preview-reading-list li + li {
+    margin-top: var(--etch-space-1);
+}
+
+.etch-fonts-preview-ui {
+    display: grid;
+    gap: var(--etch-space-3);
+    padding: var(--etch-space-4);
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+}
+
+.etch-fonts-preview-ui-input {
+    background: var(--etch-surface);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-control);
+    min-height: var(--etch-control-height);
+    padding: 10px 12px;
+}
+
+.etch-fonts-preview-ui-stats {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.etch-fonts-preview-stat {
+    background: var(--etch-surface-soft);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    display: grid;
+    gap: var(--etch-space-1);
+    padding: var(--etch-space-3);
+}
+
+.etch-fonts-preview-stat strong {
+    font-size: clamp(22px, calc(var(--etch-preview-base, 32px) * 0.95), 34px);
+    line-height: 1;
+}
+
+.etch-fonts-preview-ui-actions .button,
+.etch-fonts-preview-card-footer .button {
+    pointer-events: none;
+}
+
+.etch-fonts-heading-preview {
+    font-size: clamp(32px, calc(var(--etch-preview-base, 32px) * 1.35), 50px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    margin: 0;
+}
+
+.etch-fonts-body-preview,
+.etch-fonts-font-preview {
+    font-size: 17px;
+    line-height: 1.55;
+}
+
+.etch-fonts-preview-controls {
+    display: grid;
+    gap: var(--etch-space-2);
+    grid-template-columns: minmax(0, 1fr) 128px max-content;
+    align-items: flex-end;
+    margin-top: var(--etch-space-2);
+}
+
+.etch-fonts-inline-field {
+    min-width: 0;
+}
+
+.etch-fonts-inline-field--small,
+.etch-fonts-inline-field--select {
+    min-width: 0;
+}
+
+.etch-fonts-code-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+    margin-bottom: var(--etch-space-4);
+}
+
+.etch-fonts-code-panel {
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    overflow: hidden;
+    background: var(--etch-surface);
+}
+
+.etch-fonts-code-panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--etch-surface-soft);
+    border-bottom: 1px solid var(--etch-border);
+}
+
+.etch-fonts-output {
+    width: 100%;
+    min-height: 164px;
+    resize: vertical;
+    border: 0;
+    box-shadow: none;
+    padding: 14px;
+    background: transparent;
+}
+
+.etch-fonts-toolbar {
+    align-items: center;
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: minmax(0, 320px);
+    margin-bottom: var(--etch-space-3);
+}
+
+.etch-fonts-search-field {
+    display: grid;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-library-tools {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: var(--etch-space-2);
+    margin-left: auto;
+    min-width: 0;
+    width: fit-content;
+    max-width: 100%;
+    flex: 0 0 auto;
+}
+
+.etch-fonts-search-field--compact {
+    flex: 0 0 520px;
+    width: 520px;
+}
+
+.etch-fonts-search-field--compact input {
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-import-shell {
+    margin-bottom: var(--etch-space-4);
+    padding: var(--etch-card-padding-tight);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface);
+    border: 1px solid var(--etch-border);
+}
+
+.etch-fonts-import-head {
+    display: grid;
+    gap: var(--etch-space-1);
+    margin-bottom: var(--etch-space-3);
+}
+
+.etch-fonts-add-font-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+    margin-bottom: var(--etch-space-3);
+}
+
+.etch-fonts-add-font-tab {
+    min-width: 0;
+    min-height: var(--etch-control-height);
+}
+
+.etch-fonts-add-font-tab.is-active {
+    background: var(--etch-accent);
+    border-color: var(--etch-accent);
+    color: #fff;
+}
+
+.etch-fonts-add-font-panel {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-google-shell {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-google-access,
+.etch-fonts-search-shell,
+.etch-fonts-import-panel {
+    min-width: 0;
+    padding: var(--etch-card-padding-tight);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface-soft);
+}
+
+.etch-fonts-google-access,
+.etch-fonts-search-shell,
+.etch-fonts-import-panel {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-google-access-head,
+.etch-fonts-panel-head {
+    display: grid;
+    gap: 6px;
+}
+
+.etch-fonts-google-access-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    flex-wrap: wrap;
+}
+
+.etch-fonts-google-access-head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--etch-space-2);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.etch-fonts-google-access-title-row h4,
+.etch-fonts-panel-head h4 {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.3;
+}
+
+.etch-fonts-google-access-grid {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-google-access-panel {
+    display: grid;
+    gap: var(--etch-space-3);
+    padding-top: var(--etch-space-2);
+    border-top: 1px solid var(--etch-border);
+}
+
+/* Google import and local upload */
+.etch-fonts-google-access-form {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-google-access-footer {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: start;
+}
+
+.etch-fonts-google-access-meta {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.etch-fonts-google-access-meta p {
+    margin: 0;
+}
+
+.etch-fonts-google-workflow {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: minmax(320px, 1.02fr) minmax(320px, 0.98fr);
+}
+
+.etch-fonts-import-copy h3 {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.3;
+}
+
+.etch-fonts-import-copy p {
+    margin: 0;
+    max-width: 720px;
+}
+
+.etch-fonts-import-grid {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+}
+
+.etch-fonts-search-shell {
+    align-content: start;
+}
+
+.etch-fonts-upload-shell {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-upload-intro {
+    display: grid;
+    gap: var(--etch-space-2);
+    margin: 0;
+}
+
+.etch-fonts-upload-intro p {
+    margin: 0;
+}
+
+.etch-fonts-upload-tip {
+    display: grid;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1px solid rgba(34, 113, 177, 0.16);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-accent-soft);
+}
+
+.etch-fonts-upload-tip strong {
+    color: var(--etch-text);
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.etch-fonts-upload-tip span {
+    color: var(--etch-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.etch-fonts-upload-form {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-upload-groups {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-upload-group {
+    display: grid;
+    gap: var(--etch-space-3);
+    padding: var(--etch-card-padding-tight);
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface-soft);
+}
+
+.etch-fonts-upload-group-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    flex-wrap: wrap;
+}
+
+.etch-fonts-upload-group-fields {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 0.8fr);
+    flex: 1 1 640px;
+    min-width: 0;
+}
+
+.etch-fonts-upload-group-remove {
+    min-height: var(--etch-control-height);
+    white-space: nowrap;
+}
+
+.etch-fonts-upload-face-headings,
+.etch-fonts-upload-face-grid {
+    display: grid;
+    align-items: end;
+    gap: var(--etch-space-3);
+    grid-template-columns:
+        minmax(280px, 1.6fr)
+        minmax(110px, 0.65fr)
+        minmax(120px, 0.7fr)
+        auto;
+}
+
+.etch-fonts-upload-face-headings {
+    padding: 0 0 0 var(--etch-space-1);
+    color: var(--etch-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.etch-fonts-upload-face-list {
+    display: grid;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-upload-face-row {
+    display: grid;
+    gap: var(--etch-space-2);
+    padding: var(--etch-space-3);
+    border: 1px solid rgba(208, 215, 222, 0.82);
+    border-radius: var(--etch-radius-control);
+    background: var(--etch-surface);
+}
+
+.etch-fonts-upload-file-field {
+    min-width: 0;
+}
+
+.etch-fonts-upload-file-picker {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    min-height: var(--etch-control-height);
+    padding: 4px;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-control);
+    background: var(--etch-surface);
+    min-width: 0;
+}
+
+.etch-fonts-upload-file-picker:focus-within {
+    border-color: var(--etch-accent);
+    box-shadow: var(--etch-shadow-focus);
+}
+
+.etch-fonts-upload-native-file {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.etch-fonts-upload-file-button,
+.etch-fonts-upload-file-name {
+    pointer-events: none;
+}
+
+.etch-fonts-upload-file-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(var(--etch-control-height) - 10px);
+    padding: 0 14px;
+    border: 1px solid var(--etch-border);
+    border-radius: calc(var(--etch-radius-control) - 1px);
+    background: var(--etch-surface-soft);
+    color: var(--etch-text);
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.etch-fonts-upload-file-name {
+    min-width: 0;
+    padding: 0 14px;
+    color: var(--etch-text-muted);
+    font-size: 14px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.etch-fonts-upload-face-row.has-file .etch-fonts-upload-file-name {
+    color: var(--etch-text);
+}
+
+.etch-fonts-upload-row-remove {
+    min-height: var(--etch-control-height);
+    min-width: 116px;
+}
+
+.etch-fonts-upload-row-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    min-height: 24px;
+}
+
+.etch-fonts-upload-detected {
+    min-height: var(--etch-control-height);
+    padding-inline: 14px;
+    border-style: dashed;
+    white-space: normal;
+}
+
+.etch-fonts-upload-row-status {
+    min-height: 20px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--etch-muted);
+    text-align: right;
+}
+
+.etch-fonts-upload-row-status.is-imported {
+    color: var(--etch-success);
+}
+
+.etch-fonts-upload-row-status.is-skipped {
+    color: var(--etch-muted);
+}
+
+.etch-fonts-upload-row-status.is-error {
+    color: var(--etch-danger);
+}
+
+.etch-fonts-upload-row-status.is-uploading,
+.etch-fonts-upload-row-status.is-queued {
+    color: var(--etch-text);
+}
+
+.etch-fonts-upload-group-actions {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.etch-fonts-upload-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--etch-space-3);
+    flex-wrap: wrap;
+}
+
+.etch-fonts-actions--upload-builder {
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-import-shell .button,
+.etch-fonts-import-shell a.button {
+    min-height: var(--etch-control-height);
+    padding: 0 var(--etch-space-4);
+}
+
+.etch-fonts-import-manual-grid {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.etch-fonts-import-note {
+    margin: 0;
+}
+
+.etch-fonts-search-results {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    margin-top: 14px;
+    align-content: start;
+    max-height: 320px;
+    overflow: auto;
+}
+
+.etch-fonts-search-card {
+    padding: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.etch-fonts-search-card h3 {
+    margin: 0 0 6px;
+}
+
+.etch-fonts-search-card.is-active {
+    border-color: var(--etch-accent);
+    background: var(--etch-accent-soft);
+}
+
+.etch-fonts-selected-wrap {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-selected-wrap--import {
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-selected-card {
+    padding: 12px;
+}
+
+.etch-fonts-variant-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 30px;
+}
+
+.etch-fonts-variant-list label {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-pill);
+    min-height: var(--etch-pill-height);
+    padding: 0 var(--etch-pill-padding-x);
+    background: var(--etch-surface);
+}
+
+.etch-fonts-import-status {
+    display: none;
+    gap: 10px;
+}
+
+.etch-fonts-import-status:not(:empty) {
+    display: grid;
+    padding: 12px 14px;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface-soft);
+}
+
+.etch-fonts-import-status-message {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.etch-fonts-import-status.is-progress {
+    color: var(--etch-text);
+}
+
+.etch-fonts-import-status.is-error {
+    background: #fff5f5;
+    border-color: rgba(214, 54, 56, 0.16);
+    color: var(--etch-danger);
+}
+
+.etch-fonts-import-status.is-success {
+    background: #f2fcf5;
+    border-color: rgba(0, 163, 42, 0.16);
+    color: var(--etch-success);
+}
+
+.etch-fonts-import-progress-track {
+    width: 100%;
+    height: 6px;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+}
+
+.etch-fonts-import-progress-bar {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--etch-accent);
+    transition: width 0.22s ease;
+}
+
+/* Upload responsive adjustments */
+@media (max-width: 1080px) {
+    .etch-fonts-import-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-upload-group-fields,
+    .etch-fonts-upload-face-headings,
+    .etch-fonts-upload-face-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 782px) {
+    .etch-fonts-upload-group-fields,
+    .etch-fonts-upload-face-headings,
+    .etch-fonts-upload-face-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-upload-actions {
+        align-items: stretch;
+    }
+
+    .etch-fonts-upload-row-foot {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .etch-fonts-upload-file-picker {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .etch-fonts-upload-file-button {
+        justify-self: flex-start;
+    }
+
+    .etch-fonts-upload-file-name {
+        padding: 0 4px 4px;
+    }
+
+    .etch-fonts-upload-row-status {
+        text-align: left;
+    }
+}
+
+/* Library inventory */
+.etch-fonts-library-grid {
+    display: grid;
+    align-items: start;
+    gap: var(--etch-space-4);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-actions--library {
+    justify-content: flex-end;
+    gap: var(--etch-space-2);
+    flex-wrap: nowrap;
+}
+
+.etch-fonts-actions--import {
+    justify-content: flex-start;
+}
+
+.etch-fonts-font-card {
+    display: grid;
+    align-content: start;
+    gap: var(--etch-space-3);
+    padding: var(--etch-card-padding-tight);
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-font-card.is-active {
+    border-color: rgba(34, 113, 177, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(34, 113, 177, 0.06), var(--etch-shadow-card);
+}
+
+.etch-fonts-font-card.is-expanded {
+    grid-column: 1 / -1;
+}
+
+.etch-fonts-row-head {
+    align-items: start;
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: 1fr;
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-font-card-main {
+    display: grid;
+    gap: var(--etch-space-3);
+    grid-template-columns: 1fr;
+    margin-bottom: 0;
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-font-card-top,
+.etch-fonts-font-primary,
+.etch-fonts-font-sidebar {
+    min-width: 0;
+}
+
+.etch-fonts-font-card-top {
+    display: grid;
+    gap: var(--etch-space-3);
+}
+
+.etch-fonts-font-card.is-expanded .etch-fonts-font-card-main {
+    gap: var(--etch-panel-gap);
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+}
+
+.etch-fonts-font-card.is-expanded .etch-fonts-font-card-top {
+    display: contents;
+}
+
+.etch-fonts-font-primary {
+    display: grid;
+    gap: var(--etch-space-2);
+    align-content: start;
+}
+
+.etch-fonts-font-loaded {
+    display: grid;
+    gap: 6px;
+}
+
+.etch-fonts-font-sidebar {
+    display: grid;
+    gap: var(--etch-space-2);
+    align-content: start;
+}
+
+.etch-fonts-font-identity {
+    display: grid;
+    gap: var(--etch-space-2);
+    min-width: 0;
+}
+
+.etch-fonts-font-identity-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--etch-space-2);
+    min-width: 0;
+}
+
+.etch-fonts-font-card h3 {
+    margin: 0;
+    line-height: 1.1;
+}
+
+.etch-fonts-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--etch-space-2);
+    justify-content: flex-end;
+}
+
+.etch-fonts-badge,
+.etch-fonts-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--etch-space-2);
+    min-height: var(--etch-pill-height);
+    padding: 0 9px;
+    border-radius: var(--etch-radius-pill);
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.etch-fonts-badge.is-role {
+    background: var(--etch-accent-soft);
+    border-color: rgba(34, 113, 177, 0.2);
+    color: var(--etch-accent);
+}
+
+.etch-fonts-badge.is-success {
+    background: #f2fcf5;
+    border-color: rgba(0, 163, 42, 0.18);
+    color: var(--etch-success);
+}
+
+.etch-fonts-badge.is-warning {
+    background: #fcf9e8;
+    border-color: rgba(153, 104, 0, 0.18);
+    color: var(--etch-warning);
+}
+
+.etch-fonts-badge.is-danger {
+    background: #fff5f5;
+    border-color: rgba(214, 54, 56, 0.16);
+    color: var(--etch-danger);
+}
+
+.etch-fonts-family-meta {
+    align-content: start;
+    display: grid;
+    gap: var(--etch-space-2);
+    justify-content: stretch;
+    min-width: 0;
+    width: 100%;
+}
+
+.etch-fonts-family-fallback-form {
+    display: grid;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-inline-field-row {
+    display: grid;
+    gap: var(--etch-space-2);
+    grid-template-columns: minmax(0, 1fr) 112px;
+    align-items: end;
+}
+
+.etch-fonts-admin .etch-fonts-family-fallback-save.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--etch-control-height);
+    height: var(--etch-control-height);
+    width: 100%;
+    padding: 0 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.etch-fonts-stack-chip {
+    display: grid;
+    gap: var(--etch-space-1);
+    min-width: 0;
+}
+
+.etch-fonts-face-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.etch-fonts-face-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 0 8px;
+    border: 1px solid #dcdcde;
+    border-radius: var(--etch-radius-pill);
+    background: #fff;
+    color: #50575e;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.etch-fonts-face-pill.is-muted {
+    background: var(--etch-surface-soft);
+}
+
+.etch-fonts-font-actions {
+    display: grid;
+    gap: var(--etch-space-2);
+}
+
+.etch-fonts-font-card.is-saving {
+    opacity: 0.72;
+}
+
+.etch-fonts-font-actions-primary {
+    display: grid;
+    gap: var(--etch-space-2);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.etch-fonts-font-actions-secondary {
+    display: grid;
+    gap: var(--etch-space-2);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+}
+
+.etch-fonts-font-actions-primary .button,
+.etch-fonts-font-actions-secondary .button {
+    width: 100%;
+    min-height: var(--etch-button-height-small);
+}
+
+.etch-fonts-button-danger {
+    border-color: #d63638;
+    color: #d63638;
+}
+
+.etch-fonts-button-danger:hover,
+.etch-fonts-button-danger:focus {
+    border-color: #b32d2e;
+    color: #b32d2e;
+}
+
+.etch-fonts-delete-form {
+    margin: 0;
+}
+
+.etch-fonts-delete-form .button {
+    width: 100%;
+}
+
+.etch-fonts-family-details {
+    display: grid;
+    gap: var(--etch-space-3);
+    margin-top: var(--etch-space-2);
+    padding-top: var(--etch-space-3);
+    border-top: 1px solid var(--etch-border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.etch-fonts-table {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--etch-border);
+    min-width: 960px;
+}
+
+.etch-fonts-table th,
+.etch-fonts-table td {
+    vertical-align: top;
+}
+
+.etch-fonts-face-preview-cell {
+    min-width: 240px;
+}
+
+.etch-fonts-face-preview {
+    min-width: 220px;
+    max-width: 280px;
+    padding: 10px 12px;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-control);
+    background: var(--etch-surface-soft);
+    color: var(--etch-text);
+    font-size: 17px;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+}
+
+.etch-fonts-file-path + .etch-fonts-file-path {
+    margin-top: 8px;
+}
+
+/* Activity log and empty states */
+.etch-fonts-log-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.etch-fonts-log-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px 0;
+}
+
+.etch-fonts-log-item + .etch-fonts-log-item {
+    border-top: 1px solid var(--etch-border);
+}
+
+.etch-fonts-log-marker {
+    width: 10px;
+    height: 10px;
+    margin-top: 6px;
+    border-radius: 999px;
+    background: var(--etch-accent);
+    box-shadow: 0 0 0 4px rgba(34, 113, 177, 0.08);
+}
+
+.etch-fonts-log-content {
+    min-width: 0;
+}
+
+.etch-fonts-activity-more {
+    margin-top: var(--etch-space-3);
+}
+
+.etch-fonts-log-list--older {
+    margin-top: var(--etch-space-3);
+    padding-top: var(--etch-space-2);
+    border-top: 1px solid var(--etch-border);
+}
+
+.etch-fonts-log-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.etch-fonts-log-time {
+    font-size: 12px;
+    margin-bottom: 0;
+}
+
+.etch-fonts-log-actor {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--etch-border);
+    border-radius: var(--etch-radius-pill);
+    background: var(--etch-surface-soft);
+    color: var(--etch-text-muted);
+    font-size: 12px;
+    line-height: 1;
+}
+
+.etch-fonts-empty {
+    color: var(--etch-text-muted);
+    padding: 8px 0;
+}
+
+.etch-fonts-empty-state {
+    padding: 26px;
+    text-align: center;
+    border: 1px dashed var(--etch-border);
+    border-radius: var(--etch-radius-card);
+    background: var(--etch-surface-soft);
+}
+
+/* Shared controls */
+.etch-fonts-admin a.button,
+.etch-fonts-admin .button {
+    align-items: center;
+    border-radius: var(--etch-radius-control);
+    box-sizing: border-box;
+    display: inline-flex;
+    gap: 6px;
+    justify-content: center;
+    line-height: 1.2;
+    min-height: var(--etch-button-height);
+    padding: 0 var(--etch-space-4);
+    text-align: center;
+    text-decoration: none;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.etch-fonts-admin .button.button-primary,
+.etch-fonts-admin .button-primary {
+    box-shadow: none;
+}
+
+.etch-fonts-admin .button.button-small {
+    min-height: var(--etch-button-height-small);
+    padding: 0 12px;
+}
+
+.etch-fonts-hero-actions > *,
+.etch-fonts-actions > *,
+.etch-fonts-role-actions > *,
+.etch-fonts-settings-actions > * {
+    flex-shrink: 0;
+}
+
+.etch-fonts-admin a.button,
+.etch-fonts-admin .button-link,
+.etch-fonts-admin button,
+.etch-fonts-admin input,
+.etch-fonts-admin select,
+.etch-fonts-code-tab {
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.etch-fonts-admin a.button:focus,
+.etch-fonts-admin .button:focus,
+.etch-fonts-admin .button-link:focus,
+.etch-fonts-admin button:focus,
+.etch-fonts-admin input:focus,
+.etch-fonts-admin select:focus,
+.etch-fonts-code-tab:focus,
+.etch-fonts-preview-tab:focus {
+    border-color: var(--etch-accent);
+    box-shadow: var(--etch-shadow-focus);
+    outline: none;
+}
+
+/* Responsive layout */
+@media (max-width: 1200px) {
+    .etch-fonts-import-grid,
+    .etch-fonts-google-workflow {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-library-grid,
+    .etch-fonts-preview-support-grid,
+    .etch-fonts-preview-card-gallery {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .etch-fonts-overview-head {
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+
+    .etch-fonts-hero-copy {
+        flex: 1 1 auto;
+        max-width: none;
+        width: 100%;
+    }
+
+    .etch-fonts-preview-specimen-board {
+        grid-template-columns: minmax(120px, 0.42fr) minmax(0, 1fr);
+    }
+
+    .etch-fonts-preview-specimen-copy {
+        grid-column: 1 / -1;
+    }
+
+    .etch-fonts-preview-reading-layout,
+    .etch-fonts-preview-ui-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 960px) {
+    .etch-fonts-metrics,
+    .etch-fonts-diagnostics-grid,
+    .etch-fonts-role-grid,
+    .etch-fonts-grid-two,
+    .etch-fonts-import-manual-grid,
+    .etch-fonts-selected-wrap {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .etch-fonts-role-fields,
+    .etch-fonts-preview-controls,
+    .etch-fonts-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-google-access-footer {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-google-access-head-actions {
+        justify-content: flex-start;
+    }
+
+    .etch-fonts-role-toolbar {
+        align-items: start;
+        flex-direction: column;
+    }
+
+    .etch-fonts-font-card.is-expanded .etch-fonts-font-card-main {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-font-card.is-expanded .etch-fonts-font-card-top {
+        display: grid;
+    }
+
+    .etch-fonts-font-sidebar,
+    .etch-fonts-font-actions {
+        width: min(100%, var(--etch-action-cluster-width));
+    }
+
+    .etch-fonts-preview-ui-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-preview-specimen-board,
+    .etch-fonts-preview-card-gallery,
+    .etch-fonts-preview-support-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-library-tools {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .etch-fonts-search-field--compact {
+        flex: 1 1 320px;
+        width: auto;
+        min-width: 0;
+    }
+
+    .etch-fonts-preview-specimen-rail,
+    .etch-fonts-font-preview-aside {
+        gap: 10px;
+    }
+
+    .etch-fonts-preview-specimen-scale,
+    .etch-fonts-font-preview-scale {
+        gap: 8px;
+    }
+
+    .etch-fonts-preview-specimen-copy-row {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-preview-card-body,
+    .etch-fonts-preview-reading-sheet,
+    .etch-fonts-preview-ui-shell {
+        padding: 18px;
+    }
+
+    .etch-fonts-preview-card-media {
+        min-height: 168px;
+    }
+
+    .etch-fonts-preview-card-actions .button {
+        flex: 1 1 120px;
+    }
+}
+
+@media (max-width: 782px) {
+    .etch-fonts-card,
+    .etch-fonts-font-card {
+        padding: 20px;
+    }
+
+    .etch-fonts-overview-head,
+    .etch-fonts-card-head {
+        flex-direction: column;
+    }
+
+    .etch-fonts-settings-head,
+    .etch-fonts-settings-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-card-head {
+        align-items: stretch;
+    }
+
+    .etch-fonts-metrics,
+    .etch-fonts-diagnostics-grid,
+    .etch-fonts-role-grid,
+    .etch-fonts-grid-two,
+    .etch-fonts-import-manual-grid,
+    .etch-fonts-selected-wrap {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-library-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-font-sidebar,
+    .etch-fonts-family-meta,
+    .etch-fonts-font-actions {
+        max-width: none;
+        width: 100%;
+    }
+
+    .etch-fonts-library-tools {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .etch-fonts-search-field--compact {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+
+    .etch-fonts-actions--library {
+        flex-wrap: wrap;
+    }
+
+    .etch-fonts-role-fields,
+    .etch-fonts-preview-controls,
+    .etch-fonts-toolbar,
+    .etch-fonts-grid-two,
+    .etch-fonts-import-manual-grid,
+    .etch-fonts-selected-wrap {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-font-actions-primary,
+    .etch-fonts-font-actions-secondary {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-inline-field-row {
+        grid-template-columns: 1fr;
+    }
+
+    .etch-fonts-font-identity-top {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .etch-fonts-badges {
+        justify-content: flex-start;
+    }
+
+    .etch-fonts-settings-buttons,
+    .etch-fonts-preview-card-footer,
+    .etch-fonts-preview-ui-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .etch-fonts-code-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+}
