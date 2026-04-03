@@ -1,0 +1,56 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate plugin version matches tag
+        shell: bash
+        run: |
+          tag_name="${GITHUB_REF_NAME}"
+          plugin_version="$(sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r')"
+
+          if [ -z "${plugin_version}" ]; then
+            echo "Could not read plugin version from plugin.php" >&2
+            exit 1
+          fi
+
+          if [ "${tag_name}" != "${plugin_version}" ]; then
+            echo "Tag ${tag_name} does not match plugin version ${plugin_version}" >&2
+            exit 1
+          fi
+
+      - name: Build plugin zip
+        id: build
+        shell: bash
+        run: |
+          zip_name="etch-fonts-${GITHUB_REF_NAME}.zip"
+          git archive \
+            --format=zip \
+            --worktree-attributes \
+            --prefix=etch-fonts/ \
+            -o "${zip_name}" \
+            "${GITHUB_SHA}"
+
+          echo "zip_name=${zip_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Etch Custom Fonts ${{ github.ref_name }}
+          files: ${{ steps.build.outputs.zip_name }}
+          generate_release_notes: true

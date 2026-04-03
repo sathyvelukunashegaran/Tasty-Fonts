@@ -1,0 +1,7 @@
+/.gitattributes export-ignore
+/.DS_Store export-ignore
+/.github export-ignore
+/.gitignore export-ignore
+/.playwright-cli export-ignore
+/output export-ignore
+/tests export-ignore
