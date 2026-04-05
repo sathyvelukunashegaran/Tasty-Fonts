@@ -22,6 +22,8 @@ final class AdminPageRenderer
         $logs = is_array($context['logs'] ?? null) ? $context['logs'] : [];
         $activityActorOptions = is_array($context['activity_actor_options'] ?? null) ? $context['activity_actor_options'] : [];
         $familyFallbacks = is_array($context['family_fallbacks'] ?? null) ? $context['family_fallbacks'] : [];
+        $familyFontDisplays = is_array($context['family_font_displays'] ?? null) ? $context['family_font_displays'] : [];
+        $familyFontDisplayOptions = is_array($context['family_font_display_options'] ?? null) ? $context['family_font_display_options'] : [];
         $previewText = (string) ($context['preview_text'] ?? '');
         $previewSize = (int) ($context['preview_size'] ?? 32);
         $googleApiState = (string) ($context['google_api_state'] ?? 'empty');
@@ -42,6 +44,7 @@ final class AdminPageRenderer
         $adobeAccessCopy = (string) ($context['adobe_access_copy'] ?? '');
         $adobeProjectLink = (string) ($context['adobe_project_link'] ?? 'https://fonts.adobe.com/');
         $adobeDetectedFamilies = is_array($context['adobe_detected_families'] ?? null) ? $context['adobe_detected_families'] : [];
+        $bunnyCatalogLink = 'https://fonts.bunny.net/';
         $googleAccessButtonLabel = $googleApiEnabled ? __('Edit Key', 'tasty-fonts') : __('Key Settings', 'tasty-fonts');
         $adobeAccessButtonLabel = $adobeProjectSaved ? __('Project Settings', 'tasty-fonts') : __('Add Project', 'tasty-fonts');
         $fontDisplay = (string) ($context['font_display'] ?? 'optional');
@@ -52,6 +55,7 @@ final class AdminPageRenderer
         $diagnosticItems = is_array($context['diagnostic_items'] ?? null) ? $context['diagnostic_items'] : [];
         $overviewMetrics = is_array($context['overview_metrics'] ?? null) ? $context['overview_metrics'] : [];
         $outputPanels = is_array($context['output_panels'] ?? null) ? $context['output_panels'] : [];
+        $generatedCssPanel = is_array($context['generated_css_panel'] ?? null) ? $context['generated_css_panel'] : [];
         $previewPanels = is_array($context['preview_panels'] ?? null) ? $context['preview_panels'] : [];
         $toasts = is_array($context['toasts'] ?? null) ? $context['toasts'] : [];
         $applyEverywhere = !empty($context['apply_everywhere']);
@@ -313,7 +317,7 @@ final class AdminPageRenderer
                                             >
                                                 <?php esc_html_e('Advanced Tools', 'tasty-fonts'); ?>
                                             </button>
-                                            <?php $this->renderHelpTip(__('Open the preview, snippets, system details, and output settings panels for the current role pairing.', 'tasty-fonts'), __('Advanced Tools', 'tasty-fonts')); ?>
+                                            <?php $this->renderHelpTip(__('Open the preview, snippets, generated CSS, system details, and output settings panels for the current role pairing.', 'tasty-fonts'), __('Advanced Tools', 'tasty-fonts')); ?>
                                         </div>
                                     </div>
                                 </div>
@@ -347,6 +351,19 @@ final class AdminPageRenderer
                                         role="tab"
                                     >
                                         <?php esc_html_e('Snippets', 'tasty-fonts'); ?>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="tasty-fonts-studio-tab tasty-fonts-tab-button"
+                                        id="tasty-fonts-studio-tab-generated"
+                                        data-tab-group="studio"
+                                        data-tab-target="generated"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                        aria-controls="tasty-fonts-studio-panel-generated"
+                                        role="tab"
+                                    >
+                                        <?php esc_html_e('Generated CSS', 'tasty-fonts'); ?>
                                     </button>
                                     <button
                                         type="button"
@@ -469,13 +486,25 @@ final class AdminPageRenderer
                                                 aria-labelledby="<?php echo esc_attr($buttonId); ?>"
                                                 <?php echo !empty($panel['active']) ? '' : 'hidden'; ?>
                                             >
-                                                <div class="tasty-fonts-code-panel-head">
-                                                    <span><?php echo esc_html((string) ($panel['label'] ?? '')); ?></span>
-                                                    <button type="button" class="button button-small" data-copy-target="<?php echo esc_attr((string) ($panel['target'] ?? '')); ?>"><?php esc_html_e('Copy', 'tasty-fonts'); ?></button>
-                                                </div>
-                                                <textarea id="<?php echo esc_attr((string) ($panel['target'] ?? '')); ?>" class="tasty-fonts-output" readonly><?php echo esc_textarea((string) ($panel['value'] ?? '')); ?></textarea>
+                                                <?php $this->renderCodeEditor($panel); ?>
                                             </section>
                                         <?php endforeach; ?>
+                                    </div>
+                                </section>
+
+                                <section
+                                    id="tasty-fonts-studio-panel-generated"
+                                    class="tasty-fonts-studio-panel"
+                                    data-tab-group="studio"
+                                    data-tab-panel="generated"
+                                    role="tabpanel"
+                                    aria-labelledby="tasty-fonts-studio-tab-generated"
+                                    hidden
+                                >
+                                    <div class="tasty-fonts-code-card tasty-fonts-code-card--embedded">
+                                        <div class="tasty-fonts-code-panel is-active">
+                                            <?php $this->renderCodeEditor($generatedCssPanel); ?>
+                                        </div>
                                     </div>
                                 </section>
 
@@ -522,7 +551,7 @@ final class AdminPageRenderer
                                             <input type="hidden" name="tasty_fonts_save_settings" value="1">
                                             <div class="tasty-fonts-output-settings-list">
                                                 <label class="tasty-fonts-stack-field tasty-fonts-stack-field--output">
-                                                    <?php $this->renderFieldLabel(__('Font Display', 'tasty-fonts')); ?>
+                                                    <?php $this->renderFieldLabel(__('Default Font Display', 'tasty-fonts')); ?>
                                                     <span class="tasty-fonts-select-field">
                                                         <select id="tasty-fonts-font-display" name="font_display">
                                                             <?php foreach ($fontDisplayOptions as $option): ?>
@@ -532,7 +561,7 @@ final class AdminPageRenderer
                                                             <?php endforeach; ?>
                                                         </select>
                                                     </span>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('This value is written into every generated @font-face rule. Optional is the default because it avoids late font swaps and is usually the best LCP choice when your fallback metrics are close; choose Swap when the branded face should replace the fallback as soon as it loads.', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('This is the default value written into generated @font-face rules unless a family-level override is saved in the library. Optional stays the safest default for most sites because it avoids late swaps when fallback metrics are already close; choose Swap when a branded face should replace the fallback as soon as it loads.', 'tasty-fonts'); ?></span>
                                                 </label>
                                                 <input type="hidden" name="minify_css_output" value="0">
                                                 <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
@@ -546,7 +575,7 @@ final class AdminPageRenderer
                                                     <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                     <span class="tasty-fonts-toggle-copy">
                                                         <span class="tasty-fonts-toggle-title"><?php esc_html_e('Minify generated CSS', 'tasty-fonts'); ?></span>
-                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Compresses the generated stylesheet and the CSS shown in the Snippets tab to remove extra whitespace. Leave this on for production output; turn it off when you need readable CSS while auditing selectors, variables, or spacing.', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Compresses the generated stylesheet and the CSS shown in the Snippets and Generated CSS panels to remove extra whitespace. Leave this on for production output; turn it off when you need readable CSS while auditing selectors, variables, or spacing.', 'tasty-fonts'); ?></span>
                                                     </span>
                                                 </label>
                                                 <input type="hidden" name="preload_primary_fonts" value="0">
@@ -599,7 +628,7 @@ final class AdminPageRenderer
                             $this->renderSectionHeading(
                                 'h2',
                                 __('Local Library', 'tasty-fonts'),
-                                __('Browse every self-hosted family, assign roles, inspect files, or add fonts from Google and direct uploads.', 'tasty-fonts')
+                                __('Browse every self-hosted family, assign roles, inspect files, or add fonts from Google, Bunny, and direct uploads.', 'tasty-fonts')
                             );
                             ?>
                             <div class="tasty-fonts-library-tools">
@@ -625,6 +654,7 @@ final class AdminPageRenderer
                                             <option value="all"><?php esc_html_e('All Fonts', 'tasty-fonts'); ?></option>
                                             <option value="used"><?php esc_html_e('In Use', 'tasty-fonts'); ?></option>
                                             <option value="google"><?php esc_html_e('Google Fonts', 'tasty-fonts'); ?></option>
+                                            <option value="bunny"><?php esc_html_e('Bunny Fonts', 'tasty-fonts'); ?></option>
                                             <option value="uploaded"><?php esc_html_e('File Uploads', 'tasty-fonts'); ?></option>
                                             <option value="adobe"><?php esc_html_e('Adobe Fonts', 'tasty-fonts'); ?></option>
                                         </select>
@@ -654,6 +684,7 @@ final class AdminPageRenderer
                         <div id="tasty-fonts-add-font-panel" class="tasty-fonts-import-shell" hidden>
                             <div class="tasty-fonts-add-font-tabs tasty-fonts-tab-list" role="tablist" aria-label="<?php esc_attr_e('Add font source', 'tasty-fonts'); ?>" aria-orientation="horizontal">
                                 <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button is-active" id="tasty-fonts-add-font-tab-google" data-tab-group="add-font" data-tab-target="google" aria-selected="true" tabindex="0" aria-controls="tasty-fonts-add-font-panel-google" role="tab"><?php esc_html_e('Google Fonts', 'tasty-fonts'); ?></button>
+                                <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button" id="tasty-fonts-add-font-tab-bunny" data-tab-group="add-font" data-tab-target="bunny" aria-selected="false" tabindex="-1" aria-controls="tasty-fonts-add-font-panel-bunny" role="tab"><?php esc_html_e('Bunny Fonts', 'tasty-fonts'); ?></button>
                                 <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button" id="tasty-fonts-add-font-tab-adobe" data-tab-group="add-font" data-tab-target="adobe" aria-selected="false" tabindex="-1" aria-controls="tasty-fonts-add-font-panel-adobe" role="tab"><?php esc_html_e('Adobe Fonts', 'tasty-fonts'); ?></button>
                                 <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button" id="tasty-fonts-add-font-tab-upload" data-tab-group="add-font" data-tab-target="upload" aria-selected="false" tabindex="-1" aria-controls="tasty-fonts-add-font-panel-upload" role="tab"><?php esc_html_e('Upload Files', 'tasty-fonts'); ?></button>
                             </div>
@@ -837,6 +868,123 @@ final class AdminPageRenderer
                                     </div>
                                 </section>
 
+                                <section class="tasty-fonts-add-font-panel" id="tasty-fonts-add-font-panel-bunny" data-tab-group="add-font" data-tab-panel="bunny" role="tabpanel" aria-labelledby="tasty-fonts-add-font-tab-bunny" hidden>
+                                    <div class="tasty-fonts-source-shell tasty-fonts-source-shell--bunny">
+                                        <section class="tasty-fonts-source-card tasty-fonts-source-card--status">
+                                            <div class="tasty-fonts-source-status-row">
+                                                <div class="tasty-fonts-source-status-copy">
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source Setup', 'tasty-fonts'); ?></span>
+                                                    <div class="tasty-fonts-source-status-title-row">
+                                                        <h4><?php esc_html_e('Bunny Fonts', 'tasty-fonts'); ?></h4>
+                                                    </div>
+                                                    <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php esc_html_e('Use Bunny Fonts as a privacy-friendly source, then store the downloaded WOFF2 files locally in uploads/fonts so runtime CSS stays self-hosted.', 'tasty-fonts'); ?></p>
+                                                </div>
+                                                <div class="tasty-fonts-source-status-actions">
+                                                    <span class="tasty-fonts-badge is-success"><?php esc_html_e('No Key Needed', 'tasty-fonts'); ?></span>
+                                                </div>
+                                            </div>
+
+                                            <aside class="tasty-fonts-access-note tasty-fonts-access-note--external">
+                                                <span class="tasty-fonts-access-note-label"><?php esc_html_e('Browse on Bunny', 'tasty-fonts'); ?></span>
+                                                <p class="tasty-fonts-muted"><?php esc_html_e('Search Bunny’s public catalog in a new tab, then paste the family name here to import and self-host it locally.', 'tasty-fonts'); ?></p>
+                                                <a class="tasty-fonts-access-link" href="<?php echo esc_url($bunnyCatalogLink); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Open Bunny Fonts Catalog', 'tasty-fonts'); ?></a>
+                                            </aside>
+                                        </section>
+
+                                        <div class="tasty-fonts-google-workflow">
+                                            <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-search-shell">
+                                                <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 1', 'tasty-fonts'); ?></span>
+                                                    <h4><?php esc_html_e('Find a Family', 'tasty-fonts'); ?></h4>
+                                                </div>
+
+                                                <label class="tasty-fonts-stack-field">
+                                                    <span class="screen-reader-text"><?php esc_html_e('Search Bunny Fonts', 'tasty-fonts'); ?></span>
+                                                    <input
+                                                        type="search"
+                                                        id="tasty-fonts-bunny-search"
+                                                        class="regular-text"
+                                                        placeholder="<?php esc_attr_e('Search Bunny Fonts families', 'tasty-fonts'); ?>"
+                                                    >
+                                                </label>
+
+                                                <div id="tasty-fonts-bunny-results" class="tasty-fonts-search-results" aria-live="polite"></div>
+                                            </section>
+
+                                            <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--google tasty-fonts-import-panel--bunny">
+                                                <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 2', 'tasty-fonts'); ?></span>
+                                                    <h4><?php esc_html_e('Import Selected Files', 'tasty-fonts'); ?></h4>
+                                                </div>
+
+                                                <div class="tasty-fonts-import-manual-grid">
+                                                    <label class="tasty-fonts-stack-field">
+                                                        <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
+                                                        <input type="text" id="tasty-fonts-bunny-family" class="regular-text" placeholder="<?php esc_attr_e('e.g. Inter', 'tasty-fonts'); ?>">
+                                                    </label>
+                                                    <label class="tasty-fonts-stack-field">
+                                                        <?php $this->renderFieldLabel(__('Manual Variants', 'tasty-fonts')); ?>
+                                                        <input type="text" id="tasty-fonts-bunny-variants" class="regular-text" placeholder="<?php esc_attr_e('Leave blank, or enter regular,700italic', 'tasty-fonts'); ?>">
+                                                    </label>
+                                                </div>
+
+                                                <div class="tasty-fonts-selected-wrap tasty-fonts-selected-wrap--import">
+                                                    <div class="tasty-fonts-selected-card tasty-fonts-selected-card--import-family">
+                                                        <div class="tasty-fonts-import-card-head">
+                                                            <div class="tasty-fonts-import-card-copy">
+                                                                <?php $this->renderFieldLabel(__('Selected Family', 'tasty-fonts')); ?>
+                                                                <div id="tasty-fonts-bunny-selected-family" class="tasty-fonts-import-selected-name"><?php esc_html_e('Choose a Bunny family or type one manually.', 'tasty-fonts'); ?></div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="tasty-fonts-import-preview-shell">
+                                                            <span class="tasty-fonts-import-preview-label"><?php esc_html_e('Live Preview', 'tasty-fonts'); ?></span>
+                                                            <div id="tasty-fonts-bunny-selected-family-preview" class="tasty-fonts-import-selected-preview is-placeholder"><?php esc_html_e('Preview appears here after you choose a Bunny family.', 'tasty-fonts'); ?></div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="tasty-fonts-selected-card tasty-fonts-selected-card--import-variants">
+                                                        <div class="tasty-fonts-import-card-head">
+                                                            <div class="tasty-fonts-import-card-copy">
+                                                                <?php $this->renderFieldLabel(__('Variants to Import', 'tasty-fonts')); ?>
+                                                                <p class="tasty-fonts-import-variant-note tasty-fonts-muted"><?php esc_html_e('Click chips or type a comma-separated list above. Both stay in sync.', 'tasty-fonts'); ?></p>
+                                                            </div>
+                                                            <div class="tasty-fonts-import-card-meta">
+                                                                <div id="tasty-fonts-bunny-import-selection-summary" class="tasty-fonts-import-selection-summary"><?php esc_html_e('0 Variants Selected', 'tasty-fonts'); ?></div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="tasty-fonts-import-variant-toolbar">
+                                                            <div class="tasty-fonts-import-variant-actions">
+                                                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-bunny-variant-select="all"><?php esc_html_e('All', 'tasty-fonts'); ?></button>
+                                                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-bunny-variant-select="normal"><?php esc_html_e('Normal', 'tasty-fonts'); ?></button>
+                                                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-bunny-variant-select="italic"><?php esc_html_e('Italic', 'tasty-fonts'); ?></button>
+                                                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-bunny-variant-select="clear"><?php esc_html_e('Clear', 'tasty-fonts'); ?></button>
+                                                            </div>
+                                                        </div>
+                                                        <div id="tasty-fonts-bunny-variants-list" class="tasty-fonts-variant-list"></div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="tasty-fonts-import-footer">
+                                                    <div id="tasty-fonts-bunny-import-status" class="tasty-fonts-import-status" aria-live="polite"></div>
+
+                                                    <div class="tasty-fonts-actions tasty-fonts-actions--import">
+                                                        <button
+                                                            type="button"
+                                                            id="tasty-fonts-bunny-import-size-estimate"
+                                                            class="tasty-fonts-badge tasty-fonts-badge--interactive is-role"
+                                                            data-help-tooltip="<?php echo esc_attr__('The estimated transfer size only varies by family and subset.', 'tasty-fonts'); ?>"
+                                                            data-help-passive="1"
+                                                            aria-label="<?php esc_attr_e('Estimated transfer size information', 'tasty-fonts'); ?>"
+                                                            title="<?php echo esc_attr__('The estimated transfer size only varies by family and subset.', 'tasty-fonts'); ?>"
+                                                        ><?php esc_html_e('Approx. +0 KB WOFF2', 'tasty-fonts'); ?></button>
+                                                        <button type="button" class="button button-primary" id="tasty-fonts-bunny-import-submit"><?php esc_html_e('Import and Self-Host', 'tasty-fonts'); ?></button>
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        </div>
+                                    </div>
+                                </section>
+
                                 <section class="tasty-fonts-add-font-panel" id="tasty-fonts-add-font-panel-adobe" data-tab-group="add-font" data-tab-panel="adobe" role="tabpanel" aria-labelledby="tasty-fonts-add-font-tab-adobe" hidden>
                                     <div class="tasty-fonts-source-shell tasty-fonts-source-shell--adobe" data-source-state="<?php echo esc_attr($adobeProjectState); ?>">
                                         <section class="tasty-fonts-source-card tasty-fonts-source-card--status tasty-fonts-adobe-access">
@@ -986,7 +1134,7 @@ final class AdminPageRenderer
                             <div class="tasty-fonts-empty-state tasty-fonts-empty-state--rich tasty-fonts-empty-state--library">
                                 <div class="tasty-fonts-empty-state-body">
                                     <h3 class="tasty-fonts-empty-state-title"><?php esc_html_e('Your library is empty', 'tasty-fonts'); ?></h3>
-                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Import a Google family, connect an Adobe Fonts project, or upload local files to start building your library and assigning heading and body roles.', 'tasty-fonts'); ?></p>
+                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Import a Google or Bunny family, connect an Adobe Fonts project, or upload local files to start building your library and assigning heading and body roles.', 'tasty-fonts'); ?></p>
                                 </div>
                                 <div class="tasty-fonts-empty-state-actions">
                                     <button type="button" class="button button-primary" data-open-add-fonts aria-controls="tasty-fonts-add-font-panel"><?php esc_html_e('Add Fonts', 'tasty-fonts'); ?></button>
@@ -996,7 +1144,7 @@ final class AdminPageRenderer
                             <div id="tasty-fonts-library-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty-state" hidden><?php esc_html_e('No fonts match the current filters.', 'tasty-fonts'); ?></div>
                             <div class="tasty-fonts-library-grid">
                                 <?php foreach ($catalog as $family): ?>
-                                    <?php $this->renderFamilyRow($family, $roles, $familyFallbacks, $previewText); ?>
+                                    <?php $this->renderFamilyRow($family, $roles, $familyFallbacks, $familyFontDisplays, $familyFontDisplayOptions, $previewText); ?>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
@@ -1132,7 +1280,14 @@ final class AdminPageRenderer
         <?php
     }
 
-    private function renderFamilyRow(array $family, array $roles, array $familyFallbacks, string $previewText): void
+    private function renderFamilyRow(
+        array $family,
+        array $roles,
+        array $familyFallbacks,
+        array $familyFontDisplays,
+        array $familyFontDisplayOptions,
+        string $previewText
+    ): void
     {
         $familyName = (string) ($family['family'] ?? '');
         $familySlug = (string) ($family['slug'] ?? FontUtils::slugify($familyName));
@@ -1145,6 +1300,9 @@ final class AdminPageRenderer
         $deleteBlockedMessageBody = $this->buildDeleteBlockedMessage($familyName, false, true);
         $deleteBlockedMessageBoth = $this->buildDeleteBlockedMessage($familyName, true, true);
         $savedFallback = FontUtils::sanitizeFallback((string) ($familyFallbacks[$familyName] ?? 'sans-serif'));
+        $savedFontDisplay = (string) ($familyFontDisplays[$familyName] ?? '');
+        $currentFontDisplay = $savedFontDisplay !== '' ? $savedFontDisplay : 'inherit';
+        $supportsFontDisplayOverride = array_intersect((array) ($family['sources'] ?? []), ['local', 'google', 'bunny']) !== [];
         $defaultStack = FontUtils::buildFontStack($familyName, $savedFallback);
         $facePreviewText = $this->buildFacePreviewText($previewText);
         $faceSummaryLabels = $this->buildFamilyFaceSummaryLabels((array) ($family['faces'] ?? []));
@@ -1262,6 +1420,41 @@ final class AdminPageRenderer
                                     </div>
                                     <p class="tasty-fonts-family-fallback-feedback" data-family-fallback-feedback aria-live="polite" hidden></p>
                                 </form>
+
+                                <?php if ($supportsFontDisplayOverride): ?>
+                                    <form method="post" class="tasty-fonts-family-font-display-form" data-family-font-display-form>
+                                        <?php wp_nonce_field('tasty_fonts_save_family_font_display'); ?>
+                                        <input type="hidden" name="tasty_fonts_save_family_font_display" value="1">
+                                        <input type="hidden" name="tasty_fonts_family_name" value="<?php echo esc_attr($familyName); ?>">
+                                        <div class="tasty-fonts-inline-field-row">
+                                            <label class="tasty-fonts-inline-field tasty-fonts-inline-field--select">
+                                                <span class="tasty-fonts-field-label"><?php esc_html_e('Font Display', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-select-field">
+                                                    <select
+                                                        name="tasty_fonts_family_font_display"
+                                                        class="tasty-fonts-font-display-selector"
+                                                        data-font-family="<?php echo esc_attr($familyName); ?>"
+                                                        data-saved-value="<?php echo esc_attr($currentFontDisplay); ?>"
+                                                    >
+                                                        <?php foreach ($familyFontDisplayOptions as $option): ?>
+                                                            <option value="<?php echo esc_attr((string) ($option['value'] ?? '')); ?>" <?php selected($currentFontDisplay, (string) ($option['value'] ?? '')); ?>>
+                                                                <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </span>
+                                            </label>
+                                            <button
+                                                type="submit"
+                                                class="button tasty-fonts-family-font-display-save"
+                                                data-family-font-display-save
+                                            >
+                                                <?php esc_html_e('Save Display', 'tasty-fonts'); ?>
+                                            </button>
+                                        </div>
+                                        <p class="tasty-fonts-family-font-display-feedback" data-family-font-display-feedback aria-live="polite" hidden></p>
+                                    </form>
+                                <?php endif; ?>
                             </div>
 
                             <div class="tasty-fonts-font-actions">
@@ -1515,6 +1708,7 @@ final class AdminPageRenderer
         return match (strtolower(trim($source))) {
             'local' => __('Uploaded', 'tasty-fonts'),
             'google' => __('Google', 'tasty-fonts'),
+            'bunny' => __('Bunny', 'tasty-fonts'),
             'adobe' => __('Adobe', 'tasty-fonts'),
             default => ucfirst(trim($source)),
         };
@@ -2069,6 +2263,17 @@ final class AdminPageRenderer
                 <?php $this->renderHelpTip($help, $label); ?>
             <?php endif; ?>
         </span>
+        <?php
+    }
+
+    private function renderCodeEditor(array $panel): void
+    {
+        ?>
+        <div class="tasty-fonts-code-panel-head">
+            <span><?php echo esc_html((string) ($panel['label'] ?? '')); ?></span>
+            <button type="button" class="button button-small" data-copy-target="<?php echo esc_attr((string) ($panel['target'] ?? '')); ?>"><?php esc_html_e('Copy', 'tasty-fonts'); ?></button>
+        </div>
+        <textarea id="<?php echo esc_attr((string) ($panel['target'] ?? '')); ?>" class="tasty-fonts-output" readonly><?php echo esc_textarea((string) ($panel['value'] ?? '')); ?></textarea>
         <?php
     }
 

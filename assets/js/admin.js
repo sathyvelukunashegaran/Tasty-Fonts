@@ -34,19 +34,31 @@
     const librarySourceFilter = document.querySelector('[data-library-source-filter]');
     const libraryFilteredEmpty = document.getElementById('tasty-fonts-library-empty-filtered');
     const googleSearch = document.getElementById('tasty-fonts-google-search');
+    const bunnySearch = document.getElementById('tasty-fonts-bunny-search');
     const adobeProjectId = document.getElementById('tasty-fonts-adobe-project-id');
     const googleResults = document.getElementById('tasty-fonts-google-results');
+    const bunnyResults = document.getElementById('tasty-fonts-bunny-results');
     const manualFamily = document.getElementById('tasty-fonts-manual-family');
     const manualVariants = document.getElementById('tasty-fonts-manual-variants');
     const selectedFamily = document.getElementById('tasty-fonts-selected-family');
     const selectedFamilyPreview = document.getElementById('tasty-fonts-selected-family-preview');
+    const bunnyFamily = document.getElementById('tasty-fonts-bunny-family');
+    const bunnyVariants = document.getElementById('tasty-fonts-bunny-variants');
+    const bunnySelectedFamily = document.getElementById('tasty-fonts-bunny-selected-family');
+    const bunnySelectedFamilyPreview = document.getElementById('tasty-fonts-bunny-selected-family-preview');
     const importFilesEstimate = document.getElementById('tasty-fonts-import-files-estimate');
     const importSizeEstimate = document.getElementById('tasty-fonts-import-size-estimate');
     const importSelectionSummary = document.getElementById('tasty-fonts-import-selection-summary');
     const variantsWrap = document.getElementById('tasty-fonts-google-variants');
     const variantQuickSelectButtons = Array.from(document.querySelectorAll('[data-google-variant-select]'));
+    const bunnyImportSizeEstimate = document.getElementById('tasty-fonts-bunny-import-size-estimate');
+    const bunnyImportSelectionSummary = document.getElementById('tasty-fonts-bunny-import-selection-summary');
+    const bunnyVariantsWrap = document.getElementById('tasty-fonts-bunny-variants-list');
+    const bunnyVariantQuickSelectButtons = Array.from(document.querySelectorAll('[data-bunny-variant-select]'));
     const importButton = document.getElementById('tasty-fonts-import-submit');
     const importStatus = document.getElementById('tasty-fonts-import-status');
+    const bunnyImportButton = document.getElementById('tasty-fonts-bunny-import-submit');
+    const bunnyImportStatus = document.getElementById('tasty-fonts-bunny-import-status');
     const uploadForm = document.getElementById('tasty-fonts-upload-form');
     const uploadGroupsWrap = document.getElementById('tasty-fonts-upload-groups');
     const uploadGroupTemplate = document.getElementById('tasty-fonts-upload-group-template');
@@ -67,6 +79,11 @@
     let selectedSearchFamily = null;
     let searchResults = [];
     let searchTimer = 0;
+    let selectedBunnySearchFamily = null;
+    let bunnySearchResults = [];
+    let bunnySearchTimer = 0;
+    let bunnyFamilyLookupTimer = 0;
+    let bunnyFamilyLookupToken = 0;
     let importInFlight = false;
     let uploadInFlight = false;
     let activeHelpButton = null;
@@ -75,6 +92,8 @@
     let activeLibrarySourceFilter = 'all';
     let syncingGoogleVariants = false;
     let renderedGoogleVariantFamily = '';
+    let syncingBunnyVariants = false;
+    let renderedBunnyVariantFamily = '';
     let roleDraftSaveInFlight = false;
 
     // Shared helpers
@@ -135,8 +154,32 @@
         return document.getElementById('tasty-fonts-google-preview-stylesheet');
     }
 
+    function bunnyPreviewStylesheet() {
+        return document.getElementById('tasty-fonts-bunny-preview-stylesheet');
+    }
+
+    function bunnySearchPreviewStylesheet() {
+        return document.getElementById('tasty-fonts-bunny-search-preview-stylesheet');
+    }
+
     function removeGooglePreviewStylesheet() {
         const stylesheet = googlePreviewStylesheet();
+
+        if (stylesheet) {
+            stylesheet.remove();
+        }
+    }
+
+    function removeBunnyPreviewStylesheet() {
+        const stylesheet = bunnyPreviewStylesheet();
+
+        if (stylesheet) {
+            stylesheet.remove();
+        }
+    }
+
+    function removeBunnySearchPreviewStylesheet() {
+        const stylesheet = bunnySearchPreviewStylesheet();
 
         if (stylesheet) {
             stylesheet.remove();
@@ -181,6 +224,56 @@
             .trim();
     }
 
+    function normalizeHostedVariantTokens(value) {
+        return normalizeVariantTokens(value).filter((token) => /^(regular|italic|[1-9]00|[1-9]00italic)$/i.test(token));
+    }
+
+    function buildHostedCssAxes(variants) {
+        const axes = [];
+
+        normalizeHostedVariantTokens(Array.isArray(variants) ? variants.join(',') : variants).forEach((token) => {
+            const normalized = String(token).toLowerCase();
+
+            if (normalized === 'regular') {
+                axes.push('0,400');
+                return;
+            }
+
+            if (normalized === 'italic') {
+                axes.push('1,400');
+                return;
+            }
+
+            const match = normalized.match(/^([1-9]00)(italic)?$/);
+
+            if (!match) {
+                return;
+            }
+
+            axes.push(`${match[2] ? '1' : '0'},${match[1]}`);
+        });
+
+        return Array.from(new Set(axes));
+    }
+
+    function buildHostedCssUrl(baseUrl, family, variants) {
+        const familyName = String(family || '').trim();
+
+        if (!familyName) {
+            return '';
+        }
+
+        const familyQuery = encodeURIComponent(familyName).replace(/%20/g, '+');
+        const axes = buildHostedCssAxes(variants);
+        let url = `${baseUrl}?family=${familyQuery}`;
+
+        if (axes.length) {
+            url += `:ital,wght@${axes.join(';')}`;
+        }
+
+        return `${url}&display=swap`;
+    }
+
     function updateGooglePreviewStylesheet(items) {
         const families = Array.from(
             new Set(
@@ -209,6 +302,62 @@
         if (!stylesheet) {
             stylesheet = document.createElement('link');
             stylesheet.id = 'tasty-fonts-google-preview-stylesheet';
+            stylesheet.rel = 'stylesheet';
+            document.head.appendChild(stylesheet);
+        }
+
+        if (stylesheet.href !== href) {
+            stylesheet.href = href;
+        }
+    }
+
+    function updateBunnyPreviewStylesheet(family, variants) {
+        const href = buildHostedCssUrl('https://fonts.bunny.net/css2', family, variants);
+
+        if (!href) {
+            removeBunnyPreviewStylesheet();
+            return;
+        }
+
+        let stylesheet = bunnyPreviewStylesheet();
+
+        if (!stylesheet) {
+            stylesheet = document.createElement('link');
+            stylesheet.id = 'tasty-fonts-bunny-preview-stylesheet';
+            stylesheet.rel = 'stylesheet';
+            document.head.appendChild(stylesheet);
+        }
+
+        if (stylesheet.href !== href) {
+            stylesheet.href = href;
+        }
+    }
+
+    function updateBunnySearchPreviewStylesheet(items) {
+        const families = Array.from(
+            new Set(
+                (items || [])
+                    .map((item) => (item && item.family ? String(item.family).trim() : ''))
+                    .filter(Boolean)
+            )
+        ).slice(0, 8);
+
+        if (!families.length) {
+            removeBunnySearchPreviewStylesheet();
+            return;
+        }
+
+        const sample = googlePreviewText();
+        const queryParts = families.map((family) => `family=${encodeURIComponent(family).replace(/%20/g, '+')}`);
+        queryParts.push(`text=${encodeURIComponent(sample)}`);
+        queryParts.push('display=swap');
+
+        const href = `https://fonts.bunny.net/css2?${queryParts.join('&')}`;
+        let stylesheet = bunnySearchPreviewStylesheet();
+
+        if (!stylesheet) {
+            stylesheet = document.createElement('link');
+            stylesheet.id = 'tasty-fonts-bunny-search-preview-stylesheet';
             stylesheet.rel = 'stylesheet';
             document.head.appendChild(stylesheet);
         }
@@ -334,6 +483,10 @@
         return manualFamily ? manualFamily.value.trim() : '';
     }
 
+    function currentBunnyImportFamily() {
+        return bunnyFamily ? bunnyFamily.value.trim() : '';
+    }
+
     function normalizeFamilyKey(value) {
         return String(value || '').trim().toLowerCase();
     }
@@ -346,6 +499,36 @@
         }
 
         return searchResults.find((item) => String(item.family || '').trim().toLowerCase() === normalized) || null;
+    }
+
+    function matchesBunnyFamilyEntry(item, familyName) {
+        const normalized = normalizeFamilyKey(familyName);
+
+        if (!normalized || !item) {
+            return false;
+        }
+
+        const itemFamily = normalizeFamilyKey(item.family || '');
+        const itemSlug = normalizeFamilyKey(item.slug || '');
+        const spacedSlug = normalizeFamilyKey(String(item.slug || '').replace(/-/g, ' '));
+
+        return normalized === itemFamily || normalized === itemSlug || normalized === spacedSlug;
+    }
+
+    function findBunnyFamilyMatch(familyName) {
+        const normalized = normalizeFamilyKey(familyName);
+
+        if (!normalized) {
+            return null;
+        }
+
+        const exactSearchResult = bunnySearchResults.find((item) => matchesBunnyFamilyEntry(item, normalized)) || null;
+
+        if (exactSearchResult) {
+            return exactSearchResult;
+        }
+
+        return matchesBunnyFamilyEntry(selectedBunnySearchFamily, normalized) ? selectedBunnySearchFamily : null;
     }
 
     function approximateVariantTransferSize(variant, category) {
@@ -423,6 +606,10 @@
         return variantsWrap ? Array.from(variantsWrap.querySelectorAll('input[type="checkbox"]')) : [];
     }
 
+    function availableBunnyVariantInputs() {
+        return bunnyVariantsWrap ? Array.from(bunnyVariantsWrap.querySelectorAll('input[type="checkbox"]')) : [];
+    }
+
     function syncManualVariantsInputFromChips() {
         if (!manualVariants) {
             return;
@@ -461,6 +648,56 @@
 
         manualVariants.value = normalizedValues.join(',');
         syncingGoogleVariants = false;
+
+        return true;
+    }
+
+    function bunnySelectedVariantTokens() {
+        if (bunnyVariantsWrap && bunnyVariantsWrap.querySelectorAll('input').length > 0) {
+            return Array.from(bunnyVariantsWrap.querySelectorAll('input:checked')).map((input) => input.value);
+        }
+
+        return normalizeHostedVariantTokens(getElementValue(bunnyVariants, ''));
+    }
+
+    function syncBunnyManualVariantsInputFromChips() {
+        if (!bunnyVariants) {
+            return;
+        }
+
+        bunnyVariants.value = availableBunnyVariantInputs()
+            .filter((input) => input.checked)
+            .map((input) => input.value)
+            .join(',');
+    }
+
+    function syncBunnyVariantChipsFromManualInput() {
+        if (!bunnyVariants) {
+            return false;
+        }
+
+        const inputs = availableBunnyVariantInputs();
+
+        if (!inputs.length) {
+            return false;
+        }
+
+        const selectedTokens = new Set(normalizeHostedVariantTokens(bunnyVariants.value).map((token) => token.toLowerCase()));
+        const normalizedValues = [];
+
+        syncingBunnyVariants = true;
+
+        inputs.forEach((input) => {
+            input.checked = selectedTokens.has(String(input.value).toLowerCase());
+            syncVariantChipState(input);
+
+            if (input.checked) {
+                normalizedValues.push(input.value);
+            }
+        });
+
+        bunnyVariants.value = normalizedValues.join(',');
+        syncingBunnyVariants = false;
 
         return true;
     }
@@ -582,6 +819,74 @@
         updateGooglePreviewStylesheet(searchResults);
     }
 
+    function updateBunnyImportSummary() {
+        const familyName = currentBunnyImportFamily();
+        const matchedFamily = selectedBunnySearchFamily || findBunnyFamilyMatch(familyName);
+        const hasFamily = familyName !== '';
+        const previewText = googleSelectedPreviewText();
+        const variants = hasFamily ? Array.from(new Set(bunnySelectedVariantTokens())) : [];
+        const effectiveVariants = variants.length > 0 ? variants : (hasFamily ? ['regular'] : []);
+        const variantCount = variants.length;
+        const availableCount = matchedFamily && Array.isArray(matchedFamily.variants)
+            ? matchedFamily.variants.length
+            : 0;
+        const fallback = googlePreviewFallback(matchedFamily ? matchedFamily.category : '');
+        const estimatedKilobytes = effectiveVariants.reduce((total, variant) => {
+            return total + approximateVariantTransferSize(variant, matchedFamily ? matchedFamily.category : '');
+        }, 0);
+
+        if (bunnySelectedFamily) {
+            bunnySelectedFamily.textContent = familyName || getString('bunnyImportFamilyEmpty', 'Choose a Bunny family or type one manually.');
+        }
+
+        if (bunnySelectedFamilyPreview) {
+            const previewFamilyName = matchedFamily ? matchedFamily.family : familyName;
+
+            bunnySelectedFamilyPreview.textContent = hasFamily
+                ? previewText
+                : getString('bunnyImportPreviewEmpty', 'Preview appears here after you choose a Bunny family.');
+            bunnySelectedFamilyPreview.classList.toggle('is-placeholder', !hasFamily);
+            bunnySelectedFamilyPreview.style.fontFamily = hasFamily ? `"${previewFamilyName}", ${fallback}` : '';
+        }
+
+        if (bunnyImportSizeEstimate) {
+            bunnyImportSizeEstimate.textContent = formatMessage(
+                getString('importEstimateSize', 'Approx. +%1$s WOFF2'),
+                [formatTransferEstimate(hasFamily ? estimatedKilobytes : 0)]
+            );
+        }
+
+        if (bunnyImportSelectionSummary) {
+            if (!hasFamily) {
+                bunnyImportSelectionSummary.textContent = getString(
+                    'importSelectionSummaryEmpty',
+                    '0 Variants Selected'
+                );
+            } else if (availableCount > 0) {
+                bunnyImportSelectionSummary.textContent = formatMessage(
+                    getString('importSelectionSummaryAvailable', '%1$d of %2$d Variants Selected'),
+                    [variantCount, availableCount]
+                );
+            } else if (variantCount > 0) {
+                bunnyImportSelectionSummary.textContent = formatMessage(
+                    getString('importSelectionSummaryManual', '%1$d Variant%2$s Selected'),
+                    [variantCount, variantCount === 1 ? '' : 's']
+                );
+            } else {
+                bunnyImportSelectionSummary.textContent = getString(
+                    'importSelectionSummaryEmpty',
+                    '0 Variants Selected'
+                );
+            }
+        }
+
+        bunnyVariantQuickSelectButtons.forEach((button) => {
+            button.disabled = !hasFamily || availableCount === 0;
+        });
+
+        updateBunnyPreviewStylesheet(familyName, effectiveVariants);
+    }
+
     function getDisclosureTarget(toggle) {
         if (!toggle) {
             return null;
@@ -673,6 +978,19 @@
 
             if (adobeSettingsButton) {
                 adobeSettingsButton.focus();
+            }
+
+            return;
+        }
+
+        if (activeKey === 'bunny') {
+            if (bunnySearch) {
+                bunnySearch.focus();
+                return;
+            }
+
+            if (bunnyFamily) {
+                bunnyFamily.focus();
             }
 
             return;
@@ -1271,6 +1589,20 @@
         feedback.classList.toggle('is-saving', tone === 'saving');
     }
 
+    function setFamilyFontDisplayFeedback(form, message, tone) {
+        const feedback = form ? form.querySelector('[data-family-font-display-feedback]') : null;
+
+        if (!feedback) {
+            return;
+        }
+
+        feedback.textContent = message || '';
+        feedback.hidden = !message;
+        feedback.classList.toggle('is-success', tone === 'success');
+        feedback.classList.toggle('is-error', tone === 'error');
+        feedback.classList.toggle('is-saving', tone === 'saving');
+    }
+
     function syncFamilyFallbackSaveState(form) {
         if (!form) {
             return;
@@ -1287,12 +1619,36 @@
         button.disabled = !isDirty;
     }
 
+    function syncFamilyFontDisplaySaveState(form) {
+        if (!form) {
+            return;
+        }
+
+        const selector = form.querySelector('.tasty-fonts-font-display-selector');
+        const button = form.querySelector('[data-family-font-display-save]');
+
+        if (!selector || !button) {
+            return;
+        }
+
+        const isDirty = (selector.dataset.savedValue || 'inherit') !== (selector.value || 'inherit');
+        button.disabled = !isDirty;
+    }
+
     function buildFallbackSavedMessage(family, message) {
         return message || formatMessage(getString('fallbackSaved', 'Saved fallback for %1$s.'), [family]);
     }
 
     function buildFallbackErrorMessage(error) {
         return getErrorMessage(error, getString('fallbackSaveError', 'The fallback could not be saved.'));
+    }
+
+    function buildFontDisplaySavedMessage(family, message) {
+        return message || formatMessage(getString('fontDisplaySaved', 'Saved font display for %1$s.'), [family]);
+    }
+
+    function buildFontDisplayErrorMessage(error) {
+        return getErrorMessage(error, getString('fontDisplaySaveError', 'The font-display override could not be saved.'));
     }
 
     function buildRoleDraftErrorMessage(error) {
@@ -1359,6 +1715,78 @@
             updateInlineStackPreview(family);
             syncFamilyFallbackSaveState(saveForm);
             setFamilyFallbackFeedback(saveForm, message, 'error');
+            showToast(message, 'error');
+            return false;
+        } finally {
+            selector.disabled = false;
+            selector.removeAttribute('aria-busy');
+            if (button) {
+                button.removeAttribute('aria-busy');
+            }
+
+            if (row) {
+                row.classList.remove('is-saving');
+            }
+        }
+    }
+
+    async function saveFamilyFontDisplay(selector, form) {
+        if (!selector) {
+            return false;
+        }
+
+        const family = selector.dataset.fontFamily || '';
+        const previousValue = selector.dataset.savedValue || 'inherit';
+        const nextValue = selector.value || 'inherit';
+        const saveForm = form || selector.closest('[data-family-font-display-form]');
+        const button = saveForm ? saveForm.querySelector('[data-family-font-display-save]') : null;
+
+        if (!family || !config.saveFontDisplayNonce || previousValue === nextValue) {
+            selector.dataset.savedValue = nextValue;
+            syncFamilyFontDisplaySaveState(saveForm);
+            return true;
+        }
+
+        const row = selector.closest('[data-font-row]');
+
+        selector.disabled = true;
+        selector.setAttribute('aria-busy', 'true');
+        setFamilyFontDisplayFeedback(saveForm, getString('fontDisplaySaving', 'Saving font display…'), 'saving');
+        if (button) {
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+        }
+
+        if (row) {
+            row.classList.add('is-saving');
+        }
+
+        try {
+            const payload = await postAjax('tasty_fonts_save_family_font_display', config.saveFontDisplayNonce, {
+                family,
+                font_display: nextValue
+            });
+
+            if (!payload.success) {
+                throw new Error(getPayloadMessage(payload, getString('fontDisplaySaveError', 'The font-display override could not be saved.')));
+            }
+
+            const data = payload.data || {};
+            const savedDisplay = data.font_display || nextValue;
+            const message = buildFontDisplaySavedMessage(family, data.message);
+
+            selector.value = savedDisplay;
+            selector.dataset.savedValue = savedDisplay;
+            syncFamilyFontDisplaySaveState(saveForm);
+            setFamilyFontDisplayFeedback(saveForm, message, 'success');
+            showToast(message, 'success');
+            return true;
+        } catch (error) {
+            const message = buildFontDisplayErrorMessage(error);
+
+            selector.value = previousValue;
+            syncFamilyFontDisplaySaveState(saveForm);
+            setFamilyFontDisplayFeedback(saveForm, message, 'error');
             showToast(message, 'error');
             return false;
         } finally {
@@ -1551,6 +1979,7 @@
 
             card.className = 'tasty-fonts-search-card';
             card.dataset.family = item.family;
+            card.dataset.searchProvider = 'google';
             card.setAttribute('role', 'button');
             card.setAttribute('tabindex', '0');
             card.setAttribute('aria-label', formatMessage(getString('searchResultSelectLabel', 'Select %s'), [item.family]));
@@ -1601,6 +2030,207 @@
 
         updateSelectedFamilyLabel(familyName);
         renderVariantOptions(selectedSearchFamily ? selectedSearchFamily.variants : [], familyName);
+    }
+
+    function renderBunnyVariantOptions(variants, familyName = '') {
+        if (!bunnyVariantsWrap) {
+            return;
+        }
+
+        const nextFamilyKey = normalizeFamilyKey(familyName || currentBunnyImportFamily());
+        const familyChanged = nextFamilyKey !== '' && nextFamilyKey !== renderedBunnyVariantFamily;
+        const seededTokens = bunnyVariants ? normalizeHostedVariantTokens(bunnyVariants.value) : [];
+        const preserveEmptySelection = !!(bunnyVariants && bunnyVariants.dataset.explicitEmpty === 'true' && !familyChanged);
+
+        bunnyVariantsWrap.innerHTML = '';
+
+        (variants || []).forEach((variant) => {
+            const label = document.createElement('label');
+            const input = document.createElement('input');
+            const mark = document.createElement('span');
+            const text = document.createElement('span');
+
+            label.className = 'tasty-fonts-variant-chip';
+            input.type = 'checkbox';
+            input.value = variant;
+            mark.className = 'tasty-fonts-variant-chip-mark';
+            mark.setAttribute('aria-hidden', 'true');
+            text.className = 'tasty-fonts-variant-chip-label';
+            text.textContent = variant;
+
+            label.append(input, mark, text);
+            bunnyVariantsWrap.appendChild(label);
+        });
+
+        if (seededTokens.length > 0) {
+            if (bunnyVariants) {
+                delete bunnyVariants.dataset.explicitEmpty;
+            }
+            syncBunnyVariantChipsFromManualInput();
+        } else if (preserveEmptySelection) {
+            availableBunnyVariantInputs().forEach((input) => {
+                input.checked = false;
+                syncVariantChipState(input);
+            });
+
+            if (bunnyVariants) {
+                bunnyVariants.value = '';
+                bunnyVariants.dataset.explicitEmpty = 'true';
+            }
+        } else {
+            const inputs = availableBunnyVariantInputs();
+            const preferredInputs = inputs.filter((input) => {
+                const value = String(input.value).toLowerCase();
+
+                return value === 'regular' || value === '700';
+            });
+            const normalInputs = inputs.filter((input) => !String(input.value).toLowerCase().includes('italic'));
+            const defaultSelection = preferredInputs.length > 0
+                ? preferredInputs
+                : (normalInputs.length > 0 ? normalInputs.slice(0, Math.min(2, normalInputs.length)) : inputs.slice(0, 1));
+
+            inputs.forEach((input) => {
+                input.checked = defaultSelection.includes(input);
+                syncVariantChipState(input);
+            });
+
+            if (bunnyVariants) {
+                delete bunnyVariants.dataset.explicitEmpty;
+            }
+
+            syncBunnyManualVariantsInputFromChips();
+        }
+
+        renderedBunnyVariantFamily = nextFamilyKey;
+        updateBunnyImportSummary();
+    }
+
+    function renderBunnySearchResults(items) {
+        if (!bunnyResults) {
+            return;
+        }
+
+        bunnySearchResults = items || [];
+        bunnyResults.innerHTML = '';
+
+        if (!bunnySearchResults.length) {
+            updateBunnySearchPreviewStylesheet([]);
+            bunnyResults.innerHTML = `<div class="tasty-fonts-empty">${getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.')}</div>`;
+            return;
+        }
+
+        updateBunnySearchPreviewStylesheet(bunnySearchResults);
+
+        bunnySearchResults.forEach((item) => {
+            const card = document.createElement('article');
+            const title = document.createElement('h3');
+            const preview = document.createElement('div');
+            const meta = document.createElement('div');
+            const category = document.createElement('span');
+            const variants = document.createElement('span');
+            const fallback = googlePreviewFallback(item.category);
+            const styleCount = Number(item.style_count || (Array.isArray(item.variants) ? item.variants.length : 0));
+            const isActive = !!selectedBunnySearchFamily && matchesBunnyFamilyEntry(selectedBunnySearchFamily, item.family || item.slug || '');
+
+            card.className = 'tasty-fonts-search-card';
+            card.dataset.family = item.family || '';
+            card.dataset.searchProvider = 'bunny';
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            card.setAttribute('aria-label', formatMessage(getString('searchResultSelectLabel', 'Select %s'), [item.family || '']));
+            card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            card.classList.toggle('is-active', isActive);
+
+            title.className = 'tasty-fonts-search-card-title';
+            title.textContent = item.family || '';
+
+            preview.className = 'tasty-fonts-search-card-preview';
+            preview.textContent = googlePreviewText();
+            preview.style.fontFamily = `"${item.family}", ${fallback}`;
+
+            meta.className = 'tasty-fonts-search-card-meta tasty-fonts-muted';
+            category.textContent = item.category_label || 'Bunny Fonts';
+            variants.textContent = styleCount > 0 ? `${styleCount} variant(s)` : 'Bunny Fonts';
+
+            meta.append(category, variants);
+            card.append(title, preview, meta);
+            bunnyResults.appendChild(card);
+        });
+
+        const matchedFamily = findBunnyFamilyMatch(currentBunnyImportFamily());
+
+        if (matchedFamily) {
+            selectedBunnySearchFamily = matchedFamily;
+
+            if (!availableBunnyVariantInputs().length) {
+                renderBunnyVariantOptions(matchedFamily.variants || [], matchedFamily.family || '');
+            }
+        }
+    }
+
+    function selectBunnySearchFamily(familyName) {
+        selectedBunnySearchFamily = bunnySearchResults.find((item) => matchesBunnyFamilyEntry(item, familyName)) || null;
+
+        if (bunnyResults) {
+            bunnyResults.querySelectorAll('.tasty-fonts-search-card').forEach((card) => {
+                const isActive = selectedBunnySearchFamily
+                    ? matchesBunnyFamilyEntry(selectedBunnySearchFamily, card.dataset.family || '')
+                    : false;
+                card.classList.toggle('is-active', isActive);
+                card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+        }
+
+        if (bunnyFamily) {
+            bunnyFamily.value = selectedBunnySearchFamily ? (selectedBunnySearchFamily.family || familyName || '') : (familyName || '');
+        }
+
+        renderBunnyVariantOptions(selectedBunnySearchFamily ? selectedBunnySearchFamily.variants : [], familyName);
+    }
+
+    function applyBunnyVariantQuickSelection(mode) {
+        const inputs = availableBunnyVariantInputs();
+
+        if (!inputs.length) {
+            return;
+        }
+
+        inputs.forEach((input) => {
+            const value = String(input.value).toLowerCase();
+            let shouldCheck = false;
+
+            switch (mode) {
+                case 'all':
+                    shouldCheck = true;
+                    break;
+                case 'normal':
+                    shouldCheck = !value.includes('italic');
+                    break;
+                case 'italic':
+                    shouldCheck = value.includes('italic');
+                    break;
+                case 'clear':
+                    shouldCheck = false;
+                    break;
+                default:
+                    shouldCheck = input.checked;
+                    break;
+            }
+
+            input.checked = shouldCheck;
+            syncVariantChipState(input);
+        });
+
+        if (bunnyVariants) {
+            if (mode === 'clear') {
+                bunnyVariants.dataset.explicitEmpty = 'true';
+            } else {
+                delete bunnyVariants.dataset.explicitEmpty;
+            }
+        }
+
+        syncBunnyManualVariantsInputFromChips();
+        updateBunnyImportSummary();
     }
 
     // Local upload builder
@@ -2117,6 +2747,84 @@
         renderSearchResults(payload.data.items || []);
     }
 
+    async function runBunnySearch(query) {
+        if (!bunnyResults) {
+            return;
+        }
+
+        if (!config.bunnySearchNonce || !window.fetch) {
+            updateBunnySearchPreviewStylesheet([]);
+            bunnyResults.innerHTML = '';
+            return;
+        }
+
+        if (query.trim().length < 2) {
+            bunnySearchResults = [];
+            updateBunnySearchPreviewStylesheet([]);
+            bunnyResults.innerHTML = '';
+            return;
+        }
+
+        bunnyResults.innerHTML = `<div class="tasty-fonts-empty">${getString('bunnySearching', 'Searching Bunny Fonts…')}</div>`;
+        try {
+            const payload = await postAjax('tasty_fonts_search_bunny', config.bunnySearchNonce, { query });
+
+            if (!payload.success) {
+                bunnySearchResults = [];
+                updateBunnySearchPreviewStylesheet([]);
+                bunnyResults.innerHTML = `<div class="tasty-fonts-empty">${getPayloadMessage(payload, getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.'))}</div>`;
+                return;
+            }
+
+            renderBunnySearchResults(payload.data.items || []);
+        } catch (error) {
+            bunnySearchResults = [];
+            updateBunnySearchPreviewStylesheet([]);
+            bunnyResults.innerHTML = `<div class="tasty-fonts-empty">${getErrorMessage(error, getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.'))}</div>`;
+        }
+    }
+
+    async function loadBunnyFamilyDetails(familyName) {
+        if (!config.bunnyFamilyNonce || !window.fetch) {
+            return null;
+        }
+
+        const requestToken = ++bunnyFamilyLookupToken;
+        try {
+            const payload = await postAjax('tasty_fonts_get_bunny_family', config.bunnyFamilyNonce, { family: familyName });
+
+            if (requestToken !== bunnyFamilyLookupToken) {
+                return null;
+            }
+
+            if (!payload.success) {
+                return null;
+            }
+
+            const item = payload.data && payload.data.item ? payload.data.item : null;
+
+            if (!item || normalizeFamilyKey(currentBunnyImportFamily()) !== normalizeFamilyKey(familyName)) {
+                return null;
+            }
+
+            selectedBunnySearchFamily = item;
+
+            if (!bunnySearchResults.some((entry) => matchesBunnyFamilyEntry(entry, item.family || item.slug || ''))) {
+                bunnySearchResults = [item].concat(bunnySearchResults).slice(0, 8);
+            }
+
+            renderBunnyVariantOptions(item.variants || [], item.family || familyName);
+
+            if (bunnyResults && bunnyResults.childElementCount > 0) {
+                renderBunnySearchResults(bunnySearchResults);
+            }
+
+            return item;
+        } catch (error) {
+            return null;
+        }
+    }
+
     function selectedVariantTokens() {
         if (variantsWrap && variantsWrap.querySelectorAll('input').length > 0) {
             return Array.from(variantsWrap.querySelectorAll('input:checked')).map((input) => input.value);
@@ -2125,21 +2833,39 @@
         return (manualVariants && manualVariants.value ? manualVariants.value.split(',') : []).map((item) => item.trim()).filter(Boolean);
     }
 
-    function setImportBusyState(isBusy, idleLabel) {
-        if (!importButton) {
+    function setButtonBusyState(button, isBusy, idleLabel, busyLabel) {
+        if (!button) {
             return;
         }
 
-        importButton.disabled = isBusy;
+        button.disabled = isBusy;
 
         if (isBusy) {
-            importButton.setAttribute('aria-busy', 'true');
-            importButton.textContent = getString('importButtonBusy', 'Importing…');
+            button.setAttribute('aria-busy', 'true');
+            button.textContent = busyLabel;
             return;
         }
 
-        importButton.removeAttribute('aria-busy');
-        importButton.textContent = idleLabel || getString('importButtonIdle', 'Import and Self-Host');
+        button.removeAttribute('aria-busy');
+        button.textContent = idleLabel;
+    }
+
+    function setImportBusyState(isBusy, idleLabel) {
+        setButtonBusyState(
+            importButton,
+            isBusy,
+            idleLabel || getString('importButtonIdle', 'Import and Self-Host'),
+            getString('importButtonBusy', 'Importing…')
+        );
+    }
+
+    function setBunnyImportBusyState(isBusy, idleLabel) {
+        setButtonBusyState(
+            bunnyImportButton,
+            isBusy,
+            idleLabel || getString('importButtonIdle', 'Import and Self-Host'),
+            getString('bunnyImportBusy', 'Importing Bunny Fonts…')
+        );
     }
 
     async function importGoogleVariant(family, variant, index, total) {
@@ -2236,6 +2962,69 @@
         } finally {
             importInFlight = false;
             setImportBusyState(false, originalLabel);
+        }
+    }
+
+    async function importBunnyFont() {
+        const selectedFamilyName = selectedBunnySearchFamily && selectedBunnySearchFamily.family
+            ? String(selectedBunnySearchFamily.family).trim()
+            : '';
+        const family = selectedFamilyName || currentBunnyImportFamily();
+
+        if (!family) {
+            setStatus(bunnyImportStatus, getString('bunnySelectFamily', 'Type a Bunny Fonts family name before importing.'), 'error');
+            return;
+        }
+
+        if (importInFlight) {
+            return;
+        }
+
+        const variants = bunnySelectedVariantTokens();
+        const originalLabel = bunnyImportButton ? bunnyImportButton.textContent : '';
+
+        importInFlight = true;
+        setBunnyImportBusyState(true, originalLabel);
+
+        try {
+            setStatus(
+                bunnyImportStatus,
+                getString('bunnyImportSubmitting', 'Importing Bunny Fonts and self-hosting the selected files…'),
+                'progress',
+                20
+            );
+
+            const payload = await postAjax('tasty_fonts_import_bunny', config.bunnyImportNonce, {
+                family,
+                variant_tokens: variants.join(',')
+            });
+
+            if (!payload.success) {
+                const message = getPayloadMessage(payload, getString('bunnyImportError', 'The Bunny Fonts import failed.'));
+
+                setStatus(bunnyImportStatus, message, 'error');
+                showToast(message, 'error');
+                return;
+            }
+
+            const result = payload.data || {};
+            const message = getPayloadMessage(payload, getString('bunnyImportSuccess', 'Bunny Fonts imported successfully. Reloading…'));
+            const tone = result.status === 'imported' ? 'success' : 'error';
+
+            setStatus(bunnyImportStatus, message, tone, result.status === 'imported' ? 100 : undefined);
+            showToast(message, tone);
+
+            if (result.status === 'imported') {
+                reloadPageSoon();
+            }
+        } catch (error) {
+            const message = getErrorMessage(error, getString('bunnyImportError', 'The Bunny Fonts import failed.'));
+
+            setStatus(bunnyImportStatus, message, 'error');
+            showToast(message, 'error');
+        } finally {
+            importInFlight = false;
+            setBunnyImportBusyState(false, originalLabel);
         }
     }
 
@@ -2566,6 +3355,11 @@
             return false;
         }
 
+        if ((searchCard.dataset.searchProvider || 'google') === 'bunny') {
+            selectBunnySearchFamily(searchCard.dataset.family || '');
+            return true;
+        }
+
         selectSearchFamily(searchCard.dataset.family || '');
         return true;
     }
@@ -2582,6 +3376,12 @@
         }
 
         event.preventDefault();
+
+        if ((searchCard.dataset.searchProvider || 'google') === 'bunny') {
+            selectBunnySearchFamily(searchCard.dataset.family || '');
+            return true;
+        }
+
         selectSearchFamily(searchCard.dataset.family || '');
         return true;
     }
@@ -2594,6 +3394,17 @@
         }
 
         applyVariantQuickSelection(quickSelect.getAttribute('data-google-variant-select') || '');
+        return true;
+    }
+
+    function handleBunnyVariantQuickSelect(event) {
+        const quickSelect = event.target.closest('[data-bunny-variant-select]');
+
+        if (!quickSelect) {
+            return false;
+        }
+
+        applyBunnyVariantQuickSelection(quickSelect.getAttribute('data-bunny-variant-select') || '');
         return true;
     }
 
@@ -2714,6 +3525,10 @@
             return;
         }
 
+        if (handleBunnyVariantQuickSelect(event)) {
+            return;
+        }
+
         if (handleUploadBuilderClick(event)) {
             return;
         }
@@ -2753,6 +3568,35 @@
         });
     }
 
+    function bindFamilyFontDisplayControls() {
+        document.querySelectorAll('.tasty-fonts-font-display-selector').forEach((element) => {
+            const form = element.closest('[data-family-font-display-form]');
+
+            element.addEventListener('change', () => {
+                syncFamilyFontDisplaySaveState(form);
+                setFamilyFontDisplayFeedback(form, '', '');
+            });
+            syncFamilyFontDisplaySaveState(form);
+        });
+
+        document.querySelectorAll('[data-family-font-display-form]').forEach((form) => {
+            form.addEventListener('submit', async (event) => {
+                if (!config.saveFontDisplayNonce || !window.fetch) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                const selector = form.querySelector('.tasty-fonts-font-display-selector');
+                const saved = await saveFamilyFontDisplay(selector, form);
+
+                if (!saved) {
+                    syncFamilyFontDisplaySaveState(form);
+                }
+            });
+        });
+    }
+
     function bindRolePreviewControls() {
         [roleHeading, roleBody, roleHeadingFallback, roleBodyFallback].forEach((element) => {
             if (element) {
@@ -2763,6 +3607,7 @@
         if (previewTextInput) {
             previewTextInput.addEventListener('input', updatePreviewDynamicText);
             previewTextInput.addEventListener('input', updateGoogleImportSummary);
+            previewTextInput.addEventListener('input', updateBunnyImportSummary);
         }
 
         if (previewSizeInput) {
@@ -2853,6 +3698,112 @@
         }
     }
 
+    function bindBunnyImportControls() {
+        if (bunnySearch) {
+            bunnySearch.addEventListener('input', () => {
+                window.clearTimeout(bunnySearchTimer);
+                bunnySearchTimer = window.setTimeout(() => {
+                    void runBunnySearch(bunnySearch.value);
+                }, 250);
+            });
+        }
+
+        if (bunnyFamily) {
+            bunnyFamily.addEventListener('input', () => {
+                window.clearTimeout(bunnyFamilyLookupTimer);
+
+                const familyName = bunnyFamily.value.trim();
+                const matchedFamily = findBunnyFamilyMatch(familyName);
+                const hasVariantInputs = !!(bunnyVariantsWrap && bunnyVariantsWrap.querySelector('input[type="checkbox"]'));
+
+                if (!familyName) {
+                    selectedBunnySearchFamily = null;
+                    renderedBunnyVariantFamily = '';
+
+                    if (bunnyVariantsWrap) {
+                        bunnyVariantsWrap.innerHTML = '';
+                    }
+
+                    updateBunnyImportSummary();
+                    return;
+                }
+
+                if (matchedFamily) {
+                    const shouldRenderVariants = !selectedBunnySearchFamily
+                        || !matchesBunnyFamilyEntry(selectedBunnySearchFamily, matchedFamily.family || matchedFamily.slug || '')
+                        || !hasVariantInputs;
+
+                    selectedBunnySearchFamily = matchedFamily;
+
+                    if (shouldRenderVariants) {
+                        renderBunnyVariantOptions(matchedFamily.variants || [], matchedFamily.family || familyName);
+                        return;
+                    }
+                } else if (selectedBunnySearchFamily || hasVariantInputs) {
+                    selectedBunnySearchFamily = null;
+                    renderedBunnyVariantFamily = '';
+
+                    if (bunnyVariantsWrap) {
+                        bunnyVariantsWrap.innerHTML = '';
+                    }
+                }
+
+                updateBunnyImportSummary();
+
+                if (familyName.length < 2) {
+                    return;
+                }
+
+                bunnyFamilyLookupTimer = window.setTimeout(() => {
+                    void loadBunnyFamilyDetails(familyName);
+                }, 300);
+            });
+        }
+
+        if (bunnyVariants) {
+            bunnyVariants.addEventListener('input', () => {
+                if (normalizeHostedVariantTokens(bunnyVariants.value).length === 0) {
+                    bunnyVariants.dataset.explicitEmpty = 'true';
+                } else {
+                    delete bunnyVariants.dataset.explicitEmpty;
+                }
+
+                if (!syncingBunnyVariants) {
+                    syncBunnyVariantChipsFromManualInput();
+                }
+
+                updateBunnyImportSummary();
+            });
+        }
+
+        if (bunnyVariantsWrap) {
+            bunnyVariantsWrap.addEventListener('change', (event) => {
+                const input = event.target.closest('input[type="checkbox"]');
+
+                if (!input) {
+                    return;
+                }
+
+                syncVariantChipState(input);
+                syncBunnyManualVariantsInputFromChips();
+
+                if (bunnyVariants) {
+                    if (bunnySelectedVariantTokens().length === 0) {
+                        bunnyVariants.dataset.explicitEmpty = 'true';
+                    } else {
+                        delete bunnyVariants.dataset.explicitEmpty;
+                    }
+                }
+
+                updateBunnyImportSummary();
+            });
+        }
+
+        if (bunnyImportButton) {
+            bunnyImportButton.addEventListener('click', importBunnyFont);
+        }
+    }
+
     function bindUploadControls() {
         if (uploadAddFamily) {
             uploadAddFamily.addEventListener('click', () => {
@@ -2934,8 +3885,10 @@
         });
 
         bindFamilyFallbackControls();
+        bindFamilyFontDisplayControls();
         bindRolePreviewControls();
         bindGoogleImportControls();
+        bindBunnyImportControls();
         bindUploadControls();
 
         syncDisclosureToggles();
@@ -2948,6 +3901,7 @@
         updatePreviewScale();
         updateRoleOutputs();
         updateGoogleImportSummary();
+        updateBunnyImportSummary();
         initializeTabs();
     }
 

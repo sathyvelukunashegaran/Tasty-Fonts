@@ -3631,14 +3631,17 @@ h3.tasty-fonts-section-title,
 
 .tasty-fonts-family-meta {
     align-content: start;
+    align-items: start;
     display: grid;
     gap: var(--tasty-space-2);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     justify-content: stretch;
     min-width: 0;
     width: 100%;
 }
 
-.tasty-fonts-family-fallback-form {
+.tasty-fonts-family-fallback-form,
+.tasty-fonts-family-font-display-form {
     display: grid;
     gap: var(--tasty-space-2);
 }
@@ -3650,7 +3653,8 @@ h3.tasty-fonts-section-title,
     align-items: end;
 }
 
-.tasty-fonts-family-fallback-feedback {
+.tasty-fonts-family-fallback-feedback,
+.tasty-fonts-family-font-display-feedback {
     min-height: 18px;
     margin: 0;
     font-size: 12px;
@@ -3658,19 +3662,23 @@ h3.tasty-fonts-section-title,
     color: var(--tasty-text-muted);
 }
 
-.tasty-fonts-family-fallback-feedback.is-saving {
+.tasty-fonts-family-fallback-feedback.is-saving,
+.tasty-fonts-family-font-display-feedback.is-saving {
     color: var(--tasty-text-muted);
 }
 
-.tasty-fonts-family-fallback-feedback.is-success {
+.tasty-fonts-family-fallback-feedback.is-success,
+.tasty-fonts-family-font-display-feedback.is-success {
     color: var(--tasty-success);
 }
 
-.tasty-fonts-family-fallback-feedback.is-error {
+.tasty-fonts-family-fallback-feedback.is-error,
+.tasty-fonts-family-font-display-feedback.is-error {
     color: var(--tasty-danger);
 }
 
-.tasty-fonts-admin .tasty-fonts-family-fallback-save.button {
+.tasty-fonts-admin .tasty-fonts-family-fallback-save.button,
+.tasty-fonts-admin .tasty-fonts-family-font-display-save.button {
     min-height: var(--tasty-control-height-regular);
     height: var(--tasty-control-height-regular);
     width: 100%;

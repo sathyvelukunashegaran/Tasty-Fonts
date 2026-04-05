@@ -13,6 +13,8 @@ use WP_Error;
 
 final class LibraryService
 {
+    private const IMPORTED_SOURCES = ['google', 'bunny'];
+
     public function __construct(
         private readonly Storage $storage,
         private readonly CatalogService $catalog,
@@ -58,13 +60,17 @@ final class LibraryService
             );
         }
 
-        if (
-            in_array('google', (array) ($family['sources'] ?? []), true)
-            && !$this->storage->deleteRelativeDirectory('google/' . $familySlug)
-        ) {
+        foreach ($this->managedImportSourcesForFamily($family) as $source) {
+            if ($this->storage->deleteRelativeDirectory($source . '/' . $familySlug)) {
+                continue;
+            }
+
             return $this->error(
                 'tasty_fonts_delete_failed',
-                __('The Google Fonts folder could not be removed cleanly.', 'tasty-fonts')
+                sprintf(
+                    __('The %s import folder could not be removed cleanly.', 'tasty-fonts'),
+                    $this->importSourceLabel($source)
+                )
             );
         }
 
@@ -104,7 +110,7 @@ final class LibraryService
         $normalizedWeight = FontUtils::normalizeWeight($weight);
         $normalizedStyle = FontUtils::normalizeStyle($style);
         $normalizedSource = trim($source) !== '' ? strtolower(trim($source)) : 'local';
-        $normalizedUnicodeRange = $normalizedSource === 'google' ? '' : trim($unicodeRange);
+        $normalizedUnicodeRange = $this->isManagedImportSource($normalizedSource) ? '' : trim($unicodeRange);
         $face = $this->findMatchingFace($family, $normalizedWeight, $normalizedStyle, $normalizedSource, $normalizedUnicodeRange);
 
         if ($face === null) {
@@ -136,8 +142,8 @@ final class LibraryService
             );
         }
 
-        if ($normalizedSource === 'google') {
-            $updateResult = $this->deleteGoogleImportedFace($familySlug, $normalizedWeight, $normalizedStyle);
+        if ($this->isManagedImportSource($normalizedSource)) {
+            $updateResult = $this->deleteImportedFace($familySlug, $normalizedWeight, $normalizedStyle, $normalizedSource);
 
             if (is_wp_error($updateResult)) {
                 return $updateResult;
@@ -229,7 +235,7 @@ final class LibraryService
     private function faceMatches(array $face, string $weight, string $style, string $source, string $unicodeRange): bool
     {
         $faceSource = strtolower(trim((string) ($face['source'] ?? 'local')));
-        $faceUnicodeRange = $faceSource === 'google' ? '' : trim((string) ($face['unicode_range'] ?? ''));
+        $faceUnicodeRange = $this->isManagedImportSource($faceSource) ? '' : trim((string) ($face['unicode_range'] ?? ''));
 
         return $faceSource === $source
             && FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')) === $weight
@@ -237,7 +243,7 @@ final class LibraryService
             && $faceUnicodeRange === $unicodeRange;
     }
 
-    private function deleteGoogleImportedFace(string $familySlug, string $weight, string $style): bool|WP_Error
+    private function deleteImportedFace(string $familySlug, string $weight, string $style, string $source): bool|WP_Error
     {
         $import = $this->imports->get($familySlug);
 
@@ -255,10 +261,13 @@ final class LibraryService
         if ($remainingFaces === []) {
             $this->imports->delete($familySlug);
 
-            if (!$this->storage->deleteRelativeDirectory('google/' . $familySlug)) {
+            if (!$this->storage->deleteRelativeDirectory($source . '/' . $familySlug)) {
                 return $this->error(
                     'tasty_fonts_delete_failed',
-                    __('The Google Fonts folder could not be removed cleanly.', 'tasty-fonts')
+                    sprintf(
+                        __('The %s import folder could not be removed cleanly.', 'tasty-fonts'),
+                        $this->importSourceLabel($source)
+                    )
                 );
             }
 
@@ -302,6 +311,34 @@ final class LibraryService
         }
 
         return array_values(array_unique($variants));
+    }
+
+    private function managedImportSourcesForFamily(array $family): array
+    {
+        $sources = [];
+
+        foreach ((array) ($family['sources'] ?? []) as $source) {
+            $normalized = strtolower(trim((string) $source));
+
+            if ($this->isManagedImportSource($normalized)) {
+                $sources[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($sources));
+    }
+
+    private function isManagedImportSource(string $source): bool
+    {
+        return in_array(strtolower(trim($source)), self::IMPORTED_SOURCES, true);
+    }
+
+    private function importSourceLabel(string $source): string
+    {
+        return match (strtolower(trim($source))) {
+            'bunny' => __('Bunny Fonts', 'tasty-fonts'),
+            default => __('Google Fonts', 'tasty-fonts'),
+        };
     }
 
     private function getProtectedRoleLabels(string $familyName): array

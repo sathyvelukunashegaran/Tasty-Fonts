@@ -23,10 +23,15 @@ final class CssBuilder
     private function buildCss(array $catalog, array $roles, array $settings, bool $includeRoleUsage): string
     {
         $blocks = [];
+        $defaultDisplay = $this->resolveFontDisplay((string) ($settings['font_display'] ?? 'optional'));
+        $familyDisplays = is_array($settings['family_font_displays'] ?? null) ? $settings['family_font_displays'] : [];
 
         foreach ($catalog as $family) {
+            $familyName = is_array($family) ? (string) ($family['family'] ?? '') : '';
+            $display = $this->resolveFamilyFontDisplay($familyName, $familyDisplays, $defaultDisplay);
+
             foreach ((array) ($family['faces'] ?? []) as $face) {
-                $rule = $this->buildFaceRule($face, (string) ($settings['font_display'] ?? 'optional'));
+                $rule = $this->buildFaceRule($face, $display);
 
                 if ($rule !== '') {
                     $blocks[] = $rule;
@@ -146,14 +151,28 @@ final class CssBuilder
             $css .= "  unicode-range:{$unicodeRange};\n";
         }
 
-        $css .= '  font-display:' . $this->sanitizeKeyword(
-            $display,
-            ['auto', 'block', 'swap', 'fallback', 'optional'],
-            'optional'
-        ) . ";\n";
+        $css .= '  font-display:' . $this->resolveFontDisplay($display) . ";\n";
         $css .= "}\n";
 
         return $css;
+    }
+
+    private function resolveFamilyFontDisplay(string $family, array $familyDisplays, string $defaultDisplay): string
+    {
+        if ($family === '' || !array_key_exists($family, $familyDisplays)) {
+            return $defaultDisplay;
+        }
+
+        return $this->resolveFontDisplay((string) $familyDisplays[$family]);
+    }
+
+    private function resolveFontDisplay(string $display): string
+    {
+        return $this->sanitizeKeyword(
+            $display,
+            ['auto', 'block', 'swap', 'fallback', 'optional'],
+            'optional'
+        );
     }
 
     private function minify(string $css): string

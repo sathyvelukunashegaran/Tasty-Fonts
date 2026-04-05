@@ -35,6 +35,9 @@ require_once __DIR__ . '/bootstrap.php';
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Bunny\BunnyCssParser;
+use TastyFonts\Bunny\BunnyFontsClient;
+use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
@@ -106,6 +109,13 @@ if (!function_exists('wp_make_link_relative')) {
         $parts = parse_url($url);
 
         return (string) ($parts['path'] ?? '');
+    }
+}
+
+if (!function_exists('wp_parse_url')) {
+    function wp_parse_url(string $url, int $component = -1): array|string|int|null|false
+    {
+        return $component === -1 ? parse_url($url) : parse_url($url, $component);
     }
 }
 
@@ -483,6 +493,11 @@ final class TestWpFilesystem
     public array $mkdirCalls = [];
     public array $writeCalls = [];
 
+    public function exists(string $path): bool
+    {
+        return file_exists($path);
+    }
+
     public function is_dir(string $path): bool
     {
         return is_dir($path);
@@ -506,6 +521,37 @@ final class TestWpFilesystem
         }
 
         return file_put_contents($path, $contents) !== false;
+    }
+
+    public function delete(string $path, bool $recursive = false, string $type = ''): bool
+    {
+        if (!file_exists($path)) {
+            return true;
+        }
+
+        if (is_dir($path)) {
+            if (!$recursive) {
+                return rmdir($path);
+            }
+
+            $entries = scandir($path);
+
+            if (!is_array($entries)) {
+                return false;
+            }
+
+            foreach (array_diff($entries, ['.', '..']) as $entry) {
+                $childPath = $path . DIRECTORY_SEPARATOR . $entry;
+
+                if (!$this->delete($childPath, true, is_dir($childPath) ? 'd' : 'f')) {
+                    return false;
+                }
+            }
+
+            return rmdir($path);
+        }
+
+        return unlink($path);
     }
 }
 
@@ -593,6 +639,8 @@ function makeServiceGraph(): array
         }
     );
     $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $bunny = new BunnyFontsClient();
+    $bunnyImport = new BunnyImportService($storage, $imports, $bunny, new BunnyCssParser(), $catalog, $assets, $log);
     $google = new GoogleFontsClient($settings);
     $googleImport = new GoogleImportService($storage, $imports, $google, new GoogleCssParser(), $catalog, $assets, $log);
     $controller = new AdminController(
@@ -605,6 +653,8 @@ function makeServiceGraph(): array
         $localUpload,
         new CssBuilder(),
         $adobe,
+        $bunny,
+        $bunnyImport,
         $google,
         $googleImport
     );
@@ -620,6 +670,8 @@ function makeServiceGraph(): array
         'library' => $library,
         'local_upload' => $localUpload,
         'adobe' => $adobe,
+        'bunny' => $bunny,
+        'bunny_import' => $bunnyImport,
         'google' => $google,
         'google_import' => $googleImport,
         'controller' => $controller,
@@ -718,6 +770,296 @@ CSS;
     assertSameValue('italic', $faces[1]['style'], 'Google CSS parser should capture style.');
     assertSameValue('U+0100-024F', $faces[1]['unicode_range'], 'Google CSS parser should preserve unicode-range.');
     assertSameValue('https://fonts.gstatic.com/s/inter/v18/u-4k0qWljRw-PfU81xCK.woff2', $faces[0]['files']['woff2'], 'Google CSS parser should keep the remote WOFF2 URL.');
+};
+
+$tests['bunny_fonts_client_builds_css2_urls'] = static function (): void {
+    $client = new BunnyFontsClient();
+
+    assertSameValue(
+        'https://fonts.bunny.net/css2?family=Inter:ital,wght@0,400;1,700&display=swap',
+        $client->buildCssUrl('Inter', ['regular', '700italic']),
+        'Bunny Fonts CSS URLs should use the css2 endpoint and Google-compatible axis syntax.'
+    );
+};
+
+$tests['bunny_fonts_client_searches_sitemap_catalog_and_hydrates_family_details'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $client = new BunnyFontsClient();
+    $remoteGetResponses['https://fonts.bunny.net/sitemap.xml'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'application/xml'],
+        'body' => <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://fonts.bunny.net/family/inter</loc></url>
+  <url><loc>https://fonts.bunny.net/family/ibm-plex-sans</loc></url>
+</urlset>
+XML,
+    ];
+    $remoteGetResponses['https://fonts.bunny.net/family/inter'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/html'],
+        'body' => <<<'HTML'
+<!doctype html>
+<html>
+<head>
+    <title>Inter | Bunny Fonts</title>
+</head>
+<body>
+    <div class="family"><h3>Sans Serif</h3></div>
+    <div class="styles">18 styles</div>
+    <div class="card-main"><h1>Inter</h1></div>
+    <link href="https://fonts.bunny.net/css?family=inter:100,400,700,400i,700i," rel="stylesheet" />
+</body>
+</html>
+HTML,
+    ];
+
+    $results = $client->searchFamilies('int', 5);
+    $first = $results[0] ?? [];
+
+    assertSameValue(1, count($results), 'Bunny search should filter sitemap entries by the query before hydrating family details.');
+    assertSameValue('Inter', (string) ($first['family'] ?? ''), 'Bunny search should hydrate the exact family name from the public family page.');
+    assertSameValue('inter', (string) ($first['slug'] ?? ''), 'Bunny search should preserve the Bunny family slug.');
+    assertSameValue('sans-serif', (string) ($first['category'] ?? ''), 'Bunny search should normalize public category labels for preview usage.');
+    assertSameValue('Sans Serif', (string) ($first['category_label'] ?? ''), 'Bunny search should keep the display category label for the admin cards.');
+    assertSameValue(18, (int) ($first['style_count'] ?? 0), 'Bunny search should expose the public style count for the family card.');
+    assertSameValue(
+        ['100', 'regular', '700', 'italic', '700italic'],
+        $first['variants'] ?? [],
+        'Bunny search should normalize public variant tokens into the plugin token format.'
+    );
+};
+
+$tests['bunny_fonts_client_get_family_parses_public_variant_tokens'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $client = new BunnyFontsClient();
+    $remoteGetResponses['https://fonts.bunny.net/family/alegreya-sans'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/html'],
+        'body' => <<<'HTML'
+<!doctype html>
+<html>
+<head>
+    <title>Alegreya Sans | Bunny Fonts</title>
+</head>
+<body>
+    <div class="family"><h3>Sans Serif</h3></div>
+    <div class="styles">4 styles</div>
+    <div class="card-main"><h1>Alegreya Sans</h1></div>
+    <link href="https://fonts.bunny.net/css?family=alegreya-sans:400,700,400i,700i," rel="stylesheet" />
+</body>
+</html>
+HTML,
+    ];
+
+    $family = $client->getFamily('Alegreya Sans');
+
+    assertSameValue('Alegreya Sans', (string) ($family['family'] ?? ''), 'Bunny family lookup should resolve the exact public family name.');
+    assertSameValue(
+        ['regular', '700', 'italic', '700italic'],
+        $family['variants'] ?? [],
+        'Bunny family lookup should convert Bunny public variant markers into Google-style plugin tokens.'
+    );
+};
+
+$tests['bunny_css_parser_extracts_woff2_faces_and_unicode_ranges'] = static function (): void {
+    $css = <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 700;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-700-italic.woff2) format('woff2');
+  unicode-range: U+0100-024F;
+}
+CSS;
+
+    $parser = new BunnyCssParser();
+    $faces = $parser->parse($css, 'Inter');
+
+    assertSameValue(2, count($faces), 'Bunny CSS parser should return one face per @font-face block.');
+    assertSameValue('bunny', $faces[0]['source'], 'Bunny CSS parser should tag parsed faces with the bunny source.');
+    assertSameValue('italic', $faces[1]['style'], 'Bunny CSS parser should capture style.');
+    assertSameValue('U+0100-024F', $faces[1]['unicode_range'], 'Bunny CSS parser should preserve unicode-range.');
+    assertSameValue('https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2', $faces[0]['files']['woff2'], 'Bunny CSS parser should keep the remote WOFF2 URL.');
+};
+
+$tests['bunny_import_service_imports_and_catalogs_bunny_faces'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $cssUrl = $services['bunny']->buildCssUrl('Inter', ['regular', '700']);
+    $greekUrl = 'https://fonts.bunny.net/inter/files/inter-greek-400-normal.woff2';
+    $latinUrl = 'https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2';
+    $boldUrl = 'https://fonts.bunny.net/inter/files/inter-latin-700-normal.woff2';
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-greek-400-normal.woff2) format('woff2');
+  unicode-range: U+0370-03FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-700-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+CSS,
+    ];
+    $remoteGetResponses[$greekUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'greek-font-data',
+    ];
+    $remoteGetResponses[$latinUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data',
+    ];
+    $remoteGetResponses[$boldUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'bold-font-data',
+    ];
+
+    $result = $services['bunny_import']->importFamily('Inter', ['regular', '700']);
+    $import = $services['imports']->get('inter');
+    $catalog = $services['catalog']->getCatalog();
+    $catalogFamily = $catalog['Inter'] ?? null;
+    $downloadUrls = array_map(static fn (array $call): string => (string) ($call['url'] ?? ''), $remoteGetCalls);
+    $savedRegularPath = $services['storage']->pathForRelativePath('bunny/inter/inter-400-normal.woff2');
+    $savedBoldPath = $services['storage']->pathForRelativePath('bunny/inter/inter-700-normal.woff2');
+
+    assertSameValue('imported', (string) ($result['status'] ?? ''), 'Bunny imports should report an imported result.');
+    assertSameValue('bunny', (string) ($import['provider'] ?? ''), 'Bunny imports should persist the bunny provider at the manifest level.');
+    assertSameValue('bunny', (string) ($import['faces'][0]['provider']['type'] ?? ''), 'Bunny imports should persist bunny provider metadata per face.');
+    assertSameValue(['bunny'], (array) ($catalogFamily['sources'] ?? []), 'Catalog entries created from Bunny imports should expose the bunny source.');
+    assertSameValue('bunny', (string) ($catalogFamily['faces'][0]['source'] ?? ''), 'Catalog faces created from Bunny imports should retain the bunny source.');
+    assertSameValue(true, is_string($savedRegularPath) && file_exists($savedRegularPath), 'Bunny regular faces should be written under uploads/fonts/bunny.');
+    assertSameValue(true, is_string($savedBoldPath) && file_exists($savedBoldPath), 'Bunny bold faces should be written under uploads/fonts/bunny.');
+    assertContainsValue($latinUrl, implode("\n", $downloadUrls), 'Bunny imports should download the preferred latin regular face.');
+    assertContainsValue($boldUrl, implode("\n", $downloadUrls), 'Bunny imports should download the requested bold face.');
+    assertNotContainsValue($greekUrl, implode("\n", $downloadUrls), 'Bunny imports should skip lower-priority subset faces for the same axis.');
+};
+
+$tests['bunny_import_service_skips_existing_variants_and_blocks_local_collisions'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $cssUrl = $services['bunny']->buildCssUrl('Inter', ['regular']);
+    $fontUrl = 'https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2';
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+CSS,
+    ];
+    $remoteGetResponses[$fontUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data',
+    ];
+
+    $firstImport = $services['bunny_import']->importFamily('Inter', ['regular']);
+    $secondImport = $services['bunny_import']->importFamily('Inter', ['regular']);
+
+    assertSameValue('imported', (string) ($firstImport['status'] ?? ''), 'The initial Bunny import should succeed.');
+    assertSameValue('skipped', (string) ($secondImport['status'] ?? ''), 'Re-importing an existing Bunny variant should be skipped.');
+
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2'), 'font-data');
+    $collision = $services['bunny_import']->importFamily('Inter', ['regular']);
+
+    assertSameValue(true, is_wp_error($collision), 'Bunny imports should be blocked when a local family already exists.');
+    assertSameValue('tasty_fonts_family_already_exists', $collision->get_error_code(), 'Bunny local-family collisions should surface the family-already-exists error.');
+};
+
+$tests['library_service_deletes_bunny_import_families_cleanly'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $cssUrl = $services['bunny']->buildCssUrl('Inter', ['regular']);
+    $fontUrl = 'https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2';
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+CSS,
+    ];
+    $remoteGetResponses[$fontUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data',
+    ];
+
+    $services['bunny_import']->importFamily('Inter', ['regular']);
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('lora/Lora-400-normal.woff2'), 'font-data');
+    $services['settings']->saveRoles(
+        [
+            'heading' => 'Lora',
+            'body' => 'Lora',
+            'heading_fallback' => 'serif',
+            'body_fallback' => 'serif',
+        ],
+        ['Inter', 'Lora']
+    );
+    $services['settings']->setAutoApplyRoles(false);
+    $familyDirectory = $services['storage']->pathForRelativePath('bunny/inter');
+    $result = $services['library']->deleteFamily('inter');
+
+    assertSameValue(true, $result, 'Bunny-imported families should be deletable from the library.');
+    assertSameValue(null, $services['imports']->get('inter'), 'Deleting a Bunny family should remove its import manifest entry.');
+    assertSameValue(false, is_string($familyDirectory) && file_exists($familyDirectory), 'Deleting a Bunny family should remove its provider directory from uploads/fonts.');
 };
 
 $tests['adobe_css_parser_groups_families_and_dedupes_faces'] = static function (): void {
@@ -944,6 +1286,60 @@ $tests['css_builder_defaults_font_display_to_optional'] = static function (): vo
     assertContainsValue('font-display:optional;', $css, 'Generated font-face CSS should default to font-display optional when no explicit setting is stored.');
 };
 
+$tests['css_builder_uses_per_family_font_display_overrides'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'sources' => ['local'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'unicode_range' => '',
+                    'files' => [
+                        'woff2' => 'https://example.com/fonts/inter.woff2',
+                    ],
+                ],
+            ],
+        ],
+        'Lora' => [
+            'family' => 'Lora',
+            'slug' => 'lora',
+            'sources' => ['google'],
+            'faces' => [
+                [
+                    'family' => 'Lora',
+                    'slug' => 'lora',
+                    'source' => 'google',
+                    'weight' => '700',
+                    'style' => 'normal',
+                    'unicode_range' => '',
+                    'files' => [
+                        'woff2' => 'https://example.com/fonts/lora.woff2',
+                    ],
+                ],
+            ],
+        ],
+    ];
+
+    $css = $builder->buildFontFaceOnly(
+        $catalog,
+        [
+            'font_display' => 'optional',
+            'family_font_displays' => ['Inter' => 'swap'],
+            'minify_css_output' => false,
+        ]
+    );
+
+    assertContainsValue("font-family:\"Inter\";\n  font-weight:400;\n  font-style:normal;\n  src:url(\"https://example.com/fonts/inter.woff2\") format(\"woff2\");\n  font-display:swap;", $css, 'Per-family overrides should change the font-display value for the matching family.');
+    assertContainsValue("font-family:\"Lora\";\n  font-weight:700;\n  font-style:normal;\n  src:url(\"https://example.com/fonts/lora.woff2\") format(\"woff2\");\n  font-display:optional;", $css, 'Families without an override should continue using the global font-display default.');
+};
+
 $tests['storage_returns_absolute_generated_css_url'] = static function (): void {
     resetTestState();
 
@@ -1145,6 +1541,24 @@ $tests['settings_repository_defaults_font_display_to_optional_and_normalizes_inv
 
     $settings->saveSettings(['font_display' => 'unsupported-value']);
     assertSameValue('optional', $settings->getSettings()['font_display'], 'Invalid saved font-display values should normalize back to optional.');
+};
+
+$tests['settings_repository_persists_family_font_display_overrides_and_unsets_inherit'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+
+    assertSameValue([], $settings->getSettings()['family_font_displays'], 'Per-family font-display overrides should default to an empty map.');
+
+    $settings->saveFamilyFontDisplay('Inter', 'swap');
+    assertSameValue('swap', $settings->getFamilyFontDisplay('Inter'), 'Family font-display overrides should persist supported values.');
+
+    $settings->saveFamilyFontDisplay('Lora', 'unsupported-value');
+    assertSameValue('', $settings->getFamilyFontDisplay('Lora'), 'Unsupported family font-display values should be ignored instead of being persisted.');
+
+    $settings->saveFamilyFontDisplay('Inter', 'inherit');
+    assertSameValue('', $settings->getFamilyFontDisplay('Inter'), 'Saving inherit should remove the stored family font-display override.');
+    assertSameValue([], $settings->getSettings()['family_font_displays'], 'Removing the only family font-display override should leave the stored map empty.');
 };
 
 $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent'] = static function (): void {
@@ -1686,6 +2100,21 @@ $tests['admin_controller_exposes_all_font_display_options_with_optional_first'] 
     );
 };
 
+$tests['admin_controller_exposes_family_font_display_options_with_inherit_first'] = static function (): void {
+    resetTestState();
+
+    $controller = makeAdminControllerTestInstance();
+    $options = invokePrivateMethod($controller, 'buildFamilyFontDisplayOptions', ['swap']);
+
+    assertSameValue('inherit', (string) ($options[0]['value'] ?? ''), 'Per-family font-display controls should offer inherit as the first option.');
+    assertContainsValue('Swap', (string) ($options[0]['label'] ?? ''), 'The inherit option should explain which global font-display value will be used.');
+    assertSameValue(
+        ['inherit', 'optional', 'swap', 'fallback', 'block', 'auto'],
+        array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), $options)),
+        'Per-family font-display controls should expose inherit plus every supported override option.'
+    );
+};
+
 $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] = static function (): void {
     resetTestState();
 
@@ -1744,7 +2173,7 @@ $tests['font_utils_modern_user_agent_tracks_a_recent_chrome_release'] = static f
     assertContainsValue('Chrome/146.0.0.0', FontUtils::MODERN_USER_AGENT, 'The modern browser user agent should stay current enough to trigger Google Fonts CSS2 WOFF2 responses.');
 };
 
-$tests['admin_controller_includes_generated_css_output_panel'] = static function (): void {
+$tests['admin_controller_excludes_generated_css_from_snippet_output_panels'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
@@ -1764,34 +2193,53 @@ $tests['admin_controller_includes_generated_css_output_panel'] = static function
         'buildOutputPanels',
         [$roles, $services['settings']->getSettings()]
     );
-    $generatedPanels = array_values(array_filter($panels, static fn (array $panel): bool => ($panel['key'] ?? '') === 'generated'));
 
-    assertSameValue(1, count($generatedPanels), 'Advanced Tools should expose a dedicated panel for the generated CSS output.');
-    assertContainsValue('@font-face', (string) ($generatedPanels[0]['value'] ?? ''), 'The generated CSS panel should include the current stylesheet output.');
+    assertSameValue(
+        ['usage', 'variables', 'stacks', 'names'],
+        array_values(array_map(static fn (array $panel): string => (string) ($panel['key'] ?? ''), $panels)),
+        'The Snippets panel should only expose the role snippet tabs after Generated CSS is moved to the top tab bar.'
+    );
 };
 
-$tests['admin_controller_marks_generated_css_panel_unavailable_when_sitewide_is_off'] = static function (): void {
+$tests['admin_controller_exposes_generated_css_as_a_top_level_panel'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400.woff2'), 'font-data');
     $roles = [
         'heading' => 'Inter',
         'body' => 'Inter',
         'heading_fallback' => 'sans-serif',
         'body_fallback' => 'sans-serif',
     ];
+    $services['settings']->saveRoles($roles, ['Inter']);
+    $services['settings']->setAutoApplyRoles(true);
 
-    $panels = invokePrivateMethod(
+    $panel = invokePrivateMethod(
         $services['controller'],
-        'buildOutputPanels',
-        [$roles, $services['settings']->getSettings()]
+        'buildGeneratedCssPanel',
+        [$services['settings']->getSettings()]
     );
-    $generatedPanels = array_values(array_filter($panels, static fn (array $panel): bool => ($panel['key'] ?? '') === 'generated'));
+
+    assertSameValue('generated', (string) ($panel['key'] ?? ''), 'Generated CSS should be exposed through a dedicated top-level panel key.');
+    assertContainsValue('@font-face', (string) ($panel['value'] ?? ''), 'The top-level Generated CSS panel should include the current stylesheet output.');
+};
+
+$tests['admin_controller_marks_top_level_generated_css_panel_unavailable_when_sitewide_is_off'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $panel = invokePrivateMethod(
+        $services['controller'],
+        'buildGeneratedCssPanel',
+        [$services['settings']->getSettings()]
+    );
 
     assertSameValue(
         'Not generated while Apply Sitewide is off.',
-        (string) ($generatedPanels[0]['value'] ?? ''),
-        'The generated CSS panel should explain that there is no live sitewide output while Apply Sitewide is off.'
+        (string) ($panel['value'] ?? ''),
+        'The top-level Generated CSS panel should explain that there is no live sitewide output while Apply Sitewide is off.'
     );
 };
 
@@ -1814,6 +2262,94 @@ $tests['admin_controller_enqueues_tokens_before_admin_styles'] = static function
         $enqueuedStyles['tasty-fonts-admin']['deps'] ?? null,
         'The admin stylesheet should depend on the token stylesheet so custom properties load first.'
     );
+};
+
+$tests['admin_controller_localizes_family_font_display_nonce'] = static function (): void {
+    resetTestState();
+
+    global $localizedScripts;
+
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    assertSameValue(
+        'nonce:tasty_fonts_save_family_font_display',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['saveFontDisplayNonce'] ?? ''),
+        'Admin scripts should receive the family font-display nonce for inline saves.'
+    );
+};
+
+$tests['admin_controller_localizes_bunny_import_nonce'] = static function (): void {
+    resetTestState();
+
+    global $localizedScripts;
+
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    assertSameValue(
+        'nonce:tasty_fonts_import_bunny',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['bunnyImportNonce'] ?? ''),
+        'Admin scripts should receive the Bunny import nonce for the manual Bunny import panel.'
+    );
+};
+
+$tests['admin_controller_localizes_bunny_search_nonce'] = static function (): void {
+    resetTestState();
+
+    global $localizedScripts;
+
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    assertSameValue(
+        'nonce:tasty_fonts_search_bunny',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['bunnySearchNonce'] ?? ''),
+        'Admin scripts should receive the Bunny search nonce for the mirrored Bunny search workflow.'
+    );
+};
+
+$tests['admin_controller_localizes_bunny_family_nonce'] = static function (): void {
+    resetTestState();
+
+    global $localizedScripts;
+
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    assertSameValue(
+        'nonce:tasty_fonts_get_bunny_family',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['bunnyFamilyNonce'] ?? ''),
+        'Admin scripts should receive the Bunny family lookup nonce for manual Bunny family resolution.'
+    );
+};
+
+$tests['admin_controller_family_font_display_changes_refresh_generated_assets'] = static function (): void {
+    resetTestState();
+
+    global $transientDeleted;
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400.woff2'), 'font-data');
+    $services['settings']->saveRoles(
+        [
+            'heading' => 'Inter',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        ['Inter']
+    );
+    $services['settings']->setAutoApplyRoles(true);
+
+    $services['assets']->getCss();
+    $transientDeleted = [];
+
+    invokePrivateMethod($services['controller'], 'saveFamilyFontDisplaySelection', ['Inter', 'swap']);
+
+    assertSameValue(true, in_array('tasty_fonts_css_v2', $transientDeleted, true), 'Saving a family font-display override should invalidate the cached CSS payload.');
+    assertContainsValue('font-display:swap', $services['assets']->getCss(), 'Saving a family font-display override should rebuild the generated CSS with the new value.');
 };
 
 $tests['admin_controller_reads_and_clears_transient_notice_toasts'] = static function (): void {

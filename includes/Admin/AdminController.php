@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace TastyFonts\Admin;
 
 use TastyFonts\Adobe\AdobeProjectClient;
+use TastyFonts\Bunny\BunnyFontsClient;
+use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
@@ -50,6 +52,8 @@ final class AdminController
         private readonly LocalUploadService $localUpload,
         private readonly CssBuilder $cssBuilder,
         private readonly AdobeProjectClient $adobe,
+        private readonly BunnyFontsClient $bunnyClient,
+        private readonly BunnyImportService $bunnyImport,
         private readonly GoogleFontsClient $googleClient,
         private readonly GoogleImportService $googleImport
     ) {
@@ -106,9 +110,13 @@ final class AdminController
             [
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'searchNonce' => wp_create_nonce('tasty_fonts_search_google'),
+                'bunnySearchNonce' => wp_create_nonce('tasty_fonts_search_bunny'),
+                'bunnyFamilyNonce' => wp_create_nonce('tasty_fonts_get_bunny_family'),
+                'bunnyImportNonce' => wp_create_nonce('tasty_fonts_import_bunny'),
                 'importNonce' => wp_create_nonce('tasty_fonts_import_google'),
                 'uploadNonce' => wp_create_nonce('tasty_fonts_upload_local'),
                 'saveFallbackNonce' => wp_create_nonce('tasty_fonts_save_family_fallback'),
+                'saveFontDisplayNonce' => wp_create_nonce('tasty_fonts_save_family_font_display'),
                 'saveRolesNonce' => wp_create_nonce('tasty_fonts_save_role_draft'),
                 'googleApiEnabled' => $googleSearchEnabled,
                 'strings' => $this->buildAdminStrings($this->buildSearchDisabledMessage($googleApiStatus)),
@@ -142,6 +150,10 @@ final class AdminController
             return;
         }
 
+        if ($this->handleSaveFamilyFontDisplayAction()) {
+            return;
+        }
+
         if ($this->handleDeleteVariantAction()) {
             return;
         }
@@ -165,6 +177,34 @@ final class AdminController
         wp_send_json_success(['items' => $this->googleClient->searchFamilies($this->getPostedText('query'), 20)]);
     }
 
+    public function ajaxSearchBunny(): void
+    {
+        $this->assertManageOptionsAjax(__('You are not allowed to search Bunny Fonts.', 'tasty-fonts'));
+        check_ajax_referer('tasty_fonts_search_bunny', 'nonce');
+
+        wp_send_json_success(['items' => $this->bunnyClient->searchFamilies($this->getPostedText('query'), 12)]);
+    }
+
+    public function ajaxGetBunnyFamily(): void
+    {
+        $this->assertManageOptionsAjax(__('You are not allowed to load Bunny Fonts families.', 'tasty-fonts'));
+        check_ajax_referer('tasty_fonts_get_bunny_family', 'nonce');
+
+        $familyName = $this->getPostedText('family');
+
+        if ($familyName === '') {
+            $this->sendAjaxError(__('A Bunny Fonts family name is required.', 'tasty-fonts'), 400);
+        }
+
+        $result = $this->bunnyClient->getFamily($familyName);
+
+        if ($result === null) {
+            $this->sendAjaxError(__('No Bunny Fonts family matched that name.', 'tasty-fonts'), 404);
+        }
+
+        wp_send_json_success(['item' => $result]);
+    }
+
     public function ajaxImportGoogle(): void
     {
         $this->assertManageOptionsAjax(__('You are not allowed to import Google Fonts.', 'tasty-fonts'));
@@ -173,6 +213,23 @@ final class AdminController
         $result = $this->googleImport->importFamily(
             $this->getPostedText('family'),
             $this->getPostedGoogleVariants()
+        );
+
+        if (is_wp_error($result)) {
+            $this->sendAjaxError($result->get_error_message(), 400);
+        }
+
+        wp_send_json_success($result);
+    }
+
+    public function ajaxImportBunny(): void
+    {
+        $this->assertManageOptionsAjax(__('You are not allowed to import Bunny Fonts.', 'tasty-fonts'));
+        check_ajax_referer('tasty_fonts_import_bunny', 'nonce');
+
+        $result = $this->bunnyImport->importFamily(
+            $this->getPostedText('family'),
+            $this->getPostedVariantTokens()
         );
 
         if (is_wp_error($result)) {
@@ -229,6 +286,30 @@ final class AdminController
         );
     }
 
+    public function ajaxSaveFamilyFontDisplay(): void
+    {
+        $this->assertManageOptionsAjax(__('You are not allowed to update font display settings.', 'tasty-fonts'));
+        check_ajax_referer('tasty_fonts_save_family_font_display', 'nonce');
+
+        $family = $this->getPostedText('family');
+        $display = $this->getPostedFamilyFontDisplay('font_display');
+
+        if ($family === '') {
+            $this->sendAjaxError(__('A font family is required before saving font-display.', 'tasty-fonts'), 400);
+        }
+
+        $result = $this->saveFamilyFontDisplaySelection($family, $display);
+
+        wp_send_json_success(
+            [
+                'family' => $family,
+                'font_display' => $result['font_display'],
+                'effective_font_display' => $result['effective_font_display'],
+                'message' => $result['message'],
+            ]
+        );
+    }
+
     public function ajaxSaveRoleDraft(): void
     {
         $this->assertManageOptionsAjax(__('You are not allowed to update font roles.', 'tasty-fonts'));
@@ -255,7 +336,7 @@ final class AdminController
         $applyEverywhere = !empty($settings['auto_apply_roles']);
         $appliedRoles = $this->settings->getAppliedRoles($availableFamilies);
 
-        $this->assets->refreshGeneratedAssets(false);
+        $this->assets->refreshGeneratedAssets(false, false);
 
         $message = $this->buildRolesSavedMessage('save', $roles, $appliedRoles, $applyEverywhere);
         $this->log->add($message);
@@ -402,6 +483,26 @@ final class AdminController
         $this->redirectWithNoticeKey('fallback_saved');
     }
 
+    private function handleSaveFamilyFontDisplayAction(): bool
+    {
+        if (!isset($_POST['tasty_fonts_save_family_font_display'])) {
+            return false;
+        }
+
+        check_admin_referer('tasty_fonts_save_family_font_display');
+
+        $family = $this->getPostedText('tasty_fonts_family_name');
+        $display = $this->getPostedFamilyFontDisplay('tasty_fonts_family_font_display');
+
+        if ($family === '') {
+            $this->redirectWithError(__('A font family is required before saving font-display.', 'tasty-fonts'));
+        }
+
+        $result = $this->saveFamilyFontDisplaySelection($family, $display);
+
+        $this->redirectWithSuccess((string) ($result['message'] ?? __('Font display saved.', 'tasty-fonts')));
+    }
+
     private function handleDeleteFamilyAction(): bool
     {
         if (!isset($_POST['tasty_fonts_delete_family'])) {
@@ -510,6 +611,7 @@ final class AdminController
         $counts = $this->catalog->getCounts();
         $assetStatus = $this->assets->getStatus();
         $familyFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
+        $familyFontDisplays = is_array($settings['family_font_displays'] ?? null) ? $settings['family_font_displays'] : [];
         $applyEverywhere = !empty($settings['auto_apply_roles']);
         $previewContext = $this->buildPreviewContext($settings);
         $adobeAccessContext = $this->buildAdobeAccessContext();
@@ -530,6 +632,8 @@ final class AdminController
             'logs' => $logs,
             'activity_actor_options' => $this->buildActivityActorOptions($logs),
             'family_fallbacks' => $familyFallbacks,
+            'family_font_displays' => $familyFontDisplays,
+            'family_font_display_options' => $this->buildFamilyFontDisplayOptions((string) ($settings['font_display'] ?? 'optional')),
             'preview_text' => $previewContext['preview_text'],
             'preview_size' => $previewContext['preview_size'],
             'google_api_state' => $googleAccessContext['google_api_state'],
@@ -558,6 +662,7 @@ final class AdminController
             'diagnostic_items' => $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts),
             'overview_metrics' => $this->buildOverviewMetrics($counts, $applyEverywhere, $assetStatus),
             'output_panels' => $this->buildOutputPanels($roles, $settings),
+            'generated_css_panel' => $this->buildGeneratedCssPanel($settings),
             'preview_panels' => $this->buildPreviewPanels(),
             'toasts' => $this->buildNoticeToasts(),
         ];
@@ -610,6 +715,11 @@ final class AdminController
                 'code' => true,
             ],
             [
+                'label' => __('Bunny Import Folder', 'tasty-fonts'),
+                'value' => is_array($storage) ? (string) ($storage['bunny_dir'] ?? __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
+                'code' => true,
+            ],
+            [
                 'label' => __('Library Inventory', 'tasty-fonts'),
                 'value' => sprintf(
                     __('%1$d families / %2$d files', 'tasty-fonts'),
@@ -624,7 +734,7 @@ final class AdminController
                 'code' => false,
             ],
             [
-                'label' => __('Font Display', 'tasty-fonts'),
+                'label' => __('Default Font Display', 'tasty-fonts'),
                 'value' => (string) ($settings['font_display'] ?? 'optional'),
                 'code' => false,
             ],
@@ -661,9 +771,6 @@ final class AdminController
     private function buildOutputPanels(array $roles, array $settings): array
     {
         $minifyOutput = !empty($settings['minify_css_output']);
-        $generatedCssValue = !empty($settings['auto_apply_roles'])
-            ? trim($this->assets->getCss())
-            : __('Not generated while Apply Sitewide is off.', 'tasty-fonts');
 
         return [
             [
@@ -694,13 +801,19 @@ final class AdminController
                 'value' => $this->cssBuilder->buildRoleNameSnippet($roles),
                 'active' => false,
             ],
-            [
-                'key' => 'generated',
-                'label' => __('Generated CSS', 'tasty-fonts'),
-                'target' => 'tasty-fonts-output-generated',
-                'value' => $generatedCssValue,
-                'active' => false,
-            ],
+        ];
+    }
+
+    private function buildGeneratedCssPanel(array $settings): array
+    {
+        return [
+            'key' => 'generated',
+            'label' => __('Generated CSS', 'tasty-fonts'),
+            'target' => 'tasty-fonts-output-generated',
+            'value' => !empty($settings['auto_apply_roles'])
+                ? trim($this->assets->getCss())
+                : __('Not generated while Apply Sitewide is off.', 'tasty-fonts'),
+            'active' => false,
         ];
     }
 
@@ -831,12 +944,43 @@ final class AdminController
     private function buildFontDisplayOptions(): array
     {
         return [
-            ['value' => 'optional', 'label' => __('Optional (Recommended)', 'tasty-fonts')],
-            ['value' => 'swap', 'label' => __('Swap', 'tasty-fonts')],
-            ['value' => 'fallback', 'label' => __('Fallback', 'tasty-fonts')],
-            ['value' => 'block', 'label' => __('Block', 'tasty-fonts')],
-            ['value' => 'auto', 'label' => __('Auto', 'tasty-fonts')],
+            ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional', true)],
+            ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
+            ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
+            ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
+            ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
         ];
+    }
+
+    private function buildFamilyFontDisplayOptions(string $globalDisplay): array
+    {
+        return [
+            [
+                'value' => 'inherit',
+                'label' => sprintf(
+                    __('Inherit Global (%s)', 'tasty-fonts'),
+                    $this->formatFontDisplayLabel($globalDisplay)
+                ),
+            ],
+            ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
+            ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
+            ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
+            ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
+            ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
+        ];
+    }
+
+    private function formatFontDisplayLabel(string $display, bool $recommended = false): string
+    {
+        return match ($display) {
+            'auto' => __('Auto', 'tasty-fonts'),
+            'block' => __('Block', 'tasty-fonts'),
+            'swap' => __('Swap', 'tasty-fonts'),
+            'fallback' => __('Fallback', 'tasty-fonts'),
+            default => $recommended
+                ? __('Optional (Recommended)', 'tasty-fonts')
+                : __('Optional', 'tasty-fonts'),
+        };
     }
 
     private function formatCssDeliveryModeLabel(string $mode): string
@@ -860,16 +1004,29 @@ final class AdminController
             'searching' => __('Searching Google Fonts…', 'tasty-fonts'),
             'searchEmpty' => __('No Google Fonts families matched that search.', 'tasty-fonts'),
             'searchDisabled' => $searchDisabledMessage,
+            'bunnySearching' => __('Searching Bunny Fonts…', 'tasty-fonts'),
+            'bunnySearchEmpty' => __('No Bunny Fonts families matched that search.', 'tasty-fonts'),
+            'bunnySearchStyles' => __('%1$d style%2$s', 'tasty-fonts'),
             'selectFamily' => __('Select a family from search results or type one manually.', 'tasty-fonts'),
+            'bunnySelectFamily' => __('Type a Bunny Fonts family name before importing.', 'tasty-fonts'),
+            'bunnyImportFamilyEmpty' => __('Choose a Bunny family or type one manually.', 'tasty-fonts'),
             'importFamilyEmpty' => __('Choose a Google family or type one manually.', 'tasty-fonts'),
             'importPreviewEmpty' => __('Preview appears here after you choose a family.', 'tasty-fonts'),
             'importing' => __('Importing and self-hosting selected files…', 'tasty-fonts'),
             'importSuccess' => __('Font imported successfully. Reloading…', 'tasty-fonts'),
             'importError' => __('The Google Fonts import failed.', 'tasty-fonts'),
+            'bunnyImportError' => __('The Bunny Fonts import failed.', 'tasty-fonts'),
             'importProgress' => __('Importing %1$s: %2$d of %3$d (%4$s)…', 'tasty-fonts'),
             'importSummary' => __('Imported %1$d variant%2$s. %3$d skipped. Reloading…', 'tasty-fonts'),
             'importAlreadyExists' => __('%s already exists in the library for the selected variants.', 'tasty-fonts'),
             'importNoVariants' => __('Select at least one variant to import.', 'tasty-fonts'),
+            'bunnyImportReady' => __('Paste a Bunny Fonts family name and optional variants, then self-host the downloaded WOFF2 files locally.', 'tasty-fonts'),
+            'bunnyImportSubmitting' => __('Importing Bunny Fonts and self-hosting the selected files…', 'tasty-fonts'),
+            'bunnyImportPreviewEmpty' => __('Preview appears here after you choose a Bunny family.', 'tasty-fonts'),
+            'bunnyImportNoVariants' => __('Leave variants blank to import the default regular face, or enter tokens like regular, italic, 700, or 700italic.', 'tasty-fonts'),
+            'bunnyImportBusy' => __('Importing Bunny Fonts…', 'tasty-fonts'),
+            'bunnyImportSuccess' => __('Bunny Fonts imported successfully. Reloading…', 'tasty-fonts'),
+            'bunnyImportSelectionSummaryDefault' => __('Default Regular Face', 'tasty-fonts'),
             'importButtonIdle' => __('Import and Self-Host', 'tasty-fonts'),
             'importButtonBusy' => __('Importing…', 'tasty-fonts'),
             'importEstimateFiles' => __('%1$d File%2$s Selected', 'tasty-fonts'),
@@ -901,9 +1058,12 @@ final class AdminController
             'rolesDraftSaved' => __('Role draft saved.', 'tasty-fonts'),
             'rolesDraftSaveError' => __('The role draft could not be saved.', 'tasty-fonts'),
             'fallbackSaving' => __('Saving fallback…', 'tasty-fonts'),
+            'fontDisplaySaving' => __('Saving font display…', 'tasty-fonts'),
             'deleteConfirm' => __('Delete "%s" and remove its files from uploads/fonts?', 'tasty-fonts'),
             'fallbackSaved' => __('Saved fallback for %1$s.', 'tasty-fonts'),
             'fallbackSaveError' => __('The fallback could not be saved.', 'tasty-fonts'),
+            'fontDisplaySaved' => __('Saved font display for %1$s.', 'tasty-fonts'),
+            'fontDisplaySaveError' => __('The font-display override could not be saved.', 'tasty-fonts'),
             'copied' => __('Copied', 'tasty-fonts'),
             'copy' => __('Copy', 'tasty-fonts'),
             'activityCountSingle' => __('%1$d entry', 'tasty-fonts'),
@@ -1275,6 +1435,28 @@ final class AdminController
         }
     }
 
+    private function saveFamilyFontDisplaySelection(string $family, string $display): array
+    {
+        $this->settings->saveFamilyFontDisplay($family, $display);
+
+        $settings = $this->settings->getSettings();
+        $savedDisplay = $this->settings->getFamilyFontDisplay($family);
+        $effectiveDisplay = $savedDisplay !== ''
+            ? $savedDisplay
+            : (string) ($settings['font_display'] ?? 'optional');
+
+        $this->assets->refreshGeneratedAssets(false);
+
+        $message = $this->buildFamilyFontDisplaySavedMessage($family, $savedDisplay, $effectiveDisplay);
+        $this->log->add($message);
+
+        return [
+            'font_display' => $savedDisplay === '' ? 'inherit' : $savedDisplay,
+            'effective_font_display' => $effectiveDisplay,
+            'message' => $message,
+        ];
+    }
+
     private function getPostedText(string $key, string $default = ''): string
     {
         if (!isset($_POST[$key])) {
@@ -1289,7 +1471,23 @@ final class AdminController
         return FontUtils::sanitizeFallback($this->getPostedText($key, $default));
     }
 
+    private function getPostedFamilyFontDisplay(string $key, string $default = 'inherit'): string
+    {
+        $display = $this->getPostedText($key, $default);
+
+        if ($display === 'inherit') {
+            return 'inherit';
+        }
+
+        return $this->isSupportedFontDisplay($display) ? $display : 'inherit';
+    }
+
     private function getPostedGoogleVariants(): array
+    {
+        return $this->getPostedVariantTokens();
+    }
+
+    private function getPostedVariantTokens(): array
     {
         $variants = isset($_POST['variants'])
             ? array_map('sanitize_text_field', (array) wp_unslash($_POST['variants']))
@@ -1357,6 +1555,28 @@ final class AdminController
     private function sendAjaxError(string $message, int $status): never
     {
         wp_send_json_error(['message' => $message], $status);
+    }
+
+    private function buildFamilyFontDisplaySavedMessage(string $family, string $savedDisplay, string $effectiveDisplay): string
+    {
+        if ($savedDisplay === '') {
+            return sprintf(
+                __('Font display for %1$s now inherits the global default (%2$s).', 'tasty-fonts'),
+                $family,
+                $this->formatFontDisplayLabel($effectiveDisplay)
+            );
+        }
+
+        return sprintf(
+            __('Saved font-display for %1$s: %2$s.', 'tasty-fonts'),
+            $family,
+            $this->formatFontDisplayLabel($effectiveDisplay)
+        );
+    }
+
+    private function isSupportedFontDisplay(string $display): bool
+    {
+        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true);
     }
 
     private function queueNoticeToast(string $tone, string $message, string $role): void

@@ -31,6 +31,9 @@ final class Storage
         $googleDir = wp_normalize_path(trailingslashit($rootDir) . 'google');
         $googleUrl = $rootUrl . '/google';
         $googleUrlFull = $rootUrlFull . '/google';
+        $bunnyDir = wp_normalize_path(trailingslashit($rootDir) . 'bunny');
+        $bunnyUrl = $rootUrl . '/bunny';
+        $bunnyUrlFull = $rootUrlFull . '/bunny';
 
         if (!$this->ensureDirectory($rootDir) || !is_dir($rootDir) || !is_readable($rootDir)) {
             return null;
@@ -43,6 +46,9 @@ final class Storage
             'google_dir' => $googleDir,
             'google_url' => $googleUrl,
             'google_url_full' => $googleUrlFull,
+            'bunny_dir' => $bunnyDir,
+            'bunny_url' => $bunnyUrl,
+            'bunny_url_full' => $bunnyUrlFull,
         ];
 
         return $this->storage;
@@ -60,13 +66,29 @@ final class Storage
 
     public function getGoogleRoot(): ?string
     {
-        $googleDir = $this->getStorageValue('google_dir');
+        return $this->getProviderRoot('google');
+    }
 
-        if ($googleDir === null) {
+    public function getBunnyRoot(): ?string
+    {
+        return $this->getProviderRoot('bunny');
+    }
+
+    public function getProviderRoot(string $provider): ?string
+    {
+        $provider = strtolower(trim($provider));
+
+        if ($provider === '') {
             return null;
         }
 
-        return $this->ensureDirectory($googleDir) ? $googleDir : null;
+        $providerDir = $this->getStorageValue($provider . '_dir');
+
+        if ($providerDir === null) {
+            return null;
+        }
+
+        return $this->ensureDirectory($providerDir) ? $providerDir : null;
     }
 
     public function getGeneratedCssPath(): ?string

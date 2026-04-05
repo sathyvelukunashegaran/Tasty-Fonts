@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace TastyFonts\Google;
+namespace TastyFonts\Bunny;
 
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
@@ -13,15 +13,15 @@ use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
-final class GoogleImportService
+final class BunnyImportService
 {
     private const MAX_FONT_FILE_BYTES = 10 * MB_IN_BYTES;
 
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
-        private readonly GoogleFontsClient $client,
-        private readonly GoogleCssParser $parser,
+        private readonly BunnyFontsClient $client,
+        private readonly BunnyCssParser $parser,
         private readonly CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly LogRepository $log
@@ -33,25 +33,26 @@ final class GoogleImportService
         $familyName = trim(wp_strip_all_tags($familyName));
 
         if ($familyName === '') {
-            return $this->error('tasty_fonts_missing_family', __('Choose a Google Fonts family before importing.', 'tasty-fonts'));
+            return $this->error('tasty_fonts_missing_family', __('Choose a Bunny Fonts family before importing.', 'tasty-fonts'));
         }
 
         $familySlug = FontUtils::slugify($familyName);
-        $variants = FontUtils::normalizeVariantTokens($variants);
+        $normalizedVariants = FontUtils::normalizeVariantTokens($variants);
+        $requestedVariants = $normalizedVariants === [] ? ['regular'] : $normalizedVariants;
         $existingCatalogFamily = $this->findCatalogFamily($familyName, $familySlug);
         $existingImport = $this->imports->get($familySlug);
 
-        if ($existingCatalogFamily !== null && !in_array('google', (array) ($existingCatalogFamily['sources'] ?? []), true)) {
+        if ($existingCatalogFamily !== null && !in_array('bunny', (array) ($existingCatalogFamily['sources'] ?? []), true)) {
             return $this->error(
                 'tasty_fonts_family_already_exists',
                 sprintf(
-                    __('%s already exists in the library as a local family. Remove or rename the existing files before importing it from Google Fonts.', 'tasty-fonts'),
+                    __('%s already exists in the library as another source. Remove or rename the existing family before importing it from Bunny Fonts.', 'tasty-fonts'),
                     $familyName
                 )
             );
         }
 
-        $variantPlan = $this->buildVariantPlan($variants, $existingImport);
+        $variantPlan = $this->buildVariantPlan($requestedVariants, $existingImport);
 
         if ($variantPlan['import'] === []) {
             $message = sprintf(
@@ -67,13 +68,12 @@ final class GoogleImportService
                 'family' => $familyName,
                 'faces' => 0,
                 'files' => 0,
-                'variants' => $variants,
+                'variants' => $requestedVariants,
                 'imported_variants' => [],
                 'skipped_variants' => $variantPlan['skipped'],
             ];
         }
 
-        $metadata = $this->client->getFamily($familyName);
         $css = $this->client->fetchCss($familyName, $variantPlan['import']);
 
         if (is_wp_error($css)) {
@@ -87,7 +87,7 @@ final class GoogleImportService
 
         if ($faces === []) {
             return $this->error(
-                'tasty_fonts_google_no_faces',
+                'tasty_fonts_bunny_no_faces',
                 __('No downloadable WOFF2 faces were returned for that family.', 'tasty-fonts')
             );
         }
@@ -97,7 +97,8 @@ final class GoogleImportService
         if (is_wp_error($familyDirectory)) {
             return $familyDirectory;
         }
-        $provider = $this->buildProviderMetadata($metadata, $variantPlan['import']);
+
+        $provider = $this->buildProviderMetadata($variantPlan['import']);
         $newManifestFaces = [];
         $downloadedFiles = 0;
 
@@ -122,7 +123,7 @@ final class GoogleImportService
 
         if ($newManifestFaces === []) {
             return $this->error(
-                'tasty_fonts_google_empty_manifest',
+                'tasty_fonts_bunny_empty_manifest',
                 __('No local font files were saved from that import.', 'tasty-fonts')
             );
         }
@@ -144,8 +145,8 @@ final class GoogleImportService
             [
                 'family' => $familyName,
                 'slug' => $familySlug,
-                'provider' => 'google',
-                'category' => (string) ($metadata['category'] ?? ''),
+                'provider' => 'bunny',
+                'category' => '',
                 'variants' => $allVariants,
                 'imported_at' => current_time('mysql'),
                 'faces' => $mergedFaces,
@@ -189,25 +190,25 @@ final class GoogleImportService
 
     private function resolveImportTarget(string $familySlug): string|WP_Error
     {
-        $googleRoot = $this->getGoogleRootDirectory();
+        $bunnyRoot = $this->getBunnyRootDirectory();
 
-        if (is_wp_error($googleRoot)) {
-            return $googleRoot;
+        if (is_wp_error($bunnyRoot)) {
+            return $bunnyRoot;
         }
 
-        $familyDirectory = trailingslashit($googleRoot) . $familySlug;
+        $familyDirectory = trailingslashit($bunnyRoot) . $familySlug;
 
         if (!$this->storage->ensureDirectory($familyDirectory)) {
             return $this->error(
-                'tasty_fonts_google_family_dir_failed',
-                __('The Google Fonts import directory could not be created.', 'tasty-fonts')
+                'tasty_fonts_bunny_family_dir_failed',
+                __('The Bunny Fonts import directory could not be created.', 'tasty-fonts')
             );
         }
 
         return $familyDirectory;
     }
 
-    private function getGoogleRootDirectory(): string|WP_Error
+    private function getBunnyRootDirectory(): string|WP_Error
     {
         if (!$this->storage->ensureRootDirectory()) {
             return $this->error(
@@ -216,16 +217,16 @@ final class GoogleImportService
             );
         }
 
-        $googleRoot = $this->storage->getProviderRoot('google');
+        $bunnyRoot = $this->storage->getProviderRoot('bunny');
 
-        if (!$googleRoot) {
+        if (!$bunnyRoot) {
             return $this->error(
                 'tasty_fonts_storage_unavailable',
                 __('The uploads/fonts storage directory could not be created.', 'tasty-fonts')
             );
         }
 
-        return $googleRoot;
+        return $bunnyRoot;
     }
 
     private function buildManifestFace(
@@ -269,7 +270,7 @@ final class GoogleImportService
         return [
             'family' => $familyName,
             'slug' => $familySlug,
-            'source' => 'google',
+            'source' => 'bunny',
             'weight' => (string) $face['weight'],
             'style' => (string) $face['style'],
             'unicode_range' => (string) ($face['unicode_range'] ?? ''),
@@ -305,7 +306,7 @@ final class GoogleImportService
 
         if ($status !== 200) {
             return $this->error(
-                'tasty_fonts_google_download_failed',
+                'tasty_fonts_bunny_download_failed',
                 sprintf(__('Font download failed with status %d.', 'tasty-fonts'), $status)
             );
         }
@@ -314,14 +315,14 @@ final class GoogleImportService
 
         if (!is_string($body) || $body === '') {
             return $this->error(
-                'tasty_fonts_google_empty_file',
-                __('Google Fonts returned an empty font file.', 'tasty-fonts')
+                'tasty_fonts_bunny_empty_file',
+                __('Bunny Fonts returned an empty font file.', 'tasty-fonts')
             );
         }
 
         if (strlen($body) > self::MAX_FONT_FILE_BYTES) {
             return $this->error(
-                'tasty_fonts_google_file_too_large',
+                'tasty_fonts_bunny_file_too_large',
                 __('The downloaded font file exceeded the safety size limit.', 'tasty-fonts')
             );
         }
@@ -335,14 +336,14 @@ final class GoogleImportService
             && !str_contains($contentType, 'octet-stream')
         ) {
             return $this->error(
-                'tasty_fonts_google_invalid_type',
+                'tasty_fonts_bunny_invalid_type',
                 __('The downloaded file was not returned as a WOFF2 font.', 'tasty-fonts')
             );
         }
 
         if (!$this->storage->writeAbsoluteFile($targetPath, $body)) {
             return $this->error(
-                'tasty_fonts_google_write_failed',
+                'tasty_fonts_bunny_write_failed',
                 __('The imported font file could not be written to uploads/fonts.', 'tasty-fonts')
             );
         }
@@ -356,53 +357,29 @@ final class GoogleImportService
         $host = strtolower((string) ($parts['host'] ?? ''));
         $path = strtolower((string) ($parts['path'] ?? ''));
 
-        if ($host !== 'fonts.gstatic.com') {
+        if ($host !== 'fonts.bunny.net') {
             return $this->error(
-                'tasty_fonts_google_invalid_host',
-                __('Google font downloads must come from fonts.gstatic.com.', 'tasty-fonts')
+                'tasty_fonts_bunny_invalid_host',
+                __('Bunny font downloads must come from fonts.bunny.net.', 'tasty-fonts')
             );
         }
 
         if (!str_ends_with($path, '.woff2')) {
             return $this->error(
-                'tasty_fonts_google_invalid_extension',
-                __('Only WOFF2 files can be imported from Google Fonts.', 'tasty-fonts')
+                'tasty_fonts_bunny_invalid_extension',
+                __('Only WOFF2 files can be imported from Bunny Fonts.', 'tasty-fonts')
             );
         }
 
         return true;
     }
 
-    private function error(string $code, string $message): WP_Error
-    {
-        $this->log->add($message);
-
-        return new WP_Error($code, $message);
-    }
-
-    private function buildProviderMetadata(?array $metadata, array $variants): array
+    private function buildProviderMetadata(array $variants): array
     {
         return [
-            'type' => 'google',
-            'category' => (string) ($metadata['category'] ?? ''),
+            'type' => 'bunny',
             'variants' => $variants,
-            'lastModified' => (string) ($metadata['lastModified'] ?? ''),
-            'version' => (string) ($metadata['version'] ?? ''),
         ];
-    }
-
-    private function findCatalogFamily(string $familyName, string $familySlug): ?array
-    {
-        foreach ($this->catalog->getCatalog() as $family) {
-            $catalogName = (string) ($family['family'] ?? '');
-            $catalogSlug = (string) ($family['slug'] ?? '');
-
-            if ($catalogSlug === $familySlug || strcasecmp($catalogName, $familyName) === 0) {
-                return $family;
-            }
-        }
-
-        return null;
     }
 
     private function buildVariantPlan(array $requestedVariants, ?array $existingImport): array
@@ -421,18 +398,18 @@ final class GoogleImportService
         $skipped = [];
 
         foreach ($requestedVariants as $variant) {
-            $faceKey = HostedImportSupport::faceKeyFromVariant($variant);
+            $faceKey = HostedImportSupport::faceKeyFromVariant((string) $variant);
 
             if ($faceKey === null) {
                 continue;
             }
 
             if (isset($existingKeys[$faceKey])) {
-                $skipped[] = $variant;
+                $skipped[] = (string) $variant;
                 continue;
             }
 
-            $toImport[] = $variant;
+            $toImport[] = (string) $variant;
         }
 
         return [
@@ -441,4 +418,24 @@ final class GoogleImportService
         ];
     }
 
+    private function findCatalogFamily(string $familyName, string $familySlug): ?array
+    {
+        foreach ($this->catalog->getCatalog() as $family) {
+            $catalogName = (string) ($family['family'] ?? '');
+            $catalogSlug = (string) ($family['slug'] ?? '');
+
+            if ($catalogSlug === $familySlug || strcasecmp($catalogName, $familyName) === 0) {
+                return $family;
+            }
+        }
+
+        return null;
+    }
+
+    private function error(string $code, string $message): WP_Error
+    {
+        $this->log->add($message);
+
+        return new WP_Error($code, $message);
+    }
 }

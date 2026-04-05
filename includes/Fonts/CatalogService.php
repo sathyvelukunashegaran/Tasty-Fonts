@@ -16,6 +16,7 @@ final class CatalogService
 {
     private const TRANSIENT_CATALOG = 'tasty_fonts_catalog_v2';
     private const LOCAL_FORMATS = ['woff2', 'woff', 'ttf', 'otf'];
+    private const IMPORTED_SOURCES = ['google', 'bunny'];
     private const DEFAULT_COUNTS = [
         'families' => 0,
         'files' => 0,
@@ -124,7 +125,7 @@ final class CatalogService
     private function scanLocalFamilies(): array
     {
         $root = $this->storage->getRoot();
-        $googleRootPrefix = $this->getGoogleRootPrefix();
+        $importRootPrefixes = $this->getImportedRootPrefixes();
 
         if (!$root || !is_dir($root) || !is_readable($root)) {
             return [];
@@ -139,7 +140,7 @@ final class CatalogService
         );
 
         foreach ($iterator as $file) {
-            if (!$file instanceof SplFileInfo || !$this->isScannableLocalFile($file, $googleRootPrefix)) {
+            if (!$file instanceof SplFileInfo || !$this->isScannableLocalFile($file, $importRootPrefixes)) {
                 continue;
             }
 
@@ -189,11 +190,27 @@ final class CatalogService
                 continue;
             }
 
+            $sources = array_values(
+                array_unique(
+                    array_filter(
+                        array_map(
+                            static fn (array $face): string => strtolower(trim((string) ($face['source'] ?? ''))),
+                            $faces
+                        ),
+                        'strlen'
+                    )
+                )
+            );
+
+            if ($sources === []) {
+                $sources = [$this->resolveImportedSource($import)];
+            }
+
             $families[] = [
                 'family' => $familyName,
                 'slug' => $familySlug,
                 'faces' => $faces,
-                'sources' => ['google'],
+                'sources' => $sources,
             ];
         }
 
@@ -224,10 +241,12 @@ final class CatalogService
             return null;
         }
 
+        $source = $this->resolveImportedFaceSource($face);
+
         return [
             'family' => $familyName,
             'slug' => $familySlug,
-            'source' => 'google',
+            'source' => $source,
             'weight' => FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')),
             'style' => FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')),
             'unicode_range' => trim((string) ($face['unicode_range'] ?? '')),
@@ -313,15 +332,24 @@ final class CatalogService
         );
     }
 
-    private function getGoogleRootPrefix(): string
+    private function getImportedRootPrefixes(): array
     {
-        $storage = $this->storage->get();
-        $googleRoot = is_array($storage) ? ($storage['google_dir'] ?? null) : null;
+        $prefixes = [];
 
-        return is_string($googleRoot) ? trailingslashit(wp_normalize_path($googleRoot)) : '';
+        foreach (self::IMPORTED_SOURCES as $source) {
+            $root = $this->storage->getProviderRoot($source);
+
+            if (!is_string($root) || $root === '') {
+                continue;
+            }
+
+            $prefixes[] = trailingslashit(wp_normalize_path($root));
+        }
+
+        return $prefixes;
     }
 
-    private function isScannableLocalFile(SplFileInfo $file, string $googleRootPrefix): bool
+    private function isScannableLocalFile(SplFileInfo $file, array $importRootPrefixes): bool
     {
         if (!$file->isFile()) {
             return false;
@@ -329,8 +357,10 @@ final class CatalogService
 
         $absolutePath = wp_normalize_path($file->getPathname());
 
-        if ($googleRootPrefix !== '' && str_starts_with($absolutePath, $googleRootPrefix)) {
-            return false;
+        foreach ($importRootPrefixes as $prefix) {
+            if ($prefix !== '' && str_starts_with($absolutePath, $prefix)) {
+                return false;
+            }
         }
 
         return in_array(strtolower($file->getExtension()), self::LOCAL_FORMATS, true);
@@ -398,7 +428,7 @@ final class CatalogService
                 continue;
             }
 
-            if (($existing['source'] ?? 'local') === 'google' && ($face['source'] ?? 'local') === 'google') {
+            if ($this->isManagedImportSource((string) ($existing['source'] ?? 'local')) && $existing['source'] === ($face['source'] ?? 'local')) {
                 $existing['files'] = $face['files'];
                 $existing['paths'] = $face['paths'];
                 $existing['unicode_range'] = trim((string) ($face['unicode_range'] ?? ''));
@@ -417,13 +447,42 @@ final class CatalogService
 
     private function faceIdentityKey(array $face): string
     {
-        $source = (string) ($face['source'] ?? 'local');
-        $unicodeRange = $source === 'google' ? '' : (string) ($face['unicode_range'] ?? '');
+        $source = strtolower(trim((string) ($face['source'] ?? 'local')));
+        $unicodeRange = $this->isManagedImportSource($source) ? '' : (string) ($face['unicode_range'] ?? '');
 
         return FontUtils::variantKey(
             (string) ($face['weight'] ?? '400'),
             (string) ($face['style'] ?? 'normal'),
             $unicodeRange
         ) . '|' . $source;
+    }
+
+    private function resolveImportedFaceSource(array $face): string
+    {
+        $provider = is_array($face['provider'] ?? null) ? $face['provider'] : [];
+        $providerType = strtolower(trim((string) ($provider['type'] ?? '')));
+        $faceSource = strtolower(trim((string) ($face['source'] ?? '')));
+
+        if ($this->isManagedImportSource($providerType)) {
+            return $providerType;
+        }
+
+        if ($this->isManagedImportSource($faceSource)) {
+            return $faceSource;
+        }
+
+        return 'google';
+    }
+
+    private function resolveImportedSource(array $import): string
+    {
+        $provider = strtolower(trim((string) ($import['provider'] ?? '')));
+
+        return $this->isManagedImportSource($provider) ? $provider : 'google';
+    }
+
+    private function isManagedImportSource(string $source): bool
+    {
+        return in_array(strtolower(trim($source)), self::IMPORTED_SOURCES, true);
     }
 }

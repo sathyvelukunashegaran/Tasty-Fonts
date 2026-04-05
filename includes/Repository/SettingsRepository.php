@@ -31,6 +31,7 @@ final class SettingsRepository
         'google_api_key_status_message' => '',
         'google_api_key_checked_at' => 0,
         'family_fallbacks' => [],
+        'family_font_displays' => [],
     ];
     private const DEFAULT_ROLE_FALLBACKS = [
         'heading_fallback' => 'sans-serif',
@@ -62,6 +63,7 @@ final class SettingsRepository
         $settings['google_api_key_status_message'] = $this->sanitizeStatusMessage($settings['google_api_key_status_message'] ?? '');
         $settings['google_api_key_checked_at'] = $this->normalizeTimestamp($settings['google_api_key_checked_at'] ?? 0);
         $settings['family_fallbacks'] = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
+        $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
         $settings['delete_uploaded_files_on_uninstall'] = !empty($settings['delete_uploaded_files_on_uninstall']);
 
         return $settings;
@@ -316,6 +318,49 @@ final class SettingsRepository
         return $fallbacks;
     }
 
+    public function getFamilyFontDisplay(string $family, string $default = ''): string
+    {
+        $displays = $this->getSettings()['family_font_displays'] ?? [];
+
+        if (!is_array($displays) || trim($family) === '') {
+            return $default === '' ? '' : $this->normalizeFontDisplay($default);
+        }
+
+        if (!array_key_exists($family, $displays)) {
+            return $default === '' ? '' : $this->normalizeFontDisplay($default);
+        }
+
+        return $this->normalizeFontDisplay((string) $displays[$family]);
+    }
+
+    public function saveFamilyFontDisplay(string $family, string $display): array
+    {
+        $family = sanitize_text_field($family);
+
+        if ($family === '') {
+            return $this->getSettings()['family_font_displays'] ?? [];
+        }
+
+        $settings = $this->getSettings();
+        $displays = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
+        $display = sanitize_text_field($display);
+
+        if ($display === 'inherit') {
+            unset($displays[$family]);
+        } elseif ($this->isSupportedFontDisplay($display)) {
+            $displays[$family] = $display;
+        } else {
+            unset($displays[$family]);
+        }
+
+        ksort($displays, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $settings['family_font_displays'] = $displays;
+        $this->persistSettings($settings);
+
+        return $displays;
+    }
+
     private function getDefaultRoles(array $catalog): array
     {
         $families = $this->extractFamilyNames($catalog);
@@ -419,9 +464,14 @@ final class SettingsRepository
 
     private function normalizeFontDisplay(string $display): string
     {
-        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true)
+        return $this->isSupportedFontDisplay($display)
             ? $display
             : 'optional';
+    }
+
+    private function isSupportedFontDisplay(string $display): bool
+    {
+        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true);
     }
 
     private function sanitizeAdobeProjectId(string $projectId): string
@@ -470,6 +520,30 @@ final class SettingsRepository
 
             $normalized[$family] = FontUtils::sanitizeFallback((string) $fallback);
         }
+
+        return $normalized;
+    }
+
+    private function normalizeFamilyFontDisplays(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $family => $display) {
+            $family = sanitize_text_field((string) $family);
+            $display = sanitize_text_field((string) $display);
+
+            if ($family === '' || !$this->isSupportedFontDisplay($display)) {
+                continue;
+            }
+
+            $normalized[$family] = $display;
+        }
+
+        ksort($normalized, SORT_NATURAL | SORT_FLAG_CASE);
 
         return $normalized;
     }

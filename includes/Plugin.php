@@ -7,6 +7,9 @@ namespace TastyFonts;
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Bunny\BunnyCssParser;
+use TastyFonts\Bunny\BunnyFontsClient;
+use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
@@ -38,6 +41,8 @@ final class Plugin
     private readonly LibraryService $library;
     private readonly LocalUploadService $localUpload;
     private readonly AdobeProjectClient $adobe;
+    private readonly BunnyFontsClient $bunnyClient;
+    private readonly BunnyImportService $bunnyImport;
     private readonly GoogleFontsClient $googleClient;
     private readonly GoogleImportService $googleImport;
     private readonly RuntimeService $runtime;
@@ -47,6 +52,7 @@ final class Plugin
     {
         $parser = new FontFilenameParser();
         $adobeCssParser = new AdobeCssParser();
+        $bunnyCssParser = new BunnyCssParser();
         $googleCssParser = new GoogleCssParser();
 
         $this->storage = new Storage();
@@ -83,6 +89,16 @@ final class Plugin
             $this->log
         );
         $this->adobe = new AdobeProjectClient($this->settings, $adobeCssParser);
+        $this->bunnyClient = new BunnyFontsClient();
+        $this->bunnyImport = new BunnyImportService(
+            $this->storage,
+            $this->imports,
+            $this->bunnyClient,
+            $bunnyCssParser,
+            $this->catalog,
+            $this->assets,
+            $this->log
+        );
         $this->googleClient = new GoogleFontsClient($this->settings);
         $this->googleImport = new GoogleImportService(
             $this->storage,
@@ -104,6 +120,8 @@ final class Plugin
             $this->localUpload,
             $this->cssBuilder,
             $this->adobe,
+            $this->bunnyClient,
+            $this->bunnyImport,
             $this->googleClient,
             $this->googleImport
         );
@@ -162,9 +180,13 @@ final class Plugin
         add_action('admin_enqueue_scripts', [$this->admin, 'enqueueAssets']);
         add_filter('plugin_action_links_' . plugin_basename(TASTY_FONTS_FILE), [self::class, 'filterPluginActionLinks']);
         add_action('wp_ajax_tasty_fonts_search_google', [$this->admin, 'ajaxSearchGoogle']);
+        add_action('wp_ajax_tasty_fonts_search_bunny', [$this->admin, 'ajaxSearchBunny']);
+        add_action('wp_ajax_tasty_fonts_get_bunny_family', [$this->admin, 'ajaxGetBunnyFamily']);
+        add_action('wp_ajax_tasty_fonts_import_bunny', [$this->admin, 'ajaxImportBunny']);
         add_action('wp_ajax_tasty_fonts_import_google', [$this->admin, 'ajaxImportGoogle']);
         add_action('wp_ajax_tasty_fonts_upload_local', [$this->admin, 'ajaxUploadLocal']);
         add_action('wp_ajax_tasty_fonts_save_family_fallback', [$this->admin, 'ajaxSaveFamilyFallback']);
+        add_action('wp_ajax_tasty_fonts_save_family_font_display', [$this->admin, 'ajaxSaveFamilyFontDisplay']);
         add_action('wp_ajax_tasty_fonts_save_role_draft', [$this->admin, 'ajaxSaveRoleDraft']);
     }
 
@@ -209,6 +231,7 @@ final class Plugin
             [
                 trailingslashit($root) . 'index.php',
                 trailingslashit($root) . 'google/index.php',
+                trailingslashit($root) . 'bunny/index.php',
             ] as $path
         ) {
             if (!file_exists($path)) {
