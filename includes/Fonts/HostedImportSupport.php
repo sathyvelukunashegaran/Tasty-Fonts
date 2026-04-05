@@ -83,6 +83,34 @@ final class HostedImportSupport
         return array_values($merged);
     }
 
+    public static function variantsFromFaces(array $faces): array
+    {
+        $variants = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
+            $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
+
+            if ($weight === '400' && $style === 'normal') {
+                $variants[] = 'regular';
+                continue;
+            }
+
+            if ($weight === '400' && $style === 'italic') {
+                $variants[] = 'italic';
+                continue;
+            }
+
+            $variants[] = $weight . ($style === 'italic' ? 'italic' : '');
+        }
+
+        return FontUtils::normalizeVariantTokens($variants);
+    }
+
     public static function faceKeyFromVariant(string $variant): ?string
     {
         $axis = FontUtils::googleVariantToAxis($variant);

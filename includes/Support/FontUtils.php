@@ -138,6 +138,13 @@ final class FontUtils
         return implode('/', $segments);
     }
 
+    public static function isRemoteUrl(string $value): bool
+    {
+        $value = trim($value);
+
+        return str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, '//');
+    }
+
     public static function buildStaticFontFilename(string $family, string|int $weight, string $style, string $extension): string
     {
         $family = preg_replace('/\s+/', ' ', trim($family)) ?? '';

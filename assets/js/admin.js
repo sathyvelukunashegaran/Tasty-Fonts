@@ -7,6 +7,7 @@
     const roleHeadingFallback = document.getElementById('tasty_fonts_heading_fallback');
     const roleBodyFallback = document.getElementById('tasty_fonts_body_fallback');
     const roleForm = document.querySelector('[data-role-form]');
+    const roleStudio = document.getElementById('tasty-fonts-roles-studio');
     const roleDeployment = document.querySelector('[data-role-deployment]');
     const roleDeploymentBadge = document.querySelector('[data-role-deployment-badge]');
     const roleDeploymentPill = document.querySelector('[data-role-deployment-pill]');
@@ -97,6 +98,7 @@
     let syncingBunnyVariants = false;
     let renderedBunnyVariantFamily = '';
     let roleDraftSaveInFlight = false;
+    const pendingUiStateKey = 'tastyFontsPendingUiState';
 
     // Shared helpers
     function slugify(value) {
@@ -134,12 +136,58 @@
         return error instanceof Error && error.message ? error.message : fallback;
     }
 
-    function deliveryButtonLabel(mode, provider) {
-        if (mode === 'cdn') {
-            return provider === 'bunny' ? 'Save Bunny CDN' : 'Save Google CDN';
+    function getSessionStorage() {
+        try {
+            return window.sessionStorage || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function savePendingUiState(state) {
+        const storage = getSessionStorage();
+
+        if (!storage || !state || typeof state !== 'object') {
+            return;
         }
 
-        return 'Save Self-Hosted';
+        try {
+            storage.setItem(pendingUiStateKey, JSON.stringify(state));
+        } catch (error) {
+            // Ignore storage failures and continue without persisted UI state.
+        }
+    }
+
+    function consumePendingUiState() {
+        const storage = getSessionStorage();
+
+        if (!storage) {
+            return null;
+        }
+
+        try {
+            const rawValue = storage.getItem(pendingUiStateKey);
+
+            if (!rawValue) {
+                return null;
+            }
+
+            storage.removeItem(pendingUiStateKey);
+
+            return JSON.parse(rawValue);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function deliveryButtonLabel(mode, provider) {
+        if (mode === 'cdn') {
+            return provider === 'bunny'
+                ? getString('saveDeliveryBunnyCdn', 'Add Bunny CDN')
+                : getString('saveDeliveryGoogleCdn', 'Add Google CDN');
+        }
+
+        return getString('saveDeliverySelfHosted', 'Add Self-Hosted');
     }
 
     function formatActivityCount(visibleCount, totalCount) {
@@ -377,7 +425,11 @@
         }
     }
 
-    function reloadPageSoon(delay = 900) {
+    function reloadPageSoon(delay = 900, pendingUiState = null) {
+        if (pendingUiState) {
+            savePendingUiState(pendingUiState);
+        }
+
         window.setTimeout(() => {
             window.location.reload();
         }, delay);
@@ -511,6 +563,225 @@
 
     function normalizeFamilyKey(value) {
         return String(value || '').trim().toLowerCase();
+    }
+
+    function familySlug(value) {
+        return normalizeFamilyKey(slugify(String(value || '')));
+    }
+
+    function libraryFamilySlugs() {
+        return new Set(
+            Array.from(document.querySelectorAll('[data-font-row]'))
+                .map((row) => normalizeFamilyKey(row.getAttribute('data-font-slug') || familySlug(row.getAttribute('data-font-family') || '')))
+                .filter(Boolean)
+        );
+    }
+
+    function isFamilyInLibrary(familyName, explicitSlug = '') {
+        const targetSlug = normalizeFamilyKey(explicitSlug || familySlug(familyName));
+
+        if (!targetSlug) {
+            return false;
+        }
+
+        return libraryFamilySlugs().has(targetSlug);
+    }
+
+    function flashElement(element, className = 'is-emphasized', duration = 2200) {
+        if (!element) {
+            return;
+        }
+
+        if (element._tastyFontsFlashTimer) {
+            window.clearTimeout(element._tastyFontsFlashTimer);
+            element._tastyFontsFlashTimer = 0;
+        }
+
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+        element._tastyFontsFlashTimer = window.setTimeout(() => {
+            element.classList.remove(className);
+            element._tastyFontsFlashTimer = 0;
+        }, duration);
+    }
+
+    function highlightLibraryRow(familySlugValue) {
+        const normalizedSlug = normalizeFamilyKey(familySlugValue);
+
+        if (!normalizedSlug) {
+            return;
+        }
+
+        const row = document.querySelector(`[data-font-row][data-font-slug="${CSS.escape(normalizedSlug)}"]`);
+
+        if (!row) {
+            return;
+        }
+
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        flashElement(row);
+    }
+
+    function highlightRoleSelector(role) {
+        const field = role === 'heading' ? roleHeading : roleBody;
+        const fieldWrap = field ? field.closest('.tasty-fonts-stack-field') : null;
+
+        if (roleStudio) {
+            roleStudio.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        if (field) {
+            window.setTimeout(() => {
+                try {
+                    field.focus({ preventScroll: true });
+                } catch (error) {
+                    field.focus();
+                }
+            }, 120);
+        }
+
+        if (fieldWrap) {
+            window.setTimeout(() => {
+                flashElement(fieldWrap);
+            }, 180);
+        }
+    }
+
+    function normalizeImportFamilySlug(result, fallbackFamily) {
+        if (result && result.family_record && typeof result.family_record.slug === 'string' && result.family_record.slug.trim() !== '') {
+            return normalizeFamilyKey(result.family_record.slug);
+        }
+
+        if (result && typeof result.family === 'string' && result.family.trim() !== '') {
+            return familySlug(result.family);
+        }
+
+        return familySlug(fallbackFamily);
+    }
+
+    function setRadioGroupValue(inputs, value) {
+        let matched = false;
+
+        inputs.forEach((input) => {
+            const isMatch = String(input.value || '') === value;
+            input.checked = isMatch;
+            matched = matched || isMatch;
+        });
+
+        return matched;
+    }
+
+    function ensureAddFontPanelOpen(panelKey) {
+        if (addFontsPanelToggle && addFontsPanelToggle.getAttribute('aria-expanded') !== 'true') {
+            setDisclosureState(addFontsPanelToggle, true);
+        }
+
+        activateTabGroup('add-font', panelKey);
+    }
+
+    function syncSearchCardSelection(provider, familyName) {
+        const resultContainer = provider === 'bunny' ? bunnyResults : googleResults;
+
+        if (!resultContainer) {
+            return;
+        }
+
+        resultContainer.querySelectorAll('.tasty-fonts-search-card').forEach((card) => {
+            const isActive = normalizeFamilyKey(card.dataset.family || '') === normalizeFamilyKey(familyName);
+            card.classList.toggle('is-active', isActive);
+            card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    }
+
+    function prefillSelfHostedMigration(button) {
+        const provider = normalizeFamilyKey(button.getAttribute('data-migrate-provider') || '');
+        const family = String(button.getAttribute('data-migrate-family') || '').trim();
+        const variantsValue = String(button.getAttribute('data-migrate-variants') || '').trim();
+        const variants = normalizeVariantTokens(variantsValue);
+        const seededVariants = variants.length > 0 ? variants : ['regular'];
+
+        if (!family || (provider !== 'google' && provider !== 'bunny')) {
+            return;
+        }
+
+        ensureAddFontPanelOpen(provider);
+
+        if (provider === 'google') {
+            setRadioGroupValue(googleDeliveryModes, 'self_hosted');
+
+            if (manualFamily) {
+                manualFamily.value = family;
+            }
+
+            if (manualVariants) {
+                manualVariants.value = seededVariants.join(',');
+                delete manualVariants.dataset.explicitEmpty;
+            }
+
+            selectedSearchFamily = findGoogleFamilyMatch(family);
+            syncSearchCardSelection('google', selectedSearchFamily ? selectedSearchFamily.family || family : family);
+            renderVariantOptions(
+                selectedSearchFamily && Array.isArray(selectedSearchFamily.variants) && selectedSearchFamily.variants.length > 0
+                    ? selectedSearchFamily.variants
+                    : seededVariants,
+                family
+            );
+            syncImportDeliveryButtons();
+            updateGoogleImportSummary();
+
+            if (manualFamily) {
+                manualFamily.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                window.setTimeout(() => manualFamily.focus(), 120);
+            }
+
+            return;
+        }
+
+        setRadioGroupValue(bunnyDeliveryModes, 'self_hosted');
+
+        if (bunnyFamily) {
+            bunnyFamily.value = family;
+        }
+
+        if (bunnyVariants) {
+            bunnyVariants.value = seededVariants.join(',');
+            delete bunnyVariants.dataset.explicitEmpty;
+        }
+
+        selectedBunnySearchFamily = findBunnyFamilyMatch(family) || {
+            family,
+            slug: familySlug(family),
+            variants: seededVariants,
+        };
+        syncSearchCardSelection('bunny', selectedBunnySearchFamily.family || family);
+        renderBunnyVariantOptions(
+            selectedBunnySearchFamily && Array.isArray(selectedBunnySearchFamily.variants) && selectedBunnySearchFamily.variants.length > 0
+                ? selectedBunnySearchFamily.variants
+                : seededVariants,
+            family
+        );
+        syncImportDeliveryButtons();
+        updateBunnyImportSummary();
+
+        if (bunnyFamily) {
+            bunnyFamily.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            window.setTimeout(() => bunnyFamily.focus(), 120);
+        }
+    }
+
+    function applyPendingUiState() {
+        const pendingUiState = consumePendingUiState();
+
+        if (!pendingUiState || typeof pendingUiState !== 'object') {
+            return;
+        }
+
+        if (pendingUiState.type === 'highlight-library-row') {
+            window.setTimeout(() => {
+                highlightLibraryRow(pendingUiState.familySlug || '');
+            }, 120);
+        }
     }
 
     function findGoogleFamilyMatch(familyName) {
@@ -1740,7 +2011,7 @@
     }
 
     function buildRoleDraftErrorMessage(error) {
-        return getErrorMessage(error, getString('rolesDraftSaveError', 'The role draft could not be saved.'));
+        return getErrorMessage(error, getString('rolesDraftSaveError', 'The roles could not be saved.'));
     }
 
     // Family fallback persistence
@@ -2090,7 +2361,7 @@
             });
 
             if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('rolesDraftSaveError', 'The role draft could not be saved.')));
+                throw new Error(getPayloadMessage(payload, getString('rolesDraftSaveError', 'The roles could not be saved.')));
             }
 
             const data = payload.data || {};
@@ -2114,7 +2385,7 @@
 
             updateRoleOutputs();
             syncRoleDeploymentState(data.role_deployment || null);
-            showToast(data.message || getString('rolesDraftSaved', 'Role draft saved.'), 'success');
+            showToast(data.message || getString('rolesDraftSaved', 'Roles saved.'), 'success');
             return true;
         } catch (error) {
             restoreRoleFieldSnapshot(snapshotBeforeChange);
@@ -2242,12 +2513,14 @@
 
         searchResults.forEach((item) => {
             const card = document.createElement('article');
+            const head = document.createElement('div');
             const title = document.createElement('h3');
             const preview = document.createElement('div');
             const meta = document.createElement('div');
             const category = document.createElement('span');
             const variants = document.createElement('span');
             const fallback = googlePreviewFallback(item.category);
+            const inLibrary = isFamilyInLibrary(item.family || '');
 
             card.className = 'tasty-fonts-search-card';
             card.dataset.family = item.family;
@@ -2258,8 +2531,21 @@
             card.setAttribute('aria-pressed', !!selectedSearchFamily && selectedSearchFamily.family === item.family ? 'true' : 'false');
             card.classList.toggle('is-active', !!selectedSearchFamily && selectedSearchFamily.family === item.family);
 
+            head.className = 'tasty-fonts-search-card-head';
             title.className = 'tasty-fonts-search-card-title';
             title.textContent = item.family;
+            head.appendChild(title);
+
+            if (inLibrary) {
+                const badges = document.createElement('div');
+                const badge = document.createElement('span');
+
+                badges.className = 'tasty-fonts-badges tasty-fonts-badges--import tasty-fonts-search-card-badges';
+                badge.className = 'tasty-fonts-badge is-success';
+                badge.textContent = getString('searchResultInLibrary', 'In Library');
+                badges.appendChild(badge);
+                head.appendChild(badges);
+            }
 
             preview.className = 'tasty-fonts-search-card-preview';
             preview.textContent = googlePreviewText();
@@ -2270,7 +2556,7 @@
             variants.textContent = `${(item.variants || []).length} variant(s)`;
 
             meta.append(category, variants);
-            card.append(title, preview, meta);
+            card.append(head, preview, meta);
             googleResults.appendChild(card);
         });
 
@@ -2395,6 +2681,7 @@
 
         bunnySearchResults.forEach((item) => {
             const card = document.createElement('article');
+            const head = document.createElement('div');
             const title = document.createElement('h3');
             const preview = document.createElement('div');
             const meta = document.createElement('div');
@@ -2403,6 +2690,7 @@
             const fallback = googlePreviewFallback(item.category);
             const styleCount = Number(item.style_count || (Array.isArray(item.variants) ? item.variants.length : 0));
             const isActive = !!selectedBunnySearchFamily && matchesBunnyFamilyEntry(selectedBunnySearchFamily, item.family || item.slug || '');
+            const inLibrary = isFamilyInLibrary(item.family || '', item.slug || '');
 
             card.className = 'tasty-fonts-search-card';
             card.dataset.family = item.family || '';
@@ -2413,8 +2701,21 @@
             card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             card.classList.toggle('is-active', isActive);
 
+            head.className = 'tasty-fonts-search-card-head';
             title.className = 'tasty-fonts-search-card-title';
             title.textContent = item.family || '';
+            head.appendChild(title);
+
+            if (inLibrary) {
+                const badges = document.createElement('div');
+                const badge = document.createElement('span');
+
+                badges.className = 'tasty-fonts-badges tasty-fonts-badges--import tasty-fonts-search-card-badges';
+                badge.className = 'tasty-fonts-badge is-success';
+                badge.textContent = getString('searchResultInLibrary', 'In Library');
+                badges.appendChild(badge);
+                head.appendChild(badges);
+            }
 
             preview.className = 'tasty-fonts-search-card-preview';
             preview.textContent = googlePreviewText();
@@ -2425,7 +2726,7 @@
             variants.textContent = styleCount > 0 ? `${styleCount} variant(s)` : 'Bunny Fonts';
 
             meta.append(category, variants);
-            card.append(title, preview, meta);
+            card.append(head, preview, meta);
             bunnyResults.appendChild(card);
         });
 
@@ -3126,7 +3427,7 @@
         setButtonBusyState(
             importButton,
             isBusy,
-            idleLabel || getString('importButtonIdle', 'Import and Self-Host'),
+            idleLabel || getString('importButtonIdle', 'Add to Library'),
             getString('importButtonBusy', 'Importing…')
         );
     }
@@ -3135,7 +3436,7 @@
         setButtonBusyState(
             bunnyImportButton,
             isBusy,
-            idleLabel || getString('importButtonIdle', 'Import and Self-Host'),
+            idleLabel || getString('importButtonIdle', 'Add to Library'),
             getString('bunnyImportBusy', 'Importing Bunny Fonts…')
         );
     }
@@ -3195,7 +3496,10 @@
             showToast(message, tone);
 
             if (tone === 'success') {
-                reloadPageSoon();
+                reloadPageSoon(900, {
+                    type: 'highlight-library-row',
+                    familySlug: normalizeImportFamilySlug(result, family)
+                });
             }
         } catch (error) {
             const message = getErrorMessage(error, getString('importError', 'Import failed.'));
@@ -3260,7 +3564,10 @@
             showToast(message, tone);
 
             if (tone === 'success') {
-                reloadPageSoon();
+                reloadPageSoon(900, {
+                    type: 'highlight-library-row',
+                    familySlug: normalizeImportFamilySlug(result, family)
+                });
             }
         } catch (error) {
             const message = getErrorMessage(error, getString('bunnyImportError', 'The Bunny Fonts import failed.'));
@@ -3564,7 +3871,11 @@
         }
 
         updateRoleOutputs();
-        void saveRoleDraft(snapshotBeforeChange);
+        void saveRoleDraft(snapshotBeforeChange).then((saved) => {
+            if (saved) {
+                highlightRoleSelector(role);
+            }
+        });
         return true;
     }
 
@@ -3602,6 +3913,18 @@
 
         event.preventDefault();
         void deleteDeliveryProfile(deleteTarget);
+        return true;
+    }
+
+    function handleMigrateDeliveryClick(event) {
+        const migrateTarget = event.target.closest('[data-migrate-delivery]');
+
+        if (!migrateTarget) {
+            return false;
+        }
+
+        event.preventDefault();
+        prefillSelfHostedMigration(migrateTarget);
         return true;
     }
 
@@ -3775,6 +4098,10 @@
         }
 
         if (handleDeleteDeliveryProfileClick(event)) {
+            return;
+        }
+
+        if (handleMigrateDeliveryClick(event)) {
             return;
         }
 
@@ -4245,6 +4572,7 @@
         updateBunnyImportSummary();
         syncImportDeliveryButtons();
         initializeTabs();
+        applyPendingUiState();
     }
 
     bootstrap();

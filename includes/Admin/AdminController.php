@@ -22,22 +22,9 @@ use TastyFonts\Support\Storage;
 final class AdminController
 {
     public const MENU_SLUG = 'tasty-custom-fonts';
+    private const ACTION_DOWNLOAD_GENERATED_CSS = 'tasty_fonts_download_generated_css';
     private const NOTICE_TTL = 300;
     private const NOTICE_TRANSIENT_PREFIX = 'tasty_fonts_admin_notices_';
-    private const NOTICE_MESSAGES = [
-        'settings_saved' => 'Plugin settings saved.',
-        'adobe_project_saved' => 'Adobe Fonts project saved.',
-        'adobe_project_removed' => 'Adobe Fonts project removed.',
-        'adobe_project_resynced' => 'Adobe Fonts project resynced.',
-        'google_key_saved' => 'Google Fonts API key saved and validated.',
-        'google_key_cleared' => 'Google Fonts API key removed.',
-        'fallback_saved' => 'Font fallback saved.',
-        'roles_saved' => 'Font roles saved.',
-        'rescan' => 'Fonts rescanned.',
-        'log_cleared' => 'Activity log cleared.',
-        'family_deleted' => 'Font family deleted.',
-        'variant_deleted' => 'Font variant deleted.',
-    ];
     private const ROLE_KEYS = ['heading', 'body'];
 
     private readonly AdminPageRenderer $renderer;
@@ -86,21 +73,21 @@ final class AdminController
             'tasty-fonts-admin-tokens',
             TASTY_FONTS_URL . 'assets/css/tokens.css',
             [],
-            $this->assetVersionFor('assets/css/tokens.css')
+            $this->assetVersionFor()
         );
 
         wp_enqueue_style(
             'tasty-fonts-admin',
             TASTY_FONTS_URL . 'assets/css/admin.css',
             ['tasty-fonts-admin-tokens'],
-            $this->assetVersionFor('assets/css/admin.css')
+            $this->assetVersionFor()
         );
 
         wp_enqueue_script(
             'tasty-fonts-admin',
             TASTY_FONTS_URL . 'assets/js/admin.js',
             [],
-            $this->assetVersionFor('assets/js/admin.js'),
+            $this->assetVersionFor(),
             true
         );
 
@@ -130,6 +117,10 @@ final class AdminController
     public function handleAdminActions(): void
     {
         if (!is_admin() || !current_user_can('manage_options')) {
+            return;
+        }
+
+        if ($this->handleDownloadGeneratedCssAction()) {
             return;
         }
 
@@ -665,6 +656,31 @@ final class AdminController
         $this->redirectWithSuccess($message);
     }
 
+    private function handleDownloadGeneratedCssAction(): bool
+    {
+        if (($this->getQueryText('page') !== self::MENU_SLUG) || !isset($_GET[self::ACTION_DOWNLOAD_GENERATED_CSS])) {
+            return false;
+        }
+
+        check_admin_referer(self::ACTION_DOWNLOAD_GENERATED_CSS);
+
+        $download = $this->buildGeneratedCssDownloadData($this->settings->getSettings());
+
+        if (empty($download['downloadable']) || !is_string($download['content'] ?? null) || trim((string) ($download['content'] ?? '')) === '') {
+            $this->redirectWithError(__('Generated CSS is unavailable until Apply Sitewide is active.', 'tasty-fonts'));
+        }
+
+        $filename = sanitize_file_name((string) ($download['filename'] ?? 'tasty-fonts.css'));
+        $content = (string) $download['content'];
+
+        header('Content-Type: text/css; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($content));
+
+        echo $content;
+        exit;
+    }
+
     private function buildPageContext(): array
     {
         $storage = $this->storage->get();
@@ -724,7 +740,7 @@ final class AdminController
             'remote_connection_hints' => !empty($settings['remote_connection_hints']),
             'delete_uploaded_files_on_uninstall' => !empty($settings['delete_uploaded_files_on_uninstall']),
             'diagnostic_items' => $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts),
-            'overview_metrics' => $this->buildOverviewMetrics($counts, $applyEverywhere, $assetStatus),
+            'overview_metrics' => $this->buildOverviewMetrics($counts),
             'output_panels' => $this->buildOutputPanels($roles, $settings),
             'generated_css_panel' => $this->buildGeneratedCssPanel($settings),
             'preview_panels' => $this->buildPreviewPanels(),
@@ -805,16 +821,11 @@ final class AdminController
         ];
     }
 
-    private function buildOverviewMetrics(array $counts, bool $applyEverywhere, array $assetStatus): array
+    private function buildOverviewMetrics(array $counts): array
     {
-        $cssExists = !empty($assetStatus['exists']);
-        $cssSize = $cssExists
-            ? size_format((int) ($assetStatus['size'] ?? 0))
-            : __('Not generated', 'tasty-fonts');
-
         return [
             [
-                'label' => __('Font Families', 'tasty-fonts'),
+                'label' => __('Families', 'tasty-fonts'),
                 'value' => (string) ($counts['families'] ?? 0),
             ],
             [
@@ -822,12 +833,12 @@ final class AdminController
                 'value' => (string) ($counts['published_families'] ?? 0),
             ],
             [
-                'label' => __('Library Only', 'tasty-fonts'),
+                'label' => __('Paused', 'tasty-fonts'),
                 'value' => (string) ($counts['library_only_families'] ?? 0),
             ],
             [
-                'label' => __('Final CSS', 'tasty-fonts'),
-                'value' => $cssSize,
+                'label' => __('Self-hosted', 'tasty-fonts'),
+                'value' => (string) ($counts['local_families'] ?? 0),
             ],
         ];
     }
@@ -870,14 +881,50 @@ final class AdminController
 
     private function buildGeneratedCssPanel(array $settings): array
     {
+        $download = $this->buildGeneratedCssDownloadData($settings);
+
         return [
             'key' => 'generated',
             'label' => __('Generated CSS', 'tasty-fonts'),
             'target' => 'tasty-fonts-output-generated',
-            'value' => !empty($settings['auto_apply_roles'])
-                ? trim($this->assets->getCss())
+            'value' => !empty($download['downloadable'])
+                ? trim((string) ($download['content'] ?? ''))
                 : __('Not generated while Apply Sitewide is off.', 'tasty-fonts'),
+            'download_url' => !empty($download['downloadable']) ? (string) ($download['url'] ?? '') : '',
+            'download_filename' => (string) ($download['filename'] ?? 'tasty-fonts.css'),
             'active' => false,
+        ];
+    }
+
+    private function buildGeneratedCssDownloadData(array $settings): array
+    {
+        $filename = basename((string) ($this->storage->getGeneratedCssPath() ?? 'tasty-fonts.css'));
+
+        if (empty($settings['auto_apply_roles'])) {
+            return [
+                'downloadable' => false,
+                'filename' => $filename,
+                'content' => '',
+                'url' => '',
+            ];
+        }
+
+        $content = trim($this->assets->getCss());
+
+        if ($content === '') {
+            return [
+                'downloadable' => false,
+                'filename' => $filename,
+                'content' => '',
+                'url' => '',
+            ];
+        }
+
+        return [
+            'downloadable' => true,
+            'filename' => $filename,
+            'content' => $content,
+            'url' => $this->buildGeneratedCssDownloadUrl(),
         ];
     }
 
@@ -1061,7 +1108,7 @@ final class AdminController
         };
     }
 
-    private function assetVersionFor(string $relativePath): string
+    private function assetVersionFor(): string
     {
         return TASTY_FONTS_VERSION;
     }
@@ -1073,6 +1120,7 @@ final class AdminController
             'importPreviewSample' => __("Aa Bb Cc Dd Ee Ff Gg Hh\n0123456789", 'tasty-fonts'),
             'searching' => __('Searching Google Fonts…', 'tasty-fonts'),
             'searchEmpty' => __('No Google Fonts families matched that search.', 'tasty-fonts'),
+            'searchResultInLibrary' => __('In Library', 'tasty-fonts'),
             'searchDisabled' => $searchDisabledMessage,
             'bunnySearching' => __('Searching Bunny Fonts…', 'tasty-fonts'),
             'bunnySearchEmpty' => __('No Bunny Fonts families matched that search.', 'tasty-fonts'),
@@ -1097,8 +1145,11 @@ final class AdminController
             'bunnyImportBusy' => __('Importing Bunny Fonts…', 'tasty-fonts'),
             'bunnyImportSuccess' => __('Bunny Fonts imported successfully. Reloading…', 'tasty-fonts'),
             'bunnyImportSelectionSummaryDefault' => __('Default Regular Face', 'tasty-fonts'),
-            'importButtonIdle' => __('Save Delivery', 'tasty-fonts'),
+            'importButtonIdle' => __('Add to Library', 'tasty-fonts'),
             'importButtonBusy' => __('Importing…', 'tasty-fonts'),
+            'saveDeliverySelfHosted' => __('Add Self-Hosted', 'tasty-fonts'),
+            'saveDeliveryGoogleCdn' => __('Add Google CDN', 'tasty-fonts'),
+            'saveDeliveryBunnyCdn' => __('Add Bunny CDN', 'tasty-fonts'),
             'importEstimateFiles' => __('%1$d File%2$s Selected', 'tasty-fonts'),
             'importEstimateSize' => __('Approx. +%1$s WOFF2', 'tasty-fonts'),
             'importSelectionSummaryEmpty' => __('0 Variants Selected', 'tasty-fonts'),
@@ -1124,9 +1175,9 @@ final class AdminController
             'uploadDetectedWeightStyle' => __('Detected: %1$s / %2$s', 'tasty-fonts'),
             'uploadRemoveRow' => __('Remove Row', 'tasty-fonts'),
             'uploadRequiresRows' => __('Add at least one upload row before submitting.', 'tasty-fonts'),
-            'rolesDraftSaving' => __('Saving role draft…', 'tasty-fonts'),
-            'rolesDraftSaved' => __('Role draft saved.', 'tasty-fonts'),
-            'rolesDraftSaveError' => __('The role draft could not be saved.', 'tasty-fonts'),
+            'rolesDraftSaving' => __('Saving roles…', 'tasty-fonts'),
+            'rolesDraftSaved' => __('Roles saved.', 'tasty-fonts'),
+            'rolesDraftSaveError' => __('The roles could not be saved.', 'tasty-fonts'),
             'fallbackSaving' => __('Saving fallback…', 'tasty-fonts'),
             'fontDisplaySaving' => __('Saving font display…', 'tasty-fonts'),
             'deleteConfirm' => __('Delete "%s" and remove its files from uploads/fonts?', 'tasty-fonts'),
@@ -1158,7 +1209,7 @@ final class AdminController
             return [
                 'badge' => __('Saved Only', 'tasty-fonts'),
                 'badge_class' => 'is-warning',
-                'title' => __('Draft Saved Only', 'tasty-fonts'),
+                'title' => __('Saved Roles Only', 'tasty-fonts'),
                 'copy' => sprintf(
                     __('Sitewide roles are off. %s', 'tasty-fonts'),
                     $this->buildRolePairDeliverySummary($draftRoles)
@@ -1178,9 +1229,9 @@ final class AdminController
         return [
             'badge' => __('Pending', 'tasty-fonts'),
             'badge_class' => 'is-warning',
-            'title' => __('Draft Differs From Live', 'tasty-fonts'),
+            'title' => __('Saved Pair Differs From Live', 'tasty-fonts'),
             'copy' => sprintf(
-                __('Draft: %1$s. Live: %2$s. Apply Sitewide to publish the draft pair.', 'tasty-fonts'),
+                __('Saved: %1$s. Live: %2$s. Apply Sitewide to publish these roles.', 'tasty-fonts'),
                 $this->buildRolePairDeliverySummary($draftRoles),
                 $this->buildRolePairDeliverySummary($appliedRoles)
             ),
@@ -1207,18 +1258,18 @@ final class AdminController
                 (string) ($roles['body'] ?? '')
             ),
             'disable' => sprintf(
-                __('Sitewide role CSS turned off. Draft kept as Heading: %1$s; Body: %2$s.', 'tasty-fonts'),
+                __('Sitewide role CSS turned off. Saved roles kept as Heading: %1$s; Body: %2$s.', 'tasty-fonts'),
                 (string) ($roles['heading'] ?? ''),
                 (string) ($roles['body'] ?? '')
             ),
             default => $wasAppliedSitewide
                 ? sprintf(
-                    __('Role draft saved. Live site still uses Heading: %1$s; Body: %2$s until you apply the draft.', 'tasty-fonts'),
+                    __('Roles saved. Live site still uses Heading: %1$s; Body: %2$s until you apply them sitewide.', 'tasty-fonts'),
                     (string) ($appliedRoles['heading'] ?? ''),
                     (string) ($appliedRoles['body'] ?? '')
                 )
                 : sprintf(
-                    __('Role draft saved. Sitewide roles stay off until you apply Heading: %1$s; Body: %2$s.', 'tasty-fonts'),
+                    __('Roles saved. Sitewide roles stay off until you apply Heading: %1$s; Body: %2$s.', 'tasty-fonts'),
                     (string) ($roles['heading'] ?? ''),
                     (string) ($roles['body'] ?? '')
                 ),
@@ -1719,20 +1770,62 @@ final class AdminController
         $this->redirect();
     }
 
+    private function buildNoticeMessage(string $key): string
+    {
+        return match ($key) {
+            'settings_saved' => __('Plugin settings saved.', 'tasty-fonts'),
+            'adobe_project_saved' => __('Adobe Fonts project saved.', 'tasty-fonts'),
+            'adobe_project_removed' => __('Adobe Fonts project removed.', 'tasty-fonts'),
+            'adobe_project_resynced' => __('Adobe Fonts project resynced.', 'tasty-fonts'),
+            'google_key_saved' => __('Google Fonts API key saved and validated.', 'tasty-fonts'),
+            'google_key_cleared' => __('Google Fonts API key removed.', 'tasty-fonts'),
+            'fallback_saved' => __('Font fallback saved.', 'tasty-fonts'),
+            'roles_saved' => __('Font roles saved.', 'tasty-fonts'),
+            'rescan' => __('Fonts rescanned.', 'tasty-fonts'),
+            'log_cleared' => __('Activity log cleared.', 'tasty-fonts'),
+            'family_deleted' => __('Font family deleted.', 'tasty-fonts'),
+            'variant_deleted' => __('Font variant deleted.', 'tasty-fonts'),
+            default => '',
+        };
+    }
+
     private function redirectWithNoticeKey(string $key): never
     {
-        $message = self::NOTICE_MESSAGES[$key] ?? '';
+        $message = $this->buildNoticeMessage($key);
 
         if ($message === '') {
             $this->redirect();
         }
 
-        $this->redirectWithSuccess(__($message, 'tasty-fonts'));
+        $this->redirectWithSuccess($message);
     }
 
     private function buildAdminPageUrl(): string
     {
         return add_query_arg(['page' => self::MENU_SLUG], admin_url('admin.php'));
+    }
+
+    private function buildGeneratedCssDownloadUrl(): string
+    {
+        return add_query_arg(
+            [
+                'page' => self::MENU_SLUG,
+                self::ACTION_DOWNLOAD_GENERATED_CSS => '1',
+                '_wpnonce' => wp_create_nonce(self::ACTION_DOWNLOAD_GENERATED_CSS),
+            ],
+            admin_url('admin.php')
+        );
+    }
+
+    private function getQueryText(string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $_GET)) {
+            return $default;
+        }
+
+        $rawValue = wp_unslash($_GET[$key]);
+
+        return is_scalar($rawValue) ? sanitize_text_field((string) $rawValue) : $default;
     }
 
     private function redirect(): never

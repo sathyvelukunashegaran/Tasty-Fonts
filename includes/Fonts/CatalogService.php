@@ -262,7 +262,7 @@ final class CatalogService
             $normalizedValue = trim($value);
             $paths[$normalizedFormat] = $normalizedValue;
 
-            if ($type === 'self_hosted' && !$this->isRemoteUrl($normalizedValue)) {
+            if ($type === 'self_hosted' && !FontUtils::isRemoteUrl($normalizedValue)) {
                 $relativePath = $normalizedValue;
                 $url = $this->storage->urlForRelativePath($relativePath);
 
@@ -276,7 +276,7 @@ final class CatalogService
 
             $files[$normalizedFormat] = $normalizedValue;
 
-            if ($this->isRemoteUrl($normalizedValue)) {
+            if (FontUtils::isRemoteUrl($normalizedValue)) {
                 unset($paths[$normalizedFormat]);
             }
         }
@@ -521,30 +521,7 @@ final class CatalogService
 
     private function variantsFromFaces(array $faces): array
     {
-        $variants = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-            $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
-
-            if ($weight === '400' && $style === 'normal') {
-                $variants[] = 'regular';
-                continue;
-            }
-
-            if ($weight === '400' && $style === 'italic') {
-                $variants[] = 'italic';
-                continue;
-            }
-
-            $variants[] = $weight . ($style === 'italic' ? 'italic' : '');
-        }
-
-        return FontUtils::normalizeVariantTokens($variants);
+        return HostedImportSupport::variantsFromFaces($faces);
     }
 
     private function variantTokenFromMeta(array $meta): string
@@ -572,7 +549,7 @@ final class CatalogService
 
         $badges[] = match ($publishState) {
             'library_only' => [
-                'label' => __('Library Only', 'tasty-fonts'),
+                'label' => __('Paused', 'tasty-fonts'),
                 'class' => 'is-warning',
                 'copy' => __('This family is saved for previews and configuration, but it is not enqueued on the frontend, editor, or Etch canvas.', 'tasty-fonts'),
             ],
@@ -722,13 +699,6 @@ final class CatalogService
         }
 
         return in_array(strtolower($file->getExtension()), self::LOCAL_FORMATS, true);
-    }
-
-    private function isRemoteUrl(string $value): bool
-    {
-        $value = trim($value);
-
-        return str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, '//');
     }
 
     private function localDeliveryId(): string

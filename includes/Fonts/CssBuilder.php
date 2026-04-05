@@ -275,7 +275,7 @@ final class CssBuilder
             'ttf' => 'truetype',
             default => $format,
         };
-        $escapedUrl = esc_url($url);
+        $escapedUrl = esc_url_raw($url);
 
         return 'url("' . $escapedUrl . '") format("' . $formatName . '")';
     }

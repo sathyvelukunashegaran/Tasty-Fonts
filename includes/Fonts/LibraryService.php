@@ -243,7 +243,7 @@ final class LibraryService
         if (!in_array($publishState, self::MANUAL_PUBLISH_STATES, true)) {
             return $this->error(
                 'tasty_fonts_publish_state_invalid',
-                __('Choose either Published or Library Only.', 'tasty-fonts')
+                __('Choose either Published or Paused.', 'tasty-fonts')
             );
         }
 
@@ -252,7 +252,7 @@ final class LibraryService
         if ($publishState === 'library_only' && $this->isLiveRoleFamily($familyName)) {
             return $this->error(
                 'tasty_fonts_family_live',
-                __('This family is live through the current heading/body pair. Switch roles or turn off sitewide usage before moving it to Library Only.', 'tasty-fonts')
+                __('This family is live through the current heading/body pair. Switch roles or turn off sitewide usage before pausing it.', 'tasty-fonts')
             );
         }
 
@@ -278,7 +278,7 @@ final class LibraryService
         $this->assets->refreshGeneratedAssets();
 
         $message = $publishState === 'library_only'
-            ? sprintf(__('%s is now Library Only.', 'tasty-fonts'), $familyName)
+            ? sprintf(__('%s is now Paused.', 'tasty-fonts'), $familyName)
             : sprintf(__('%s is now Published.', 'tasty-fonts'), $familyName);
         $this->log->add($message);
 
@@ -526,7 +526,7 @@ final class LibraryService
         }
 
         foreach ((array) ($face['files'] ?? []) as $file) {
-            if (!is_string($file) || trim($file) === '' || $this->isRemoteUrl($file)) {
+            if (!is_string($file) || trim($file) === '' || FontUtils::isRemoteUrl($file)) {
                 continue;
             }
 
@@ -569,30 +569,7 @@ final class LibraryService
 
     private function buildVariantsFromFaces(array $faces): array
     {
-        $variants = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-            $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
-
-            if ($weight === '400' && $style === 'normal') {
-                $variants[] = 'regular';
-                continue;
-            }
-
-            if ($weight === '400' && $style === 'italic') {
-                $variants[] = 'italic';
-                continue;
-            }
-
-            $variants[] = $weight . ($style === 'italic' ? 'italic' : '');
-        }
-
-        return FontUtils::normalizeVariantTokens($variants);
+        return HostedImportSupport::variantsFromFaces($faces);
     }
 
     private function managedImportSourcesForFamily(array $family): array
@@ -740,13 +717,6 @@ final class LibraryService
             __('%s is currently assigned to body, and this is the last saved variant. Choose a different body font before deleting it.', 'tasty-fonts'),
             $familyName
         );
-    }
-
-    private function isRemoteUrl(string $value): bool
-    {
-        $value = trim($value);
-
-        return str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, '//');
     }
 
     private function error(string $code, string $message): WP_Error

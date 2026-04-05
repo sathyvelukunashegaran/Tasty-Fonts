@@ -35,6 +35,7 @@ require_once __DIR__ . '/bootstrap.php';
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Admin\AdminPageRenderer;
 use TastyFonts\Bunny\BunnyCssParser;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
@@ -42,6 +43,7 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
+use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
@@ -137,6 +139,38 @@ if (!function_exists('sanitize_text_field')) {
     }
 }
 
+if (!function_exists('sanitize_html_class')) {
+    function sanitize_html_class(string $class, string $fallback = ''): string
+    {
+        $sanitized = preg_replace('/[^A-Za-z0-9_-]/', '', $class) ?? '';
+
+        if ($sanitized !== '') {
+            return $sanitized;
+        }
+
+        return preg_replace('/[^A-Za-z0-9_-]/', '', $fallback) ?? '';
+    }
+}
+
+if (!function_exists('wp_trim_words')) {
+    function wp_trim_words(string $text, int $numWords = 55, ?string $more = null): string
+    {
+        $normalized = trim((string) preg_replace('/\s+/', ' ', strip_tags($text)));
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        $words = preg_split('/\s+/', $normalized) ?: [];
+
+        if (count($words) <= $numWords) {
+            return $normalized;
+        }
+
+        return implode(' ', array_slice($words, 0, max(0, $numWords))) . ($more ?? '&hellip;');
+    }
+}
+
 if (!function_exists('wp_unslash')) {
     function wp_unslash(mixed $value): mixed
     {
@@ -155,7 +189,136 @@ if (!function_exists('wp_unslash')) {
 if (!function_exists('esc_url')) {
     function esc_url(string $url): string
     {
+        $sanitized = esc_url_raw($url);
+
+        return str_replace(
+            ['&', '"', "'"],
+            ['&#038;', '&#034;', '&#039;'],
+            $sanitized
+        );
+    }
+}
+
+if (!function_exists('esc_url_raw')) {
+    function esc_url_raw(string $url): string
+    {
         return filter_var($url, FILTER_SANITIZE_URL) ?: '';
+    }
+}
+
+if (!function_exists('esc_html')) {
+    function esc_html(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('esc_attr')) {
+    function esc_attr(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('esc_html_e')) {
+    function esc_html_e(string $text, string $domain = ''): void
+    {
+        echo esc_html(__($text, $domain));
+    }
+}
+
+if (!function_exists('esc_attr_e')) {
+    function esc_attr_e(string $text, string $domain = ''): void
+    {
+        echo esc_attr(__($text, $domain));
+    }
+}
+
+if (!function_exists('esc_attr__')) {
+    function esc_attr__(string $text, string $domain = ''): string
+    {
+        return esc_attr(__($text, $domain));
+    }
+}
+
+if (!function_exists('esc_html__')) {
+    function esc_html__(string $text, string $domain = ''): string
+    {
+        return esc_html(__($text, $domain));
+    }
+}
+
+if (!function_exists('_n')) {
+    function _n(string $single, string $plural, int $number, string $domain = ''): string
+    {
+        return $number === 1 ? $single : $plural;
+    }
+}
+
+if (!function_exists('selected')) {
+    function selected(mixed $selectedValue, mixed $current = true, bool $echo = true): string
+    {
+        $result = $selectedValue === $current ? 'selected="selected"' : '';
+
+        if ($echo) {
+            echo $result;
+        }
+
+        return $result;
+    }
+}
+
+if (!function_exists('disabled')) {
+    function disabled(mixed $disabledValue, mixed $current = true, bool $echo = true): string
+    {
+        $result = $disabledValue === $current ? 'disabled="disabled"' : '';
+
+        if ($echo) {
+            echo $result;
+        }
+
+        return $result;
+    }
+}
+
+if (!function_exists('checked')) {
+    function checked(mixed $checkedValue, mixed $current = true, bool $echo = true): string
+    {
+        $result = $checkedValue === $current ? 'checked="checked"' : '';
+
+        if ($echo) {
+            echo $result;
+        }
+
+        return $result;
+    }
+}
+
+if (!function_exists('wp_nonce_field')) {
+    function wp_nonce_field(string $action = '', string $name = '_wpnonce', bool $referer = true, bool $display = true): string
+    {
+        $field = sprintf(
+            '<input type="hidden" name="%s" value="%s">',
+            esc_attr($name),
+            esc_attr('nonce:' . $action)
+        );
+
+        if ($display) {
+            echo $field;
+        }
+
+        return $field;
+    }
+}
+
+if (!function_exists('wp_unique_id')) {
+    function wp_unique_id(string $prefix = ''): string
+    {
+        static $counter = 0;
+
+        $counter += 1;
+
+        return $prefix . $counter;
     }
 }
 
@@ -203,12 +366,15 @@ if (!function_exists('is_wp_error')) {
 
 $tests = [];
 $optionStore = [];
+$optionDeleted = [];
 $transientStore = [];
 $transientDeleted = [];
 $transientSet = [];
 $uploadBaseDir = sys_get_temp_dir() . '/tasty-fonts-tests/uploads';
 $uploadedFilePaths = [];
 $currentUserId = 1;
+$wpdb = null;
+$wpdbQueries = [];
 $wp_filesystem = null;
 $remoteGetResponses = [];
 $remoteGetCalls = [];
@@ -235,6 +401,19 @@ if (!function_exists('update_option')) {
         global $optionStore;
 
         $optionStore[$option] = $value;
+
+        return true;
+    }
+}
+
+if (!function_exists('delete_option')) {
+    function delete_option(string $option): bool
+    {
+        global $optionDeleted;
+        global $optionStore;
+
+        $optionDeleted[] = $option;
+        unset($optionStore[$option]);
 
         return true;
     }
@@ -556,6 +735,35 @@ final class TestWpFilesystem
     }
 }
 
+final class TestWpdb
+{
+    public string $options = 'wp_options';
+
+    public function esc_like(string $text): string
+    {
+        return addcslashes($text, '_%\\');
+    }
+
+    public function prepare(string $query, mixed ...$args): string
+    {
+        foreach ($args as $arg) {
+            $escaped = str_replace(['\\', '\''], ['\\\\', '\\\''], (string) $arg);
+            $query = preg_replace('/%s/', "'" . $escaped . "'", $query, 1) ?? $query;
+        }
+
+        return $query;
+    }
+
+    public function query(string $query): int
+    {
+        global $wpdbQueries;
+
+        $wpdbQueries[] = $query;
+
+        return 1;
+    }
+}
+
 function uniqueTestDirectory(string $name): string
 {
     return sys_get_temp_dir() . '/tasty-fonts-tests/' . $name . '-' . uniqid('', true);
@@ -569,6 +777,7 @@ function resetTestState(): void
     global $isAdminRequest;
     global $localizedScripts;
     global $currentUserId;
+    global $optionDeleted;
     global $optionStore;
     global $redirectLocation;
     global $registeredStyles;
@@ -578,10 +787,13 @@ function resetTestState(): void
     global $transientSet;
     global $transientStore;
     global $uploadedFilePaths;
+    global $wpdb;
+    global $wpdbQueries;
     global $wp_filesystem;
     global $uploadBaseDir;
 
     $optionStore = [];
+    $optionDeleted = [];
     $transientStore = [];
     $transientDeleted = [];
     $transientSet = [];
@@ -597,6 +809,8 @@ function resetTestState(): void
     $uploadBaseDir = uniqueTestDirectory('uploads');
     $uploadedFilePaths = [];
     $currentUserId = 1;
+    $wpdb = new TestWpdb();
+    $wpdbQueries = [];
     $wp_filesystem = new TestWpFilesystem();
     $_GET = [];
     $_POST = [];
@@ -724,6 +938,29 @@ $tests['font_utils_builds_face_axis_keys'] = static function (): void {
     $axisKey = FontUtils::faceAxisKey(400, 'ITALIC');
 
     assertSameValue('400|italic', $axisKey, 'Face axis keys should normalize weight and style before composing the dedupe key.');
+};
+
+$tests['font_utils_detects_remote_urls'] = static function (): void {
+    assertSameValue(true, FontUtils::isRemoteUrl('https://example.com/fonts/inter.woff2'), 'Remote URL detection should recognize HTTPS URLs.');
+    assertSameValue(true, FontUtils::isRemoteUrl('//fonts.bunny.net/inter.woff2'), 'Remote URL detection should recognize protocol-relative CDN URLs.');
+    assertSameValue(false, FontUtils::isRemoteUrl('google/inter/inter-400-normal.woff2'), 'Remote URL detection should treat relative storage paths as local.');
+};
+
+$tests['hosted_import_support_builds_variants_from_faces'] = static function (): void {
+    $variants = HostedImportSupport::variantsFromFaces([
+        ['weight' => '400', 'style' => 'normal'],
+        ['weight' => '700', 'style' => 'normal'],
+        ['weight' => '400', 'style' => 'italic'],
+        ['weight' => '700', 'style' => 'italic'],
+        ['weight' => '700', 'style' => 'italic'],
+        'invalid-face',
+    ]);
+
+    assertSameValue(
+        ['regular', '700', 'italic', '700italic'],
+        $variants,
+        'Hosted face variant synthesis should mirror the existing catalog and library token format exactly.'
+    );
 };
 
 $tests['font_utils_compares_faces_by_weight_and_style'] = static function (): void {
@@ -1229,6 +1466,39 @@ $tests['css_builder_ignores_eot_and_svg_sources'] = static function (): void {
     assertContainsValue('format("woff2")', $css, 'CSS builder should continue to emit supported modern formats.');
     assertNotContainsValue('embedded-opentype', $css, 'CSS builder should not emit legacy EOT sources.');
     assertNotContainsValue('inter.svg', $css, 'CSS builder should not emit deprecated SVG font sources.');
+};
+
+$tests['css_builder_preserves_raw_query_strings_in_source_urls'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'sources' => ['google'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'google',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'unicode_range' => '',
+                    'files' => [
+                        'woff2' => 'https://example.com/fonts/inter.woff2?display=swap&subset=latin',
+                    ],
+                ],
+            ],
+        ],
+    ];
+
+    $css = $builder->buildFontFaceOnly($catalog, ['minify_css_output' => false]);
+
+    assertContainsValue(
+        'url("https://example.com/fonts/inter.woff2?display=swap&subset=latin") format("woff2")',
+        $css,
+        'CSS builder should preserve raw query-string separators inside font source URLs.'
+    );
+    assertNotContainsValue('&#038;', $css, 'CSS builder should not HTML-escape ampersands inside CSS source URLs.');
 };
 
 $tests['css_builder_minifies_generated_css_without_leaving_layout_whitespace'] = static function (): void {
@@ -2190,9 +2460,167 @@ $tests['admin_controller_versions_admin_assets_from_plugin_version'] = static fu
     resetTestState();
 
     $controller = makeAdminControllerTestInstance();
-    $version = invokePrivateMethod($controller, 'assetVersionFor', ['assets/css/admin.css']);
+    $version = invokePrivateMethod($controller, 'assetVersionFor');
 
     assertSameValue(TASTY_FONTS_VERSION, $version, 'Admin asset versioning should reuse the plugin version instead of hashing shipped files on every request.');
+};
+
+$tests['admin_controller_builds_reordered_overview_metrics'] = static function (): void {
+    resetTestState();
+
+    $controller = makeAdminControllerTestInstance();
+    $metrics = invokePrivateMethod(
+        $controller,
+        'buildOverviewMetrics',
+        [[
+            'families' => 12,
+            'published_families' => 7,
+            'library_only_families' => 3,
+            'local_families' => 9,
+        ]]
+    );
+
+    assertSameValue(
+        ['Families', 'Published', 'Paused', 'Self-hosted'],
+        array_values(array_map(static fn (array $metric): string => (string) ($metric['label'] ?? ''), $metrics)),
+        'The overview metrics should be reordered around library state and self-hosted counts instead of file size.'
+    );
+    assertSameValue(
+        ['12', '7', '3', '9'],
+        array_values(array_map(static fn (array $metric): string => (string) ($metric['value'] ?? ''), $metrics)),
+        'The overview metrics should preserve the expected family counts after reordering.'
+    );
+};
+
+$tests['admin_page_renderer_uses_inline_delivery_badge_for_single_delivery_families'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'delivery_filter_tokens' => ['google'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'google-cdn',
+        'active_delivery' => [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular', '700'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'variants' => ['regular', '700'],
+            ],
+        ],
+        'delivery_badges' => [
+            [
+                'label' => 'Google CDN',
+                'class' => '',
+                'copy' => 'Google CDN',
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => [],
+                'paths' => [],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            ['heading' => '', 'body' => ''],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+                ['value' => 'swap', 'label' => 'swap'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('data-font-slug="inter"', $output, 'Library family rows should expose the normalized slug for client-side matching and post-import highlighting.');
+    assertContainsValue('tasty-fonts-badges--library-inline', $output, 'Single-delivery families should render the compact inline badge treatment.');
+    assertContainsValue('Google CDN', $output, 'The active single delivery label should stay visible on the family card.');
+    assertContainsValue('tasty-fonts-detail-group', $output, 'Family details should render as design-system card groups instead of plain WordPress tables.');
+    assertNotContainsValue('Available delivery profiles', $output, 'Single-delivery families should not render the verbose available deliveries note.');
+    assertNotContainsValue('Live delivery', $output, 'Single-delivery families should not render the verbose live delivery note.');
+    assertNotContainsValue('widefat striped tasty-fonts-table', $output, 'Family details should no longer use widefat table markup.');
+};
+
+$tests['admin_page_renderer_outputs_migrate_shortcuts_for_cdn_deliveries'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'delivery_filter_tokens' => ['google'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'google-cdn',
+        'active_delivery' => [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular', '700'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'variants' => ['regular', '700'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => [],
+                'paths' => [],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            ['heading' => '', 'body' => ''],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertSameValue(2, substr_count($output, 'data-migrate-delivery'), 'CDN-backed library families should expose a self-host migration shortcut in both the card actions and delivery table.');
+    assertContainsValue('data-migrate-provider="google"', $output, 'The migration shortcut should preserve the delivery provider.');
+    assertContainsValue('data-migrate-family="Inter"', $output, 'The migration shortcut should preserve the family name for panel prefill.');
+    assertContainsValue('data-migrate-variants="regular,700"', $output, 'The migration shortcut should preserve the saved variant tokens for self-hosting prefill.');
 };
 
 $tests['font_utils_modern_user_agent_tracks_a_recent_chrome_release'] = static function (): void {
@@ -2350,6 +2778,45 @@ $tests['admin_controller_localizes_bunny_family_nonce'] = static function (): vo
     );
 };
 
+$tests['admin_controller_localizes_delivery_button_labels'] = static function (): void {
+    resetTestState();
+
+    global $localizedScripts;
+
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    $strings = is_array($localizedScripts['tasty-fonts-admin']['data']['strings'] ?? null)
+        ? $localizedScripts['tasty-fonts-admin']['data']['strings']
+        : [];
+
+    assertSameValue(
+        'Add Self-Hosted',
+        (string) ($strings['saveDeliverySelfHosted'] ?? ''),
+        'Admin scripts should localize the self-hosted delivery button label.'
+    );
+    assertSameValue(
+        'Add Google CDN',
+        (string) ($strings['saveDeliveryGoogleCdn'] ?? ''),
+        'Admin scripts should localize the Google CDN delivery button label.'
+    );
+    assertSameValue(
+        'Add Bunny CDN',
+        (string) ($strings['saveDeliveryBunnyCdn'] ?? ''),
+        'Admin scripts should localize the Bunny CDN delivery button label.'
+    );
+    assertSameValue(
+        'Add to Library',
+        (string) ($strings['importButtonIdle'] ?? ''),
+        'Admin scripts should localize the default import action label.'
+    );
+    assertSameValue(
+        'In Library',
+        (string) ($strings['searchResultInLibrary'] ?? ''),
+        'Admin scripts should localize the imported-family badge label used in search results.'
+    );
+};
+
 $tests['admin_controller_family_font_display_changes_refresh_generated_assets'] = static function (): void {
     resetTestState();
 
@@ -2376,6 +2843,28 @@ $tests['admin_controller_family_font_display_changes_refresh_generated_assets'] 
 
     assertSameValue(true, in_array('tasty_fonts_css_v2', $transientDeleted, true), 'Saving a family font-display override should invalidate the cached CSS payload.');
     assertContainsValue('font-display:swap', $services['assets']->getCss(), 'Saving a family font-display override should rebuild the generated CSS with the new value.');
+};
+
+$tests['admin_controller_builds_notice_messages_from_known_keys'] = static function (): void {
+    resetTestState();
+
+    $controller = makeAdminControllerTestInstance();
+
+    assertSameValue(
+        'Google Fonts API key saved and validated.',
+        invokePrivateMethod($controller, 'buildNoticeMessage', ['google_key_saved']),
+        'Known notice keys should resolve to the translated message text.'
+    );
+    assertSameValue(
+        'Font family deleted.',
+        invokePrivateMethod($controller, 'buildNoticeMessage', ['family_deleted']),
+        'Notice message lookup should cover delete messages that do not have another static translation call site.'
+    );
+    assertSameValue(
+        '',
+        invokePrivateMethod($controller, 'buildNoticeMessage', ['missing_notice_key']),
+        'Unknown notice keys should return an empty string so the caller can fall back to a plain redirect.'
+    );
 };
 
 $tests['admin_controller_reads_and_clears_transient_notice_toasts'] = static function (): void {
@@ -2469,6 +2958,45 @@ $tests['admin_controller_builds_distinct_sorted_activity_actor_options'] = stati
         $actors,
         'Activity actor options should be distinct, trimmed, and sorted for the filter dropdown.'
     );
+};
+
+$tests['uninstall_cleans_library_and_runtime_transients'] = static function (): void {
+    resetTestState();
+
+    global $optionDeleted;
+    global $optionStore;
+    global $transientDeleted;
+    global $transientStore;
+    global $wpdbQueries;
+
+    if (!defined('WP_UNINSTALL_PLUGIN')) {
+        define('WP_UNINSTALL_PLUGIN', 'etch-fonts/plugin.php');
+    }
+
+    $optionStore = [
+        'tasty_fonts_settings' => [
+            'delete_uploaded_files_on_uninstall' => false,
+            'adobe_project_id' => '',
+        ],
+        'tasty_fonts_library' => ['Inter' => ['delivery_profiles' => []]],
+        'tasty_fonts_imports' => ['legacy' => true],
+    ];
+    $transientStore = [
+        'tasty_fonts_bunny_catalog_v1' => ['Inter'],
+    ];
+
+    require dirname(__DIR__) . '/uninstall.php';
+
+    assertSameValue(true, in_array('tasty_fonts_library', $optionDeleted, true), 'Uninstall should delete the live library option key.');
+    assertSameValue(true, in_array('tasty_fonts_imports', $optionDeleted, true), 'Uninstall should continue deleting the legacy imports option key.');
+    assertSameValue(true, in_array('tasty_fonts_bunny_catalog_v1', $transientDeleted, true), 'Uninstall should delete the Bunny catalog transient.');
+    assertSameValue(2, count($wpdbQueries), 'Uninstall should issue wildcard cleanup queries for Bunny family and admin notice transients.');
+    assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[0] ?? '', 'Uninstall should target the options table when cleaning Bunny family transients.');
+    assertContainsValue('tasty\\_fonts\\_bunny\\_family\\_', $wpdbQueries[0] ?? '', 'Uninstall should wildcard-match Bunny family transients.');
+    assertContainsValue('timeout', $wpdbQueries[0] ?? '', 'Uninstall should also remove Bunny family transient timeout rows.');
+    assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[1] ?? '', 'Uninstall should target the options table when cleaning admin notice transients.');
+    assertContainsValue('tasty\\_fonts\\_admin\\_notices\\_', $wpdbQueries[1] ?? '', 'Uninstall should wildcard-match per-user admin notice transients.');
+    assertContainsValue('timeout', $wpdbQueries[1] ?? '', 'Uninstall should also remove admin notice transient timeout rows.');
 };
 
 $failures = 0;
