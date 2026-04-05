@@ -148,6 +148,7 @@ final class Plugin
     {
         add_action('plugins_loaded', [$this, 'loadTextdomain']);
         add_action('wp_enqueue_scripts', [$this->runtime, 'enqueueFrontend']);
+        add_action('wp_head', [$this->runtime, 'outputPreloadHints'], 1);
         add_action('etch/canvas/enqueue_assets', [$this->runtime, 'enqueueEtchCanvas']);
         add_action('enqueue_block_editor_assets', [$this->runtime, 'enqueueBlockEditor']);
         add_action('admin_enqueue_scripts', [$this->runtime, 'enqueueAdminScreenFonts']);

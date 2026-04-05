@@ -330,7 +330,7 @@ final class AdminController
             }
         }
 
-        foreach (['minify_css_output', 'delete_uploaded_files_on_uninstall'] as $field) {
+        foreach (['minify_css_output', 'preload_primary_fonts', 'delete_uploaded_files_on_uninstall'] as $field) {
             if (array_key_exists($field, $_POST)) {
                 $settingsInput[$field] = $_POST[$field];
             }
@@ -338,6 +338,10 @@ final class AdminController
 
         $savedSettings = $this->settings->saveSettings($settingsInput);
         $this->googleClient->clearCatalogCache();
+
+        if ($this->settingsChangeRequiresAssetRefresh($previousSettings, $savedSettings)) {
+            $this->assets->refreshGeneratedAssets(false, false);
+        }
 
         if ($clearGoogleKey) {
             $this->settings->saveGoogleApiKeyStatus('empty');
@@ -546,11 +550,14 @@ final class AdminController
             'adobe_access_copy' => $adobeAccessContext['adobe_access_copy'],
             'adobe_project_link' => $adobeAccessContext['adobe_project_link'],
             'adobe_detected_families' => $adobeAccessContext['adobe_detected_families'],
+            'font_display' => (string) ($settings['font_display'] ?? 'optional'),
+            'font_display_options' => $this->buildFontDisplayOptions(),
             'minify_css_output' => !empty($settings['minify_css_output']),
+            'preload_primary_fonts' => !empty($settings['preload_primary_fonts']),
             'delete_uploaded_files_on_uninstall' => !empty($settings['delete_uploaded_files_on_uninstall']),
             'diagnostic_items' => $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts),
             'overview_metrics' => $this->buildOverviewMetrics($counts, $applyEverywhere, $assetStatus),
-            'output_panels' => $this->buildOutputPanels($roles),
+            'output_panels' => $this->buildOutputPanels($roles, $settings),
             'preview_panels' => $this->buildPreviewPanels(),
             'toasts' => $this->buildNoticeToasts(),
         ];
@@ -618,7 +625,7 @@ final class AdminController
             ],
             [
                 'label' => __('Font Display', 'tasty-fonts'),
-                'value' => (string) ($settings['font_display'] ?? 'swap'),
+                'value' => (string) ($settings['font_display'] ?? 'optional'),
                 'code' => false,
             ],
         ];
@@ -651,21 +658,26 @@ final class AdminController
         ];
     }
 
-    private function buildOutputPanels(array $roles): array
+    private function buildOutputPanels(array $roles, array $settings): array
     {
+        $minifyOutput = !empty($settings['minify_css_output']);
+        $generatedCssValue = !empty($settings['auto_apply_roles'])
+            ? trim($this->assets->getCss())
+            : __('Not generated while Apply Sitewide is off.', 'tasty-fonts');
+
         return [
             [
                 'key' => 'usage',
                 'label' => __('Site Snippet', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-usage',
-                'value' => $this->cssBuilder->buildRoleUsageSnippet($roles),
+                'value' => $this->cssBuilder->formatOutput($this->cssBuilder->buildRoleUsageSnippet($roles), $minifyOutput),
                 'active' => true,
             ],
             [
                 'key' => 'variables',
                 'label' => __('CSS Variables', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-vars',
-                'value' => $this->cssBuilder->buildRoleVariableSnippet($roles),
+                'value' => $this->cssBuilder->formatOutput($this->cssBuilder->buildRoleVariableSnippet($roles), $minifyOutput),
                 'active' => false,
             ],
             [
@@ -680,6 +692,13 @@ final class AdminController
                 'label' => __('Font Names', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-names',
                 'value' => $this->cssBuilder->buildRoleNameSnippet($roles),
+                'active' => false,
+            ],
+            [
+                'key' => 'generated',
+                'label' => __('Generated CSS', 'tasty-fonts'),
+                'target' => 'tasty-fonts-output-generated',
+                'value' => $generatedCssValue,
                 'active' => false,
             ],
         ];
@@ -766,7 +785,7 @@ final class AdminController
         if (($before['font_display'] ?? '') !== ($after['font_display'] ?? '')) {
             $changes[] = sprintf(
                 __('font-display set to %s', 'tasty-fonts'),
-                (string) ($after['font_display'] ?? 'swap')
+                (string) ($after['font_display'] ?? 'optional')
             );
         }
 
@@ -774,6 +793,12 @@ final class AdminController
             $changes[] = !empty($after['minify_css_output'])
                 ? __('CSS minification enabled', 'tasty-fonts')
                 : __('CSS minification disabled', 'tasty-fonts');
+        }
+
+        if (!empty($before['preload_primary_fonts']) !== !empty($after['preload_primary_fonts'])) {
+            $changes[] = !empty($after['preload_primary_fonts'])
+                ? __('primary font preloads enabled', 'tasty-fonts')
+                : __('primary font preloads disabled', 'tasty-fonts');
         }
 
         if (($before['preview_sentence'] ?? '') !== ($after['preview_sentence'] ?? '')) {
@@ -794,6 +819,24 @@ final class AdminController
             __('Plugin settings saved: %s.', 'tasty-fonts'),
             implode(', ', $changes)
         );
+    }
+
+    private function settingsChangeRequiresAssetRefresh(array $before, array $after): bool
+    {
+        return ($before['css_delivery_mode'] ?? 'file') !== ($after['css_delivery_mode'] ?? 'file')
+            || ($before['font_display'] ?? 'optional') !== ($after['font_display'] ?? 'optional')
+            || !empty($before['minify_css_output']) !== !empty($after['minify_css_output']);
+    }
+
+    private function buildFontDisplayOptions(): array
+    {
+        return [
+            ['value' => 'optional', 'label' => __('Optional (Recommended)', 'tasty-fonts')],
+            ['value' => 'swap', 'label' => __('Swap', 'tasty-fonts')],
+            ['value' => 'fallback', 'label' => __('Fallback', 'tasty-fonts')],
+            ['value' => 'block', 'label' => __('Block', 'tasty-fonts')],
+            ['value' => 'auto', 'label' => __('Auto', 'tasty-fonts')],
+        ];
     }
 
     private function formatCssDeliveryModeLabel(string $mode): string

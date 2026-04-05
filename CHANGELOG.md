@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added frontend WOFF2 preload hints for the live heading/body pair, plus an Output Settings toggle to control them.
+- Added a Generated CSS panel under Advanced Tools so the live stylesheet can be inspected directly from the plugin dashboard.
+- Added a Font Display selector to Output Settings with support for `optional`, `swap`, `fallback`, `block`, and `auto`, including contextual guidance for choosing the right trade-off.
+
+### Changed
+
+- Defaulted generated `@font-face` output to `font-display: optional`, while keeping the selected display mode reflected in the saved stylesheet and admin snippets.
+- Refreshed generated CSS immediately when output-affecting settings change so minification and font-display selections take effect without stale file output.
+- Updated the modern browser user-agent used for remote font CSS requests to a current Chrome release so Google Fonts continues returning modern WOFF2-first CSS responses.
+
 ## [1.3.0] - 2026-04-05
 
 ### Added

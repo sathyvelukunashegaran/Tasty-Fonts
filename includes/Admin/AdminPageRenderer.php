@@ -44,7 +44,10 @@ final class AdminPageRenderer
         $adobeDetectedFamilies = is_array($context['adobe_detected_families'] ?? null) ? $context['adobe_detected_families'] : [];
         $googleAccessButtonLabel = $googleApiEnabled ? __('Edit Key', 'tasty-fonts') : __('Key Settings', 'tasty-fonts');
         $adobeAccessButtonLabel = $adobeProjectSaved ? __('Project Settings', 'tasty-fonts') : __('Add Project', 'tasty-fonts');
+        $fontDisplay = (string) ($context['font_display'] ?? 'optional');
+        $fontDisplayOptions = is_array($context['font_display_options'] ?? null) ? $context['font_display_options'] : [];
         $minifyCssOutput = !empty($context['minify_css_output']);
+        $preloadPrimaryFonts = !empty($context['preload_primary_fonts']);
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
         $diagnosticItems = is_array($context['diagnostic_items'] ?? null) ? $context['diagnostic_items'] : [];
         $overviewMetrics = is_array($context['overview_metrics'] ?? null) ? $context['overview_metrics'] : [];
@@ -434,7 +437,7 @@ final class AdminPageRenderer
                                     hidden
                                 >
                                     <div class="tasty-fonts-code-card tasty-fonts-code-card--embedded">
-                                        <div class="tasty-fonts-code-tabs tasty-fonts-tab-list" role="tablist" aria-label="<?php esc_attr_e('Font snippet outputs', 'tasty-fonts'); ?>" aria-orientation="horizontal">
+                                        <div class="tasty-fonts-code-tabs tasty-fonts-tab-list" role="tablist" aria-label="<?php esc_attr_e('Font output panels', 'tasty-fonts'); ?>" aria-orientation="horizontal">
                                             <?php foreach ($outputPanels as $panel): ?>
                                                 <?php $buttonId = 'tasty-fonts-output-tab-' . $panel['key']; ?>
                                                 <?php $panelId = 'tasty-fonts-output-panel-' . $panel['key']; ?>
@@ -511,13 +514,26 @@ final class AdminPageRenderer
                                     <div class="tasty-fonts-output-settings-panel">
                                         <div class="tasty-fonts-output-settings-copy">
                                             <h3><?php esc_html_e('Output Settings', 'tasty-fonts'); ?></h3>
-                                            <p><?php esc_html_e('These controls decide how generated CSS is written and how plugin-managed font files are handled during uninstall. They do not change your current heading and body assignments.', 'tasty-fonts'); ?></p>
-                                            <p class="tasty-fonts-muted"><?php esc_html_e('Keep minified output on for production-facing delivery. Turn it off when you want readable CSS for review, debugging, or handing snippets to a developer. Only enable uninstall cleanup if you want this plugin to remove the files it placed in uploads/fonts when the plugin is deleted.', 'tasty-fonts'); ?></p>
+                                            <p><?php esc_html_e('These controls decide how generated CSS is written, whether the active heading/body pair gets frontend preload hints, and how plugin-managed font files are handled during uninstall. They do not change your current heading and body assignments.', 'tasty-fonts'); ?></p>
+                                            <p class="tasty-fonts-muted"><?php esc_html_e('Keep minified output on for production-facing delivery. Turn on preloads when you want the plugin to emit same-origin WOFF2 hints for the current heading and body role pair on live pages. Only enable uninstall cleanup if you want this plugin to remove the files it placed in uploads/fonts when the plugin is deleted.', 'tasty-fonts'); ?></p>
                                         </div>
                                         <form method="post" class="tasty-fonts-output-settings-form">
                                             <?php wp_nonce_field('tasty_fonts_save_settings'); ?>
                                             <input type="hidden" name="tasty_fonts_save_settings" value="1">
                                             <div class="tasty-fonts-output-settings-list">
+                                                <label class="tasty-fonts-stack-field tasty-fonts-stack-field--output">
+                                                    <?php $this->renderFieldLabel(__('Font Display', 'tasty-fonts')); ?>
+                                                    <span class="tasty-fonts-select-field">
+                                                        <select id="tasty-fonts-font-display" name="font_display">
+                                                            <?php foreach ($fontDisplayOptions as $option): ?>
+                                                                <option value="<?php echo esc_attr((string) ($option['value'] ?? '')); ?>" <?php selected($fontDisplay, (string) ($option['value'] ?? '')); ?>>
+                                                                    <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </span>
+                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('This value is written into every generated @font-face rule. Optional is the default because it avoids late font swaps and is usually the best LCP choice when your fallback metrics are close; choose Swap when the branded face should replace the fallback as soon as it loads.', 'tasty-fonts'); ?></span>
+                                                </label>
                                                 <input type="hidden" name="minify_css_output" value="0">
                                                 <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                                     <input
@@ -531,6 +547,21 @@ final class AdminPageRenderer
                                                     <span class="tasty-fonts-toggle-copy">
                                                         <span class="tasty-fonts-toggle-title"><?php esc_html_e('Minify generated CSS', 'tasty-fonts'); ?></span>
                                                         <span class="tasty-fonts-toggle-description"><?php esc_html_e('Compresses the generated stylesheet and the CSS shown in the Snippets tab to remove extra whitespace. Leave this on for production output; turn it off when you need readable CSS while auditing selectors, variables, or spacing.', 'tasty-fonts'); ?></span>
+                                                    </span>
+                                                </label>
+                                                <input type="hidden" name="preload_primary_fonts" value="0">
+                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="tasty-fonts-toggle-input"
+                                                        name="preload_primary_fonts"
+                                                        value="1"
+                                                        <?php checked($preloadPrimaryFonts); ?>
+                                                    >
+                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                    <span class="tasty-fonts-toggle-copy">
+                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Preload primary heading and body fonts', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Outputs same-origin WOFF2 preload tags for the live heading and body role pair so the primary text faces can start downloading earlier. Adobe-hosted fonts are skipped, and the preload tags are only emitted when Apply Sitewide is active.', 'tasty-fonts'); ?></span>
                                                     </span>
                                                 </label>
                                                 <input type="hidden" name="delete_uploaded_files_on_uninstall" value="0">
@@ -551,7 +582,7 @@ final class AdminPageRenderer
                                             </div>
                                             <div class="tasty-fonts-output-settings-note tasty-fonts-inline-note">
                                                 <strong><?php esc_html_e('What happens after saving', 'tasty-fonts'); ?></strong>
-                                                <span><?php esc_html_e('The next generated CSS refresh will use these settings. Your font library and role pairings stay exactly as they are.', 'tasty-fonts'); ?></span>
+                                                <span><?php esc_html_e('The next generated CSS refresh and frontend page load will use these settings. Your font library and role pairings stay exactly as they are.', 'tasty-fonts'); ?></span>
                                             </div>
                                             <div class="tasty-fonts-output-settings-actions">
                                                 <button type="submit" class="button"><?php esc_html_e('Save Output Settings', 'tasty-fonts'); ?></button>

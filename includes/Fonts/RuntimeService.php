@@ -27,6 +27,21 @@ final class RuntimeService
         }
     }
 
+    public function outputPreloadHints(): void
+    {
+        if (is_admin() || $this->hasEtchCanvasRequest()) {
+            return;
+        }
+
+        foreach ($this->assets->getPrimaryFontPreloadUrls() as $url) {
+            if (!is_string($url) || trim($url) === '') {
+                continue;
+            }
+
+            echo '<link rel="preload" href="' . esc_url($url) . '" as="font" type="font/woff2" crossorigin>' . "\n";
+        }
+    }
+
     public function enqueueEtchCanvas(): void
     {
         $this->assets->enqueue('tasty-fonts-etch');

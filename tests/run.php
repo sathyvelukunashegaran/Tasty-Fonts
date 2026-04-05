@@ -866,6 +866,84 @@ $tests['css_builder_ignores_eot_and_svg_sources'] = static function (): void {
     assertNotContainsValue('inter.svg', $css, 'CSS builder should not emit deprecated SVG font sources.');
 };
 
+$tests['css_builder_minifies_generated_css_without_leaving_layout_whitespace'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'sources' => ['local'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'unicode_range' => '',
+                    'files' => [
+                        'woff2' => 'https://example.com/fonts/inter.woff2',
+                    ],
+                ],
+            ],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'font_display' => 'swap',
+        'auto_apply_roles' => true,
+        'minify_css_output' => true,
+    ];
+
+    $css = $builder->build($catalog, $roles, $settings);
+
+    assertSameValue(false, str_contains($css, "\n"), 'Minified CSS should not leave newline characters in the generated output.');
+    assertSameValue(false, str_contains($css, "\t"), 'Minified CSS should not leave tab characters in the generated output.');
+    assertContainsValue('@font-face{font-family:"Inter";font-weight:400;font-style:normal;', $css, 'Minified CSS should collapse @font-face declarations into a compact form.');
+    assertContainsValue('body{font-family:var(--font-body)}', $css, 'Minified CSS should collapse role usage rules into a compact form.');
+};
+
+$tests['css_builder_format_output_respects_minify_flag'] = static function (): void {
+    $builder = new CssBuilder();
+    $snippet = ":root {\n  --font-heading: var(--font-lora);\n}\n";
+
+    assertSameValue($snippet, $builder->formatOutput($snippet, false), 'Formatted output should preserve readable snippets when minification is disabled.');
+    assertSameValue(':root{--font-heading:var(--font-lora)}', $builder->formatOutput($snippet, true), 'Formatted output should minify snippets when requested.');
+};
+
+$tests['css_builder_defaults_font_display_to_optional'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'sources' => ['local'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'unicode_range' => '',
+                    'files' => [
+                        'woff2' => 'https://example.com/fonts/inter.woff2',
+                    ],
+                ],
+            ],
+        ],
+    ];
+
+    $css = $builder->buildFontFaceOnly($catalog, ['minify_css_output' => false]);
+
+    assertContainsValue('font-display:optional;', $css, 'Generated font-face CSS should default to font-display optional when no explicit setting is stored.');
+};
+
 $tests['storage_returns_absolute_generated_css_url'] = static function (): void {
     resetTestState();
 
@@ -1038,6 +1116,54 @@ $tests['settings_repository_persists_delete_files_on_uninstall_preference'] = st
     $saved = $settings->getSettings();
 
     assertSameValue(false, !empty($saved['delete_uploaded_files_on_uninstall']), 'Settings should persist the uninstall file cleanup preference when disabled.');
+};
+
+$tests['settings_repository_persists_preload_primary_fonts_preference'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $settings->saveSettings(['preload_primary_fonts' => '1']);
+    $saved = $settings->getSettings();
+
+    assertSameValue(true, !empty($saved['preload_primary_fonts']), 'Settings should persist the primary font preload preference when enabled.');
+
+    $settings->saveSettings(['preload_primary_fonts' => '0']);
+    $saved = $settings->getSettings();
+
+    assertSameValue(false, !empty($saved['preload_primary_fonts']), 'Settings should persist the primary font preload preference when disabled.');
+};
+
+$tests['settings_repository_defaults_font_display_to_optional_and_normalizes_invalid_values'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+
+    assertSameValue('optional', $settings->getSettings()['font_display'], 'Font display should default to optional for new installs.');
+
+    $settings->saveSettings(['font_display' => 'block']);
+    assertSameValue('block', $settings->getSettings()['font_display'], 'Settings should persist supported font-display values.');
+
+    $settings->saveSettings(['font_display' => 'unsupported-value']);
+    assertSameValue('optional', $settings->getSettings()['font_display'], 'Invalid saved font-display values should normalize back to optional.');
+};
+
+$tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $settings->saveSettings([
+        'minify_css_output' => '0',
+        'preload_primary_fonts' => '0',
+        'delete_uploaded_files_on_uninstall' => '1',
+    ]);
+    $settings->saveSettings([
+        'preview_sentence' => 'Updated preview',
+    ]);
+    $saved = $settings->getSettings();
+
+    assertSameValue(false, $saved['minify_css_output'], 'Saving unrelated settings should not re-enable CSS minification.');
+    assertSameValue(false, $saved['preload_primary_fonts'], 'Saving unrelated settings should not re-enable primary font preloads.');
+    assertSameValue(true, $saved['delete_uploaded_files_on_uninstall'], 'Saving unrelated settings should not disable uninstall cleanup.');
 };
 
 $tests['settings_repository_bootstraps_applied_roles_before_draft_changes'] = static function (): void {
@@ -1264,6 +1390,67 @@ CSS,
     );
 };
 
+$tests['runtime_service_outputs_primary_font_preloads_for_live_sitewide_roles'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400.woff2'), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-700.woff2'), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('lora/Lora-400.woff2'), 'font-data');
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => 'Inter',
+            'body' => 'Lora',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'serif',
+        ],
+        ['Inter', 'Lora']
+    );
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings(['preload_primary_fonts' => '1']);
+
+    ob_start();
+    $services['runtime']->outputPreloadHints();
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('href="/wp-content/uploads/fonts/inter/Inter-700.woff2"', $output, 'Frontend preload output should include the primary heading WOFF2 file.');
+    assertContainsValue('href="/wp-content/uploads/fonts/lora/Lora-400.woff2"', $output, 'Frontend preload output should include the primary body WOFF2 file.');
+    assertContainsValue('type="font/woff2"', $output, 'Frontend preload output should declare the WOFF2 mime type.');
+    assertContainsValue('crossorigin', $output, 'Frontend preload output should include crossorigin so the hint matches the font request mode.');
+};
+
+$tests['runtime_service_skips_font_preloads_when_setting_or_live_roles_are_disabled'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400.woff2'), 'font-data');
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => 'Inter',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        ['Inter']
+    );
+
+    ob_start();
+    $services['runtime']->outputPreloadHints();
+    $outputWithSitewideOff = (string) ob_get_clean();
+
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings(['preload_primary_fonts' => '0']);
+
+    ob_start();
+    $services['runtime']->outputPreloadHints();
+    $outputWithPreloadsOff = (string) ob_get_clean();
+
+    assertSameValue('', $outputWithSitewideOff, 'Frontend preload output should stay empty while live sitewide role output is disabled.');
+    assertSameValue('', $outputWithPreloadsOff, 'Frontend preload output should stay empty when the preload setting is turned off.');
+};
+
 $tests['admin_controller_falls_back_to_variant_tokens_when_variants_are_missing'] = static function (): void {
     resetTestState();
 
@@ -1465,12 +1652,14 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
                 'css_delivery_mode' => 'file',
                 'font_display' => 'swap',
                 'minify_css_output' => true,
+                'preload_primary_fonts' => false,
                 'preview_sentence' => 'Alpha',
             ],
             [
                 'css_delivery_mode' => 'inline',
                 'font_display' => 'optional',
                 'minify_css_output' => false,
+                'preload_primary_fonts' => true,
                 'preview_sentence' => 'Beta',
             ],
         ]
@@ -1479,7 +1668,67 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
     assertContainsValue('delivery mode set to inline CSS', $message, 'Settings save messages should explain delivery-mode changes.');
     assertContainsValue('font-display set to optional', $message, 'Settings save messages should explain font-display changes.');
     assertContainsValue('CSS minification disabled', $message, 'Settings save messages should explain CSS minification changes.');
+    assertContainsValue('primary font preloads enabled', $message, 'Settings save messages should explain preload setting changes.');
     assertContainsValue('preview text updated', $message, 'Settings save messages should explain preview text changes.');
+};
+
+$tests['admin_controller_exposes_all_font_display_options_with_optional_first'] = static function (): void {
+    resetTestState();
+
+    $controller = makeAdminControllerTestInstance();
+    $options = invokePrivateMethod($controller, 'buildFontDisplayOptions', []);
+
+    assertSameValue('optional', (string) ($options[0]['value'] ?? ''), 'Optional should be the first font-display choice so the recommended default is selected first.');
+    assertSameValue(
+        ['optional', 'swap', 'fallback', 'block', 'auto'],
+        array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), $options)),
+        'Output Settings should expose every supported font-display option.'
+    );
+};
+
+$tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] = static function (): void {
+    resetTestState();
+
+    $controller = makeAdminControllerTestInstance();
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => false, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Disabling CSS minification should trigger a generated asset refresh.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => true, 'font_display' => 'optional', 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Changing font-display should trigger a generated asset refresh.'
+    );
+
+    assertSameValue(
+        false,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'preload_primary_fonts' => true],
+                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'preload_primary_fonts' => false],
+            ]
+        ),
+        'Preload-only changes should not force a generated CSS refresh.'
+    );
 };
 
 $tests['admin_controller_versions_admin_assets_from_plugin_version'] = static function (): void {
@@ -1489,6 +1738,61 @@ $tests['admin_controller_versions_admin_assets_from_plugin_version'] = static fu
     $version = invokePrivateMethod($controller, 'assetVersionFor', ['assets/css/admin.css']);
 
     assertSameValue(TASTY_FONTS_VERSION, $version, 'Admin asset versioning should reuse the plugin version instead of hashing shipped files on every request.');
+};
+
+$tests['font_utils_modern_user_agent_tracks_a_recent_chrome_release'] = static function (): void {
+    assertContainsValue('Chrome/146.0.0.0', FontUtils::MODERN_USER_AGENT, 'The modern browser user agent should stay current enough to trigger Google Fonts CSS2 WOFF2 responses.');
+};
+
+$tests['admin_controller_includes_generated_css_output_panel'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400.woff2'), 'font-data');
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $services['settings']->saveRoles($roles, ['Inter']);
+    $services['settings']->setAutoApplyRoles(true);
+
+    $panels = invokePrivateMethod(
+        $services['controller'],
+        'buildOutputPanels',
+        [$roles, $services['settings']->getSettings()]
+    );
+    $generatedPanels = array_values(array_filter($panels, static fn (array $panel): bool => ($panel['key'] ?? '') === 'generated'));
+
+    assertSameValue(1, count($generatedPanels), 'Advanced Tools should expose a dedicated panel for the generated CSS output.');
+    assertContainsValue('@font-face', (string) ($generatedPanels[0]['value'] ?? ''), 'The generated CSS panel should include the current stylesheet output.');
+};
+
+$tests['admin_controller_marks_generated_css_panel_unavailable_when_sitewide_is_off'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+
+    $panels = invokePrivateMethod(
+        $services['controller'],
+        'buildOutputPanels',
+        [$roles, $services['settings']->getSettings()]
+    );
+    $generatedPanels = array_values(array_filter($panels, static fn (array $panel): bool => ($panel['key'] ?? '') === 'generated'));
+
+    assertSameValue(
+        'Not generated while Apply Sitewide is off.',
+        (string) ($generatedPanels[0]['value'] ?? ''),
+        'The generated CSS panel should explain that there is no live sitewide output while Apply Sitewide is off.'
+    );
 };
 
 $tests['admin_controller_enqueues_tokens_before_admin_styles'] = static function (): void {

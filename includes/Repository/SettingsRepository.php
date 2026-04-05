@@ -17,8 +17,9 @@ final class SettingsRepository
         'applied_roles' => [],
         'delete_uploaded_files_on_uninstall' => false,
         'css_delivery_mode' => 'file',
-        'font_display' => 'swap',
+        'font_display' => 'optional',
         'minify_css_output' => true,
+        'preload_primary_fonts' => true,
         'preview_sentence' => 'The quick brown fox jumps over the lazy dog. 1234567890',
         'adobe_enabled' => false,
         'adobe_project_id' => '',
@@ -42,6 +43,10 @@ final class SettingsRepository
             $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS),
             self::DEFAULT_SETTINGS
         );
+        $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
+        $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
+        $settings['minify_css_output'] = !empty($settings['minify_css_output']);
+        $settings['preload_primary_fonts'] = !empty($settings['preload_primary_fonts']);
         $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
         $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
         $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
@@ -88,14 +93,15 @@ final class SettingsRepository
         }
 
         if (isset($input['font_display'])) {
-            $display = sanitize_text_field((string) $input['font_display']);
-            $settings['font_display'] = in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true)
-                ? $display
-                : 'swap';
+            $settings['font_display'] = $this->normalizeFontDisplay(sanitize_text_field((string) $input['font_display']));
         }
 
         if (array_key_exists('minify_css_output', $input)) {
             $settings['minify_css_output'] = !empty($input['minify_css_output']);
+        }
+
+        if (array_key_exists('preload_primary_fonts', $input)) {
+            $settings['preload_primary_fonts'] = !empty($input['preload_primary_fonts']);
         }
 
         if (array_key_exists('delete_uploaded_files_on_uninstall', $input)) {
@@ -409,6 +415,13 @@ final class SettingsRepository
         update_option(self::OPTION_SETTINGS, $settings, false);
 
         return $settings;
+    }
+
+    private function normalizeFontDisplay(string $display): string
+    {
+        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true)
+            ? $display
+            : 'optional';
     }
 
     private function sanitizeAdobeProjectId(string $projectId): string

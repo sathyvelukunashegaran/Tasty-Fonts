@@ -26,7 +26,7 @@ final class CssBuilder
 
         foreach ($catalog as $family) {
             foreach ((array) ($family['faces'] ?? []) as $face) {
-                $rule = $this->buildFaceRule($face, (string) ($settings['font_display'] ?? 'swap'));
+                $rule = $this->buildFaceRule($face, (string) ($settings['font_display'] ?? 'optional'));
 
                 if ($rule !== '') {
                     $blocks[] = $rule;
@@ -102,6 +102,15 @@ final class CssBuilder
         return implode("\n", [(string) ($roles['heading'] ?? ''), (string) ($roles['body'] ?? '')]);
     }
 
+    public function formatOutput(string $css, bool $minify = false): string
+    {
+        if (trim($css) === '') {
+            return '';
+        }
+
+        return $minify ? $this->minify($css) : $css;
+    }
+
     private function buildFaceRule(array $face, string $display): string
     {
         $family = (string) ($face['family'] ?? '');
@@ -140,7 +149,7 @@ final class CssBuilder
         $css .= '  font-display:' . $this->sanitizeKeyword(
             $display,
             ['auto', 'block', 'swap', 'fallback', 'optional'],
-            'swap'
+            'optional'
         ) . ";\n";
         $css .= "}\n";
 
@@ -149,10 +158,72 @@ final class CssBuilder
 
     private function minify(string $css): string
     {
-        $css = preg_replace('/\r?\n *(?![\@\.:}])/', '', $css) ?? $css;
-        $css = str_replace("\t", '', $css);
+        $css = trim($css);
 
-        return trim($css);
+        if ($css === '') {
+            return '';
+        }
+
+        $result = '';
+        $length = strlen($css);
+        $quote = null;
+        $escapeNext = false;
+
+        for ($index = 0; $index < $length; $index++) {
+            $character = $css[$index];
+            $next = $index + 1 < $length ? $css[$index + 1] : null;
+
+            if ($quote !== null) {
+                $result .= $character;
+
+                if ($escapeNext) {
+                    $escapeNext = false;
+                    continue;
+                }
+
+                if ($character === '\\') {
+                    $escapeNext = true;
+                    continue;
+                }
+
+                if ($character === $quote) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ($character === '/' && $next === '*') {
+                $commentEnd = strpos($css, '*/', $index + 2);
+
+                if ($commentEnd === false) {
+                    break;
+                }
+
+                $index = $commentEnd + 1;
+                continue;
+            }
+
+            if ($character === '"' || $character === "'") {
+                $quote = $character;
+                $result .= $character;
+                continue;
+            }
+
+            if (preg_match('/\s/', $character) === 1) {
+                continue;
+            }
+
+            if ($character === ';' && $next === '}') {
+                continue;
+            }
+
+            $result .= $character;
+        }
+
+        $result = str_replace(';}', '}', $result);
+
+        return trim($result);
     }
 
     private function sanitizeKeyword(string $value, array $allowed, string $default): string
