@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-04-05
+
 ### Added
 
 - Added `uninstall.php` cleanup for plugin options and transients, plus a settings toggle to optionally remove plugin-managed uploaded font files during uninstall.

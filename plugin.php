@@ -3,7 +3,7 @@
 Plugin Name: Tasty Custom Fonts
 Plugin URI: https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts
 Description: Self-host local and Google Fonts, with optional Adobe Fonts web project support for Etch, Gutenberg, and the frontend.
-Version: 1.2.0
+Version: 1.2.1
 Author: Tasty WP
 Author URI: https://github.com/sathyvelukunashegaran
 License: GPLv2 or later
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TASTY_FONTS_VERSION', '1.2.0');
+define('TASTY_FONTS_VERSION', '1.2.1');
 define('TASTY_FONTS_FILE', __FILE__);
 define('TASTY_FONTS_DIR', plugin_dir_path(__FILE__));
 define('TASTY_FONTS_URL', plugin_dir_url(__FILE__));
