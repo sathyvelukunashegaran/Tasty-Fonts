@@ -421,6 +421,13 @@ if (!function_exists('admin_url')) {
     }
 }
 
+if (!function_exists('wp_create_nonce')) {
+    function wp_create_nonce(string $action = '-1'): string
+    {
+        return 'nonce:' . $action;
+    }
+}
+
 if (!function_exists('wp_safe_redirect')) {
     function wp_safe_redirect(string $location): bool
     {
@@ -1482,6 +1489,27 @@ $tests['admin_controller_versions_admin_assets_from_plugin_version'] = static fu
     $version = invokePrivateMethod($controller, 'assetVersionFor', ['assets/css/admin.css']);
 
     assertSameValue(TASTY_FONTS_VERSION, $version, 'Admin asset versioning should reuse the plugin version instead of hashing shipped files on every request.');
+};
+
+$tests['admin_controller_enqueues_tokens_before_admin_styles'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    assertSameValue(
+        TASTY_FONTS_URL . 'assets/css/tokens.css',
+        (string) ($enqueuedStyles['tasty-fonts-admin-tokens']['src'] ?? ''),
+        'The plugin admin page should enqueue the standalone token stylesheet.'
+    );
+
+    assertSameValue(
+        ['tasty-fonts-admin-tokens'],
+        $enqueuedStyles['tasty-fonts-admin']['deps'] ?? null,
+        'The admin stylesheet should depend on the token stylesheet so custom properties load first.'
+    );
 };
 
 $tests['admin_controller_reads_and_clears_transient_notice_toasts'] = static function (): void {

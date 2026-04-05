@@ -1,0 +1,147 @@
+.tasty-fonts-admin {
+    /* Primitive palette */
+    --tasty-gray-0: #ffffff;
+    --tasty-gray-50: #f6f7f7;
+    --tasty-gray-100: #f0f0f0;
+    --tasty-gray-150: #f0f0f1;
+    --tasty-gray-300: #dddddd;
+    --tasty-gray-600: #8c8f94;
+    --tasty-gray-600-rgb: 140, 143, 148;
+    --tasty-gray-700: #50575e;
+    --tasty-gray-900: #1d2327;
+
+    --tasty-ctrl-border: #c3ccd5;
+    --tasty-ctrl-border-strong: #8c8f94;
+    --tasty-ctrl-border-active: #98b5d4;
+    --tasty-ctrl-surface: #ffffff;
+    --tasty-ctrl-surface-muted: #f6f8fb;
+    --tasty-ctrl-text: #22384e;
+    --tasty-ctrl-text-muted: #5d6d7b;
+    --tasty-ctrl-text-muted-rgb: 93, 109, 123;
+
+    --tasty-success-raw: #00a32a;
+    --tasty-success-rgb: 0, 163, 42;
+    --tasty-warning-raw: #996800;
+    --tasty-warning-rgb: 153, 104, 0;
+    --tasty-danger-raw: #d63638;
+    --tasty-danger-rgb: 214, 54, 56;
+
+    /* Accent and semantic surfaces */
+    --tasty-accent: var(--wp-admin-theme-color, #007cba);
+    --tasty-accent-hover: var(--wp-admin-theme-color-darker-10, #006ba1);
+    --tasty-accent-active: var(--wp-admin-theme-color-darker-20, #005a87);
+    --tasty-accent-rgb: var(--wp-admin-theme-color--rgb, 0, 124, 186);
+    --tasty-accent-soft: rgba(var(--tasty-accent-rgb), 0.08);
+
+    --tasty-surface: var(--tasty-gray-0);
+    --tasty-surface-soft: var(--tasty-gray-50);
+    --tasty-surface-muted: var(--tasty-gray-150);
+    --tasty-surface-accent-subtle: rgba(var(--tasty-accent-rgb), 0.04);
+    --tasty-surface-accent-soft: var(--tasty-accent-soft);
+    --tasty-surface-success: var(--tasty-success-soft);
+    --tasty-surface-warning: var(--tasty-warning-soft);
+    --tasty-surface-danger: var(--tasty-danger-soft);
+
+    /* Semantic borders */
+    --tasty-border: var(--tasty-gray-300);
+    --tasty-border-strong: var(--tasty-gray-600);
+    --tasty-border-subtle: rgba(var(--tasty-gray-600-rgb), 0.18);
+    --tasty-border-subtle-strong: rgba(var(--tasty-gray-600-rgb), 0.24);
+    --tasty-border-subtle-faint: rgba(var(--tasty-gray-600-rgb), 0.14);
+    --tasty-border-accent-soft: rgba(var(--tasty-accent-rgb), 0.18);
+    --tasty-border-accent-strong: rgba(var(--tasty-accent-rgb), 0.24);
+    --tasty-border-success-soft: rgba(var(--tasty-success-rgb), 0.18);
+    --tasty-border-warning-soft: rgba(var(--tasty-warning-rgb), 0.18);
+    --tasty-border-danger-soft: rgba(var(--tasty-danger-rgb), 0.16);
+
+    /* Semantic text and status */
+    --tasty-text: var(--tasty-gray-900);
+    --tasty-text-muted: var(--tasty-gray-700);
+    --tasty-text-on-accent: var(--tasty-gray-0);
+    --tasty-success: var(--tasty-success-raw);
+    --tasty-success-soft: rgba(var(--tasty-success-rgb), 0.08);
+    --tasty-warning: var(--tasty-warning-raw);
+    --tasty-warning-soft: rgba(var(--tasty-warning-rgb), 0.08);
+    --tasty-danger: var(--tasty-danger-raw);
+    --tasty-danger-soft: rgba(var(--tasty-danger-rgb), 0.08);
+
+    /* Spacing */
+    --tasty-space-1: 4px;
+    --tasty-space-2: 8px;
+    --tasty-space-3: 12px;
+    --tasty-space-4: 16px;
+    --tasty-space-5: 20px;
+    --tasty-space-6: 24px;
+    --tasty-space-8: 32px;
+    --tasty-space-10: 40px;
+
+    /* Radius */
+    --tasty-radius-s: 6px;
+    --tasty-radius-control: 8px;
+    --tasty-radius-card: 10px;
+    --tasty-radius-inner: 12px;
+    --tasty-radius-panel: 14px;
+    --tasty-radius-xl: 16px;
+    --tasty-radius-large: 18px;
+    --tasty-radius-pill: 999px;
+
+    /* Dimensions */
+    --tasty-control-height-regular: 38px;
+    --tasty-control-height-compact: 32px;
+    --tasty-control-height: var(--tasty-control-height-regular);
+    --tasty-control-adornment: var(--tasty-control-height-regular);
+    --tasty-pill-height: 22px;
+    --tasty-pill-padding-x: 12px;
+
+    /* Control aliases */
+    --tasty-control-border: var(--tasty-ctrl-border);
+    --tasty-control-border-strong: var(--tasty-ctrl-border-strong);
+    --tasty-control-border-active: var(--tasty-ctrl-border-active);
+    --tasty-control-surface: var(--tasty-ctrl-surface);
+    --tasty-control-surface-muted: var(--tasty-ctrl-surface-muted);
+    --tasty-control-text: var(--tasty-ctrl-text);
+    --tasty-control-text-muted: var(--tasty-ctrl-text-muted);
+    --tasty-control-divider: rgba(var(--tasty-ctrl-text-muted-rgb), 0.2);
+    --tasty-control-padding-inline: 12px;
+    --tasty-control-padding-inline-roomy: 14px;
+
+    /* Typography scale */
+    --tasty-font-size-xs: 11px;
+    --tasty-font-size-s: 12px;
+    --tasty-font-size-m: 13px;
+    --tasty-font-size-l: 14px;
+    --tasty-font-size-xl: 16px;
+    --tasty-font-size-2xl: 18px;
+    --tasty-font-weight-regular: 400;
+    --tasty-font-weight-medium: 500;
+    --tasty-font-weight-semibold: 600;
+    --tasty-font-weight-bold: 700;
+    --tasty-line-height-tight: 1.2;
+    --tasty-line-height-body: 1.5;
+    --tasty-line-height-relaxed: 1.45;
+    --tasty-type-meta-size: var(--tasty-font-size-xs);
+    --tasty-type-meta-weight: var(--tasty-font-weight-semibold);
+    --tasty-type-meta-spacing: 0.08em;
+    --tasty-type-body-size: var(--tasty-font-size-m);
+    --tasty-type-body-line-height: var(--tasty-line-height-body);
+    --tasty-type-title-size: var(--tasty-font-size-2xl);
+    --tasty-type-title-compact-size: var(--tasty-font-size-xl);
+    --tasty-type-title-weight: var(--tasty-font-weight-semibold);
+
+    /* Shadows */
+    --tasty-shadow-card: none;
+    --tasty-shadow-overlay: 0 8px 18px rgba(0, 0, 0, 0.08);
+    --tasty-shadow-focus: 0 0 0 2px var(--tasty-surface), 0 0 0 4px var(--tasty-accent);
+
+    /* Layout constants */
+    --tasty-card-padding: var(--tasty-space-5);
+    --tasty-card-padding-tight: var(--tasty-space-4);
+    --tasty-panel-gap: var(--tasty-space-4);
+    --tasty-section-gap: var(--tasty-space-4);
+    --tasty-section-gap-tight: var(--tasty-space-3);
+    --tasty-sidebar-width: 300px;
+    --tasty-action-cluster-width: 344px;
+    --tasty-toolbar-search-width: 32rem;
+    --tasty-toolbar-field-width: clamp(208px, 20vw, 236px);
+    --tasty-library-card-min-width: 18rem;
+}

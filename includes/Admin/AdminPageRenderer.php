@@ -53,7 +53,7 @@ final class AdminPageRenderer
         $toasts = is_array($context['toasts'] ?? null) ? $context['toasts'] : [];
         $applyEverywhere = !empty($context['apply_everywhere']);
         $roleDeployment = is_array($context['role_deployment'] ?? null) ? $context['role_deployment'] : [];
-        $roleActionsClass = $applyEverywhere ? 'is-four-actions' : 'is-three-actions';
+        $roleSaveActionsClass = $applyEverywhere ? ' is-three-actions' : '';
         $headingFamily = (string) ($roles['heading'] ?? '');
         $bodyFamily = (string) ($roles['body'] ?? '');
         $headingFallback = (string) ($roles['heading_fallback'] ?? 'sans-serif');
@@ -64,6 +64,19 @@ final class AdminPageRenderer
         $bodyVariable = 'var(--font-body)';
         $headingFamilyVariable = $this->buildFontVariableReference($headingFamily);
         $bodyFamilyVariable = $this->buildFontVariableReference($bodyFamily);
+        $pluginVersion = defined('TASTY_FONTS_VERSION') ? (string) TASTY_FONTS_VERSION : '';
+        $pluginRepositoryUrl = 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts';
+        $pluginVersionUrl = $pluginVersion !== ''
+            ? $pluginRepositoryUrl . '/releases/tag/' . rawurlencode($pluginVersion)
+            : $pluginRepositoryUrl;
+        $roleDeploymentBadge = (string) ($roleDeployment['badge'] ?? '');
+        $roleDeploymentBadgeClass = (string) ($roleDeployment['badge_class'] ?? '');
+        $roleDeploymentTitle = trim((string) ($roleDeployment['title'] ?? ''));
+        $roleDeploymentCopy = trim((string) ($roleDeployment['copy'] ?? ''));
+        $roleDeploymentTooltip = trim(
+            $roleDeploymentTitle . ($roleDeploymentTitle !== '' && $roleDeploymentCopy !== '' ? '. ' : '') . $roleDeploymentCopy
+        );
+        $roleDeploymentAnnouncementId = 'tasty-fonts-role-deployment-announcement';
         ?>
         <div class="wrap tasty-fonts-admin">
             <?php $this->renderNotices($toasts); ?>
@@ -76,8 +89,22 @@ final class AdminPageRenderer
                         <div class="tasty-fonts-top-panel-intro">
                             <div class="tasty-fonts-overview-head tasty-fonts-top-panel-overview">
                                 <div class="tasty-fonts-hero-copy">
-                                    <h1><?php esc_html_e('Tasty Custom Fonts', 'tasty-fonts'); ?></h1>
-                                    <p class="tasty-fonts-hero-text"><?php esc_html_e('Self-hosted typography for Etch, Gutenberg, and the frontend.', 'tasty-fonts'); ?></p>
+                                    <div class="tasty-fonts-hero-title-row">
+                                        <h1><?php esc_html_e('Tasty Custom Fonts', 'tasty-fonts'); ?></h1>
+                                        <?php if ($pluginVersion !== ''): ?>
+                                            <a
+                                                class="tasty-fonts-version-link tasty-fonts-badge is-role"
+                                                href="<?php echo esc_url($pluginVersionUrl); ?>"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                aria-label="<?php echo esc_attr(sprintf(__('View GitHub changelog for version %s', 'tasty-fonts'), $pluginVersion)); ?>"
+                                                title="<?php echo esc_attr(sprintf(__('View changelog for version %s on GitHub', 'tasty-fonts'), $pluginVersion)); ?>"
+                                            >
+                                                <?php echo esc_html(sprintf(__('v%s', 'tasty-fonts'), $pluginVersion)); ?>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+                                    <p class="tasty-fonts-hero-text"><?php esc_html_e('Typography management for Etch, Gutenberg, and the frontend.', 'tasty-fonts'); ?></p>
                                 </div>
                             </div>
 
@@ -101,6 +128,25 @@ final class AdminPageRenderer
                                 );
                                 ?>
                                 <div class="tasty-fonts-role-stacks">
+                                    <?php if ($roleDeployment !== []): ?>
+                                        <span class="tasty-fonts-role-stack tasty-fonts-role-deployment <?php echo esc_attr($roleDeploymentBadgeClass); ?>" data-role-deployment aria-live="polite" aria-atomic="true">
+                                            <span class="tasty-fonts-role-stack-label"><?php esc_html_e('Status', 'tasty-fonts'); ?></span>
+                                            <button
+                                                type="button"
+                                                class="tasty-fonts-role-status-pill <?php echo esc_attr($roleDeploymentBadgeClass); ?>"
+                                                data-role-deployment-pill
+                                                data-help-tooltip="<?php echo esc_attr($roleDeploymentTooltip); ?>"
+                                                data-help-passive="1"
+                                                aria-label="<?php esc_attr_e('Role deployment status', 'tasty-fonts'); ?>"
+                                                aria-describedby="<?php echo esc_attr($roleDeploymentAnnouncementId); ?>"
+                                                aria-controls="tasty-fonts-help-tooltip-layer"
+                                                title="<?php echo esc_attr($roleDeploymentTooltip); ?>"
+                                            >
+                                                <span data-role-deployment-badge><?php echo esc_html($roleDeploymentBadge); ?></span>
+                                            </button>
+                                            <span id="<?php echo esc_attr($roleDeploymentAnnouncementId); ?>" class="screen-reader-text" data-role-deployment-announcement><?php echo esc_html($roleDeploymentTooltip); ?></span>
+                                        </span>
+                                    <?php endif; ?>
                                     <span class="tasty-fonts-role-stack">
                                         <span class="tasty-fonts-role-stack-label"><?php esc_html_e('Heading', 'tasty-fonts'); ?></span>
                                         <button
@@ -135,17 +181,6 @@ final class AdminPageRenderer
                                     </span>
                                 </div>
                             </div>
-                            <?php if ($roleDeployment !== []): ?>
-                                <div class="tasty-fonts-role-deployment <?php echo esc_attr((string) ($roleDeployment['badge_class'] ?? '')); ?>" data-role-deployment>
-                                    <span class="tasty-fonts-status-label <?php echo esc_attr((string) ($roleDeployment['badge_class'] ?? '')); ?>" data-role-deployment-badge>
-                                        <?php echo esc_html((string) ($roleDeployment['badge'] ?? '')); ?>
-                                    </span>
-                                    <div class="tasty-fonts-role-deployment-copy">
-                                        <span class="tasty-fonts-role-deployment-title" data-role-deployment-title><?php echo esc_html((string) ($roleDeployment['title'] ?? '')); ?></span>
-                                        <span class="tasty-fonts-role-deployment-text" data-role-deployment-text><?php echo esc_html((string) ($roleDeployment['copy'] ?? '')); ?></span>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
                             <?php wp_nonce_field('tasty_fonts_save_roles'); ?>
                             <input type="hidden" name="tasty_fonts_save_roles" value="1">
                             <div class="tasty-fonts-role-grid">
@@ -233,8 +268,8 @@ final class AdminPageRenderer
                             </div>
 
                             <div class="tasty-fonts-role-toolbar">
-                                <div class="tasty-fonts-role-actions <?php echo esc_attr($roleActionsClass); ?>">
-                                    <div class="tasty-fonts-role-save-actions">
+                                <div class="tasty-fonts-role-actions">
+                                    <div class="tasty-fonts-role-save-actions<?php echo esc_attr($roleSaveActionsClass); ?>">
                                         <div class="tasty-fonts-action-choice tasty-fonts-action-choice--primary">
                                             <div class="tasty-fonts-button-with-help">
                                                 <button type="submit" class="button button-primary tasty-fonts-scope-button tasty-fonts-scope-button--apply" name="tasty_fonts_action_type" value="apply">
@@ -262,19 +297,21 @@ final class AdminPageRenderer
                                             </div>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="tasty-fonts-button-with-help">
-                                        <button
-                                            type="button"
-                                            class="button tasty-fonts-disclosure-button tasty-fonts-disclosure-button--preview"
-                                            data-disclosure-toggle="tasty-fonts-role-advanced-panel"
-                                            data-expanded-label="<?php echo esc_attr__('Advanced Tools', 'tasty-fonts'); ?>"
-                                            data-collapsed-label="<?php echo esc_attr__('Advanced Tools', 'tasty-fonts'); ?>"
-                                            aria-expanded="false"
-                                            aria-controls="tasty-fonts-role-advanced-panel"
-                                        >
-                                            <?php esc_html_e('Advanced Tools', 'tasty-fonts'); ?>
-                                        </button>
-                                        <?php $this->renderHelpTip(__('Open the preview, snippets, and system details panels for the current role pairing.', 'tasty-fonts'), __('Advanced Tools', 'tasty-fonts')); ?>
+                                    <div class="tasty-fonts-role-secondary-actions">
+                                        <div class="tasty-fonts-button-with-help">
+                                            <button
+                                                type="button"
+                                                class="button tasty-fonts-disclosure-button tasty-fonts-disclosure-button--preview"
+                                                data-disclosure-toggle="tasty-fonts-role-advanced-panel"
+                                                data-expanded-label="<?php echo esc_attr__('Advanced Tools', 'tasty-fonts'); ?>"
+                                                data-collapsed-label="<?php echo esc_attr__('Advanced Tools', 'tasty-fonts'); ?>"
+                                                aria-expanded="false"
+                                                aria-controls="tasty-fonts-role-advanced-panel"
+                                            >
+                                                <?php esc_html_e('Advanced Tools', 'tasty-fonts'); ?>
+                                            </button>
+                                            <?php $this->renderHelpTip(__('Open the preview, snippets, system details, and output settings panels for the current role pairing.', 'tasty-fonts'), __('Advanced Tools', 'tasty-fonts')); ?>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -320,6 +357,19 @@ final class AdminPageRenderer
                                         role="tab"
                                     >
                                         <?php esc_html_e('System Details', 'tasty-fonts'); ?>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="tasty-fonts-studio-tab tasty-fonts-tab-button"
+                                        id="tasty-fonts-studio-tab-output-settings"
+                                        data-tab-group="studio"
+                                        data-tab-target="output-settings"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                        aria-controls="tasty-fonts-studio-panel-output-settings"
+                                        role="tab"
+                                    >
+                                        <?php esc_html_e('Output Settings', 'tasty-fonts'); ?>
                                     </button>
                                 </div>
 
@@ -384,48 +434,6 @@ final class AdminPageRenderer
                                     hidden
                                 >
                                     <div class="tasty-fonts-code-card tasty-fonts-code-card--embedded">
-                                        <div class="tasty-fonts-output-settings-panel">
-                                            <div class="tasty-fonts-output-settings-copy">
-                                                <h3><?php esc_html_e('Output Settings', 'tasty-fonts'); ?></h3>
-                                                <p class="tasty-fonts-muted"><?php esc_html_e('Minify affects the generated stylesheet and the CSS snippets below. Keep it on for production output, or turn it off when you need readable CSS while auditing changes.', 'tasty-fonts'); ?></p>
-                                            </div>
-                                            <form method="post" class="tasty-fonts-output-settings-form">
-                                                <?php wp_nonce_field('tasty_fonts_save_settings'); ?>
-                                                <input type="hidden" name="tasty_fonts_save_settings" value="1">
-                                                <input type="hidden" name="minify_css_output" value="0">
-                                                <label class="tasty-fonts-toggle-field">
-                                                    <input
-                                                        type="checkbox"
-                                                        class="tasty-fonts-toggle-input"
-                                                        name="minify_css_output"
-                                                        value="1"
-                                                        <?php checked($minifyCssOutput); ?>
-                                                    >
-                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
-                                                    <span class="tasty-fonts-toggle-copy">
-                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Minify generated CSS', 'tasty-fonts'); ?></span>
-                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Reduces whitespace in frontend CSS and snippet output.', 'tasty-fonts'); ?></span>
-                                                    </span>
-                                                </label>
-                                                <input type="hidden" name="delete_uploaded_files_on_uninstall" value="0">
-                                                <label class="tasty-fonts-toggle-field">
-                                                    <input
-                                                        type="checkbox"
-                                                        class="tasty-fonts-toggle-input"
-                                                        name="delete_uploaded_files_on_uninstall"
-                                                        value="1"
-                                                        <?php checked($deleteUploadedFilesOnUninstall); ?>
-                                                    >
-                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
-                                                    <span class="tasty-fonts-toggle-copy">
-                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Delete uploaded fonts on uninstall', 'tasty-fonts'); ?></span>
-                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Also remove the plugin-managed files in uploads/fonts when the plugin is deleted.', 'tasty-fonts'); ?></span>
-                                                    </span>
-                                                </label>
-                                                <button type="submit" class="button"><?php esc_html_e('Save Output Settings', 'tasty-fonts'); ?></button>
-                                            </form>
-                                        </div>
-
                                         <div class="tasty-fonts-code-tabs tasty-fonts-tab-list" role="tablist" aria-label="<?php esc_attr_e('Font snippet outputs', 'tasty-fonts'); ?>" aria-orientation="horizontal">
                                             <?php foreach ($outputPanels as $panel): ?>
                                                 <?php $buttonId = 'tasty-fonts-output-tab-' . $panel['key']; ?>
@@ -490,6 +498,67 @@ final class AdminPageRenderer
                                         </div>
                                     </div>
                                 </section>
+
+                                <section
+                                    id="tasty-fonts-studio-panel-output-settings"
+                                    class="tasty-fonts-studio-panel"
+                                    data-tab-group="studio"
+                                    data-tab-panel="output-settings"
+                                    role="tabpanel"
+                                    aria-labelledby="tasty-fonts-studio-tab-output-settings"
+                                    hidden
+                                >
+                                    <div class="tasty-fonts-output-settings-panel">
+                                        <div class="tasty-fonts-output-settings-copy">
+                                            <h3><?php esc_html_e('Output Settings', 'tasty-fonts'); ?></h3>
+                                            <p><?php esc_html_e('These controls decide how generated CSS is written and how plugin-managed font files are handled during uninstall. They do not change your current heading and body assignments.', 'tasty-fonts'); ?></p>
+                                            <p class="tasty-fonts-muted"><?php esc_html_e('Keep minified output on for production-facing delivery. Turn it off when you want readable CSS for review, debugging, or handing snippets to a developer. Only enable uninstall cleanup if you want this plugin to remove the files it placed in uploads/fonts when the plugin is deleted.', 'tasty-fonts'); ?></p>
+                                        </div>
+                                        <form method="post" class="tasty-fonts-output-settings-form">
+                                            <?php wp_nonce_field('tasty_fonts_save_settings'); ?>
+                                            <input type="hidden" name="tasty_fonts_save_settings" value="1">
+                                            <div class="tasty-fonts-output-settings-list">
+                                                <input type="hidden" name="minify_css_output" value="0">
+                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="tasty-fonts-toggle-input"
+                                                        name="minify_css_output"
+                                                        value="1"
+                                                        <?php checked($minifyCssOutput); ?>
+                                                    >
+                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                    <span class="tasty-fonts-toggle-copy">
+                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Minify generated CSS', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Compresses the generated stylesheet and the CSS shown in the Snippets tab to remove extra whitespace. Leave this on for production output; turn it off when you need readable CSS while auditing selectors, variables, or spacing.', 'tasty-fonts'); ?></span>
+                                                    </span>
+                                                </label>
+                                                <input type="hidden" name="delete_uploaded_files_on_uninstall" value="0">
+                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="tasty-fonts-toggle-input"
+                                                        name="delete_uploaded_files_on_uninstall"
+                                                        value="1"
+                                                        <?php checked($deleteUploadedFilesOnUninstall); ?>
+                                                    >
+                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                    <span class="tasty-fonts-toggle-copy">
+                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Delete uploaded fonts on uninstall', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Removes the plugin-managed font files stored in uploads/fonts when the plugin is deleted. Leave this off if you want those uploaded files to remain available after uninstalling; turn it on when you want a full cleanup of plugin-managed assets.', 'tasty-fonts'); ?></span>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                            <div class="tasty-fonts-output-settings-note tasty-fonts-inline-note">
+                                                <strong><?php esc_html_e('What happens after saving', 'tasty-fonts'); ?></strong>
+                                                <span><?php esc_html_e('The next generated CSS refresh will use these settings. Your font library and role pairings stay exactly as they are.', 'tasty-fonts'); ?></span>
+                                            </div>
+                                            <div class="tasty-fonts-output-settings-actions">
+                                                <button type="submit" class="button"><?php esc_html_e('Save Output Settings', 'tasty-fonts'); ?></button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </section>
                             </div>
                     </section>
 
@@ -537,6 +606,7 @@ final class AdminPageRenderer
                                     </form>
                                     <button
                                         type="button"
+                                        id="tasty-fonts-add-font-panel-toggle"
                                         class="button button-primary tasty-fonts-disclosure-button tasty-fonts-disclosure-button--library"
                                         data-disclosure-toggle="tasty-fonts-add-font-panel"
                                         data-expanded-label="<?php echo esc_attr__('Add Fonts', 'tasty-fonts'); ?>"
@@ -882,7 +952,15 @@ final class AdminPageRenderer
                         </div>
 
                         <?php if ($catalog === []): ?>
-                            <div class="tasty-fonts-empty tasty-fonts-empty-state"><?php esc_html_e('No supported font files were found yet in uploads/fonts.', 'tasty-fonts'); ?></div>
+                            <div class="tasty-fonts-empty-state tasty-fonts-empty-state--rich tasty-fonts-empty-state--library">
+                                <div class="tasty-fonts-empty-state-body">
+                                    <h3 class="tasty-fonts-empty-state-title"><?php esc_html_e('Your library is empty', 'tasty-fonts'); ?></h3>
+                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Import a Google family, connect an Adobe Fonts project, or upload local files to start building your library and assigning heading and body roles.', 'tasty-fonts'); ?></p>
+                                </div>
+                                <div class="tasty-fonts-empty-state-actions">
+                                    <button type="button" class="button button-primary" data-open-add-fonts aria-controls="tasty-fonts-add-font-panel"><?php esc_html_e('Add Fonts', 'tasty-fonts'); ?></button>
+                                </div>
+                            </div>
                         <?php else: ?>
                             <div id="tasty-fonts-library-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty-state" hidden><?php esc_html_e('No fonts match the current filters.', 'tasty-fonts'); ?></div>
                             <div class="tasty-fonts-library-grid">
@@ -943,7 +1021,12 @@ final class AdminPageRenderer
                         </div>
 
                         <?php if ($logs === []): ?>
-                            <div class="tasty-fonts-empty tasty-fonts-empty-state"><?php esc_html_e('No log entries yet.', 'tasty-fonts'); ?></div>
+                            <div class="tasty-fonts-empty-state tasty-fonts-empty-state--rich tasty-fonts-empty-state--activity tasty-fonts-activity-empty">
+                                <div class="tasty-fonts-empty-state-body">
+                                    <h3 class="tasty-fonts-empty-state-title"><?php esc_html_e('No activity yet', 'tasty-fonts'); ?></h3>
+                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Scans, imports, deletes, and generated stylesheet refreshes will appear here after you start managing fonts.', 'tasty-fonts'); ?></p>
+                                </div>
+                            </div>
                         <?php else: ?>
                             <div class="tasty-fonts-activity-shell">
                                 <div id="tasty-fonts-activity-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty--panel tasty-fonts-activity-empty" hidden><?php esc_html_e('No activity matches the current filters.', 'tasty-fonts'); ?></div>

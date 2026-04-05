@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-04-05
+
+### Added
+
+- Added a standalone admin token stylesheet with explicit enqueue ordering and regression coverage so shared design tokens load before the main admin stylesheet.
+- Added a clickable dashboard version badge that links directly to the GitHub release notes for the running plugin version.
+- Added a dedicated Output Settings tab with fuller guidance, plus richer empty states for the library and activity panels.
+
+### Changed
+
+- Strengthened the admin interface accessibility with clearer focus treatment, better tooltip announcement wiring, live role-status announcements, and reduced-motion and forced-colors support.
+- Reworked the Font Roles workspace so live deployment status is now a compact top-row pill, publishing actions are separated from Advanced Tools, and output settings live in their own single-column advanced tab.
+- Updated the dashboard hero copy to position Tasty Custom Fonts as typography management for Etch, Gutenberg, and the frontend.
+
 ## [1.2.1] - 2026-04-05
 
 ### Added

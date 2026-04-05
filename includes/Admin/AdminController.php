@@ -79,9 +79,16 @@ final class AdminController
         $googleSearchEnabled = $this->googleClient->canSearch();
 
         wp_enqueue_style(
+            'tasty-fonts-admin-tokens',
+            TASTY_FONTS_URL . 'assets/css/tokens.css',
+            [],
+            $this->assetVersionFor('assets/css/tokens.css')
+        );
+
+        wp_enqueue_style(
             'tasty-fonts-admin',
             TASTY_FONTS_URL . 'assets/css/admin.css',
-            [],
+            ['tasty-fonts-admin-tokens'],
             $this->assetVersionFor('assets/css/admin.css')
         );
 

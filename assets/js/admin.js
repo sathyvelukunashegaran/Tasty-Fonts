@@ -9,8 +9,8 @@
     const roleForm = document.querySelector('[data-role-form]');
     const roleDeployment = document.querySelector('[data-role-deployment]');
     const roleDeploymentBadge = document.querySelector('[data-role-deployment-badge]');
-    const roleDeploymentTitle = document.querySelector('[data-role-deployment-title]');
-    const roleDeploymentText = document.querySelector('[data-role-deployment-text]');
+    const roleDeploymentPill = document.querySelector('[data-role-deployment-pill]');
+    const roleDeploymentAnnouncement = document.querySelector('[data-role-deployment-announcement]');
     const headingRoleVariableCopies = Array.from(document.querySelectorAll('[data-role-variable-copy="heading"]'));
     const bodyRoleVariableCopies = Array.from(document.querySelectorAll('[data-role-variable-copy="body"]'));
     const headingFamilyVariableCopies = Array.from(document.querySelectorAll('[data-role-family-variable-copy="heading"]'));
@@ -54,6 +54,7 @@
     const uploadAddFamily = document.getElementById('tasty-fonts-upload-add-family');
     const uploadSubmit = document.getElementById('tasty-fonts-upload-submit');
     const uploadStatus = document.getElementById('tasty-fonts-upload-status');
+    const addFontsPanelToggle = document.getElementById('tasty-fonts-add-font-panel-toggle');
     const toastItems = Array.from(document.querySelectorAll('[data-toast]'));
     const helpButtons = Array.from(document.querySelectorAll('[data-help-tooltip]'));
     const helpTooltipLayer = document.getElementById('tasty-fonts-help-tooltip-layer');
@@ -268,12 +269,28 @@
         }
     }
 
+    function buildRoleDeploymentTooltip(deployment) {
+        const title = deployment && deployment.title ? String(deployment.title).trim() : '';
+        const copy = deployment && deployment.copy ? String(deployment.copy).trim() : '';
+
+        if (!title) {
+            return copy;
+        }
+
+        if (!copy) {
+            return title;
+        }
+
+        return `${title}. ${copy}`;
+    }
+
     function syncRoleDeploymentState(deployment) {
         if (!roleDeployment || !deployment) {
             return;
         }
 
         const badgeClass = deployment.badge_class || '';
+        const tooltip = buildRoleDeploymentTooltip(deployment);
 
         roleDeployment.classList.remove('is-success', 'is-warning', 'is-accent');
 
@@ -281,17 +298,23 @@
             roleDeployment.classList.add(badgeClass);
         }
 
+        if (roleDeploymentPill) {
+            roleDeploymentPill.className = `tasty-fonts-role-status-pill${badgeClass ? ` ${badgeClass}` : ''}`;
+            roleDeploymentPill.setAttribute('data-help-tooltip', tooltip);
+            roleDeploymentPill.setAttribute('title', tooltip);
+        }
+
         if (roleDeploymentBadge) {
-            roleDeploymentBadge.className = `tasty-fonts-status-label${badgeClass ? ` ${badgeClass}` : ''}`;
             roleDeploymentBadge.textContent = deployment.badge || '';
         }
 
-        if (roleDeploymentTitle) {
-            roleDeploymentTitle.textContent = deployment.title || '';
+        if (roleDeploymentAnnouncement) {
+            roleDeploymentAnnouncement.textContent = tooltip;
         }
 
-        if (roleDeploymentText) {
-            roleDeploymentText.textContent = deployment.copy || '';
+        if (activeHelpButton === roleDeploymentPill && helpTooltipLayer && !helpTooltipLayer.hidden) {
+            helpTooltipLayer.textContent = tooltip;
+            positionHelpTooltip(roleDeploymentPill);
         }
     }
 
@@ -815,6 +838,38 @@
         helpTooltipLayer.classList.toggle('is-above', isAbove);
     }
 
+    function rememberHelpTooltipDescription(button) {
+        if (!button || Object.prototype.hasOwnProperty.call(button.dataset, 'helpTooltipDescribedby')) {
+            return;
+        }
+
+        button.dataset.helpTooltipDescribedby = button.getAttribute('aria-describedby') || '';
+    }
+
+    function restoreHelpTooltipDescription(button) {
+        if (!button) {
+            return;
+        }
+
+        const describedBy = button.dataset.helpTooltipDescribedby || '';
+
+        if (describedBy) {
+            button.setAttribute('aria-describedby', describedBy);
+            return;
+        }
+
+        button.removeAttribute('aria-describedby');
+    }
+
+    function applyHelpTooltipDescription(button) {
+        if (!button || !helpTooltipLayer) {
+            return;
+        }
+
+        rememberHelpTooltipDescription(button);
+        button.setAttribute('aria-describedby', helpTooltipLayer.id);
+    }
+
     function hideHelpTooltip() {
         if (!helpTooltipLayer) {
             return;
@@ -822,6 +877,7 @@
 
         if (activeHelpButton) {
             activeHelpButton.setAttribute('aria-expanded', 'false');
+            restoreHelpTooltipDescription(activeHelpButton);
         }
 
         helpTooltipLayer.hidden = true;
@@ -844,10 +900,12 @@
 
         if (activeHelpButton && activeHelpButton !== button) {
             activeHelpButton.setAttribute('aria-expanded', 'false');
+            restoreHelpTooltipDescription(activeHelpButton);
         }
 
         activeHelpButton = button;
         activeHelpButton.setAttribute('aria-expanded', 'true');
+        applyHelpTooltipDescription(activeHelpButton);
         helpTooltipLayer.textContent = copy;
         helpTooltipLayer.hidden = false;
         positionHelpTooltip(button);
@@ -860,17 +918,18 @@
 
         helpButtons.forEach((button) => {
             button.setAttribute('aria-expanded', 'false');
+            rememberHelpTooltipDescription(button);
 
             button.addEventListener('mouseenter', () => showHelpTooltip(button));
             button.addEventListener('focus', () => showHelpTooltip(button));
             button.addEventListener('mouseleave', () => {
-                if (document.activeElement !== button) {
+                if (activeHelpButton === button && document.activeElement !== button) {
                     hideHelpTooltip();
                 }
             });
             button.addEventListener('blur', () => {
                 window.setTimeout(() => {
-                    if (document.activeElement !== button) {
+                    if (activeHelpButton === button && document.activeElement !== button) {
                         hideHelpTooltip();
                     }
                 }, 0);
@@ -2349,6 +2408,23 @@
         return true;
     }
 
+    function handleOpenAddFontsClick(event) {
+        const trigger = event.target.closest('[data-open-add-fonts]');
+
+        if (!trigger || !addFontsPanelToggle) {
+            return false;
+        }
+
+        event.preventDefault();
+
+        if (addFontsPanelToggle.getAttribute('aria-expanded') !== 'true') {
+            setDisclosureState(addFontsPanelToggle, true);
+        }
+
+        window.setTimeout(focusAddFontPanel, 0);
+        return true;
+    }
+
     function handleTabClick(event) {
         const tab = event.target.closest('[data-tab-group][data-tab-target]');
 
@@ -2603,6 +2679,10 @@
         const toastDismiss = event.target.closest('[data-toast-dismiss]');
         if (toastDismiss) {
             dismissToast(toastDismiss.closest('[data-toast]'));
+            return;
+        }
+
+        if (handleOpenAddFontsClick(event)) {
             return;
         }
 
