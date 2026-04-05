@@ -44,6 +44,7 @@ use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
+use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleCssParser;
 use TastyFonts\Google\GoogleFontsClient;
@@ -605,7 +606,6 @@ function resetTestState(): void
 function invokePrivateMethod(object $object, string $methodName, array $arguments = []): mixed
 {
     $reflection = new ReflectionMethod($object, $methodName);
-    $reflection->setAccessible(true);
 
     return $reflection->invokeArgs($object, $arguments);
 }
@@ -623,8 +623,12 @@ function makeServiceGraph(): array
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log);
-    $assets = new AssetService($storage, $catalog, $settings, new CssBuilder(), $log);
+    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $bunny = new BunnyFontsClient();
+    $google = new GoogleFontsClient($settings);
+    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe);
+    $assets = new AssetService($storage, $catalog, $settings, new CssBuilder(), $planner, $log);
     $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings);
     $localUpload = new LocalUploadService(
         $storage,
@@ -638,10 +642,7 @@ function makeServiceGraph(): array
             return in_array($filename, $uploadedFilePaths, true);
         }
     );
-    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
-    $bunny = new BunnyFontsClient();
     $bunnyImport = new BunnyImportService($storage, $imports, $bunny, new BunnyCssParser(), $catalog, $assets, $log);
-    $google = new GoogleFontsClient($settings);
     $googleImport = new GoogleImportService($storage, $imports, $google, new GoogleCssParser(), $catalog, $assets, $log);
     $controller = new AdminController(
         $storage,
@@ -658,7 +659,7 @@ function makeServiceGraph(): array
         $google,
         $googleImport
     );
-    $runtime = new RuntimeService($catalog, $assets, $adobe);
+    $runtime = new RuntimeService($planner, $assets, $adobe);
 
     return [
         'storage' => $storage,
@@ -666,6 +667,7 @@ function makeServiceGraph(): array
         'imports' => $imports,
         'log' => $log,
         'catalog' => $catalog,
+        'planner' => $planner,
         'assets' => $assets,
         'library' => $library,
         'local_upload' => $localUpload,
@@ -953,6 +955,7 @@ CSS,
 
     $result = $services['bunny_import']->importFamily('Inter', ['regular', '700']);
     $import = $services['imports']->get('inter');
+    $profile = (array) (($import['delivery_profiles']['bunny-self_hosted'] ?? null) ?: []);
     $catalog = $services['catalog']->getCatalog();
     $catalogFamily = $catalog['Inter'] ?? null;
     $downloadUrls = array_map(static fn (array $call): string => (string) ($call['url'] ?? ''), $remoteGetCalls);
@@ -960,8 +963,8 @@ CSS,
     $savedBoldPath = $services['storage']->pathForRelativePath('bunny/inter/inter-700-normal.woff2');
 
     assertSameValue('imported', (string) ($result['status'] ?? ''), 'Bunny imports should report an imported result.');
-    assertSameValue('bunny', (string) ($import['provider'] ?? ''), 'Bunny imports should persist the bunny provider at the manifest level.');
-    assertSameValue('bunny', (string) ($import['faces'][0]['provider']['type'] ?? ''), 'Bunny imports should persist bunny provider metadata per face.');
+    assertSameValue('bunny', (string) ($profile['provider'] ?? ''), 'Bunny imports should persist the bunny provider on the saved delivery profile.');
+    assertSameValue('bunny', (string) ($profile['faces'][0]['provider']['type'] ?? ''), 'Bunny imports should persist bunny provider metadata per face.');
     assertSameValue(['bunny'], (array) ($catalogFamily['sources'] ?? []), 'Catalog entries created from Bunny imports should expose the bunny source.');
     assertSameValue('bunny', (string) ($catalogFamily['faces'][0]['source'] ?? ''), 'Catalog faces created from Bunny imports should retain the bunny source.');
     assertSameValue(true, is_string($savedRegularPath) && file_exists($savedRegularPath), 'Bunny regular faces should be written under uploads/fonts/bunny.');
@@ -971,7 +974,7 @@ CSS,
     assertNotContainsValue($greekUrl, implode("\n", $downloadUrls), 'Bunny imports should skip lower-priority subset faces for the same axis.');
 };
 
-$tests['bunny_import_service_skips_existing_variants_and_blocks_local_collisions'] = static function (): void {
+$tests['bunny_import_service_skips_existing_variants_and_can_coexist_with_local_faces'] = static function (): void {
     resetTestState();
 
     global $remoteGetResponses;
@@ -1009,10 +1012,30 @@ CSS,
     $services = makeServiceGraph();
     $services['storage']->ensureRootDirectory();
     $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2'), 'font-data');
-    $collision = $services['bunny_import']->importFamily('Inter', ['regular']);
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+CSS,
+    ];
+    $remoteGetResponses[$fontUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data',
+    ];
 
-    assertSameValue(true, is_wp_error($collision), 'Bunny imports should be blocked when a local family already exists.');
-    assertSameValue('tasty_fonts_family_already_exists', $collision->get_error_code(), 'Bunny local-family collisions should surface the family-already-exists error.');
+    $coexistingImport = $services['bunny_import']->importFamily('Inter', ['regular']);
+    $catalogFamily = $services['catalog']->getCatalog()['Inter'] ?? [];
+
+    assertSameValue('imported', (string) ($coexistingImport['status'] ?? ''), 'Bunny imports should still succeed when a local family already exists.');
+    assertSameValue(['local', 'bunny'], (array) ($catalogFamily['sources'] ?? []), 'Families should be able to keep both local/self-hosted and Bunny delivery profiles.');
 };
 
 $tests['library_service_deletes_bunny_import_families_cleanly'] = static function (): void {
@@ -1362,7 +1385,11 @@ $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static f
     $storage->writeAbsoluteFile((string) $storage->pathForRelativePath('legacy/Legacy-400-normal.eot'), 'font-data');
     $storage->writeAbsoluteFile((string) $storage->pathForRelativePath('vector/Vector-400-normal.svg'), 'font-data');
 
-    $catalog = new CatalogService($storage, new ImportRepository(), new FontFilenameParser(), new LogRepository());
+    $settings = new SettingsRepository();
+    $imports = new ImportRepository();
+    $log = new LogRepository();
+    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
     $families = $catalog->getCatalog();
 
     assertSameValue(['Inter'], array_values(array_keys($families)), 'Catalog scanning should ignore local EOT and SVG files so the scanned formats match the upload allowlist.');
@@ -1636,7 +1663,7 @@ $tests['repositories_migrate_legacy_option_keys'] = static function (): void {
         'body_fallback' => 'sans-serif',
     ];
     $optionStore['etch_fonts_imports'] = [
-        'inter' => ['slug' => 'inter', 'family' => 'Inter'],
+        'inter' => ['slug' => 'inter', 'family' => 'Inter', 'provider' => 'google'],
     ];
     $optionStore['etch_fonts_log'] = [
         ['time' => '2026-04-04 00:00:00', 'message' => 'Legacy log entry', 'actor' => 'System'],
@@ -1656,7 +1683,7 @@ $tests['repositories_migrate_legacy_option_keys'] = static function (): void {
     assertSameValue('Inter', $roles['heading'], 'Role settings should migrate from the legacy option key during upgrade.');
     assertSameValue(true, isset($optionStore[SettingsRepository::OPTION_SETTINGS]), 'Settings migration should seed the renamed option key.');
     assertSameValue(true, isset($optionStore[SettingsRepository::OPTION_ROLES]), 'Role migration should seed the renamed option key.');
-    assertSameValue(true, isset($optionStore[ImportRepository::OPTION_IMPORTS]), 'Import migration should seed the renamed option key.');
+    assertSameValue(true, isset($optionStore[ImportRepository::OPTION_LIBRARY]), 'Import migration should seed the renamed option key.');
     assertSameValue(true, isset($optionStore[LogRepository::OPTION_LOG]), 'Log migration should seed the renamed option key.');
     assertSameValue('Inter', (string) ($imports['inter']['family'] ?? ''), 'Imports should remain available after migrating the option key.');
     assertSameValue('Legacy log entry', (string) ($log[0]['message'] ?? ''), 'Logs should remain available after migrating the option key.');
@@ -1687,8 +1714,15 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_rewrites_c
     $transientStore['tasty_fonts_css_hash_v2'] = 'stale-hash';
 
     $storage = new Storage();
-    $catalog = new CatalogService($storage, new ImportRepository(), new FontFilenameParser(), new LogRepository());
-    $assets = new AssetService($storage, $catalog, new SettingsRepository(), new CssBuilder(), new LogRepository());
+    $settings = new SettingsRepository();
+    $imports = new ImportRepository();
+    $log = new LogRepository();
+    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $google = new GoogleFontsClient($settings);
+    $bunny = new BunnyFontsClient();
+    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe);
+    $assets = new AssetService($storage, $catalog, $settings, new CssBuilder(), $planner, $log);
 
     $assets->refreshGeneratedAssets();
 
@@ -1722,6 +1756,8 @@ $tests['admin_controller_merges_adobe_families_into_selectable_role_names'] = st
     global $remoteGetResponses;
 
     $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2'), 'font-data');
     $services['settings']->saveAdobeProject('abc1234', true);
     $services['settings']->saveAdobeProjectStatus('valid', 'Adobe project ready.');
     $remoteGetResponses['https://use.typekit.net/abc1234.css'] = [
@@ -1737,20 +1773,13 @@ $tests['admin_controller_merges_adobe_families_into_selectable_role_names'] = st
 CSS,
     ];
 
-    $families = invokePrivateMethod(
-        $services['controller'],
-        'buildSelectableFamilyNames',
-        [
-            [
-                'Inter' => ['family' => 'Inter'],
-            ],
-        ]
-    );
+    $catalog = $services['catalog']->getCatalog();
+    $families = invokePrivateMethod($services['controller'], 'buildSelectableFamilyNames', [$catalog]);
 
     assertSameValue(
         ['Inter', 'mr-eaves-xl-modern'],
         $families,
-        'Selectable role names should merge local library families with Adobe project families.'
+        'Selectable role names should use the unified catalog, including Adobe project families.'
     );
 };
 
@@ -1779,12 +1808,14 @@ CSS,
     $_GET['etch'] = '1';
 
     $services['runtime']->enqueueFrontend();
-    $editorFamilies = invokePrivateMethod($services['runtime'], 'buildEditorFontFamilies');
+    $editorFamilies = $services['planner']->getEditorFontFamilies();
     $familyNames = array_values(array_map(static fn (array $item): string => (string) ($item['name'] ?? ''), $editorFamilies));
+    $styleUrls = array_values(array_map(static fn (array $style): string => (string) ($style['src'] ?? ''), $enqueuedStyles));
+    $canvasStylesheetUrls = (array) ($localizedScripts['tasty-fonts-canvas']['data']['stylesheetUrls'] ?? []);
 
     assertSameValue(
-        'https://use.typekit.net/abc1234.css',
-        (string) ($enqueuedStyles['tasty-fonts-adobe-frontend']['src'] ?? ''),
+        true,
+        in_array('https://use.typekit.net/abc1234.css', $styleUrls, true),
         'Runtime should enqueue the Adobe project stylesheet as a separate frontend style handle.'
     );
     assertSameValue(
@@ -1794,12 +1825,7 @@ CSS,
     );
     assertSameValue(
         true,
-        isset($localizedScripts['tasty-fonts-canvas']['data']['stylesheetUrls'][1]),
-        'Etch canvas runtime data should include a second stylesheet entry for Adobe fonts.'
-    );
-    assertContainsValue(
-        'https://use.typekit.net/abc1234.css',
-        (string) $localizedScripts['tasty-fonts-canvas']['data']['stylesheetUrls'][1],
+        in_array('https://use.typekit.net/abc1234.css', $canvasStylesheetUrls, true),
         'Etch canvas runtime data should include the Adobe stylesheet URL.'
     );
 };

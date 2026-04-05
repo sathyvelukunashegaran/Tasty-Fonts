@@ -28,7 +28,7 @@ final class BunnyImportService
     ) {
     }
 
-    public function importFamily(string $familyName, array $variants): array|WP_Error
+    public function importFamily(string $familyName, array $variants, string $deliveryMode = 'self_hosted'): array|WP_Error
     {
         $familyName = trim(wp_strip_all_tags($familyName));
 
@@ -37,28 +37,17 @@ final class BunnyImportService
         }
 
         $familySlug = FontUtils::slugify($familyName);
+        $deliveryMode = $this->normalizeDeliveryMode($deliveryMode);
         $normalizedVariants = FontUtils::normalizeVariantTokens($variants);
         $requestedVariants = $normalizedVariants === [] ? ['regular'] : $normalizedVariants;
-        $existingCatalogFamily = $this->findCatalogFamily($familyName, $familySlug);
-        $existingImport = $this->imports->get($familySlug);
-
-        if ($existingCatalogFamily !== null && !in_array('bunny', (array) ($existingCatalogFamily['sources'] ?? []), true)) {
-            return $this->error(
-                'tasty_fonts_family_already_exists',
-                sprintf(
-                    __('%s already exists in the library as another source. Remove or rename the existing family before importing it from Bunny Fonts.', 'tasty-fonts'),
-                    $familyName
-                )
-            );
-        }
-
-        $variantPlan = $this->buildVariantPlan($requestedVariants, $existingImport);
+        $existingFamily = $this->imports->getFamily($familySlug);
+        $existingProfile = $this->findDeliveryProfile($existingFamily, 'bunny', $deliveryMode);
+        $variantPlan = $this->buildVariantPlan($requestedVariants, $existingProfile);
 
         if ($variantPlan['import'] === []) {
-            $message = sprintf(
-                __('%s already exists in the library for the selected variants.', 'tasty-fonts'),
-                $familyName
-            );
+            $message = $deliveryMode === 'cdn'
+                ? sprintf(__('Bunny CDN delivery for %s already includes the selected variants.', 'tasty-fonts'), $familyName)
+                : sprintf(__('%s already exists in the library for the selected variants.', 'tasty-fonts'), $familyName);
 
             $this->log->add($message);
 
@@ -66,6 +55,7 @@ final class BunnyImportService
                 'status' => 'skipped',
                 'message' => $message,
                 'family' => $familyName,
+                'delivery_type' => $deliveryMode,
                 'faces' => 0,
                 'files' => 0,
                 'variants' => $requestedVariants,
@@ -74,6 +64,7 @@ final class BunnyImportService
             ];
         }
 
+        $metadata = $this->client->getFamily($familyName);
         $css = $this->client->fetchCss($familyName, $variantPlan['import']);
 
         if (is_wp_error($css)) {
@@ -88,17 +79,39 @@ final class BunnyImportService
         if ($faces === []) {
             return $this->error(
                 'tasty_fonts_bunny_no_faces',
-                __('No downloadable WOFF2 faces were returned for that family.', 'tasty-fonts')
+                __('No usable Bunny Fonts faces were returned for that family.', 'tasty-fonts')
             );
         }
 
+        $result = $deliveryMode === 'cdn'
+            ? $this->saveCdnProfile($familyName, $familySlug, $faces, $metadata, $variantPlan, $existingFamily, $existingProfile)
+            : $this->saveSelfHostedProfile($familyName, $familySlug, $faces, $metadata, $variantPlan, $existingFamily, $existingProfile);
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $this->assets->refreshGeneratedAssets();
+
+        return $result;
+    }
+
+    private function saveSelfHostedProfile(
+        string $familyName,
+        string $familySlug,
+        array $faces,
+        ?array $metadata,
+        array $variantPlan,
+        ?array $existingFamily,
+        ?array $existingProfile
+    ): array|WP_Error {
         $familyDirectory = $this->resolveImportTarget($familySlug);
 
         if (is_wp_error($familyDirectory)) {
             return $familyDirectory;
         }
 
-        $provider = $this->buildProviderMetadata($variantPlan['import']);
+        $provider = $this->buildProviderMetadata($metadata, $variantPlan['import']);
         $newManifestFaces = [];
         $downloadedFiles = 0;
 
@@ -129,36 +142,41 @@ final class BunnyImportService
         }
 
         $mergedFaces = HostedImportSupport::mergeManifestFaces(
-            is_array($existingImport['faces'] ?? null) ? (array) $existingImport['faces'] : [],
+            is_array($existingProfile['faces'] ?? null) ? (array) $existingProfile['faces'] : [],
             $newManifestFaces
         );
         $allVariants = array_values(
             array_unique(
                 array_merge(
-                    is_array($existingImport['variants'] ?? null) ? (array) $existingImport['variants'] : [],
+                    is_array($existingProfile['variants'] ?? null) ? (array) $existingProfile['variants'] : [],
                     $variantPlan['import']
                 )
             )
         );
 
-        $this->imports->upsert(
+        $savedFamily = $this->imports->saveProfile(
+            $familyName,
+            $familySlug,
             [
-                'family' => $familyName,
-                'slug' => $familySlug,
+                'id' => $this->profileId('self_hosted'),
                 'provider' => 'bunny',
-                'category' => '',
+                'type' => 'self_hosted',
+                'label' => __('Self-hosted (Bunny import)', 'tasty-fonts'),
                 'variants' => $allVariants,
-                'imported_at' => current_time('mysql'),
                 'faces' => $mergedFaces,
-            ]
+                'meta' => [
+                    'category' => (string) ($metadata['category'] ?? ''),
+                    'imported_at' => current_time('mysql'),
+                ],
+            ],
+            $existingFamily === null ? 'library_only' : (string) ($existingFamily['publish_state'] ?? 'published'),
+            $existingFamily === null
         );
-
-        $this->assets->refreshGeneratedAssets();
 
         $faceCount = count($newManifestFaces);
         $skipCount = count($variantPlan['skipped']);
         $message = sprintf(
-            __('Imported %1$s (%2$d variant%3$s, %4$d file%5$s).', 'tasty-fonts'),
+            __('Added %1$s as a self-hosted Bunny delivery (%2$d variant%3$s, %4$d file%5$s).', 'tasty-fonts'),
             $familyName,
             $faceCount,
             $faceCount === 1 ? '' : 's',
@@ -168,7 +186,7 @@ final class BunnyImportService
 
         if ($skipCount > 0) {
             $message .= ' ' . sprintf(
-                __('%d variant%s already existed.', 'tasty-fonts'),
+                __('%d variant%s already existed in this delivery profile.', 'tasty-fonts'),
                 $skipCount,
                 $skipCount === 1 ? '' : 's'
             );
@@ -180,8 +198,106 @@ final class BunnyImportService
             'status' => 'imported',
             'message' => $message,
             'family' => $familyName,
+            'family_record' => $savedFamily,
+            'delivery_type' => 'self_hosted',
+            'delivery_id' => $this->profileId('self_hosted'),
             'faces' => $faceCount,
             'files' => $downloadedFiles,
+            'variants' => $allVariants,
+            'imported_variants' => $variantPlan['import'],
+            'skipped_variants' => $variantPlan['skipped'],
+        ];
+    }
+
+    private function saveCdnProfile(
+        string $familyName,
+        string $familySlug,
+        array $faces,
+        ?array $metadata,
+        array $variantPlan,
+        ?array $existingFamily,
+        ?array $existingProfile
+    ): array|WP_Error {
+        $provider = $this->buildProviderMetadata($metadata, $variantPlan['import']);
+        $cdnFaces = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $cdnFaces[] = [
+                'family' => $familyName,
+                'slug' => $familySlug,
+                'source' => 'bunny',
+                'weight' => (string) ($face['weight'] ?? '400'),
+                'style' => (string) ($face['style'] ?? 'normal'),
+                'unicode_range' => (string) ($face['unicode_range'] ?? ''),
+                'files' => (array) ($face['files'] ?? []),
+                'provider' => $provider,
+            ];
+        }
+
+        $mergedFaces = HostedImportSupport::mergeManifestFaces(
+            is_array($existingProfile['faces'] ?? null) ? (array) $existingProfile['faces'] : [],
+            $cdnFaces
+        );
+        $allVariants = array_values(
+            array_unique(
+                array_merge(
+                    is_array($existingProfile['variants'] ?? null) ? (array) $existingProfile['variants'] : [],
+                    $variantPlan['import']
+                )
+            )
+        );
+
+        $savedFamily = $this->imports->saveProfile(
+            $familyName,
+            $familySlug,
+            [
+                'id' => $this->profileId('cdn'),
+                'provider' => 'bunny',
+                'type' => 'cdn',
+                'label' => __('Bunny CDN', 'tasty-fonts'),
+                'variants' => $allVariants,
+                'faces' => $mergedFaces,
+                'meta' => [
+                    'category' => (string) ($metadata['category'] ?? ''),
+                    'saved_at' => current_time('mysql'),
+                ],
+            ],
+            $existingFamily === null ? 'library_only' : (string) ($existingFamily['publish_state'] ?? 'published'),
+            $existingFamily === null
+        );
+
+        $faceCount = count($cdnFaces);
+        $skipCount = count($variantPlan['skipped']);
+        $message = sprintf(
+            __('Added %1$s as a Bunny CDN delivery (%2$d variant%3$s).', 'tasty-fonts'),
+            $familyName,
+            $faceCount,
+            $faceCount === 1 ? '' : 's'
+        );
+
+        if ($skipCount > 0) {
+            $message .= ' ' . sprintf(
+                __('%d variant%s already existed in this delivery profile.', 'tasty-fonts'),
+                $skipCount,
+                $skipCount === 1 ? '' : 's'
+            );
+        }
+
+        $this->log->add($message);
+
+        return [
+            'status' => 'saved',
+            'message' => $message,
+            'family' => $familyName,
+            'family_record' => $savedFamily,
+            'delivery_type' => 'cdn',
+            'delivery_id' => $this->profileId('cdn'),
+            'faces' => $faceCount,
+            'files' => 0,
             'variants' => $allVariants,
             'imported_variants' => $variantPlan['import'],
             'skipped_variants' => $variantPlan['skipped'],
@@ -374,19 +490,46 @@ final class BunnyImportService
         return true;
     }
 
-    private function buildProviderMetadata(array $variants): array
+    private function normalizeDeliveryMode(string $deliveryMode): string
+    {
+        $deliveryMode = strtolower(trim($deliveryMode));
+
+        return in_array($deliveryMode, ['self_hosted', 'cdn'], true) ? $deliveryMode : 'self_hosted';
+    }
+
+    private function findDeliveryProfile(?array $family, string $provider, string $type): ?array
+    {
+        if (!is_array($family)) {
+            return null;
+        }
+
+        foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
+            if (
+                is_array($profile)
+                && strtolower(trim((string) ($profile['provider'] ?? ''))) === $provider
+                && strtolower(trim((string) ($profile['type'] ?? ''))) === $type
+            ) {
+                return $profile;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildProviderMetadata(?array $metadata, array $variants): array
     {
         return [
             'type' => 'bunny',
+            'category' => (string) ($metadata['category'] ?? ''),
             'variants' => $variants,
         ];
     }
 
-    private function buildVariantPlan(array $requestedVariants, ?array $existingImport): array
+    private function buildVariantPlan(array $requestedVariants, ?array $existingProfile): array
     {
         $existingKeys = [];
 
-        foreach ((array) ($existingImport['faces'] ?? []) as $face) {
+        foreach ((array) ($existingProfile['faces'] ?? []) as $face) {
             if (!is_array($face)) {
                 continue;
             }
@@ -418,18 +561,9 @@ final class BunnyImportService
         ];
     }
 
-    private function findCatalogFamily(string $familyName, string $familySlug): ?array
+    private function profileId(string $deliveryMode): string
     {
-        foreach ($this->catalog->getCatalog() as $family) {
-            $catalogName = (string) ($family['family'] ?? '');
-            $catalogSlug = (string) ($family['slug'] ?? '');
-
-            if ($catalogSlug === $familySlug || strcasecmp($catalogName, $familyName) === 0) {
-                return $family;
-            }
-        }
-
-        return null;
+        return FontUtils::slugify('bunny-' . $deliveryMode);
     }
 
     private function error(string $code, string $message): WP_Error

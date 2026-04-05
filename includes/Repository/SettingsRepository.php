@@ -20,6 +20,7 @@ final class SettingsRepository
         'font_display' => 'optional',
         'minify_css_output' => true,
         'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
         'preview_sentence' => 'The quick brown fox jumps over the lazy dog. 1234567890',
         'adobe_enabled' => false,
         'adobe_project_id' => '',
@@ -48,6 +49,7 @@ final class SettingsRepository
         $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['preload_primary_fonts'] = !empty($settings['preload_primary_fonts']);
+        $settings['remote_connection_hints'] = !empty($settings['remote_connection_hints']);
         $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
         $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
         $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
@@ -104,6 +106,10 @@ final class SettingsRepository
 
         if (array_key_exists('preload_primary_fonts', $input)) {
             $settings['preload_primary_fonts'] = !empty($input['preload_primary_fonts']);
+        }
+
+        if (array_key_exists('remote_connection_hints', $input)) {
+            $settings['remote_connection_hints'] = !empty($input['remote_connection_hints']);
         }
 
         if (array_key_exists('delete_uploaded_files_on_uninstall', $input)) {

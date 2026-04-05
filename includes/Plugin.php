@@ -16,6 +16,7 @@ use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
+use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleCssParser;
 use TastyFonts\Google\GoogleFontsClient;
@@ -37,6 +38,7 @@ final class Plugin
     private readonly LogRepository $log;
     private readonly CatalogService $catalog;
     private readonly CssBuilder $cssBuilder;
+    private readonly RuntimeAssetPlanner $planner;
     private readonly AssetService $assets;
     private readonly LibraryService $library;
     private readonly LocalUploadService $localUpload;
@@ -59,18 +61,30 @@ final class Plugin
         $this->settings = new SettingsRepository();
         $this->imports = new ImportRepository();
         $this->log = new LogRepository();
+        $this->adobe = new AdobeProjectClient($this->settings, $adobeCssParser);
+        $this->bunnyClient = new BunnyFontsClient();
+        $this->googleClient = new GoogleFontsClient($this->settings);
         $this->catalog = new CatalogService(
             $this->storage,
             $this->imports,
             $parser,
-            $this->log
+            $this->log,
+            $this->adobe
         );
         $this->cssBuilder = new CssBuilder();
+        $this->planner = new RuntimeAssetPlanner(
+            $this->catalog,
+            $this->settings,
+            $this->googleClient,
+            $this->bunnyClient,
+            $this->adobe
+        );
         $this->assets = new AssetService(
             $this->storage,
             $this->catalog,
             $this->settings,
             $this->cssBuilder,
+            $this->planner,
             $this->log
         );
         $this->library = new LibraryService(
@@ -88,8 +102,6 @@ final class Plugin
             $this->settings,
             $this->log
         );
-        $this->adobe = new AdobeProjectClient($this->settings, $adobeCssParser);
-        $this->bunnyClient = new BunnyFontsClient();
         $this->bunnyImport = new BunnyImportService(
             $this->storage,
             $this->imports,
@@ -99,7 +111,6 @@ final class Plugin
             $this->assets,
             $this->log
         );
-        $this->googleClient = new GoogleFontsClient($this->settings);
         $this->googleImport = new GoogleImportService(
             $this->storage,
             $this->imports,
@@ -109,7 +120,7 @@ final class Plugin
             $this->assets,
             $this->log
         );
-        $this->runtime = new RuntimeService($this->catalog, $this->assets, $this->adobe);
+        $this->runtime = new RuntimeService($this->planner, $this->assets, $this->adobe);
         $this->admin = new AdminController(
             $this->storage,
             $this->settings,
@@ -187,6 +198,9 @@ final class Plugin
         add_action('wp_ajax_tasty_fonts_upload_local', [$this->admin, 'ajaxUploadLocal']);
         add_action('wp_ajax_tasty_fonts_save_family_fallback', [$this->admin, 'ajaxSaveFamilyFallback']);
         add_action('wp_ajax_tasty_fonts_save_family_font_display', [$this->admin, 'ajaxSaveFamilyFontDisplay']);
+        add_action('wp_ajax_tasty_fonts_save_family_delivery', [$this->admin, 'ajaxSaveFamilyDelivery']);
+        add_action('wp_ajax_tasty_fonts_save_family_publish_state', [$this->admin, 'ajaxSaveFamilyPublishState']);
+        add_action('wp_ajax_tasty_fonts_delete_delivery_profile', [$this->admin, 'ajaxDeleteDeliveryProfile']);
         add_action('wp_ajax_tasty_fonts_save_role_draft', [$this->admin, 'ajaxSaveRoleDraft']);
     }
 

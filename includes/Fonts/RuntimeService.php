@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace TastyFonts\Fonts;
 
 use TastyFonts\Adobe\AdobeProjectClient;
-use TastyFonts\Support\FontUtils;
 use WP_Theme_JSON_Data;
 
 final class RuntimeService
 {
     public function __construct(
-        private readonly CatalogService $catalog,
+        private readonly RuntimeAssetPlanner $planner,
         private readonly AssetService $assets,
         private readonly AdobeProjectClient $adobe
     ) {
@@ -20,7 +19,7 @@ final class RuntimeService
     public function enqueueFrontend(): void
     {
         $this->assets->enqueue('tasty-fonts-frontend');
-        $this->enqueueAdobeStylesheet('tasty-fonts-adobe-frontend');
+        $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets());
 
         if ($this->hasEtchCanvasRequest()) {
             $this->enqueueEtchCanvasBridge();
@@ -31,6 +30,14 @@ final class RuntimeService
     {
         if (is_admin() || $this->hasEtchCanvasRequest()) {
             return;
+        }
+
+        foreach ($this->planner->getPreconnectOrigins() as $origin) {
+            if (!is_string($origin) || trim($origin) === '') {
+                continue;
+            }
+
+            echo '<link rel="preconnect" href="' . esc_url($origin) . '" crossorigin>' . "\n";
         }
 
         foreach ($this->assets->getPrimaryFontPreloadUrls() as $url) {
@@ -45,13 +52,13 @@ final class RuntimeService
     public function enqueueEtchCanvas(): void
     {
         $this->assets->enqueue('tasty-fonts-etch');
-        $this->enqueueAdobeStylesheet('tasty-fonts-adobe-etch');
+        $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets());
     }
 
     public function enqueueBlockEditor(): void
     {
         $this->assets->enqueue('tasty-fonts-editor');
-        $this->enqueueAdobeStylesheet('tasty-fonts-adobe-editor');
+        $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets());
     }
 
     public function enqueueAdminScreenFonts(string $hookSuffix): void
@@ -61,12 +68,12 @@ final class RuntimeService
         }
 
         $this->assets->enqueueFontFacesOnly('tasty-fonts-admin-fonts');
-        $this->enqueueAdobeStylesheet('tasty-fonts-adobe-admin');
+        $this->enqueueExternalStylesheets($this->planner->getAdminPreviewStylesheets());
     }
 
     public function injectEditorFontPresets(WP_Theme_JSON_Data $themeJson): WP_Theme_JSON_Data
     {
-        $fontFamilies = $this->buildEditorFontFamilies();
+        $fontFamilies = $this->planner->getEditorFontFamilies();
 
         if ($fontFamilies === []) {
             return $themeJson;
@@ -113,50 +120,22 @@ final class RuntimeService
         );
     }
 
-    private function buildEditorFontFamilies(): array
+    private function enqueueExternalStylesheets(array $stylesheets): void
     {
-        $fontFamilies = [];
-
-        foreach ($this->catalog->getCatalog() as $family) {
-            $familyName = (string) $family['family'];
-
-            $fontFamilies[$familyName] = [
-                'name' => $familyName,
-                'slug' => $family['slug'],
-                'fontFamily' => FontUtils::buildFontStack($familyName, 'sans-serif'),
-            ];
-        }
-
-        foreach ($this->adobe->getConfiguredFamilies() as $family) {
-            $familyName = (string) ($family['family'] ?? '');
-
-            if ($familyName === '' || isset($fontFamilies[$familyName])) {
+        foreach ($stylesheets as $stylesheet) {
+            if (!is_array($stylesheet)) {
                 continue;
             }
 
-            $fontFamilies[$familyName] = [
-                'name' => $familyName,
-                'slug' => (string) ($family['slug'] ?? FontUtils::slugify($familyName)),
-                'fontFamily' => FontUtils::buildFontStack($familyName, 'sans-serif'),
-            ];
+            $handle = (string) ($stylesheet['handle'] ?? '');
+            $url = (string) ($stylesheet['url'] ?? '');
+
+            if ($handle === '' || $url === '') {
+                continue;
+            }
+
+            wp_enqueue_style($handle, $url, [], $this->stylesheetVersion($stylesheet));
         }
-
-        return array_values($fontFamilies);
-    }
-
-    private function enqueueAdobeStylesheet(string $handle): void
-    {
-        if (!$this->adobe->canEnqueue()) {
-            return;
-        }
-
-        $url = $this->adobe->getStylesheetUrl($this->adobe->getProjectId());
-
-        if ($url === '') {
-            return;
-        }
-
-        wp_enqueue_style($handle, $url, [], $this->adobe->getEnqueueVersion());
     }
 
     private function getCanvasStylesheetUrls(): array
@@ -168,15 +147,28 @@ final class RuntimeService
             $urls[] = $generatedUrl;
         }
 
-        if ($this->adobe->canEnqueue()) {
-            $adobeUrl = $this->adobe->getStylesheetUrl($this->adobe->getProjectId());
+        foreach ($this->planner->getExternalStylesheets() as $stylesheet) {
+            if (!is_array($stylesheet)) {
+                continue;
+            }
 
-            if ($adobeUrl !== '') {
-                $urls[] = add_query_arg('ver', $this->adobe->getEnqueueVersion(), $adobeUrl);
+            $url = (string) ($stylesheet['url'] ?? '');
+
+            if ($url !== '') {
+                $urls[] = $url;
             }
         }
 
         return array_values(array_unique(array_filter($urls, 'strlen')));
+    }
+
+    private function stylesheetVersion(array $stylesheet): string
+    {
+        $provider = strtolower(trim((string) ($stylesheet['provider'] ?? '')));
+
+        return $provider === 'adobe'
+            ? $this->adobe->getEnqueueVersion()
+            : TASTY_FONTS_VERSION;
     }
 
     private function hasEtchCanvasRequest(): bool

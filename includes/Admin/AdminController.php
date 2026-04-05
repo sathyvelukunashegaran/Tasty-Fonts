@@ -117,6 +117,9 @@ final class AdminController
                 'uploadNonce' => wp_create_nonce('tasty_fonts_upload_local'),
                 'saveFallbackNonce' => wp_create_nonce('tasty_fonts_save_family_fallback'),
                 'saveFontDisplayNonce' => wp_create_nonce('tasty_fonts_save_family_font_display'),
+                'saveFamilyDeliveryNonce' => wp_create_nonce('tasty_fonts_save_family_delivery'),
+                'saveFamilyPublishStateNonce' => wp_create_nonce('tasty_fonts_save_family_publish_state'),
+                'deleteDeliveryProfileNonce' => wp_create_nonce('tasty_fonts_delete_delivery_profile'),
                 'saveRolesNonce' => wp_create_nonce('tasty_fonts_save_role_draft'),
                 'googleApiEnabled' => $googleSearchEnabled,
                 'strings' => $this->buildAdminStrings($this->buildSearchDisabledMessage($googleApiStatus)),
@@ -212,7 +215,8 @@ final class AdminController
 
         $result = $this->googleImport->importFamily(
             $this->getPostedText('family'),
-            $this->getPostedGoogleVariants()
+            $this->getPostedGoogleVariants(),
+            $this->getPostedDeliveryMode()
         );
 
         if (is_wp_error($result)) {
@@ -229,7 +233,8 @@ final class AdminController
 
         $result = $this->bunnyImport->importFamily(
             $this->getPostedText('family'),
-            $this->getPostedVariantTokens()
+            $this->getPostedVariantTokens(),
+            $this->getPostedDeliveryMode()
         );
 
         if (is_wp_error($result)) {
@@ -335,6 +340,7 @@ final class AdminController
         $settings = $this->settings->getSettings();
         $applyEverywhere = !empty($settings['auto_apply_roles']);
         $appliedRoles = $this->settings->getAppliedRoles($availableFamilies);
+        $this->library->syncLiveRolePublishStates($appliedRoles, $applyEverywhere);
 
         $this->assets->refreshGeneratedAssets(false, false);
 
@@ -348,6 +354,57 @@ final class AdminController
                 'role_deployment' => $this->buildRoleDeploymentContext($roles, $appliedRoles, $applyEverywhere),
             ]
         );
+    }
+
+    public function ajaxSaveFamilyDelivery(): void
+    {
+        $this->assertManageOptionsAjax(__('You are not allowed to update font delivery.', 'tasty-fonts'));
+        check_ajax_referer('tasty_fonts_save_family_delivery', 'nonce');
+
+        $result = $this->library->saveFamilyDelivery(
+            $this->getPostedText('family_slug'),
+            $this->getPostedText('delivery_id')
+        );
+
+        if (is_wp_error($result)) {
+            $this->sendAjaxError($result->get_error_message(), 400);
+        }
+
+        wp_send_json_success($result);
+    }
+
+    public function ajaxSaveFamilyPublishState(): void
+    {
+        $this->assertManageOptionsAjax(__('You are not allowed to update the font library state.', 'tasty-fonts'));
+        check_ajax_referer('tasty_fonts_save_family_publish_state', 'nonce');
+
+        $result = $this->library->saveFamilyPublishState(
+            $this->getPostedText('family_slug'),
+            $this->getPostedText('publish_state')
+        );
+
+        if (is_wp_error($result)) {
+            $this->sendAjaxError($result->get_error_message(), 400);
+        }
+
+        wp_send_json_success($result);
+    }
+
+    public function ajaxDeleteDeliveryProfile(): void
+    {
+        $this->assertManageOptionsAjax(__('You are not allowed to delete font delivery profiles.', 'tasty-fonts'));
+        check_ajax_referer('tasty_fonts_delete_delivery_profile', 'nonce');
+
+        $result = $this->library->deleteDeliveryProfile(
+            $this->getPostedText('family_slug'),
+            $this->getPostedText('delivery_id')
+        );
+
+        if (is_wp_error($result)) {
+            $this->sendAjaxError($result->get_error_message(), 400);
+        }
+
+        wp_send_json_success($result);
     }
 
     public function renderPage(): void
@@ -411,7 +468,7 @@ final class AdminController
             }
         }
 
-        foreach (['minify_css_output', 'preload_primary_fonts', 'delete_uploaded_files_on_uninstall'] as $field) {
+        foreach (['minify_css_output', 'preload_primary_fonts', 'remote_connection_hints', 'delete_uploaded_files_on_uninstall'] as $field) {
             if (array_key_exists($field, $_POST)) {
                 $settingsInput[$field] = $_POST[$field];
             }
@@ -588,6 +645,12 @@ final class AdminController
             $this->settings->setAutoApplyRoles(false);
         }
 
+        $sitewideEnabled = !empty($this->settings->getSettings()['auto_apply_roles']);
+        $liveRoles = $sitewideEnabled
+            ? $this->settings->getAppliedRoles($availableFamilies)
+            : [];
+        $this->library->syncLiveRolePublishStates($liveRoles, $sitewideEnabled);
+
         $this->assets->refreshGeneratedAssets(false);
 
         $message = $this->buildRolesSavedMessage(
@@ -658,6 +721,7 @@ final class AdminController
             'font_display_options' => $this->buildFontDisplayOptions(),
             'minify_css_output' => !empty($settings['minify_css_output']),
             'preload_primary_fonts' => !empty($settings['preload_primary_fonts']),
+            'remote_connection_hints' => !empty($settings['remote_connection_hints']),
             'delete_uploaded_files_on_uninstall' => !empty($settings['delete_uploaded_files_on_uninstall']),
             'diagnostic_items' => $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts),
             'overview_metrics' => $this->buildOverviewMetrics($counts, $applyEverywhere, $assetStatus),
@@ -729,7 +793,7 @@ final class AdminController
                 'code' => false,
             ],
             [
-                'label' => __('Delivery Mode', 'tasty-fonts'),
+                'label' => __('Generated CSS Delivery', 'tasty-fonts'),
                 'value' => (string) ($settings['css_delivery_mode'] ?? 'file'),
                 'code' => false,
             ],
@@ -754,12 +818,12 @@ final class AdminController
                 'value' => (string) ($counts['families'] ?? 0),
             ],
             [
-                'label' => __('Font Files', 'tasty-fonts'),
-                'value' => (string) ($counts['files'] ?? 0),
+                'label' => __('Published', 'tasty-fonts'),
+                'value' => (string) ($counts['published_families'] ?? 0),
             ],
             [
-                'label' => __('Apply Everywhere', 'tasty-fonts'),
-                'value' => $applyEverywhere ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
+                'label' => __('Library Only', 'tasty-fonts'),
+                'value' => (string) ($counts['library_only_families'] ?? 0),
             ],
             [
                 'label' => __('Final CSS', 'tasty-fonts'),
@@ -914,6 +978,12 @@ final class AdminController
                 : __('primary font preloads disabled', 'tasty-fonts');
         }
 
+        if (!empty($before['remote_connection_hints']) !== !empty($after['remote_connection_hints'])) {
+            $changes[] = !empty($after['remote_connection_hints'])
+                ? __('remote connection hints enabled', 'tasty-fonts')
+                : __('remote connection hints disabled', 'tasty-fonts');
+        }
+
         if (($before['preview_sentence'] ?? '') !== ($after['preview_sentence'] ?? '')) {
             $changes[] = __('preview text updated', 'tasty-fonts');
         }
@@ -1012,22 +1082,22 @@ final class AdminController
             'bunnyImportFamilyEmpty' => __('Choose a Bunny family or type one manually.', 'tasty-fonts'),
             'importFamilyEmpty' => __('Choose a Google family or type one manually.', 'tasty-fonts'),
             'importPreviewEmpty' => __('Preview appears here after you choose a family.', 'tasty-fonts'),
-            'importing' => __('Importing and self-hosting selected files…', 'tasty-fonts'),
+            'importing' => __('Saving the selected Google delivery…', 'tasty-fonts'),
             'importSuccess' => __('Font imported successfully. Reloading…', 'tasty-fonts'),
             'importError' => __('The Google Fonts import failed.', 'tasty-fonts'),
             'bunnyImportError' => __('The Bunny Fonts import failed.', 'tasty-fonts'),
             'importProgress' => __('Importing %1$s: %2$d of %3$d (%4$s)…', 'tasty-fonts'),
-            'importSummary' => __('Imported %1$d variant%2$s. %3$d skipped. Reloading…', 'tasty-fonts'),
+            'importSummary' => __('Saved %1$d variant%2$s. %3$d skipped. Reloading…', 'tasty-fonts'),
             'importAlreadyExists' => __('%s already exists in the library for the selected variants.', 'tasty-fonts'),
             'importNoVariants' => __('Select at least one variant to import.', 'tasty-fonts'),
-            'bunnyImportReady' => __('Paste a Bunny Fonts family name and optional variants, then self-host the downloaded WOFF2 files locally.', 'tasty-fonts'),
-            'bunnyImportSubmitting' => __('Importing Bunny Fonts and self-hosting the selected files…', 'tasty-fonts'),
+            'bunnyImportReady' => __('Paste a Bunny Fonts family name, choose variants, and decide whether to self-host or keep Bunny CDN delivery.', 'tasty-fonts'),
+            'bunnyImportSubmitting' => __('Saving the selected Bunny delivery…', 'tasty-fonts'),
             'bunnyImportPreviewEmpty' => __('Preview appears here after you choose a Bunny family.', 'tasty-fonts'),
             'bunnyImportNoVariants' => __('Leave variants blank to import the default regular face, or enter tokens like regular, italic, 700, or 700italic.', 'tasty-fonts'),
             'bunnyImportBusy' => __('Importing Bunny Fonts…', 'tasty-fonts'),
             'bunnyImportSuccess' => __('Bunny Fonts imported successfully. Reloading…', 'tasty-fonts'),
             'bunnyImportSelectionSummaryDefault' => __('Default Regular Face', 'tasty-fonts'),
-            'importButtonIdle' => __('Import and Self-Host', 'tasty-fonts'),
+            'importButtonIdle' => __('Save Delivery', 'tasty-fonts'),
             'importButtonBusy' => __('Importing…', 'tasty-fonts'),
             'importEstimateFiles' => __('%1$d File%2$s Selected', 'tasty-fonts'),
             'importEstimateSize' => __('Approx. +%1$s WOFF2', 'tasty-fonts'),
@@ -1064,6 +1134,14 @@ final class AdminController
             'fallbackSaveError' => __('The fallback could not be saved.', 'tasty-fonts'),
             'fontDisplaySaved' => __('Saved font display for %1$s.', 'tasty-fonts'),
             'fontDisplaySaveError' => __('The font-display override could not be saved.', 'tasty-fonts'),
+            'familyDeliverySaving' => __('Switching live delivery…', 'tasty-fonts'),
+            'familyDeliverySaved' => __('Live delivery updated.', 'tasty-fonts'),
+            'familyDeliverySaveError' => __('The live delivery could not be updated.', 'tasty-fonts'),
+            'familyPublishStateSaving' => __('Updating publish state…', 'tasty-fonts'),
+            'familyPublishStateSaved' => __('Publish state updated.', 'tasty-fonts'),
+            'familyPublishStateSaveError' => __('The publish state could not be updated.', 'tasty-fonts'),
+            'deliveryDeleteConfirm' => __('Delete the "%1$s" delivery from %2$s?', 'tasty-fonts'),
+            'deliveryDeleteError' => __('The delivery profile could not be deleted.', 'tasty-fonts'),
             'copied' => __('Copied', 'tasty-fonts'),
             'copy' => __('Copy', 'tasty-fonts'),
             'activityCountSingle' => __('%1$d entry', 'tasty-fonts'),
@@ -1082,9 +1160,8 @@ final class AdminController
                 'badge_class' => 'is-warning',
                 'title' => __('Draft Saved Only', 'tasty-fonts'),
                 'copy' => sprintf(
-                    __('Sitewide roles are off. Apply Heading %1$s / Body %2$s when you want the frontend, editor, and Etch to use this pair.', 'tasty-fonts'),
-                    (string) ($draftRoles['heading'] ?? ''),
-                    (string) ($draftRoles['body'] ?? '')
+                    __('Sitewide roles are off. %s', 'tasty-fonts'),
+                    $this->buildRolePairDeliverySummary($draftRoles)
                 ),
             ];
         }
@@ -1094,11 +1171,7 @@ final class AdminController
                 'badge' => __('Live', 'tasty-fonts'),
                 'badge_class' => 'is-success',
                 'title' => __('Live Pair Active', 'tasty-fonts'),
-                'copy' => sprintf(
-                    __('Frontend, editor, and Etch are using Heading %1$s / Body %2$s.', 'tasty-fonts'),
-                    (string) ($draftRoles['heading'] ?? ''),
-                    (string) ($draftRoles['body'] ?? '')
-                ),
+                'copy' => $this->buildRolePairDeliverySummary($draftRoles),
             ];
         }
 
@@ -1107,11 +1180,9 @@ final class AdminController
             'badge_class' => 'is-warning',
             'title' => __('Draft Differs From Live', 'tasty-fonts'),
             'copy' => sprintf(
-                __('Draft %1$s / %2$s. Live %3$s / %4$s. Apply Sitewide to publish the draft pair.', 'tasty-fonts'),
-                (string) ($draftRoles['heading'] ?? ''),
-                (string) ($draftRoles['body'] ?? ''),
-                (string) ($appliedRoles['heading'] ?? ''),
-                (string) ($appliedRoles['body'] ?? '')
+                __('Draft: %1$s. Live: %2$s. Apply Sitewide to publish the draft pair.', 'tasty-fonts'),
+                $this->buildRolePairDeliverySummary($draftRoles),
+                $this->buildRolePairDeliverySummary($appliedRoles)
             ),
         ];
     }
@@ -1274,7 +1345,7 @@ final class AdminController
             'valid' => __('Google search is ready. Open key settings only when you want to replace or remove the saved key.', 'tasty-fonts'),
             'invalid' => __('The saved Google Fonts API key was rejected. Update it to re-enable live search.', 'tasty-fonts'),
             'unknown' => __('This saved key has not been verified yet. Save it again to validate before using live search.', 'tasty-fonts'),
-            default => __('Enable live family search with a Google Fonts Developer API key. Imported files are still downloaded and stored locally after import.', 'tasty-fonts'),
+            default => __('Enable live family search with a Google Fonts Developer API key. The key is only needed for search, not for Google CDN delivery itself.', 'tasty-fonts'),
         };
     }
 
@@ -1339,16 +1410,6 @@ final class AdminController
     {
         $families = array_keys($catalog);
 
-        foreach ($this->adobe->getConfiguredFamilies() as $family) {
-            $familyName = trim((string) ($family['family'] ?? ''));
-
-            if ($familyName === '') {
-                continue;
-            }
-
-            $families[] = $familyName;
-        }
-
         $storedRoles = $this->settings->getRoles([]);
 
         foreach (self::ROLE_KEYS as $roleKey) {
@@ -1363,6 +1424,46 @@ final class AdminController
         natcasesort($families);
 
         return array_values($families);
+    }
+
+    private function buildRolePairDeliverySummary(array $roles): string
+    {
+        $parts = [];
+
+        foreach (self::ROLE_KEYS as $roleKey) {
+            $familyName = trim((string) ($roles[$roleKey] ?? ''));
+
+            if ($familyName === '') {
+                continue;
+            }
+
+            $parts[] = sprintf(
+                __('%1$s: %2$s', 'tasty-fonts'),
+                ucfirst($roleKey),
+                $this->describeFamilyDelivery($familyName)
+            );
+        }
+
+        return $parts === [] ? __('No role pair selected yet.', 'tasty-fonts') : implode('; ', $parts) . '.';
+    }
+
+    private function describeFamilyDelivery(string $familyName): string
+    {
+        $catalog = $this->catalog->getCatalog();
+        $family = $catalog[$familyName] ?? null;
+
+        if (!is_array($family)) {
+            return $familyName;
+        }
+
+        $delivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+        $label = strtolower(trim((string) ($delivery['label'] ?? '')));
+
+        if ($label === '') {
+            return $familyName;
+        }
+
+        return sprintf(__('%1$s via %2$s', 'tasty-fonts'), $familyName, $label);
     }
 
     private function handleSaveAdobeProjectAction(): bool
@@ -1485,6 +1586,13 @@ final class AdminController
     private function getPostedGoogleVariants(): array
     {
         return $this->getPostedVariantTokens();
+    }
+
+    private function getPostedDeliveryMode(): string
+    {
+        $mode = strtolower(trim($this->getPostedText('delivery_mode', 'self_hosted')));
+
+        return in_array($mode, ['self_hosted', 'cdn'], true) ? $mode : 'self_hosted';
     }
 
     private function getPostedVariantTokens(): array

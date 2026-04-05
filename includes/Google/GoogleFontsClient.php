@@ -146,9 +146,9 @@ final class GoogleFontsClient
         return null;
     }
 
-    public function fetchCss(string $familyName, array $variants): string|WP_Error
+    public function fetchCss(string $familyName, array $variants, string $display = 'swap'): string|WP_Error
     {
-        $url = $this->buildCssUrl($familyName, $variants);
+        $url = $this->buildCssUrl($familyName, $variants, $display);
 
         $response = wp_remote_get(
             $url,
@@ -186,7 +186,7 @@ final class GoogleFontsClient
         return $body;
     }
 
-    public function buildCssUrl(string $familyName, array $variants): string
+    public function buildCssUrl(string $familyName, array $variants, string $display = 'swap'): string
     {
         $familyQuery = str_replace('%20', '+', rawurlencode($familyName));
         $url = 'https://fonts.googleapis.com/css2?family=' . $familyQuery;
@@ -196,7 +196,7 @@ final class GoogleFontsClient
             $url .= ':ital,wght@' . implode(';', $axes);
         }
 
-        return $url . '&display=swap';
+        return $url . '&display=' . rawurlencode($this->sanitizeDisplay($display));
     }
 
     private function fetchCatalogItems(): array
@@ -263,6 +263,15 @@ final class GoogleFontsClient
         }
 
         return array_values(array_unique($axes));
+    }
+
+    private function sanitizeDisplay(string $display): string
+    {
+        $display = strtolower(trim($display));
+
+        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true)
+            ? $display
+            : 'swap';
     }
 
     private function getApiKey(): string

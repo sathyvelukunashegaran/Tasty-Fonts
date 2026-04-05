@@ -6,7 +6,6 @@ namespace TastyFonts\Fonts;
 
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
-use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 
 final class AssetService
@@ -22,6 +21,7 @@ final class AssetService
         private readonly CatalogService $catalog,
         private readonly SettingsRepository $settings,
         private readonly CssBuilder $cssBuilder,
+        private readonly RuntimeAssetPlanner $planner,
         private readonly LogRepository $log
     ) {
     }
@@ -51,12 +51,13 @@ final class AssetService
         }
 
         $catalog = $this->catalog->getCatalog();
+        $localCatalog = $this->planner->getLocalRuntimeCatalog();
         $settings = $this->settings->getSettings();
         $roles = !empty($settings['auto_apply_roles'])
             ? $this->settings->getAppliedRoles($catalog)
             : $this->settings->getRoles($catalog);
 
-        $this->css = $this->cssBuilder->build($catalog, $roles, $settings);
+        $this->css = $this->cssBuilder->build($localCatalog, $roles, $settings);
         $this->hash = hash('crc32b', $this->css);
 
         set_transient(self::TRANSIENT_CSS, $this->css, DAY_IN_SECONDS);
@@ -145,7 +146,7 @@ final class AssetService
 
     public function enqueueFontFacesOnly(string $handle): void
     {
-        $catalog = $this->catalog->getCatalog();
+        $catalog = $this->planner->getLocalPreviewCatalog();
         $settings = $this->settings->getSettings();
         $css = $this->cssBuilder->buildFontFaceOnly($catalog, $settings);
 
@@ -184,183 +185,12 @@ final class AssetService
 
     public function getPrimaryFontPreloadUrls(): array
     {
-        $settings = $this->settings->getSettings();
-
-        if (empty($settings['preload_primary_fonts']) || empty($settings['auto_apply_roles'])) {
-            return [];
-        }
-
-        $catalog = $this->catalog->getCatalog();
-        $roles = $this->settings->getAppliedRoles($catalog);
-        $urls = [];
-
-        // Favor the weights most likely to drive early text rendering.
-        foreach (
-            [
-                ['family' => (string) ($roles['heading'] ?? ''), 'weight' => 700],
-                ['family' => (string) ($roles['body'] ?? ''), 'weight' => 400],
-            ] as $target
-        ) {
-            $face = $this->findBestPreloadFace($catalog, $target['family'], (int) $target['weight']);
-
-            if ($face === null) {
-                continue;
-            }
-
-            $url = $this->getSameOriginWoff2Url($face);
-
-            if ($url === '') {
-                continue;
-            }
-
-            $urls[$url] = $url;
-        }
-
-        return array_values($urls);
+        return $this->planner->getPrimaryFontPreloadUrls();
     }
 
     private function getVersionedCss(): string
     {
         return "/* Version: " . TASTY_FONTS_VERSION . " */\n" . $this->getCss();
-    }
-
-    private function findBestPreloadFace(array $catalog, string $familyName, int $targetWeight): ?array
-    {
-        $family = $this->findCatalogFamily($catalog, $familyName);
-
-        if ($family === null) {
-            return null;
-        }
-
-        $bestFace = null;
-        $bestScore = null;
-
-        foreach ((array) ($family['faces'] ?? []) as $face) {
-            if (
-                !is_array($face)
-                || FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')) !== 'normal'
-                || !is_string($face['files']['woff2'] ?? null)
-                || $this->getSameOriginWoff2Url($face) === ''
-            ) {
-                continue;
-            }
-
-            $score = $this->preloadFaceScore($face, $targetWeight);
-
-            if ($bestScore !== null && $this->comparePreloadFaceScores($score, $bestScore) >= 0) {
-                continue;
-            }
-
-            $bestFace = $face;
-            $bestScore = $score;
-        }
-
-        return $bestFace;
-    }
-
-    private function preloadFaceScore(array $face, int $targetWeight): array
-    {
-        $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-        $isVariable = str_contains($weight, '..');
-        $distance = $this->weightDistanceFromTarget($weight, $targetWeight);
-        $referenceWeight = $this->weightReferenceValue($weight, $targetWeight);
-
-        return [$distance, $isVariable ? 1 : 0, $referenceWeight];
-    }
-
-    private function comparePreloadFaceScores(array $left, array $right): int
-    {
-        foreach ([0, 1, 2] as $index) {
-            $comparison = ((int) ($left[$index] ?? 0)) <=> ((int) ($right[$index] ?? 0));
-
-            if ($comparison !== 0) {
-                return $comparison;
-            }
-        }
-
-        return 0;
-    }
-
-    private function weightDistanceFromTarget(string $weight, int $targetWeight): int
-    {
-        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $weight, $matches) === 1) {
-            $start = (int) $matches[1];
-            $end = (int) $matches[2];
-
-            if ($targetWeight < $start) {
-                return $start - $targetWeight;
-            }
-
-            if ($targetWeight > $end) {
-                return $targetWeight - $end;
-            }
-
-            return 0;
-        }
-
-        return abs(FontUtils::weightSortValue($weight) - $targetWeight);
-    }
-
-    private function weightReferenceValue(string $weight, int $targetWeight): int
-    {
-        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $weight, $matches) === 1) {
-            $start = (int) $matches[1];
-            $end = (int) $matches[2];
-
-            return max($start, min($targetWeight, $end));
-        }
-
-        return FontUtils::weightSortValue($weight);
-    }
-
-    private function findCatalogFamily(array $catalog, string $familyName): ?array
-    {
-        if ($familyName === '') {
-            return null;
-        }
-
-        if (isset($catalog[$familyName]) && is_array($catalog[$familyName])) {
-            return $catalog[$familyName];
-        }
-
-        foreach ($catalog as $family) {
-            if (!is_array($family) || ($family['family'] ?? '') !== $familyName) {
-                continue;
-            }
-
-            return $family;
-        }
-
-        return null;
-    }
-
-    private function getSameOriginWoff2Url(array $face): string
-    {
-        $url = trim((string) ($face['files']['woff2'] ?? ''));
-
-        if ($url === '' || !$this->isSameOriginFontUrl($url)) {
-            return '';
-        }
-
-        return $url;
-    }
-
-    private function isSameOriginFontUrl(string $url): bool
-    {
-        $host = (string) (parse_url($url, PHP_URL_HOST) ?: '');
-
-        if ($host === '') {
-            return !str_starts_with($url, '//');
-        }
-
-        $uploadBaseUrl = (string) (wp_get_upload_dir()['baseurl'] ?? '');
-        $uploadHost = (string) (parse_url($uploadBaseUrl, PHP_URL_HOST) ?: '');
-
-        if ($uploadHost === '') {
-            return false;
-        }
-
-        return strtolower($host) === strtolower($uploadHost);
     }
 
     private function isFileDeliveryEnabled(): bool
