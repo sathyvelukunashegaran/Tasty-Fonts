@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Repository;
 
+defined('ABSPATH') || exit;
+
 final class LogRepository
 {
     public const OPTION_LOG = 'tasty_fonts_log';

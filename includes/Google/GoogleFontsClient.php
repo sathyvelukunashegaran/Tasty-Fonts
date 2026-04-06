@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Google;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use WP_Error;
@@ -13,6 +15,9 @@ final class GoogleFontsClient
     private const TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v1';
     private const CATALOG_TTL = 12 * HOUR_IN_SECONDS;
     private const REQUEST_TIMEOUT = 20;
+
+    private ?array $catalogIndex = null;
+    private ?array $catalogItems = null;
 
     public function __construct(private readonly SettingsRepository $settings)
     {
@@ -37,6 +42,8 @@ final class GoogleFontsClient
 
     public function clearCatalogCache(): void
     {
+        $this->catalogIndex = null;
+        $this->catalogItems = null;
         delete_transient(self::TRANSIENT_CATALOG);
     }
 
@@ -51,7 +58,7 @@ final class GoogleFontsClient
             ];
         }
 
-        $response = wp_remote_get($this->buildCatalogRequestUrl($apiKey), ['timeout' => self::REQUEST_TIMEOUT]);
+        $response = $this->remoteGet($this->buildCatalogRequestUrl($apiKey), ['timeout' => self::REQUEST_TIMEOUT]);
 
         if (is_wp_error($response)) {
             return [
@@ -104,14 +111,14 @@ final class GoogleFontsClient
 
         $results = [];
 
-        foreach ($this->fetchCatalogItems() as $item) {
+        foreach ($this->fetchCatalogIndex() as $slug => $item) {
             $family = (string) ($item['family'] ?? '');
 
             if (!$this->matchesSearchQuery($family, $query)) {
                 continue;
             }
 
-            $results[] = $this->normalizeCatalogItem($item);
+            $results[] = $this->normalizeSearchResultItem((string) $slug, $item);
         }
 
         usort(
@@ -150,7 +157,7 @@ final class GoogleFontsClient
     {
         $url = $this->buildCssUrl($familyName, $variants, $display);
 
-        $response = wp_remote_get(
+        $response = $this->remoteGet(
             $url,
             [
                 'timeout' => self::REQUEST_TIMEOUT,
@@ -199,36 +206,61 @@ final class GoogleFontsClient
         return $url . '&display=' . rawurlencode($this->sanitizeDisplay($display));
     }
 
-    private function fetchCatalogItems(): array
+    private function fetchCatalogIndex(): array
     {
+        if (is_array($this->catalogIndex)) {
+            return $this->catalogIndex;
+        }
+
         $cached = get_transient(self::TRANSIENT_CATALOG);
 
-        if (is_array($cached)) {
-            return $cached;
+        if ($this->isCatalogIndex($cached)) {
+            $this->catalogIndex = $cached;
+
+            return $this->catalogIndex;
         }
 
-        $apiKey = $this->getApiKey();
+        if ($this->isLegacyCatalogItemsCache($cached)) {
+            $this->catalogItems = $cached;
+            $this->catalogIndex = $this->buildCatalogIndex($cached);
+            set_transient(self::TRANSIENT_CATALOG, $this->catalogIndex, self::CATALOG_TTL);
 
-        if ($apiKey === '') {
+            return $this->catalogIndex;
+        }
+
+        $items = $this->fetchRemoteCatalogItems();
+
+        if ($items === []) {
             return [];
         }
 
-        $response = wp_remote_get($this->buildCatalogRequestUrl($apiKey), ['timeout' => self::REQUEST_TIMEOUT]);
+        $this->catalogItems = $items;
+        $this->catalogIndex = $this->buildCatalogIndex($items);
+        set_transient(self::TRANSIENT_CATALOG, $this->catalogIndex, self::CATALOG_TTL);
 
-        if (is_wp_error($response)) {
+        return $this->catalogIndex;
+    }
+
+    private function fetchCatalogItems(): array
+    {
+        if (is_array($this->catalogItems)) {
+            return $this->catalogItems;
+        }
+
+        $items = $this->fetchRemoteCatalogItems();
+
+        if ($items === []) {
             return [];
         }
 
-        $status = (int) wp_remote_retrieve_response_code($response);
-        $body = json_decode((string) wp_remote_retrieve_body($response), true);
+        $this->catalogItems = $items;
 
-        if ($status !== 200 || !is_array($body) || !isset($body['items']) || !is_array($body['items'])) {
-            return [];
+        if (!is_array($this->catalogIndex)) {
+            $this->catalogIndex = $this->buildCatalogIndex($items);
+            set_transient(self::TRANSIENT_CATALOG, $this->catalogIndex, self::CATALOG_TTL);
         }
 
-        set_transient(self::TRANSIENT_CATALOG, $body['items'], self::CATALOG_TTL);
-
-        return $body['items'];
+        return $this->catalogItems;
     }
 
     private function normalizeCatalogItem(array $item): array
@@ -243,9 +275,26 @@ final class GoogleFontsClient
         ];
     }
 
+    private function normalizeSearchResultItem(string $slug, array $item): array
+    {
+        return [
+            'family' => (string) ($item['family'] ?? ''),
+            'slug' => $slug,
+            'category' => (string) ($item['category'] ?? ''),
+            'variants_count' => max(0, (int) ($item['variants_count'] ?? 0)),
+        ];
+    }
+
     private function modernUserAgent(): string
     {
         return FontUtils::MODERN_USER_AGENT;
+    }
+
+    private function remoteGet(string $url, array $args = []): mixed
+    {
+        $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);
+
+        return wp_remote_get($url, is_array($filteredArgs) ? $filteredArgs : $args);
     }
 
     private function buildCssAxes(array $variants): array
@@ -277,6 +326,88 @@ final class GoogleFontsClient
     private function getApiKey(): string
     {
         return trim((string) $this->settings->getSettings()['google_api_key']);
+    }
+
+    private function fetchRemoteCatalogItems(): array
+    {
+        $apiKey = $this->getApiKey();
+
+        if ($apiKey === '') {
+            return [];
+        }
+
+        $response = $this->remoteGet($this->buildCatalogRequestUrl($apiKey), ['timeout' => self::REQUEST_TIMEOUT]);
+
+        if (is_wp_error($response)) {
+            return [];
+        }
+
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body = json_decode((string) wp_remote_retrieve_body($response), true);
+
+        if ($status !== 200 || !is_array($body) || !isset($body['items']) || !is_array($body['items'])) {
+            return [];
+        }
+
+        return $body['items'];
+    }
+
+    private function buildCatalogIndex(array $items): array
+    {
+        $index = [];
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $family = trim((string) ($item['family'] ?? ''));
+            $slug = FontUtils::slugify($family);
+
+            if ($family === '' || $slug === '') {
+                continue;
+            }
+
+            $index[$slug] = [
+                'family' => $family,
+                'category' => (string) ($item['category'] ?? ''),
+                'variants_count' => count(FontUtils::normalizeVariantTokens((array) ($item['variants'] ?? []))),
+            ];
+        }
+
+        return $index;
+    }
+
+    private function isCatalogIndex(mixed $cached): bool
+    {
+        if (!is_array($cached) || $cached === []) {
+            return false;
+        }
+
+        foreach ($cached as $slug => $item) {
+            if (
+                !is_string($slug)
+                || !is_array($item)
+                || !array_key_exists('family', $item)
+                || !array_key_exists('category', $item)
+                || !array_key_exists('variants_count', $item)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function isLegacyCatalogItemsCache(mixed $cached): bool
+    {
+        if (!is_array($cached) || $cached === []) {
+            return false;
+        }
+
+        $first = reset($cached);
+
+        return is_array($first) && array_key_exists('family', $first) && array_key_exists('variants', $first);
     }
 
     private function buildCatalogRequestUrl(string $apiKey): string

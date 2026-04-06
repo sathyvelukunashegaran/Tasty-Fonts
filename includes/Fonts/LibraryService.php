@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Fonts;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -16,6 +18,18 @@ final class LibraryService
     private const MANAGED_IMPORT_SOURCES = ['google', 'bunny'];
     private const MANUAL_PUBLISH_STATES = ['library_only', 'published'];
 
+    /**
+     * Create the library service.
+     *
+     * @since 1.4.0
+     *
+     * @param Storage $storage Storage abstraction for library file operations.
+     * @param CatalogService $catalog Catalog service used to inspect normalized family records.
+     * @param ImportRepository $imports Repository used to persist delivery and publish-state changes.
+     * @param AssetService $assets Asset service used to refresh generated CSS after mutations.
+     * @param LogRepository $log Log repository used for audit entries.
+     * @param SettingsRepository $settings Settings repository used to protect live role assignments.
+     */
     public function __construct(
         private readonly Storage $storage,
         private readonly CatalogService $catalog,
@@ -26,6 +40,14 @@ final class LibraryService
     ) {
     }
 
+    /**
+     * Delete a family and all of its managed files from the library.
+     *
+     * @since 1.4.0
+     *
+     * @param string $familySlug Stored family slug to delete.
+     * @return bool|WP_Error True when the family is deleted, or a WordPress error when deletion is blocked or fails.
+     */
     public function deleteFamily(string $familySlug): bool|WP_Error
     {
         $familySlug = FontUtils::slugify($familySlug);
@@ -57,7 +79,7 @@ final class LibraryService
         if (!$this->storage->deleteRelativeFiles($relativePaths)) {
             return $this->error(
                 'tasty_fonts_delete_failed',
-                __('The font files could not be deleted from uploads/fonts.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The font files could not be deleted from uploads/fonts.', 'tasty-fonts'))
             );
         }
 
@@ -67,6 +89,7 @@ final class LibraryService
 
         $this->imports->deleteFamily($familySlug);
         $this->assets->refreshGeneratedAssets();
+        do_action('tasty_fonts_after_delete_family', $familySlug, $familyName);
 
         $fileCount = count($relativePaths);
         $this->log->add(
@@ -81,6 +104,21 @@ final class LibraryService
         return true;
     }
 
+    /**
+     * Delete a single delivery profile from a family, or the full family when it is the last delivery.
+     *
+     * @since 1.4.0
+     *
+     * @param string $familySlug Stored family slug.
+     * @param string $deliveryId Delivery profile identifier to remove.
+     * @return array{
+     *     family: string,
+     *     family_slug: string,
+     *     delivery_id: string,
+     *     deleted_family: bool,
+     *     message?: string
+     * }|WP_Error Result payload for the deleted delivery, or a WordPress error when deletion is blocked or fails.
+     */
     public function deleteDeliveryProfile(string $familySlug, string $deliveryId): array|WP_Error
     {
         $familySlug = FontUtils::slugify($familySlug);
@@ -133,7 +171,7 @@ final class LibraryService
         if (!$this->storage->deleteRelativeFiles($relativePaths)) {
             return $this->error(
                 'tasty_fonts_delete_failed',
-                __('The files for that delivery profile could not be removed from uploads/fonts.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The files for that delivery profile could not be removed from uploads/fonts.', 'tasty-fonts'))
             );
         }
 
@@ -175,6 +213,21 @@ final class LibraryService
         ];
     }
 
+    /**
+     * Switch the active live delivery profile for a family.
+     *
+     * @since 1.4.0
+     *
+     * @param string $familySlug Stored family slug.
+     * @param string $deliveryId Delivery profile identifier to activate.
+     * @return array{
+     *     family: string,
+     *     family_slug: string,
+     *     delivery_id: string,
+     *     delivery_label: string,
+     *     message: string
+     * }|WP_Error Result payload for the saved delivery switch, or a WordPress error when the change fails.
+     */
     public function saveFamilyDelivery(string $familySlug, string $deliveryId): array|WP_Error
     {
         $familySlug = FontUtils::slugify($familySlug);
@@ -227,6 +280,20 @@ final class LibraryService
         ];
     }
 
+    /**
+     * Save a manual published or paused state for a family.
+     *
+     * @since 1.4.0
+     *
+     * @param string $familySlug Stored family slug.
+     * @param string $publishState Requested publish state (`published` or `library_only`).
+     * @return array{
+     *     family: string,
+     *     family_slug: string,
+     *     publish_state: string,
+     *     message: string
+     * }|WP_Error Result payload for the saved publish state, or a WordPress error when the change fails.
+     */
     public function saveFamilyPublishState(string $familySlug, string $publishState): array|WP_Error
     {
         $familySlug = FontUtils::slugify($familySlug);
@@ -290,6 +357,15 @@ final class LibraryService
         ];
     }
 
+    /**
+     * Sync stored family publish states to reflect the active heading/body role pair.
+     *
+     * @since 1.4.0
+     *
+     * @param array{heading?: string, body?: string} $liveRoles Currently applied live role families.
+     * @param bool $sitewideEnabled Whether sitewide role application is enabled.
+     * @return void
+     */
     public function syncLiveRolePublishStates(array $liveRoles, bool $sitewideEnabled): void
     {
         $liveFamilies = [];
@@ -339,6 +415,18 @@ final class LibraryService
         $this->catalog->invalidate();
     }
 
+    /**
+     * Delete a single self-hosted face variant from the active delivery profile.
+     *
+     * @since 1.4.0
+     *
+     * @param string $familySlug Stored family slug.
+     * @param string $weight Requested face weight.
+     * @param string $style Requested face style.
+     * @param string $source Face source identifier.
+     * @param string $unicodeRange Optional unicode range used to disambiguate local faces.
+     * @return array{family: string, weight: string, style: string}|WP_Error Result payload for the deleted face, or a WordPress error when deletion is blocked or fails.
+     */
     public function deleteFaceVariant(
         string $familySlug,
         string $weight,
@@ -717,6 +805,13 @@ final class LibraryService
             __('%s is currently assigned to body, and this is the last saved variant. Choose a different body font before deleting it.', 'tasty-fonts'),
             $familyName
         );
+    }
+
+    private function storageErrorMessage(string $fallback): string
+    {
+        $message = trim($this->storage->getLastFilesystemErrorMessage());
+
+        return $message !== '' ? $message : $fallback;
     }
 
     private function error(string $code, string $message): WP_Error

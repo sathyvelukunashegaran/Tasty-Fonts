@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Fonts;
 
-use Closure;
+defined('ABSPATH') || exit;
+
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -17,22 +18,47 @@ final class LocalUploadService
     private const ALLOWED_WEIGHTS = ['100', '200', '300', '400', '500', '600', '700', '800', '900'];
     private const ALLOWED_STYLES = ['normal', 'italic', 'oblique'];
 
+    /**
+     * Create the local upload service.
+     *
+     * @since 1.4.0
+     *
+     * @param Storage $storage Storage abstraction for uploads/fonts paths and writes.
+     * @param CatalogService $catalog Catalog service used to inspect existing families and faces.
+     * @param AssetService $assets Asset service used to refresh generated CSS after imports.
+     * @param SettingsRepository $settings Settings repository used to persist family fallbacks.
+     * @param LogRepository $log Log repository used for audit entries.
+     * @param UploadedFileValidatorInterface $uploadedFileValidator Uploaded-file validator for HTTP upload checks.
+     */
     public function __construct(
         private readonly Storage $storage,
         private readonly CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly SettingsRepository $settings,
         private readonly LogRepository $log,
-        private readonly ?Closure $isUploadedFileValidator = null
+        private readonly UploadedFileValidatorInterface $uploadedFileValidator
     ) {
     }
 
+    /**
+     * Import one or more uploaded local font rows into the library.
+     *
+     * @since 1.4.0
+     *
+     * @param array<int|string, array<string, mixed>> $rows Raw upload rows assembled from the admin request.
+     * @return array{
+     *     message: string,
+     *     rows: list<array{index: int, status: string, message: string}>,
+     *     summary: array{imported: int, skipped: int, errors: int},
+     *     families: list<string>
+     * }|WP_Error Import summary on success, or a WordPress error when validation fails before any row can be processed.
+     */
     public function uploadRows(array $rows): array|WP_Error
     {
         if (!$this->storage->ensureRootDirectory()) {
             return $this->error(
                 'tasty_fonts_upload_storage_unavailable',
-                __('The uploads/fonts storage directory could not be created.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The uploads/fonts storage directory could not be created.', 'tasty-fonts'))
             );
         }
 
@@ -324,11 +350,7 @@ final class LocalUploadService
 
     private function isUploadedFile(string $tmpName): bool
     {
-        if ($this->isUploadedFileValidator instanceof Closure) {
-            return (bool) ($this->isUploadedFileValidator)($tmpName);
-        }
-
-        return is_uploaded_file($tmpName);
+        return $this->uploadedFileValidator->isUploadedFile($tmpName);
     }
 
     private function writeUploadedFontFile(
@@ -343,7 +365,7 @@ final class LocalUploadService
         if (!$root) {
             return $this->error(
                 'tasty_fonts_upload_storage_unavailable',
-                __('The uploads/fonts storage directory could not be created.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The uploads/fonts storage directory could not be created.', 'tasty-fonts'))
             );
         }
 
@@ -352,7 +374,7 @@ final class LocalUploadService
         if (!$this->storage->ensureDirectory($familyDirectory)) {
             return $this->error(
                 'tasty_fonts_upload_family_directory_failed',
-                __('The font family directory could not be created inside uploads/fonts.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The font family directory could not be created inside uploads/fonts.', 'tasty-fonts'))
             );
         }
 
@@ -371,11 +393,18 @@ final class LocalUploadService
         if (!$this->storage->copyAbsoluteFile($tmpName, $targetPath)) {
             return $this->error(
                 'tasty_fonts_upload_write_failed',
-                __('The uploaded font file could not be copied into uploads/fonts.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The uploaded font file could not be copied into uploads/fonts.', 'tasty-fonts'))
             );
         }
 
         return true;
+    }
+
+    private function storageErrorMessage(string $fallback): string
+    {
+        $message = trim($this->storage->getLastFilesystemErrorMessage());
+
+        return $message !== '' ? $message : $fallback;
     }
 
     private function buildFamilyLookup(): array

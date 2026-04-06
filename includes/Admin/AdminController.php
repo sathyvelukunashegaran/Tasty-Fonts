@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace TastyFonts\Admin;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
+use TastyFonts\Api\RestController;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
@@ -18,6 +21,7 @@ use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
+use WP_Error;
 
 final class AdminController
 {
@@ -26,6 +30,11 @@ final class AdminController
     private const NOTICE_TTL = 300;
     private const NOTICE_TRANSIENT_PREFIX = 'tasty_fonts_admin_notices_';
     private const ROLE_KEYS = ['heading', 'body'];
+    private const SEARCH_CACHE_TTL = 900;
+    private const SEARCH_CACHE_TRANSIENT_PREFIX = 'tasty_fonts_search_cache_';
+    private const SEARCH_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_search_cooldown_';
+    private const SEARCH_COOLDOWN_WINDOW_SECONDS = 0.5;
+    private const SEARCH_COOLDOWN_TRANSIENT_TTL = 1;
 
     private readonly AdminPageRenderer $renderer;
 
@@ -86,30 +95,30 @@ final class AdminController
         wp_enqueue_script(
             'tasty-fonts-admin',
             TASTY_FONTS_URL . 'assets/js/admin.js',
-            [],
+            ['wp-i18n'],
             $this->assetVersionFor(),
             true
         );
+
+        if (function_exists('wp_set_script_translations')) {
+            wp_set_script_translations(
+                'tasty-fonts-admin',
+                'tasty-fonts',
+                TASTY_FONTS_DIR . 'languages'
+            );
+        }
 
         wp_localize_script(
             'tasty-fonts-admin',
             'TastyFontsAdmin',
             [
-                'ajaxUrl' => admin_url('admin-ajax.php'),
-                'searchNonce' => wp_create_nonce('tasty_fonts_search_google'),
-                'bunnySearchNonce' => wp_create_nonce('tasty_fonts_search_bunny'),
-                'bunnyFamilyNonce' => wp_create_nonce('tasty_fonts_get_bunny_family'),
-                'bunnyImportNonce' => wp_create_nonce('tasty_fonts_import_bunny'),
-                'importNonce' => wp_create_nonce('tasty_fonts_import_google'),
-                'uploadNonce' => wp_create_nonce('tasty_fonts_upload_local'),
-                'saveFallbackNonce' => wp_create_nonce('tasty_fonts_save_family_fallback'),
-                'saveFontDisplayNonce' => wp_create_nonce('tasty_fonts_save_family_font_display'),
-                'saveFamilyDeliveryNonce' => wp_create_nonce('tasty_fonts_save_family_delivery'),
-                'saveFamilyPublishStateNonce' => wp_create_nonce('tasty_fonts_save_family_publish_state'),
-                'deleteDeliveryProfileNonce' => wp_create_nonce('tasty_fonts_delete_delivery_profile'),
-                'saveRolesNonce' => wp_create_nonce('tasty_fonts_save_role_draft'),
+                'restUrl' => rest_url(RestController::API_NAMESPACE . '/'),
+                'restNonce' => wp_create_nonce('wp_rest'),
+                'routes' => RestController::routeMap(),
                 'googleApiEnabled' => $googleSearchEnabled,
-                'strings' => $this->buildAdminStrings($this->buildSearchDisabledMessage($googleApiStatus)),
+                'runtimeStrings' => [
+                    'searchDisabled' => $this->buildSearchDisabledMessage($googleApiStatus),
+                ],
             ]
         );
     }
@@ -159,158 +168,190 @@ final class AdminController
         $this->handleSaveRolesAction();
     }
 
-    public function ajaxSearchGoogle(): void
+    public function searchGoogle(string $query): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to search Google Fonts.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_search_google', 'nonce');
+        return $this->resolveRateLimitedSearch(
+            'google',
+            $query,
+            fn (string $resolvedQuery): array|WP_Error => $this->searchGoogleResults($resolvedQuery)
+        );
+    }
 
+    public function searchBunny(string $query): array|WP_Error
+    {
+        return $this->resolveRateLimitedSearch(
+            'bunny',
+            $query,
+            fn (string $resolvedQuery): array|WP_Error => $this->searchBunnyResults($resolvedQuery)
+        );
+    }
+
+    public function searchGoogleResults(string $query): array|WP_Error
+    {
         if (!$this->googleClient->canSearch()) {
-            $this->sendAjaxError(__('Search is unavailable until a Google Fonts API key is saved.', 'tasty-fonts'), 400);
+            return new WP_Error(
+                'tasty_fonts_google_search_unavailable',
+                __('Search is unavailable until a Google Fonts API key is saved.', 'tasty-fonts')
+            );
         }
 
-        wp_send_json_success(['items' => $this->googleClient->searchFamilies($this->getPostedText('query'), 20)]);
+        return ['items' => $this->googleClient->searchFamilies(sanitize_text_field($query), 20)];
     }
 
-    public function ajaxSearchBunny(): void
+    public function searchBunnyResults(string $query): array
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to search Bunny Fonts.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_search_bunny', 'nonce');
-
-        wp_send_json_success(['items' => $this->bunnyClient->searchFamilies($this->getPostedText('query'), 12)]);
+        return ['items' => $this->bunnyClient->searchFamilies(sanitize_text_field($query), 12)];
     }
 
-    public function ajaxGetBunnyFamily(): void
+    public function fetchGoogleFamily(string $familyName): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to load Bunny Fonts families.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_get_bunny_family', 'nonce');
-
-        $familyName = $this->getPostedText('family');
+        $familyName = sanitize_text_field($familyName);
 
         if ($familyName === '') {
-            $this->sendAjaxError(__('A Bunny Fonts family name is required.', 'tasty-fonts'), 400);
+            return new WP_Error(
+                'tasty_fonts_missing_google_family',
+                __('A Google Fonts family name is required.', 'tasty-fonts')
+            );
+        }
+
+        if (!$this->googleClient->canSearch()) {
+            return new WP_Error(
+                'tasty_fonts_google_search_unavailable',
+                __('Search is unavailable until a Google Fonts API key is saved.', 'tasty-fonts')
+            );
+        }
+
+        $result = $this->googleClient->getFamily($familyName);
+
+        if ($result === null) {
+            return new WP_Error(
+                'tasty_fonts_google_family_not_found',
+                __('No Google Fonts family matched that name.', 'tasty-fonts')
+            );
+        }
+
+        return ['item' => $result];
+    }
+
+    public function fetchBunnyFamily(string $familyName): array|WP_Error
+    {
+        $familyName = sanitize_text_field($familyName);
+
+        if ($familyName === '') {
+            return new WP_Error(
+                'tasty_fonts_missing_bunny_family',
+                __('A Bunny Fonts family name is required.', 'tasty-fonts')
+            );
         }
 
         $result = $this->bunnyClient->getFamily($familyName);
 
         if ($result === null) {
-            $this->sendAjaxError(__('No Bunny Fonts family matched that name.', 'tasty-fonts'), 404);
+            return new WP_Error(
+                'tasty_fonts_bunny_family_not_found',
+                __('No Bunny Fonts family matched that name.', 'tasty-fonts')
+            );
         }
 
-        wp_send_json_success(['item' => $result]);
+        return ['item' => $result];
     }
 
-    public function ajaxImportGoogle(): void
+    public function importGoogleFamily(string $familyName, array $variantTokens, string $deliveryMode = 'self_hosted'): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to import Google Fonts.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_import_google', 'nonce');
-
-        $result = $this->googleImport->importFamily(
-            $this->getPostedText('family'),
-            $this->getPostedGoogleVariants(),
-            $this->getPostedDeliveryMode()
+        return $this->googleImport->importFamily(
+            sanitize_text_field($familyName),
+            $this->sanitizeVariantTokens($variantTokens),
+            $this->normalizeDeliveryMode($deliveryMode)
         );
-
-        if (is_wp_error($result)) {
-            $this->sendAjaxError($result->get_error_message(), 400);
-        }
-
-        wp_send_json_success($result);
     }
 
-    public function ajaxImportBunny(): void
+    public function importBunnyFamily(string $familyName, array $variantTokens, string $deliveryMode = 'self_hosted'): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to import Bunny Fonts.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_import_bunny', 'nonce');
-
-        $result = $this->bunnyImport->importFamily(
-            $this->getPostedText('family'),
-            $this->getPostedVariantTokens(),
-            $this->getPostedDeliveryMode()
+        return $this->bunnyImport->importFamily(
+            sanitize_text_field($familyName),
+            $this->sanitizeVariantTokens($variantTokens),
+            $this->normalizeDeliveryMode($deliveryMode)
         );
-
-        if (is_wp_error($result)) {
-            $this->sendAjaxError($result->get_error_message(), 400);
-        }
-
-        wp_send_json_success($result);
     }
 
-    public function ajaxUploadLocal(): void
+    public function prepareUploadRows(array $postedRows, array $rawFiles): array
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to upload local fonts.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_upload_local', 'nonce');
+        $uploadedFiles = $this->normalizeUploadedFiles($rawFiles);
+        $rows = [];
 
-        $rows = $this->getPostedUploadRows();
+        foreach ($postedRows as $index => $row) {
+            $rows[] = [
+                'family' => sanitize_text_field((string) ($row['family'] ?? '')),
+                'weight' => sanitize_text_field((string) ($row['weight'] ?? '400')),
+                'style' => sanitize_text_field((string) ($row['style'] ?? 'normal')),
+                'fallback' => sanitize_text_field((string) ($row['fallback'] ?? 'sans-serif')),
+                'file' => $uploadedFiles[$index] ?? [],
+            ];
+        }
 
+        return $rows;
+    }
+
+    public function uploadLocalFontRows(array $rows): array|WP_Error
+    {
         if ($rows === []) {
-            $this->sendAjaxError(__('Add at least one upload row before submitting.', 'tasty-fonts'), 400);
+            return new WP_Error(
+                'tasty_fonts_upload_requires_rows',
+                __('Add at least one upload row before submitting.', 'tasty-fonts')
+            );
         }
 
-        $result = $this->localUpload->uploadRows($rows);
-
-        if (is_wp_error($result)) {
-            $this->sendAjaxError($result->get_error_message(), 400);
-        }
-
-        wp_send_json_success($result);
+        return $this->localUpload->uploadRows($rows);
     }
 
-    public function ajaxSaveFamilyFallback(): void
+    public function saveFamilyFallbackValue(string $family, string $fallback): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to update font fallback settings.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_save_family_fallback', 'nonce');
-
-        $family = $this->getPostedText('family');
-        $fallback = $this->getPostedFallback('fallback');
+        $family = sanitize_text_field($family);
+        $fallback = FontUtils::sanitizeFallback($fallback);
 
         if ($family === '') {
-            $this->sendAjaxError(__('A font family is required before saving its fallback.', 'tasty-fonts'), 400);
+            return new WP_Error(
+                'tasty_fonts_missing_family',
+                __('A font family is required before saving its fallback.', 'tasty-fonts')
+            );
         }
 
         $this->settings->saveFamilyFallback($family, $fallback);
 
-        wp_send_json_success(
-            [
-                'family' => $family,
-                'fallback' => $fallback,
-                'stack' => FontUtils::buildFontStack($family, $fallback),
-                'message' => sprintf(
-                    __('Saved fallback for %s.', 'tasty-fonts'),
-                    $family
-                ),
-            ]
-        );
+        return [
+            'family' => $family,
+            'fallback' => $fallback,
+            'stack' => FontUtils::buildFontStack($family, $fallback),
+            'message' => sprintf(
+                __('Saved fallback for %s.', 'tasty-fonts'),
+                $family
+            ),
+        ];
     }
 
-    public function ajaxSaveFamilyFontDisplay(): void
+    public function saveFamilyFontDisplayValue(string $family, string $display): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to update font display settings.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_save_family_font_display', 'nonce');
-
-        $family = $this->getPostedText('family');
-        $display = $this->getPostedFamilyFontDisplay('font_display');
+        $family = sanitize_text_field($family);
 
         if ($family === '') {
-            $this->sendAjaxError(__('A font family is required before saving font-display.', 'tasty-fonts'), 400);
+            return new WP_Error(
+                'tasty_fonts_missing_family',
+                __('A font family is required before saving font-display.', 'tasty-fonts')
+            );
         }
 
-        $result = $this->saveFamilyFontDisplaySelection($family, $display);
+        $result = $this->saveFamilyFontDisplaySelection($family, $this->normalizeFamilyFontDisplay($display));
 
-        wp_send_json_success(
-            [
-                'family' => $family,
-                'font_display' => $result['font_display'],
-                'effective_font_display' => $result['effective_font_display'],
-                'message' => $result['message'],
-            ]
-        );
+        return [
+            'family' => $family,
+            'font_display' => $result['font_display'],
+            'effective_font_display' => $result['effective_font_display'],
+            'message' => $result['message'],
+        ];
     }
 
-    public function ajaxSaveRoleDraft(): void
+    public function saveRoleDraftValues(array $roleValues): array
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to update font roles.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_save_role_draft', 'nonce');
-
         $availableFamilies = $this->buildSelectableFamilyNames($this->catalog->getCatalog());
         $settings = $this->settings->getSettings();
 
@@ -320,10 +361,10 @@ final class AdminController
 
         $roles = $this->settings->saveRoles(
             [
-                'heading' => $this->getPostedText('heading'),
-                'body' => $this->getPostedText('body'),
-                'heading_fallback' => $this->getPostedFallback('heading_fallback'),
-                'body_fallback' => $this->getPostedFallback('body_fallback'),
+                'heading' => sanitize_text_field((string) ($roleValues['heading'] ?? '')),
+                'body' => sanitize_text_field((string) ($roleValues['body'] ?? '')),
+                'heading_fallback' => FontUtils::sanitizeFallback((string) ($roleValues['heading_fallback'] ?? 'sans-serif')),
+                'body_fallback' => FontUtils::sanitizeFallback((string) ($roleValues['body_fallback'] ?? 'sans-serif')),
             ],
             $availableFamilies
         );
@@ -338,64 +379,37 @@ final class AdminController
         $message = $this->buildRolesSavedMessage('save', $roles, $appliedRoles, $applyEverywhere);
         $this->log->add($message);
 
-        wp_send_json_success(
-            [
-                'message' => $message,
-                'roles' => $roles,
-                'role_deployment' => $this->buildRoleDeploymentContext($roles, $appliedRoles, $applyEverywhere),
-            ]
-        );
+        return [
+            'message' => $message,
+            'roles' => $roles,
+            'role_deployment' => $this->buildRoleDeploymentContext($roles, $appliedRoles, $applyEverywhere),
+        ];
     }
 
-    public function ajaxSaveFamilyDelivery(): void
+    public function saveFamilyDeliveryValue(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to update font delivery.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_save_family_delivery', 'nonce');
-
-        $result = $this->library->saveFamilyDelivery(
-            $this->getPostedText('family_slug'),
-            $this->getPostedText('delivery_id')
-        );
-
-        if (is_wp_error($result)) {
-            $this->sendAjaxError($result->get_error_message(), 400);
-        }
-
-        wp_send_json_success($result);
+        return $this->library->saveFamilyDelivery($familySlug, $deliveryId);
     }
 
-    public function ajaxSaveFamilyPublishState(): void
+    public function saveFamilyPublishStateValue(string $familySlug, string $publishState): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to update the font library state.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_save_family_publish_state', 'nonce');
-
-        $result = $this->library->saveFamilyPublishState(
-            $this->getPostedText('family_slug'),
-            $this->getPostedText('publish_state')
-        );
-
-        if (is_wp_error($result)) {
-            $this->sendAjaxError($result->get_error_message(), 400);
-        }
-
-        wp_send_json_success($result);
+        return $this->library->saveFamilyPublishState($familySlug, $publishState);
     }
 
-    public function ajaxDeleteDeliveryProfile(): void
+    public function deleteDeliveryProfileValue(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $this->assertManageOptionsAjax(__('You are not allowed to delete font delivery profiles.', 'tasty-fonts'));
-        check_ajax_referer('tasty_fonts_delete_delivery_profile', 'nonce');
+        return $this->library->deleteDeliveryProfile($familySlug, $deliveryId);
+    }
 
-        $result = $this->library->deleteDeliveryProfile(
-            $this->getPostedText('family_slug'),
-            $this->getPostedText('delivery_id')
-        );
-
-        if (is_wp_error($result)) {
-            $this->sendAjaxError($result->get_error_message(), 400);
-        }
-
-        wp_send_json_success($result);
+    public function statusForError(WP_Error $error, int $defaultStatus = 400): int
+    {
+        return match ($error->get_error_code()) {
+            'tasty_fonts_google_family_not_found',
+            'tasty_fonts_bunny_family_not_found',
+            'tasty_fonts_family_not_found',
+            'tasty_fonts_delivery_not_found' => 404,
+            default => $defaultStatus,
+        };
     }
 
     public function renderPage(): void
@@ -1113,96 +1127,6 @@ final class AdminController
         return TASTY_FONTS_VERSION;
     }
 
-    private function buildAdminStrings(string $searchDisabledMessage): array
-    {
-        return [
-            'previewFallback' => __('The quick brown fox jumps over the lazy dog. 1234567890', 'tasty-fonts'),
-            'importPreviewSample' => __("Aa Bb Cc Dd Ee Ff Gg Hh\n0123456789", 'tasty-fonts'),
-            'searching' => __('Searching Google Fonts…', 'tasty-fonts'),
-            'searchEmpty' => __('No Google Fonts families matched that search.', 'tasty-fonts'),
-            'searchResultInLibrary' => __('In Library', 'tasty-fonts'),
-            'searchDisabled' => $searchDisabledMessage,
-            'bunnySearching' => __('Searching Bunny Fonts…', 'tasty-fonts'),
-            'bunnySearchEmpty' => __('No Bunny Fonts families matched that search.', 'tasty-fonts'),
-            'bunnySearchStyles' => __('%1$d style%2$s', 'tasty-fonts'),
-            'selectFamily' => __('Select a family from search results or type one manually.', 'tasty-fonts'),
-            'bunnySelectFamily' => __('Type a Bunny Fonts family name before importing.', 'tasty-fonts'),
-            'bunnyImportFamilyEmpty' => __('Choose a Bunny family or type one manually.', 'tasty-fonts'),
-            'importFamilyEmpty' => __('Choose a Google family or type one manually.', 'tasty-fonts'),
-            'importPreviewEmpty' => __('Preview appears here after you choose a family.', 'tasty-fonts'),
-            'importing' => __('Saving the selected Google delivery…', 'tasty-fonts'),
-            'importSuccess' => __('Font imported successfully. Reloading…', 'tasty-fonts'),
-            'importError' => __('The Google Fonts import failed.', 'tasty-fonts'),
-            'bunnyImportError' => __('The Bunny Fonts import failed.', 'tasty-fonts'),
-            'importProgress' => __('Importing %1$s: %2$d of %3$d (%4$s)…', 'tasty-fonts'),
-            'importSummary' => __('Saved %1$d variant%2$s. %3$d skipped. Reloading…', 'tasty-fonts'),
-            'importAlreadyExists' => __('%s already exists in the library for the selected variants.', 'tasty-fonts'),
-            'importNoVariants' => __('Select at least one variant to import.', 'tasty-fonts'),
-            'bunnyImportReady' => __('Paste a Bunny Fonts family name, choose variants, and decide whether to self-host or keep Bunny CDN delivery.', 'tasty-fonts'),
-            'bunnyImportSubmitting' => __('Saving the selected Bunny delivery…', 'tasty-fonts'),
-            'bunnyImportPreviewEmpty' => __('Preview appears here after you choose a Bunny family.', 'tasty-fonts'),
-            'bunnyImportNoVariants' => __('Leave variants blank to import the default regular face, or enter tokens like regular, italic, 700, or 700italic.', 'tasty-fonts'),
-            'bunnyImportBusy' => __('Importing Bunny Fonts…', 'tasty-fonts'),
-            'bunnyImportSuccess' => __('Bunny Fonts imported successfully. Reloading…', 'tasty-fonts'),
-            'bunnyImportSelectionSummaryDefault' => __('Default Regular Face', 'tasty-fonts'),
-            'importButtonIdle' => __('Add to Library', 'tasty-fonts'),
-            'importButtonBusy' => __('Importing…', 'tasty-fonts'),
-            'saveDeliverySelfHosted' => __('Add Self-Hosted', 'tasty-fonts'),
-            'saveDeliveryGoogleCdn' => __('Add Google CDN', 'tasty-fonts'),
-            'saveDeliveryBunnyCdn' => __('Add Bunny CDN', 'tasty-fonts'),
-            'importEstimateFiles' => __('%1$d File%2$s Selected', 'tasty-fonts'),
-            'importEstimateSize' => __('Approx. +%1$s WOFF2', 'tasty-fonts'),
-            'importSelectionSummaryEmpty' => __('0 Variants Selected', 'tasty-fonts'),
-            'importSelectionSummaryAvailable' => __('%1$d of %2$d Variants Selected', 'tasty-fonts'),
-            'importSelectionSummaryManual' => __('%1$d Variant%2$s Selected', 'tasty-fonts'),
-            'uploadReady' => __('Upload WOFF2, WOFF, TTF, or OTF files. Each row imports one face.', 'tasty-fonts'),
-            'uploadSubmitting' => __('Uploading font files…', 'tasty-fonts'),
-            'uploadProgress' => __('Uploading files… %1$d%%', 'tasty-fonts'),
-            'uploadSuccess' => __('Upload complete. Refreshing the library…', 'tasty-fonts'),
-            'uploadError' => __('The font upload failed.', 'tasty-fonts'),
-            'uploadNoFile' => __('No file chosen', 'tasty-fonts'),
-            'uploadButtonIdle' => __('Upload to Library', 'tasty-fonts'),
-            'uploadButtonBusy' => __('Uploading…', 'tasty-fonts'),
-            'uploadRowQueued' => __('Queued', 'tasty-fonts'),
-            'uploadRowUploading' => __('Uploading…', 'tasty-fonts'),
-            'uploadRowImported' => __('Imported', 'tasty-fonts'),
-            'uploadRowSkipped' => __('Skipped', 'tasty-fonts'),
-            'uploadRowError' => __('Error', 'tasty-fonts'),
-            'uploadAddFace' => __('Add Face', 'tasty-fonts'),
-            'uploadAddFamily' => __('Add Another Family', 'tasty-fonts'),
-            'uploadUseDetected' => __('Use Detected Values', 'tasty-fonts'),
-            'uploadDetectedSummary' => __('Detected: %1$s / %2$s / %3$s', 'tasty-fonts'),
-            'uploadDetectedWeightStyle' => __('Detected: %1$s / %2$s', 'tasty-fonts'),
-            'uploadRemoveRow' => __('Remove Row', 'tasty-fonts'),
-            'uploadRequiresRows' => __('Add at least one upload row before submitting.', 'tasty-fonts'),
-            'rolesDraftSaving' => __('Saving roles…', 'tasty-fonts'),
-            'rolesDraftSaved' => __('Roles saved.', 'tasty-fonts'),
-            'rolesDraftSaveError' => __('The roles could not be saved.', 'tasty-fonts'),
-            'fallbackSaving' => __('Saving fallback…', 'tasty-fonts'),
-            'fontDisplaySaving' => __('Saving font display…', 'tasty-fonts'),
-            'deleteConfirm' => __('Delete "%s" and remove its files from uploads/fonts?', 'tasty-fonts'),
-            'fallbackSaved' => __('Saved fallback for %1$s.', 'tasty-fonts'),
-            'fallbackSaveError' => __('The fallback could not be saved.', 'tasty-fonts'),
-            'fontDisplaySaved' => __('Saved font display for %1$s.', 'tasty-fonts'),
-            'fontDisplaySaveError' => __('The font-display override could not be saved.', 'tasty-fonts'),
-            'familyDeliverySaving' => __('Switching live delivery…', 'tasty-fonts'),
-            'familyDeliverySaved' => __('Live delivery updated.', 'tasty-fonts'),
-            'familyDeliverySaveError' => __('The live delivery could not be updated.', 'tasty-fonts'),
-            'familyPublishStateSaving' => __('Updating publish state…', 'tasty-fonts'),
-            'familyPublishStateSaved' => __('Publish state updated.', 'tasty-fonts'),
-            'familyPublishStateSaveError' => __('The publish state could not be updated.', 'tasty-fonts'),
-            'deliveryDeleteConfirm' => __('Delete the "%1$s" delivery from %2$s?', 'tasty-fonts'),
-            'deliveryDeleteError' => __('The delivery profile could not be deleted.', 'tasty-fonts'),
-            'copied' => __('Copied', 'tasty-fonts'),
-            'copy' => __('Copy', 'tasty-fonts'),
-            'activityCountSingle' => __('%1$d entry', 'tasty-fonts'),
-            'activityCountMultiple' => __('%1$d entries', 'tasty-fonts'),
-            'activityCountFilteredSingle' => __('%1$d of %2$d entry', 'tasty-fonts'),
-            'activityCountFilteredMultiple' => __('%1$d of %2$d entries', 'tasty-fonts'),
-            'activityNoMatches' => __('No activity matches the current filters.', 'tasty-fonts'),
-        ];
-    }
-
     private function buildRoleDeploymentContext(array $draftRoles, array $appliedRoles, bool $applyEverywhere): array
     {
         if (!$applyEverywhere) {
@@ -1580,11 +1504,35 @@ final class AdminController
         $this->redirectWithNoticeKey($isResync ? 'adobe_project_resynced' : 'adobe_project_saved');
     }
 
-    private function assertManageOptionsAjax(string $message): void
+    private function resolveRateLimitedSearch(string $provider, string $query, callable $resolver): array|WP_Error
     {
-        if (!current_user_can('manage_options')) {
-            $this->sendAjaxError($message, 403);
+        $provider = strtolower(trim($provider));
+        $query = sanitize_text_field($query);
+        $cooldownKey = $this->getSearchCooldownTransientKey();
+        $cacheKey = $this->getSearchCacheTransientKey($provider, $query);
+
+        if ($this->isSearchCooldownActive($cooldownKey, $provider, $query)) {
+            $cached = get_transient($cacheKey);
+
+            if (is_array($cached) || $cached instanceof WP_Error) {
+                return $cached;
+            }
         }
+
+        $result = $resolver($query);
+
+        set_transient($cacheKey, $result, self::SEARCH_CACHE_TTL);
+        set_transient(
+            $cooldownKey,
+            [
+                'provider' => $provider,
+                'query' => $query,
+                'expires_at' => microtime(true) + self::SEARCH_COOLDOWN_WINDOW_SECONDS,
+            ],
+            self::SEARCH_COOLDOWN_TRANSIENT_TTL
+        );
+
+        return $result;
     }
 
     private function saveFamilyFontDisplaySelection(string $family, string $display): array
@@ -1609,6 +1557,37 @@ final class AdminController
         ];
     }
 
+    private function sanitizeVariantTokens(array $variantTokens): array
+    {
+        return array_values(
+            array_filter(
+                array_map(
+                    static fn (mixed $token): string => sanitize_text_field((string) $token),
+                    $variantTokens
+                ),
+                'strlen'
+            )
+        );
+    }
+
+    private function normalizeDeliveryMode(string $mode): string
+    {
+        $mode = strtolower(trim($mode));
+
+        return in_array($mode, ['self_hosted', 'cdn'], true) ? $mode : 'self_hosted';
+    }
+
+    private function normalizeFamilyFontDisplay(string $display): string
+    {
+        $display = strtolower(trim($display));
+
+        if ($display === 'inherit') {
+            return 'inherit';
+        }
+
+        return $this->isSupportedFontDisplay($display) ? $display : 'inherit';
+    }
+
     private function getPostedText(string $key, string $default = ''): string
     {
         if (!isset($_POST[$key])) {
@@ -1625,65 +1604,7 @@ final class AdminController
 
     private function getPostedFamilyFontDisplay(string $key, string $default = 'inherit'): string
     {
-        $display = $this->getPostedText($key, $default);
-
-        if ($display === 'inherit') {
-            return 'inherit';
-        }
-
-        return $this->isSupportedFontDisplay($display) ? $display : 'inherit';
-    }
-
-    private function getPostedGoogleVariants(): array
-    {
-        return $this->getPostedVariantTokens();
-    }
-
-    private function getPostedDeliveryMode(): string
-    {
-        $mode = strtolower(trim($this->getPostedText('delivery_mode', 'self_hosted')));
-
-        return in_array($mode, ['self_hosted', 'cdn'], true) ? $mode : 'self_hosted';
-    }
-
-    private function getPostedVariantTokens(): array
-    {
-        $variants = isset($_POST['variants'])
-            ? array_map('sanitize_text_field', (array) wp_unslash($_POST['variants']))
-            : [];
-
-        if ($variants !== []) {
-            return $variants;
-        }
-
-        $tokens = $this->getPostedText('variant_tokens');
-
-        if ($tokens === '') {
-            return [];
-        }
-
-        return array_map('trim', explode(',', $tokens));
-    }
-
-    private function getPostedUploadRows(): array
-    {
-        $postedRows = isset($_POST['rows']) && is_array($_POST['rows'])
-            ? wp_unslash($_POST['rows'])
-            : [];
-        $uploadedFiles = $this->normalizeUploadedFiles($_FILES['files'] ?? []);
-        $rows = [];
-
-        foreach ($postedRows as $index => $row) {
-            $rows[] = [
-                'family' => sanitize_text_field((string) ($row['family'] ?? '')),
-                'weight' => sanitize_text_field((string) ($row['weight'] ?? '400')),
-                'style' => sanitize_text_field((string) ($row['style'] ?? 'normal')),
-                'fallback' => sanitize_text_field((string) ($row['fallback'] ?? 'sans-serif')),
-                'file' => $uploadedFiles[$index] ?? [],
-            ];
-        }
-
-        return $rows;
+        return $this->normalizeFamilyFontDisplay($this->getPostedText($key, $default));
     }
 
     private function normalizeUploadedFiles(mixed $rawFiles): array
@@ -1709,11 +1630,6 @@ final class AdminController
         }
 
         return $normalized;
-    }
-
-    private function sendAjaxError(string $message, int $status): never
-    {
-        wp_send_json_error(['message' => $message], $status);
     }
 
     private function buildFamilyFontDisplaySavedMessage(string $family, string $savedDisplay, string $effectiveDisplay): string
@@ -1756,6 +1672,40 @@ final class AdminController
     private function getPendingNoticeTransientKey(): string
     {
         return self::NOTICE_TRANSIENT_PREFIX . max(0, (int) get_current_user_id());
+    }
+
+    private function getSearchCooldownTransientKey(): string
+    {
+        return self::SEARCH_COOLDOWN_TRANSIENT_PREFIX . max(0, (int) get_current_user_id());
+    }
+
+    private function getSearchCacheTransientKey(string $provider, string $query): string
+    {
+        return self::SEARCH_CACHE_TRANSIENT_PREFIX
+            . strtolower(trim($provider))
+            . '_'
+            . max(0, (int) get_current_user_id())
+            . '_'
+            . md5(strtolower(trim($query)));
+    }
+
+    private function isSearchCooldownActive(string $cooldownKey, string $provider, string $query): bool
+    {
+        $cooldown = get_transient($cooldownKey);
+
+        if (!is_array($cooldown)) {
+            return false;
+        }
+
+        $expiresAt = (float) ($cooldown['expires_at'] ?? 0);
+
+        if ($expiresAt <= microtime(true)) {
+            delete_transient($cooldownKey);
+            return false;
+        }
+
+        return strtolower(trim((string) ($cooldown['provider'] ?? ''))) === strtolower(trim($provider))
+            && strtolower(trim((string) ($cooldown['query'] ?? ''))) === strtolower(trim($query));
     }
 
     private function redirectWithSuccess(string $message): never

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Bunny;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Support\FontUtils;
 use WP_Error;
 
@@ -79,7 +81,7 @@ final class BunnyFontsClient
     {
         $url = $this->buildCssUrl($familyName, $variants, $display);
 
-        $response = wp_remote_get(
+        $response = $this->remoteGet(
             $url,
             [
                 'timeout' => self::REQUEST_TIMEOUT,
@@ -218,7 +220,7 @@ final class BunnyFontsClient
 
     private function request(string $url, string $accept): array|WP_Error
     {
-        return wp_remote_get(
+        return $this->remoteGet(
             $url,
             [
                 'timeout' => self::REQUEST_TIMEOUT,
@@ -228,6 +230,13 @@ final class BunnyFontsClient
                 ],
             ]
         );
+    }
+
+    private function remoteGet(string $url, array $args = []): mixed
+    {
+        $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);
+
+        return wp_remote_get($url, is_array($filteredArgs) ? $filteredArgs : $args);
     }
 
     private function parseCatalogEntries(string $xml): array

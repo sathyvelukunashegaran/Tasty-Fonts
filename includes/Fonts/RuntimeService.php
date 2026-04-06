@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace TastyFonts\Fonts;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Adobe\AdobeProjectClient;
 use WP_Theme_JSON_Data;
 
 final class RuntimeService
 {
+    /**
+     * Create the runtime service.
+     *
+     * @since 1.4.0
+     *
+     * @param RuntimeAssetPlanner $planner Planner that resolves runtime stylesheets and editor presets.
+     * @param AssetService $assets Asset service for generated CSS handles and preload URLs.
+     * @param AdobeProjectClient $adobe Adobe client used to version Adobe-hosted stylesheet handles.
+     */
     public function __construct(
         private readonly RuntimeAssetPlanner $planner,
         private readonly AssetService $assets,
@@ -16,6 +27,13 @@ final class RuntimeService
     ) {
     }
 
+    /**
+     * Enqueue frontend font assets for the live site.
+     *
+     * @since 1.4.0
+     *
+     * @return void
+     */
     public function enqueueFrontend(): void
     {
         $this->assets->enqueue('tasty-fonts-frontend');
@@ -26,6 +44,13 @@ final class RuntimeService
         }
     }
 
+    /**
+     * Output preload and preconnect hints for active runtime font assets.
+     *
+     * @since 1.4.0
+     *
+     * @return void
+     */
     public function outputPreloadHints(): void
     {
         if (is_admin() || $this->hasEtchCanvasRequest()) {
@@ -49,18 +74,40 @@ final class RuntimeService
         }
     }
 
+    /**
+     * Enqueue font assets for the Etch canvas runtime.
+     *
+     * @since 1.4.0
+     *
+     * @return void
+     */
     public function enqueueEtchCanvas(): void
     {
         $this->assets->enqueue('tasty-fonts-etch');
         $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets());
     }
 
+    /**
+     * Enqueue font assets inside the block editor.
+     *
+     * @since 1.4.0
+     *
+     * @return void
+     */
     public function enqueueBlockEditor(): void
     {
         $this->assets->enqueue('tasty-fonts-editor');
         $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets());
     }
 
+    /**
+     * Enqueue preview fonts for the plugin's admin screens.
+     *
+     * @since 1.4.0
+     *
+     * @param string $hookSuffix Current admin hook suffix.
+     * @return void
+     */
     public function enqueueAdminScreenFonts(string $hookSuffix): void
     {
         if (!\TastyFonts\Admin\AdminController::isPluginAdminHook($hookSuffix)) {
@@ -71,6 +118,14 @@ final class RuntimeService
         $this->enqueueExternalStylesheets($this->planner->getAdminPreviewStylesheets());
     }
 
+    /**
+     * Inject plugin-managed font families into the editor theme JSON settings.
+     *
+     * @since 1.4.0
+     *
+     * @param WP_Theme_JSON_Data $themeJson Theme JSON object passed through the WordPress filter.
+     * @return WP_Theme_JSON_Data Updated theme JSON data.
+     */
     public function injectEditorFontPresets(WP_Theme_JSON_Data $themeJson): WP_Theme_JSON_Data
     {
         $fontFamilies = $this->planner->getEditorFontFamilies();

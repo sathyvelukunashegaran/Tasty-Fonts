@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Adobe;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Support\FontUtils;
 
 final class AdobeCssParser

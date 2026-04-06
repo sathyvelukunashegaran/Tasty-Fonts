@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Fonts;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
@@ -30,6 +32,17 @@ final class CatalogService
     private ?array $catalog = null;
     private array $counts = self::DEFAULT_COUNTS;
 
+    /**
+     * Create the catalog service.
+     *
+     * @since 1.4.0
+     *
+     * @param Storage $storage Storage abstraction for uploads/fonts discovery and URL resolution.
+     * @param ImportRepository $imports Repository for stored imported family records.
+     * @param FontFilenameParser $parser Parser used to infer family metadata from local filenames.
+     * @param LogRepository $log Log repository used when attachment changes invalidate the catalog.
+     * @param AdobeProjectClient $adobe Adobe project client used to merge hosted Adobe families into the catalog.
+     */
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
@@ -39,6 +52,13 @@ final class CatalogService
     ) {
     }
 
+    /**
+     * Return the merged font catalog used by the admin UI and runtime planners.
+     *
+     * @since 1.4.0
+     *
+     * @return array<string, array<string, mixed>> Catalog entries keyed by family name.
+     */
     public function getCatalog(): array
     {
         if (is_array($this->catalog)) {
@@ -46,7 +66,7 @@ final class CatalogService
         }
 
         if ($this->hydrateFromCache(get_transient(self::TRANSIENT_CATALOG))) {
-            return $this->catalog;
+            return $this->applyCatalogFilter();
         }
 
         $built = $this->buildCatalog();
@@ -54,9 +74,23 @@ final class CatalogService
         $this->counts = $built['counts'];
         $this->cacheCatalogState();
 
-        return $this->catalog;
+        return $this->applyCatalogFilter();
     }
 
+    /**
+     * Return catalog summary counts for the current cached catalog state.
+     *
+     * @since 1.4.0
+     *
+     * @return array{
+     *     families: int,
+     *     files: int,
+     *     published_families: int,
+     *     library_only_families: int,
+     *     local_families: int,
+     *     remote_families: int
+     * } Aggregate catalog counts used by the admin overview.
+     */
     public function getCounts(): array
     {
         $this->getCatalog();
@@ -64,6 +98,13 @@ final class CatalogService
         return $this->counts;
     }
 
+    /**
+     * Invalidate the cached catalog and reset its derived counts.
+     *
+     * @since 1.4.0
+     *
+     * @return void
+     */
     public function invalidate(): void
     {
         delete_transient(self::TRANSIENT_CATALOG);
@@ -71,6 +112,14 @@ final class CatalogService
         $this->counts = self::DEFAULT_COUNTS;
     }
 
+    /**
+     * Invalidate the catalog when an uploaded font attachment under uploads/fonts changes.
+     *
+     * @since 1.4.0
+     *
+     * @param int $attachmentId WordPress attachment ID being added or removed.
+     * @return void
+     */
     public function maybeInvalidateFromAttachment(int $attachmentId): void
     {
         $file = get_attached_file($attachmentId);
@@ -636,6 +685,49 @@ final class CatalogService
         }
 
         return $count;
+    }
+
+    private function applyCatalogFilter(): array
+    {
+        $filtered = apply_filters('tasty_fonts_catalog', $this->catalog);
+
+        if (is_array($filtered)) {
+            $this->catalog = $filtered;
+            $this->counts = $this->countCatalogFamilies($this->catalog);
+        }
+
+        return $this->catalog ?? [];
+    }
+
+    private function countCatalogFamilies(array $families): array
+    {
+        $counts = self::DEFAULT_COUNTS;
+
+        foreach ($families as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $counts['families']++;
+            $counts['files'] += $this->countFamilyFiles($family);
+
+            if (($family['publish_state'] ?? 'published') === 'library_only') {
+                $counts['library_only_families']++;
+            } else {
+                $counts['published_families']++;
+            }
+
+            $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+            $activeType = strtolower(trim((string) ($activeDelivery['type'] ?? '')));
+
+            if ($activeType === 'self_hosted') {
+                $counts['local_families']++;
+            } else {
+                $counts['remote_families']++;
+            }
+        }
+
+        return $counts;
     }
 
     private function hydrateFromCache(mixed $cached): bool

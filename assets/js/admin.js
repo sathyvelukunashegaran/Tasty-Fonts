@@ -1,7 +1,13 @@
 (function () {
     // DOM references
     const config = window.TastyFontsAdmin || {};
-    const strings = config.strings || {};
+    const runtimeStrings = {
+        ...(config.strings || {}),
+        ...(config.runtimeStrings || {}),
+    };
+    const wpI18n = window.wp && window.wp.i18n ? window.wp.i18n : {};
+    const __ = typeof wpI18n.__ === 'function' ? wpI18n.__ : (text) => text;
+    const wpSprintf = typeof wpI18n.sprintf === 'function' ? wpI18n.sprintf : null;
     const roleHeading = document.getElementById('tasty_fonts_heading_font');
     const roleBody = document.getElementById('tasty_fonts_body_font');
     const roleHeadingFallback = document.getElementById('tasty_fonts_heading_fallback');
@@ -82,6 +88,8 @@
     let selectedSearchFamily = null;
     let searchResults = [];
     let searchTimer = 0;
+    let googleFamilyLookupTimer = 0;
+    let googleFamilyLookupToken = 0;
     let selectedBunnySearchFamily = null;
     let bunnySearchResults = [];
     let bunnySearchTimer = 0;
@@ -99,6 +107,94 @@
     let renderedBunnyVariantFamily = '';
     let roleDraftSaveInFlight = false;
     const pendingUiStateKey = 'tastyFontsPendingUiState';
+    const trackedUiQueryKeys = [
+        'tf_advanced',
+        'tf_studio',
+        'tf_preview',
+        'tf_output',
+        'tf_add_fonts',
+        'tf_source',
+        'tf_google_access',
+        'tf_adobe_project'
+    ];
+    const trackedUiTabGroups = new Set(['studio', 'preview', 'output', 'add-font']);
+    const trackedUiDisclosureTargets = new Set([
+        'tasty-fonts-role-advanced-panel',
+        'tasty-fonts-add-font-panel',
+        'tasty-fonts-google-access-panel',
+        'tasty-fonts-adobe-project-panel'
+    ]);
+    const staticStrings = {
+        previewFallback: __('The quick brown fox jumps over the lazy dog. 1234567890', 'tasty-fonts'),
+        importPreviewSample: __('Aa Bb Cc Dd Ee Ff Gg Hh\n0123456789', 'tasty-fonts'),
+        searching: __('Searching Google Fonts…', 'tasty-fonts'),
+        searchEmpty: __('No Google Fonts families matched that search.', 'tasty-fonts'),
+        searchResultSelectLabel: __('Select %s', 'tasty-fonts'),
+        searchResultInLibrary: __('In Library', 'tasty-fonts'),
+        searchDisabled: __('Add a Google Fonts API key above to enable search, or use manual import below.', 'tasty-fonts'),
+        bunnySearching: __('Searching Bunny Fonts…', 'tasty-fonts'),
+        bunnySearchEmpty: __('No Bunny Fonts families matched that search.', 'tasty-fonts'),
+        selectFamily: __('Select a family from search results or type one manually.', 'tasty-fonts'),
+        bunnySelectFamily: __('Type a Bunny Fonts family name before importing.', 'tasty-fonts'),
+        bunnyImportFamilyEmpty: __('Choose a Bunny family or type one manually.', 'tasty-fonts'),
+        importFamilyEmpty: __('Choose a Google family or type one manually.', 'tasty-fonts'),
+        importPreviewEmpty: __('Preview appears here after you choose a family.', 'tasty-fonts'),
+        importing: __('Saving the selected Google delivery…', 'tasty-fonts'),
+        importError: __('The Google Fonts import failed.', 'tasty-fonts'),
+        bunnyImportError: __('The Bunny Fonts import failed.', 'tasty-fonts'),
+        importSummary: __('Saved %1$d variant%2$s. %3$d skipped. Reloading…', 'tasty-fonts'),
+        importNoVariants: __('Select at least one variant to import.', 'tasty-fonts'),
+        bunnyImportSubmitting: __('Saving the selected Bunny delivery…', 'tasty-fonts'),
+        bunnyImportPreviewEmpty: __('Preview appears here after you choose a Bunny family.', 'tasty-fonts'),
+        bunnyImportBusy: __('Importing Bunny Fonts…', 'tasty-fonts'),
+        bunnyImportSuccess: __('Bunny Fonts imported successfully. Reloading…', 'tasty-fonts'),
+        importButtonIdle: __('Add to Library', 'tasty-fonts'),
+        importButtonBusy: __('Importing…', 'tasty-fonts'),
+        saveDeliverySelfHosted: __('Add Self-Hosted', 'tasty-fonts'),
+        saveDeliveryGoogleCdn: __('Add Google CDN', 'tasty-fonts'),
+        saveDeliveryBunnyCdn: __('Add Bunny CDN', 'tasty-fonts'),
+        importEstimateFiles: __('%1$d File%2$s Selected', 'tasty-fonts'),
+        importEstimateSize: __('Approx. +%1$s WOFF2', 'tasty-fonts'),
+        importSelectionSummaryEmpty: __('0 Variants Selected', 'tasty-fonts'),
+        importSelectionSummaryAvailable: __('%1$d of %2$d Variants Selected', 'tasty-fonts'),
+        importSelectionSummaryManual: __('%1$d Variant%2$s Selected', 'tasty-fonts'),
+        uploadSubmitting: __('Uploading font files…', 'tasty-fonts'),
+        uploadProgress: __('Uploading files… %1$d%%', 'tasty-fonts'),
+        uploadSuccess: __('Upload complete. Refreshing the library…', 'tasty-fonts'),
+        uploadError: __('The font upload failed.', 'tasty-fonts'),
+        uploadNoFile: __('No file chosen', 'tasty-fonts'),
+        uploadButtonIdle: __('Upload to Library', 'tasty-fonts'),
+        uploadButtonBusy: __('Uploading…', 'tasty-fonts'),
+        uploadRowQueued: __('Queued', 'tasty-fonts'),
+        uploadRowUploading: __('Uploading…', 'tasty-fonts'),
+        uploadRowError: __('Error', 'tasty-fonts'),
+        uploadUseDetected: __('Use Detected Values', 'tasty-fonts'),
+        uploadDetectedSummary: __('Detected: %1$s / %2$s / %3$s', 'tasty-fonts'),
+        uploadDetectedWeightStyle: __('Detected: %1$s / %2$s', 'tasty-fonts'),
+        uploadRequiresRows: __('Add at least one upload row before submitting.', 'tasty-fonts'),
+        rolesDraftSaved: __('Roles saved.', 'tasty-fonts'),
+        rolesDraftSaveError: __('The roles could not be saved.', 'tasty-fonts'),
+        fallbackSaving: __('Saving fallback…', 'tasty-fonts'),
+        fallbackSaved: __('Saved fallback for %1$s.', 'tasty-fonts'),
+        fallbackSaveError: __('The fallback could not be saved.', 'tasty-fonts'),
+        fontDisplaySaving: __('Saving font display…', 'tasty-fonts'),
+        fontDisplaySaved: __('Saved font display for %1$s.', 'tasty-fonts'),
+        fontDisplaySaveError: __('The font-display override could not be saved.', 'tasty-fonts'),
+        familyDeliverySaving: __('Switching live delivery…', 'tasty-fonts'),
+        familyDeliverySaved: __('Live delivery updated.', 'tasty-fonts'),
+        familyDeliverySaveError: __('The live delivery could not be updated.', 'tasty-fonts'),
+        familyPublishStateSaving: __('Updating publish state…', 'tasty-fonts'),
+        familyPublishStateSaved: __('Publish state updated.', 'tasty-fonts'),
+        familyPublishStateSaveError: __('The publish state could not be updated.', 'tasty-fonts'),
+        deliveryDeleteConfirm: __('Delete the "%1$s" delivery from %2$s?', 'tasty-fonts'),
+        deliveryDeleteError: __('The delivery profile could not be deleted.', 'tasty-fonts'),
+        deleteConfirm: __('Delete "%s" and remove its files from uploads/fonts?', 'tasty-fonts'),
+        copied: __('Copied', 'tasty-fonts'),
+        activityCountSingle: __('%1$d entry', 'tasty-fonts'),
+        activityCountMultiple: __('%1$d entries', 'tasty-fonts'),
+        activityCountFilteredSingle: __('%1$d of %2$d entry', 'tasty-fonts'),
+        activityCountFilteredMultiple: __('%1$d of %2$d entries', 'tasty-fonts'),
+    };
 
     // Shared helpers
     function slugify(value) {
@@ -110,7 +206,7 @@
     }
 
     function getString(key, fallback) {
-        return strings[key] || fallback;
+        return runtimeStrings[key] || staticStrings[key] || fallback;
     }
 
     function getElementValue(element, fallback) {
@@ -120,6 +216,14 @@
     function formatMessage(template, replacements) {
         let sequentialIndex = 0;
 
+        if (wpSprintf) {
+            try {
+                return wpSprintf(template || '', ...replacements);
+            } catch (error) {
+                // Fall back to the lightweight formatter below.
+            }
+        }
+
         return (template || '').replace(/%(?:(\d+)\$)?[sd]/g, (match, index) => {
             const replacementIndex = index ? Number(index) - 1 : sequentialIndex++;
             const replacement = replacements[replacementIndex];
@@ -128,12 +232,90 @@
         });
     }
 
-    function getPayloadMessage(payload, fallback) {
-        return payload && payload.data && payload.data.message ? payload.data.message : fallback;
+    function getApiMessage(payload, fallback) {
+        return payload && typeof payload.message === 'string' && payload.message ? payload.message : fallback;
     }
 
     function getErrorMessage(error, fallback) {
         return error instanceof Error && error.message ? error.message : fallback;
+    }
+
+    function hasRestConfig() {
+        return Boolean(config.restUrl && config.restNonce);
+    }
+
+    function getRoutePath(key, fallback) {
+        const route = config.routes && typeof config.routes[key] === 'string' ? config.routes[key] : '';
+
+        return route || fallback;
+    }
+
+    function buildRestUrl(path, query) {
+        if (!config.restUrl || !path) {
+            return '';
+        }
+
+        const url = new URL(String(path).replace(/^\/+/, ''), config.restUrl);
+
+        Object.entries(query || {}).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') {
+                return;
+            }
+
+            if (Array.isArray(value)) {
+                value.forEach((item) => url.searchParams.append(key, String(item)));
+                return;
+            }
+
+            url.searchParams.set(key, String(value));
+        });
+
+        return url.toString();
+    }
+
+    async function readApiPayload(response) {
+        const rawBody = await response.text();
+
+        if (!rawBody) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(rawBody);
+        } catch (error) {
+            return {};
+        }
+    }
+
+    async function requestJson(path, { method = 'GET', query = {}, body = null, fallbackMessage = '' } = {}) {
+        const url = buildRestUrl(path, query);
+
+        if (!url) {
+            throw new Error(fallbackMessage || 'Request failed.');
+        }
+
+        const headers = {
+            Accept: 'application/json',
+            'X-WP-Nonce': config.restNonce || ''
+        };
+        const options = {
+            method,
+            headers
+        };
+
+        if (body !== null) {
+            headers['Content-Type'] = 'application/json; charset=UTF-8';
+            options.body = JSON.stringify(body);
+        }
+
+        const response = await fetch(url, options);
+        const payload = await readApiPayload(response);
+
+        if (!response.ok) {
+            throw new Error(getApiMessage(payload, fallbackMessage || 'Request failed.'));
+        }
+
+        return payload && typeof payload === 'object' ? payload : {};
     }
 
     function getSessionStorage() {
@@ -178,6 +360,251 @@
         } catch (error) {
             return null;
         }
+    }
+
+    function getDisclosureToggleTargetId(toggle) {
+        return toggle ? String(toggle.getAttribute('data-disclosure-toggle') || '').trim() : '';
+    }
+
+    function disclosureToggleByTargetId(targetId) {
+        if (!targetId) {
+            return null;
+        }
+
+        return disclosureToggles.find((toggle) => getDisclosureToggleTargetId(toggle) === targetId) || null;
+    }
+
+    function isDisclosureExpanded(toggle) {
+        return Boolean(toggle) && toggle.getAttribute('aria-expanded') === 'true';
+    }
+
+    function isTrackedDisclosureToggle(toggle) {
+        return trackedUiDisclosureTargets.has(getDisclosureToggleTargetId(toggle));
+    }
+
+    function isTrackedTabGroup(group) {
+        return trackedUiTabGroups.has(String(group || '').trim());
+    }
+
+    function isAllowedTabKey(group, key) {
+        if (!group || !key) {
+            return false;
+        }
+
+        return tabButtonsForGroup(group).some((tab) => tab.getAttribute('data-tab-target') === key);
+    }
+
+    function readTrackedUiState(locationValue) {
+        const url = locationValue instanceof URL
+            ? locationValue
+            : new URL(locationValue && typeof locationValue.href === 'string' ? locationValue.href : window.location.href);
+        const params = url.searchParams;
+        const state = {};
+
+        if (params.get('tf_advanced') === '1' && disclosureToggleByTargetId('tasty-fonts-role-advanced-panel')) {
+            state.advancedOpen = true;
+        }
+
+        const studio = String(params.get('tf_studio') || '');
+
+        if (state.advancedOpen && isAllowedTabKey('studio', studio)) {
+            state.studio = studio;
+        }
+
+        const preview = String(params.get('tf_preview') || '');
+
+        if (state.studio === 'preview' && isAllowedTabKey('preview', preview)) {
+            state.preview = preview;
+        }
+
+        const output = String(params.get('tf_output') || '');
+
+        if (state.studio === 'snippets' && isAllowedTabKey('output', output)) {
+            state.output = output;
+        }
+
+        if (params.get('tf_add_fonts') === '1' && addFontsPanelToggle) {
+            state.addFontsOpen = true;
+        }
+
+        const source = String(params.get('tf_source') || '');
+
+        if (state.addFontsOpen && isAllowedTabKey('add-font', source)) {
+            state.source = source;
+        }
+
+        if (
+            state.addFontsOpen
+            && state.source === 'google'
+            && params.get('tf_google_access') === '1'
+            && disclosureToggleByTargetId('tasty-fonts-google-access-panel')
+        ) {
+            state.googleAccessOpen = true;
+        }
+
+        if (
+            state.addFontsOpen
+            && state.source === 'adobe'
+            && params.get('tf_adobe_project') === '1'
+            && disclosureToggleByTargetId('tasty-fonts-adobe-project-panel')
+        ) {
+            state.adobeProjectOpen = true;
+        }
+
+        return state;
+    }
+
+    function applyTrackedUiState(state) {
+        if (!state || typeof state !== 'object') {
+            return;
+        }
+
+        const advancedToggle = disclosureToggleByTargetId('tasty-fonts-role-advanced-panel');
+
+        if (state.advancedOpen && advancedToggle) {
+            setDisclosureState(advancedToggle, true);
+        }
+
+        if (state.advancedOpen && state.studio) {
+            activateTabGroup('studio', state.studio);
+        }
+
+        if (state.studio === 'preview' && state.preview) {
+            activateTabGroup('preview', state.preview);
+        }
+
+        if (state.studio === 'snippets' && state.output) {
+            activateTabGroup('output', state.output);
+        }
+
+        if (state.addFontsOpen && addFontsPanelToggle) {
+            setDisclosureState(addFontsPanelToggle, true);
+        }
+
+        if (state.addFontsOpen && state.source) {
+            activateTabGroup('add-font', state.source);
+        }
+
+        if (state.addFontsOpen && state.source === 'google' && state.googleAccessOpen) {
+            const googleAccessToggle = disclosureToggleByTargetId('tasty-fonts-google-access-panel');
+
+            if (googleAccessToggle) {
+                setDisclosureState(googleAccessToggle, true);
+            }
+        }
+
+        if (state.addFontsOpen && state.source === 'adobe' && state.adobeProjectOpen) {
+            const adobeProjectToggle = disclosureToggleByTargetId('tasty-fonts-adobe-project-panel');
+
+            if (adobeProjectToggle) {
+                setDisclosureState(adobeProjectToggle, true);
+            }
+        }
+    }
+
+    function captureTrackedUiState() {
+        const state = {};
+        const advancedToggle = disclosureToggleByTargetId('tasty-fonts-role-advanced-panel');
+        const googleAccessToggle = disclosureToggleByTargetId('tasty-fonts-google-access-panel');
+        const adobeProjectToggle = disclosureToggleByTargetId('tasty-fonts-adobe-project-panel');
+
+        if (isDisclosureExpanded(advancedToggle)) {
+            state.advancedOpen = true;
+
+            const studio = activeTabKeyForGroup('studio');
+
+            if (isAllowedTabKey('studio', studio)) {
+                state.studio = studio;
+
+                if (studio === 'preview') {
+                    const preview = activeTabKeyForGroup('preview');
+
+                    if (isAllowedTabKey('preview', preview)) {
+                        state.preview = preview;
+                    }
+                }
+
+                if (studio === 'snippets') {
+                    const output = activeTabKeyForGroup('output');
+
+                    if (isAllowedTabKey('output', output)) {
+                        state.output = output;
+                    }
+                }
+            }
+        }
+
+        if (isDisclosureExpanded(addFontsPanelToggle)) {
+            state.addFontsOpen = true;
+
+            const source = activeTabKeyForGroup('add-font');
+
+            if (isAllowedTabKey('add-font', source)) {
+                state.source = source;
+
+                if (source === 'google' && isDisclosureExpanded(googleAccessToggle)) {
+                    state.googleAccessOpen = true;
+                }
+
+                if (source === 'adobe' && isDisclosureExpanded(adobeProjectToggle)) {
+                    state.adobeProjectOpen = true;
+                }
+            }
+        }
+
+        return state;
+    }
+
+    function syncTrackedUiUrl() {
+        if (!window.history || typeof window.history.replaceState !== 'function') {
+            return;
+        }
+
+        const currentUrl = new URL(window.location.href);
+        const nextUrl = new URL(currentUrl.toString());
+        const state = captureTrackedUiState();
+
+        trackedUiQueryKeys.forEach((key) => {
+            nextUrl.searchParams.delete(key);
+        });
+
+        if (state.advancedOpen) {
+            nextUrl.searchParams.set('tf_advanced', '1');
+        }
+
+        if (state.studio) {
+            nextUrl.searchParams.set('tf_studio', state.studio);
+        }
+
+        if (state.preview) {
+            nextUrl.searchParams.set('tf_preview', state.preview);
+        }
+
+        if (state.output) {
+            nextUrl.searchParams.set('tf_output', state.output);
+        }
+
+        if (state.addFontsOpen) {
+            nextUrl.searchParams.set('tf_add_fonts', '1');
+        }
+
+        if (state.source) {
+            nextUrl.searchParams.set('tf_source', state.source);
+        }
+
+        if (state.googleAccessOpen) {
+            nextUrl.searchParams.set('tf_google_access', '1');
+        }
+
+        if (state.adobeProjectOpen) {
+            nextUrl.searchParams.set('tf_adobe_project', '1');
+        }
+
+        if (nextUrl.toString() === currentUrl.toString()) {
+            return;
+        }
+
+        window.history.replaceState(window.history.state, '', nextUrl.toString());
     }
 
     function deliveryButtonLabel(mode, provider) {
@@ -672,12 +1099,16 @@
         return matched;
     }
 
-    function ensureAddFontPanelOpen(panelKey) {
+    function ensureAddFontPanelOpen(panelKey, { syncUrl = false } = {}) {
         if (addFontsPanelToggle && addFontsPanelToggle.getAttribute('aria-expanded') !== 'true') {
             setDisclosureState(addFontsPanelToggle, true);
         }
 
         activateTabGroup('add-font', panelKey);
+
+        if (syncUrl) {
+            syncTrackedUiUrl();
+        }
     }
 
     function syncSearchCardSelection(provider, familyName) {
@@ -705,7 +1136,7 @@
             return;
         }
 
-        ensureAddFontPanelOpen(provider);
+        ensureAddFontPanelOpen(provider, { syncUrl: true });
 
         if (provider === 'google') {
             setRadioGroupValue(googleDeliveryModes, 'self_hosted');
@@ -1585,36 +2016,19 @@
         }, true);
     }
 
-    async function postAjax(action, nonce, fields) {
-        const body = new URLSearchParams();
-        body.set('action', action);
-        body.set('nonce', nonce || '');
+    async function requestMultipart(path, formData, onProgress, fallbackMessage) {
+        const url = buildRestUrl(path, {});
 
-        Object.entries(fields).forEach(([key, value]) => {
-            if (Array.isArray(value)) {
-                value.forEach((item) => body.append(key, item));
-                return;
-            }
+        if (!url) {
+            throw new Error(fallbackMessage || getString('uploadError', 'The font upload failed.'));
+        }
 
-            body.set(key, value);
-        });
-
-        const response = await fetch(config.ajaxUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-            },
-            body: body.toString()
-        });
-
-        return response.json();
-    }
-
-    async function postMultipartAjax(formData, onProgress) {
         return new Promise((resolve, reject) => {
             const request = new XMLHttpRequest();
 
-            request.open('POST', config.ajaxUrl || '', true);
+            request.open('POST', url, true);
+            request.setRequestHeader('Accept', 'application/json');
+            request.setRequestHeader('X-WP-Nonce', config.restNonce || '');
 
             request.upload.addEventListener('progress', (event) => {
                 if (!event.lengthComputable || typeof onProgress !== 'function') {
@@ -1625,13 +2039,12 @@
             });
 
             request.addEventListener('load', () => {
-                let payload = null;
+                let payload = {};
 
                 try {
-                    payload = JSON.parse(request.responseText || '{}');
+                    payload = request.responseText ? JSON.parse(request.responseText) : {};
                 } catch (error) {
-                    reject(new Error(getString('uploadError', 'The font upload failed.')));
-                    return;
+                    payload = {};
                 }
 
                 if (request.status >= 200 && request.status < 300) {
@@ -1641,7 +2054,7 @@
 
                 reject(
                     new Error(
-                        getPayloadMessage(payload, getString('uploadError', 'The font upload failed.'))
+                        getApiMessage(payload, fallbackMessage || getString('uploadError', 'The font upload failed.'))
                     )
                 );
             });
@@ -2026,7 +2439,7 @@
         const saveForm = form || selector.closest('[data-family-fallback-form]');
         const button = saveForm ? saveForm.querySelector('[data-family-fallback-save]') : null;
 
-        if (!family || !config.saveFallbackNonce || previousValue === nextValue) {
+        if (!family || !hasRestConfig() || previousValue === nextValue) {
             selector.dataset.savedValue = nextValue;
             syncFamilyFallbackSaveState(saveForm);
             return true;
@@ -2047,18 +2460,16 @@
         }
 
         try {
-            const payload = await postAjax('tasty_fonts_save_family_fallback', config.saveFallbackNonce, {
-                family,
-                fallback: nextValue
+            const payload = await requestJson(getRoutePath('saveFamilyFallback', 'families/fallback'), {
+                method: 'PATCH',
+                body: {
+                    family,
+                    fallback: nextValue
+                },
+                fallbackMessage: getString('fallbackSaveError', 'The fallback could not be saved.')
             });
-
-            if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('fallbackSaveError', 'The fallback could not be saved.')));
-            }
-
-            const data = payload.data || {};
-            const savedFallback = data.fallback || nextValue;
-            const message = buildFallbackSavedMessage(family, data.message);
+            const savedFallback = payload.fallback || nextValue;
+            const message = buildFallbackSavedMessage(family, payload.message);
 
             selector.value = savedFallback;
             selector.dataset.savedValue = savedFallback;
@@ -2100,7 +2511,7 @@
         const saveForm = form || selector.closest('[data-family-font-display-form]');
         const button = saveForm ? saveForm.querySelector('[data-family-font-display-save]') : null;
 
-        if (!family || !config.saveFontDisplayNonce || previousValue === nextValue) {
+        if (!family || !hasRestConfig() || previousValue === nextValue) {
             selector.dataset.savedValue = nextValue;
             syncFamilyFontDisplaySaveState(saveForm);
             return true;
@@ -2121,18 +2532,16 @@
         }
 
         try {
-            const payload = await postAjax('tasty_fonts_save_family_font_display', config.saveFontDisplayNonce, {
-                family,
-                font_display: nextValue
+            const payload = await requestJson(getRoutePath('saveFamilyFontDisplay', 'families/font-display'), {
+                method: 'PATCH',
+                body: {
+                    family,
+                    font_display: nextValue
+                },
+                fallbackMessage: getString('fontDisplaySaveError', 'The font-display override could not be saved.')
             });
-
-            if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('fontDisplaySaveError', 'The font-display override could not be saved.')));
-            }
-
-            const data = payload.data || {};
-            const savedDisplay = data.font_display || nextValue;
-            const message = buildFontDisplaySavedMessage(family, data.message);
+            const savedDisplay = payload.font_display || nextValue;
+            const message = buildFontDisplaySavedMessage(family, payload.message);
 
             selector.value = savedDisplay;
             selector.dataset.savedValue = savedDisplay;
@@ -2172,7 +2581,7 @@
         const saveForm = form || selector.closest('[data-family-delivery-form]');
         const button = saveForm ? saveForm.querySelector('[data-family-delivery-save]') : null;
 
-        if (!familySlug || !nextValue || !config.saveFamilyDeliveryNonce || previousValue === nextValue) {
+        if (!familySlug || !nextValue || !hasRestConfig() || previousValue === nextValue) {
             selector.dataset.savedValue = nextValue;
             syncFamilyDeliverySaveState(saveForm);
             return true;
@@ -2188,17 +2597,15 @@
         }
 
         try {
-            const payload = await postAjax('tasty_fonts_save_family_delivery', config.saveFamilyDeliveryNonce, {
-                family_slug: familySlug,
-                delivery_id: nextValue
+            const payload = await requestJson(getRoutePath('saveFamilyDelivery', 'families/delivery'), {
+                method: 'PATCH',
+                body: {
+                    family_slug: familySlug,
+                    delivery_id: nextValue
+                },
+                fallbackMessage: getString('familyDeliverySaveError', 'The live delivery could not be updated.')
             });
-
-            if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('familyDeliverySaveError', 'The live delivery could not be updated.')));
-            }
-
-            const data = payload.data || {};
-            const message = data.message || getString('familyDeliverySaved', 'Live delivery updated.');
+            const message = payload.message || getString('familyDeliverySaved', 'Live delivery updated.');
 
             selector.dataset.savedValue = nextValue;
             syncFamilyDeliverySaveState(saveForm);
@@ -2235,7 +2642,7 @@
         const saveForm = form || selector.closest('[data-family-publish-state-form]');
         const button = saveForm ? saveForm.querySelector('[data-family-publish-state-save]') : null;
 
-        if (!familySlug || !config.saveFamilyPublishStateNonce || previousValue === nextValue) {
+        if (!familySlug || !hasRestConfig() || previousValue === nextValue) {
             selector.dataset.savedValue = nextValue;
             syncFamilyPublishStateSaveState(saveForm);
             return true;
@@ -2251,17 +2658,15 @@
         }
 
         try {
-            const payload = await postAjax('tasty_fonts_save_family_publish_state', config.saveFamilyPublishStateNonce, {
-                family_slug: familySlug,
-                publish_state: nextValue
+            const payload = await requestJson(getRoutePath('saveFamilyPublishState', 'families/publish-state'), {
+                method: 'PATCH',
+                body: {
+                    family_slug: familySlug,
+                    publish_state: nextValue
+                },
+                fallbackMessage: getString('familyPublishStateSaveError', 'The publish state could not be updated.')
             });
-
-            if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('familyPublishStateSaveError', 'The publish state could not be updated.')));
-            }
-
-            const data = payload.data || {};
-            const message = data.message || getString('familyPublishStateSaved', 'Publish state updated.');
+            const message = payload.message || getString('familyPublishStateSaved', 'Publish state updated.');
 
             selector.dataset.savedValue = nextValue;
             syncFamilyPublishStateSaveState(saveForm);
@@ -2288,7 +2693,7 @@
     }
 
     async function deleteDeliveryProfile(button) {
-        if (!button || !config.deleteDeliveryProfileNonce) {
+        if (!button || !hasRestConfig()) {
             return false;
         }
 
@@ -2321,17 +2726,15 @@
         button.setAttribute('aria-busy', 'true');
 
         try {
-            const payload = await postAjax('tasty_fonts_delete_delivery_profile', config.deleteDeliveryProfileNonce, {
-                family_slug: familySlug,
-                delivery_id: deliveryId
+            const payload = await requestJson(getRoutePath('deleteDeliveryProfile', 'families/delivery-profile'), {
+                method: 'DELETE',
+                query: {
+                    family_slug: familySlug,
+                    delivery_id: deliveryId
+                },
+                fallbackMessage: getString('deliveryDeleteError', 'The delivery profile could not be deleted.')
             });
-
-            if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('deliveryDeleteError', 'The delivery profile could not be deleted.')));
-            }
-
-            const data = payload.data || {};
-            const message = data.message || getString('familyDeliverySaved', 'Live delivery updated.');
+            const message = payload.message || getString('familyDeliverySaved', 'Live delivery updated.');
 
             showToast(message, 'success');
             reloadPageSoon(600);
@@ -2346,26 +2749,24 @@
     }
 
     async function saveRoleDraft(snapshotBeforeChange) {
-        if (!config.saveRolesNonce || !window.fetch || roleDraftSaveInFlight) {
+        if (!hasRestConfig() || !window.fetch || roleDraftSaveInFlight) {
             return false;
         }
 
         setRoleDraftSavingState(true);
 
         try {
-            const payload = await postAjax('tasty_fonts_save_role_draft', config.saveRolesNonce, {
-                heading: getElementValue(roleHeading, ''),
-                body: getElementValue(roleBody, ''),
-                heading_fallback: getElementValue(roleHeadingFallback, 'sans-serif'),
-                body_fallback: getElementValue(roleBodyFallback, 'sans-serif')
+            const payload = await requestJson(getRoutePath('saveRoleDraft', 'roles/draft'), {
+                method: 'PATCH',
+                body: {
+                    heading: getElementValue(roleHeading, ''),
+                    body: getElementValue(roleBody, ''),
+                    heading_fallback: getElementValue(roleHeadingFallback, 'sans-serif'),
+                    body_fallback: getElementValue(roleBodyFallback, 'sans-serif')
+                },
+                fallbackMessage: getString('rolesDraftSaveError', 'The roles could not be saved.')
             });
-
-            if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('rolesDraftSaveError', 'The roles could not be saved.')));
-            }
-
-            const data = payload.data || {};
-            const roles = data.roles || {};
+            const roles = payload.roles || {};
 
             if (roleHeading && typeof roles.heading === 'string') {
                 roleHeading.value = roles.heading;
@@ -2384,8 +2785,8 @@
             }
 
             updateRoleOutputs();
-            syncRoleDeploymentState(data.role_deployment || null);
-            showToast(data.message || getString('rolesDraftSaved', 'Roles saved.'), 'success');
+            syncRoleDeploymentState(payload.role_deployment || null);
+            showToast(payload.message || getString('rolesDraftSaved', 'Roles saved.'), 'success');
             return true;
         } catch (error) {
             restoreRoleFieldSnapshot(snapshotBeforeChange);
@@ -2521,6 +2922,7 @@
             const variants = document.createElement('span');
             const fallback = googlePreviewFallback(item.category);
             const inLibrary = isFamilyInLibrary(item.family || '');
+            const variantCount = Number(item.variants_count || (Array.isArray(item.variants) ? item.variants.length : 0));
 
             card.className = 'tasty-fonts-search-card';
             card.dataset.family = item.family;
@@ -2553,7 +2955,7 @@
 
             meta.className = 'tasty-fonts-search-card-meta tasty-fonts-muted';
             category.textContent = item.category || fallback;
-            variants.textContent = `${(item.variants || []).length} variant(s)`;
+            variants.textContent = `${variantCount} variant(s)`;
 
             meta.append(category, variants);
             card.append(head, preview, meta);
@@ -2566,7 +2968,11 @@
             selectedSearchFamily = matchedFamily;
 
             if (!availableVariantInputs().length) {
-                renderVariantOptions(matchedFamily.variants || [], matchedFamily.family || '');
+                if (Array.isArray(matchedFamily.variants) && matchedFamily.variants.length > 0) {
+                    renderVariantOptions(matchedFamily.variants || [], matchedFamily.family || '');
+                } else {
+                    void loadGoogleFamilyDetails(matchedFamily.family || currentGoogleImportFamily());
+                }
             }
         }
     }
@@ -2587,7 +2993,20 @@
         }
 
         updateSelectedFamilyLabel(familyName);
-        renderVariantOptions(selectedSearchFamily ? selectedSearchFamily.variants : [], familyName);
+
+        if (selectedSearchFamily && Array.isArray(selectedSearchFamily.variants) && selectedSearchFamily.variants.length > 0) {
+            renderVariantOptions(selectedSearchFamily.variants, familyName);
+            return;
+        }
+
+        renderedGoogleVariantFamily = '';
+
+        if (variantsWrap) {
+            variantsWrap.innerHTML = '';
+        }
+
+        updateGoogleImportSummary();
+        void loadGoogleFamilyDetails(familyName);
     }
 
     function renderBunnyVariantOptions(variants, familyName = '') {
@@ -3164,9 +3583,6 @@
         let hasAnyFile = false;
         let rowIndex = 0;
 
-        formData.append('action', 'tasty_fonts_upload_local');
-        formData.append('nonce', config.uploadNonce || '');
-
         groups.forEach((group) => {
             const family = familyInputForGroup(group);
             const fallback = fallbackInputForGroup(group);
@@ -3232,7 +3648,7 @@
     }
 
     async function uploadLocalFonts() {
-        if (!uploadForm || !uploadGroupsWrap || !config.uploadNonce || uploadInFlight) {
+        if (!uploadForm || !uploadGroupsWrap || !hasRestConfig() || uploadInFlight) {
             return;
         }
 
@@ -3258,26 +3674,25 @@
             rows.forEach((row) => setUploadRowStatus(row, 'uploading', getString('uploadRowUploading', 'Uploading…')));
             setStatus(uploadStatus, getString('uploadSubmitting', 'Uploading font files…'), 'progress', 0);
 
-            const payload = await postMultipartAjax(formData, (progress) => {
-                setStatus(
-                    uploadStatus,
-                    formatMessage(getString('uploadProgress', 'Uploading files… %1$d%%'), [progress]),
-                    'progress',
-                    progress
-                );
-            });
-
-            if (!payload.success) {
-                throw new Error(getPayloadMessage(payload, getString('uploadError', 'The font upload failed.')));
-            }
-
-            const data = payload.data || {};
-            const results = Array.isArray(data.rows) ? data.rows : [];
+            const payload = await requestMultipart(
+                getRoutePath('uploadLocal', 'local/upload'),
+                formData,
+                (progress) => {
+                    setStatus(
+                        uploadStatus,
+                        formatMessage(getString('uploadProgress', 'Uploading files… %1$d%%'), [progress]),
+                        'progress',
+                        progress
+                    );
+                },
+                getString('uploadError', 'The font upload failed.')
+            );
+            const results = Array.isArray(payload.rows) ? payload.rows : [];
             applyUploadResults(rows, results);
 
-            setStatus(uploadStatus, data.message || getString('uploadSuccess', 'Upload complete. Refreshing the library…'), 'success', 100);
+            setStatus(uploadStatus, payload.message || getString('uploadSuccess', 'Upload complete. Refreshing the library…'), 'success', 100);
 
-            if ((data.summary && data.summary.imported > 0) || (Array.isArray(data.families) && data.families.length > 0)) {
+            if ((payload.summary && payload.summary.imported > 0) || (Array.isArray(payload.families) && payload.families.length > 0)) {
                 reloadPageSoon();
             }
         } catch (error) {
@@ -3309,15 +3724,19 @@
         }
 
         googleResults.innerHTML = `<div class="tasty-fonts-empty">${getString('searching', 'Searching Google Fonts…')}</div>`;
-        const payload = await postAjax('tasty_fonts_search_google', config.searchNonce, { query });
 
-        if (!payload.success) {
+        try {
+            const payload = await requestJson(getRoutePath('searchGoogle', 'google/search'), {
+                method: 'GET',
+                query: { query },
+                fallbackMessage: getString('importError', 'Request failed.')
+            });
+
+            renderSearchResults(payload.items || []);
+        } catch (error) {
             updateGooglePreviewStylesheet([]);
-            googleResults.innerHTML = `<div class="tasty-fonts-empty">${getPayloadMessage(payload, getString('importError', 'Request failed.'))}</div>`;
-            return;
+            googleResults.innerHTML = `<div class="tasty-fonts-empty">${getErrorMessage(error, getString('importError', 'Request failed.'))}</div>`;
         }
-
-        renderSearchResults(payload.data.items || []);
     }
 
     async function runBunnySearch(query) {
@@ -3325,7 +3744,7 @@
             return;
         }
 
-        if (!config.bunnySearchNonce || !window.fetch) {
+        if (!hasRestConfig() || !window.fetch) {
             updateBunnySearchPreviewStylesheet([]);
             bunnyResults.innerHTML = '';
             return;
@@ -3340,16 +3759,13 @@
 
         bunnyResults.innerHTML = `<div class="tasty-fonts-empty">${getString('bunnySearching', 'Searching Bunny Fonts…')}</div>`;
         try {
-            const payload = await postAjax('tasty_fonts_search_bunny', config.bunnySearchNonce, { query });
+            const payload = await requestJson(getRoutePath('searchBunny', 'bunny/search'), {
+                method: 'GET',
+                query: { query },
+                fallbackMessage: getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.')
+            });
 
-            if (!payload.success) {
-                bunnySearchResults = [];
-                updateBunnySearchPreviewStylesheet([]);
-                bunnyResults.innerHTML = `<div class="tasty-fonts-empty">${getPayloadMessage(payload, getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.'))}</div>`;
-                return;
-            }
-
-            renderBunnySearchResults(payload.data.items || []);
+            renderBunnySearchResults(payload.items || []);
         } catch (error) {
             bunnySearchResults = [];
             updateBunnySearchPreviewStylesheet([]);
@@ -3357,24 +3773,68 @@
         }
     }
 
+    async function loadGoogleFamilyDetails(familyName) {
+        if (!hasRestConfig() || !window.fetch) {
+            return null;
+        }
+
+        const requestToken = ++googleFamilyLookupToken;
+
+        try {
+            const payload = await requestJson(getRoutePath('googleFamily', 'google/family'), {
+                method: 'GET',
+                query: { family: familyName }
+            });
+
+            if (requestToken !== googleFamilyLookupToken) {
+                return null;
+            }
+
+            const item = payload && payload.item ? payload.item : null;
+
+            if (!item || normalizeFamilyKey(currentGoogleImportFamily()) !== normalizeFamilyKey(familyName)) {
+                return null;
+            }
+
+            selectedSearchFamily = item;
+
+            const existingIndex = searchResults.findIndex((entry) => normalizeFamilyKey(entry && entry.family ? entry.family : '') === normalizeFamilyKey(item.family || ''));
+
+            if (existingIndex === -1) {
+                searchResults = [item].concat(searchResults).slice(0, 8);
+            } else {
+                searchResults[existingIndex] = item;
+            }
+
+            renderVariantOptions(item.variants || [], item.family || familyName);
+
+            if (googleResults && googleResults.childElementCount > 0) {
+                renderSearchResults(searchResults);
+            }
+
+            return item;
+        } catch (error) {
+            return null;
+        }
+    }
+
     async function loadBunnyFamilyDetails(familyName) {
-        if (!config.bunnyFamilyNonce || !window.fetch) {
+        if (!hasRestConfig() || !window.fetch) {
             return null;
         }
 
         const requestToken = ++bunnyFamilyLookupToken;
         try {
-            const payload = await postAjax('tasty_fonts_get_bunny_family', config.bunnyFamilyNonce, { family: familyName });
+            const payload = await requestJson(getRoutePath('bunnyFamily', 'bunny/family'), {
+                method: 'GET',
+                query: { family: familyName }
+            });
 
             if (requestToken !== bunnyFamilyLookupToken) {
                 return null;
             }
 
-            if (!payload.success) {
-                return null;
-            }
-
-            const item = payload.data && payload.data.item ? payload.data.item : null;
+            const item = payload && payload.item ? payload.item : null;
 
             if (!item || normalizeFamilyKey(currentBunnyImportFamily()) !== normalizeFamilyKey(familyName)) {
                 return null;
@@ -3468,28 +3928,22 @@
         try {
             setStatus(importStatus, getString('importing', 'Saving the selected Google delivery…'), 'progress', 20);
 
-            const payload = await postAjax('tasty_fonts_import_google', config.importNonce, {
-                family,
-                variant_tokens: variants.join(','),
-                delivery_mode: deliveryMode
+            const result = await requestJson(getRoutePath('importGoogle', 'google/import'), {
+                method: 'POST',
+                body: {
+                    family,
+                    variant_tokens: variants.join(','),
+                    delivery_mode: deliveryMode
+                },
+                fallbackMessage: getString('importError', 'Import failed.')
             });
-
-            if (!payload.success) {
-                const message = getPayloadMessage(payload, getString('importError', 'Import failed.'));
-
-                setStatus(importStatus, message, 'error');
-                showToast(message, 'error');
-                return;
-            }
-
-            const result = payload.data || {};
             const importedCount = Array.isArray(result.imported_variants) ? result.imported_variants.length : 0;
             const skippedCount = Array.isArray(result.skipped_variants) ? result.skipped_variants.length : 0;
             const summary = formatMessage(
                 getString('importSummary', 'Saved %1$d variant%2$s. %3$d skipped. Reloading…'),
                 [importedCount, importedCount === 1 ? '' : 's', skippedCount]
             );
-            const message = getPayloadMessage(payload, summary);
+            const message = getApiMessage(result, summary);
             const tone = result.status === 'skipped' ? 'error' : 'success';
 
             setStatus(importStatus, message, tone, tone === 'success' ? 100 : undefined);
@@ -3542,22 +3996,16 @@
                 20
             );
 
-            const payload = await postAjax('tasty_fonts_import_bunny', config.bunnyImportNonce, {
-                family,
-                variant_tokens: variants.join(','),
-                delivery_mode: deliveryMode
+            const result = await requestJson(getRoutePath('importBunny', 'bunny/import'), {
+                method: 'POST',
+                body: {
+                    family,
+                    variant_tokens: variants.join(','),
+                    delivery_mode: deliveryMode
+                },
+                fallbackMessage: getString('bunnyImportError', 'The Bunny Fonts import failed.')
             });
-
-            if (!payload.success) {
-                const message = getPayloadMessage(payload, getString('bunnyImportError', 'The Bunny Fonts import failed.'));
-
-                setStatus(bunnyImportStatus, message, 'error');
-                showToast(message, 'error');
-                return;
-            }
-
-            const result = payload.data || {};
-            const message = getPayloadMessage(payload, getString('bunnyImportSuccess', 'Bunny Fonts imported successfully. Reloading…'));
+            const message = getApiMessage(result, getString('bunnyImportSuccess', 'Bunny Fonts imported successfully. Reloading…'));
             const tone = result.status === 'imported' || result.status === 'saved' ? 'success' : 'error';
 
             setStatus(bunnyImportStatus, message, tone, tone === 'success' ? 100 : undefined);
@@ -3742,6 +4190,10 @@
 
         setDisclosureState(disclosureToggle, nextExpanded);
 
+        if (isTrackedDisclosureToggle(disclosureToggle)) {
+            syncTrackedUiUrl();
+        }
+
         if (nextExpanded && disclosureToggle.getAttribute('data-disclosure-toggle') === 'tasty-fonts-add-font-panel') {
             window.setTimeout(focusAddFontPanel, 0);
         }
@@ -3762,6 +4214,7 @@
             setDisclosureState(addFontsPanelToggle, true);
         }
 
+        syncTrackedUiUrl();
         window.setTimeout(focusAddFontPanel, 0);
         return true;
     }
@@ -3770,7 +4223,14 @@
         const tab = event.target.closest('[data-tab-group][data-tab-target]');
 
         if (tab) {
-            activateTabGroup(tab.getAttribute('data-tab-group'), tab.getAttribute('data-tab-target'));
+            const group = tab.getAttribute('data-tab-group') || '';
+
+            activateTabGroup(group, tab.getAttribute('data-tab-target'));
+
+            if (isTrackedTabGroup(group)) {
+                syncTrackedUiUrl();
+            }
+
             return true;
         }
 
@@ -3817,6 +4277,11 @@
 
         const nextTab = buttons[nextIndex];
         activateTabGroup(group, nextTab.getAttribute('data-tab-target'));
+
+        if (isTrackedTabGroup(group)) {
+            syncTrackedUiUrl();
+        }
+
         nextTab.focus();
         return true;
     }
@@ -4140,7 +4605,7 @@
 
         document.querySelectorAll('[data-family-fallback-form]').forEach((form) => {
             form.addEventListener('submit', async (event) => {
-                if (!config.saveFallbackNonce || !window.fetch) {
+                if (!hasRestConfig() || !window.fetch) {
                     return;
                 }
 
@@ -4169,7 +4634,7 @@
 
         document.querySelectorAll('[data-family-font-display-form]').forEach((form) => {
             form.addEventListener('submit', async (event) => {
-                if (!config.saveFontDisplayNonce || !window.fetch) {
+                if (!hasRestConfig() || !window.fetch) {
                     return;
                 }
 
@@ -4199,7 +4664,7 @@
 
         document.querySelectorAll('[data-family-delivery-form]').forEach((form) => {
             form.addEventListener('submit', async (event) => {
-                if (!config.saveFamilyDeliveryNonce || !window.fetch) {
+                if (!hasRestConfig() || !window.fetch) {
                     return;
                 }
 
@@ -4229,7 +4694,7 @@
 
         document.querySelectorAll('[data-family-publish-state-form]').forEach((form) => {
             form.addEventListener('submit', async (event) => {
-                if (!config.saveFamilyPublishStateNonce || !window.fetch) {
+                if (!hasRestConfig() || !window.fetch) {
                     return;
                 }
 
@@ -4286,6 +4751,8 @@
 
         if (manualFamily) {
             manualFamily.addEventListener('input', () => {
+                window.clearTimeout(googleFamilyLookupTimer);
+
                 const familyName = manualFamily.value.trim();
                 const matchedFamily = findGoogleFamilyMatch(familyName);
                 const hasVariantInputs = !!(variantsWrap && variantsWrap.querySelector('input[type="checkbox"]'));
@@ -4298,7 +4765,21 @@
                     selectedSearchFamily = matchedFamily;
 
                     if (shouldRenderVariants) {
-                        renderVariantOptions(matchedFamily.variants || [], matchedFamily.family || '');
+                        if (Array.isArray(matchedFamily.variants) && matchedFamily.variants.length > 0) {
+                            renderVariantOptions(matchedFamily.variants || [], matchedFamily.family || '');
+                        } else {
+                            renderedGoogleVariantFamily = '';
+
+                            if (variantsWrap) {
+                                variantsWrap.innerHTML = '';
+                            }
+
+                            updateGoogleImportSummary();
+                            googleFamilyLookupTimer = window.setTimeout(() => {
+                                void loadGoogleFamilyDetails(familyName);
+                            }, 300);
+                        }
+
                         return;
                     }
                 } else if (selectedSearchFamily || hasVariantInputs) {
@@ -4541,6 +5022,8 @@
 
     // Bootstrap
     function bootstrap() {
+        const initialTrackedUiState = readTrackedUiState(window.location);
+
         document.addEventListener('click', handleDocumentClick);
         document.addEventListener('keydown', (event) => {
             if (handleSearchCardKeydown(event)) {
@@ -4572,6 +5055,8 @@
         updateBunnyImportSummary();
         syncImportDeliveryButtons();
         initializeTabs();
+        applyTrackedUiState(initialTrackedUiState);
+        syncTrackedUiUrl();
         applyPendingUiState();
     }
 

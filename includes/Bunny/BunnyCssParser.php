@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Bunny;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Fonts\HostedCssParser;
 
 final class BunnyCssParser

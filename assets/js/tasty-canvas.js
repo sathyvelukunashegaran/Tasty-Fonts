@@ -1,6 +1,6 @@
 (function () {
-    var config = window.TastyFontsCanvas || {};
-    var stylesheetUrls = Array.isArray(config.stylesheetUrls)
+    const config = window.TastyFontsCanvas || {};
+    const stylesheetUrls = Array.isArray(config.stylesheetUrls)
         ? config.stylesheetUrls.filter(Boolean)
         : (config.stylesheetUrl ? [config.stylesheetUrl] : []);
 
@@ -8,74 +8,87 @@
         return;
     }
 
-    function getIframeDocument(iframe) {
+    const getIframeDocument = (iframe) => {
         if (!iframe || !iframe.contentDocument || !iframe.contentDocument.head) {
             return null;
         }
 
         return iframe.contentDocument;
-    }
+    };
 
-    function injectIntoIframe(iframe) {
-        var doc = getIframeDocument(iframe);
+    const injectIntoIframe = (iframe) => {
+        const doc = getIframeDocument(iframe);
 
         if (!doc) {
             return false;
         }
 
-        var existing = Array.from(doc.querySelectorAll('link[data-tasty-fonts-runtime="1"]'));
+        let existingIndex = 0;
 
-        existing.forEach(function (node, index) {
-            if (index >= stylesheetUrls.length && node.parentNode) {
+        for (const node of doc.querySelectorAll('link[data-tasty-fonts-runtime="1"]')) {
+            if (existingIndex >= stylesheetUrls.length && node.parentNode) {
                 node.parentNode.removeChild(node);
             }
-        });
 
-        stylesheetUrls.forEach(function (stylesheetUrl, index) {
-            var current = doc.querySelector('link[data-tasty-fonts-runtime="1"][data-tasty-fonts-runtime-index="' + index + '"]');
+            existingIndex += 1;
+        }
+
+        for (const [index, stylesheetUrl] of stylesheetUrls.entries()) {
+            const current = doc.querySelector(`link[data-tasty-fonts-runtime="1"][data-tasty-fonts-runtime-index="${index}"]`);
 
             if (current) {
                 if (current.href !== stylesheetUrl) {
                     current.href = stylesheetUrl;
                 }
 
-                return;
+                continue;
             }
 
-            var link = doc.createElement('link');
+            const link = doc.createElement('link');
             link.rel = 'stylesheet';
             link.href = stylesheetUrl;
             link.setAttribute('data-tasty-fonts-runtime', '1');
             link.setAttribute('data-tasty-fonts-runtime-index', String(index));
             doc.head.appendChild(link);
-        });
+        }
 
         return true;
-    }
+    };
 
-    function bindIframe(iframe) {
+    const bindIframe = (iframe) => {
         if (!iframe || iframe.dataset.tastyFontsBound === '1') {
             return;
         }
 
         iframe.dataset.tastyFontsBound = '1';
 
-        iframe.addEventListener('load', function () {
+        iframe.addEventListener('load', () => {
             injectIntoIframe(iframe);
         });
 
         injectIntoIframe(iframe);
-    }
+    };
 
-    function bindAllIframes() {
-        document.querySelectorAll('iframe').forEach(bindIframe);
-    }
+    const bindAllIframes = () => {
+        for (const iframe of document.querySelectorAll('iframe')) {
+            bindIframe(iframe);
+        }
+    };
 
-    var observer = new MutationObserver(bindAllIframes);
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
+    let bindAllIframesTimeout = 0;
+
+    const scheduleBindAllIframes = () => {
+        window.clearTimeout(bindAllIframesTimeout);
+        bindAllIframesTimeout = window.setTimeout(bindAllIframes, 100);
+    };
+
+    if (document.body) {
+        const observer = new MutationObserver(scheduleBindAllIframes);
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
 
     bindAllIframes();
 })();

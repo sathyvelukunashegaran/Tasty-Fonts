@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Admin;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 
@@ -85,12 +87,13 @@ final class AdminPageRenderer
             $roleDeploymentTitle . ($roleDeploymentTitle !== '' && $roleDeploymentCopy !== '' ? '. ' : '') . $roleDeploymentCopy
         );
         $roleDeploymentAnnouncementId = 'tasty-fonts-role-deployment-announcement';
+        $storageErrorMessage = trim($this->storage->getLastFilesystemErrorMessage());
         ?>
         <div class="wrap tasty-fonts-admin">
             <?php $this->renderNotices($toasts); ?>
 
             <?php if (!$storage): ?>
-                <div class="notice notice-error"><p><?php esc_html_e('The uploads/fonts directory could not be initialized.', 'tasty-fonts'); ?></p></div>
+                <div class="notice notice-error"><p><?php echo esc_html($storageErrorMessage !== '' ? $storageErrorMessage : __('The uploads/fonts directory could not be initialized.', 'tasty-fonts')); ?></p></div>
             <?php else: ?>
                 <div class="tasty-fonts-shell">
                     <section class="tasty-fonts-card tasty-fonts-studio-card tasty-fonts-top-panel" id="tasty-fonts-roles-studio">
@@ -1351,11 +1354,14 @@ final class AdminPageRenderer
         $activeDeliveryId = (string) ($family['active_delivery_id'] ?? '');
         $availableDeliveries = is_array($family['available_deliveries'] ?? null) ? (array) $family['available_deliveries'] : [];
         $deliveryCount = count($availableDeliveries);
-        $activeDeliveryLabel = (string) ($activeDelivery['label'] ?? __('Unavailable', 'tasty-fonts'));
+        $activeDeliveryLabel = $this->translateProfileLabel((string) ($activeDelivery['label'] ?? ''));
+        $activeDeliveryLabel = $activeDeliveryLabel !== '' ? $activeDeliveryLabel : __('Unavailable', 'tasty-fonts');
         $availableDeliveryLabels = array_values(
             array_filter(
                 array_map(
-                    static fn (mixed $profile): string => is_array($profile) ? trim((string) ($profile['label'] ?? '')) : '',
+                    fn (mixed $profile): string => is_array($profile)
+                        ? $this->translateProfileLabel((string) ($profile['label'] ?? ''))
+                        : '',
                     $availableDeliveries
                 ),
                 'strlen'
@@ -1521,7 +1527,7 @@ final class AdminPageRenderer
                                                             <?php foreach ($availableDeliveries as $profile): ?>
                                                                 <?php if (!is_array($profile)) { continue; } ?>
                                                                 <option value="<?php echo esc_attr((string) ($profile['id'] ?? '')); ?>" <?php selected($activeDeliveryId, (string) ($profile['id'] ?? '')); ?>>
-                                                                    <?php echo esc_html((string) ($profile['label'] ?? '')); ?>
+                                                                    <?php echo esc_html($this->translateProfileLabel((string) ($profile['label'] ?? ''))); ?>
                                                                 </option>
                                                             <?php endforeach; ?>
                                                         </select>
@@ -1825,6 +1831,25 @@ final class AdminPageRenderer
         };
     }
 
+    private function translateProfileLabel(string $label): string
+    {
+        $normalized = trim($label);
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        return match ($normalized) {
+            'Self-hosted' => __('Self-hosted', 'tasty-fonts'),
+            'Self-hosted (Google import)' => __('Self-hosted (Google import)', 'tasty-fonts'),
+            'Google CDN' => __('Google CDN', 'tasty-fonts'),
+            'Self-hosted (Bunny import)' => __('Self-hosted (Bunny import)', 'tasty-fonts'),
+            'Bunny CDN' => __('Bunny CDN', 'tasty-fonts'),
+            'Adobe-hosted' => __('Adobe-hosted', 'tasty-fonts'),
+            default => $normalized,
+        };
+    }
+
     private function buildProfileRequestSummary(array $profile): string
     {
         $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
@@ -1879,7 +1904,7 @@ final class AdminPageRenderer
         array $profile
     ): void {
         $profileId = (string) ($profile['id'] ?? '');
-        $profileLabel = (string) ($profile['label'] ?? '');
+        $profileLabel = $this->translateProfileLabel((string) ($profile['label'] ?? ''));
         $profileProvider = (string) ($profile['provider'] ?? '');
         $profileIsActive = $profileId === $activeDeliveryId;
         $profileDeleteBlocked = $profileIsActive && $publishState === 'role_active'

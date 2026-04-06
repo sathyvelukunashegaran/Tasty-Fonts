@@ -1,5 +1,6 @@
 .tasty-fonts-admin {
     /* Primitive palette */
+    --tasty-white-rgb: 255, 255, 255;
     --tasty-gray-0: #ffffff;
     --tasty-gray-50: #f6f7f7;
     --tasty-gray-100: #f0f0f0;
@@ -9,6 +10,7 @@
     --tasty-gray-600-rgb: 140, 143, 148;
     --tasty-gray-700: #50575e;
     --tasty-gray-900: #1d2327;
+    --tasty-gray-900-rgb: 29, 35, 39;
 
     --tasty-ctrl-border: #c3ccd5;
     --tasty-ctrl-border-strong: #8c8f94;
@@ -39,8 +41,11 @@
     --tasty-surface-accent-subtle: rgba(var(--tasty-accent-rgb), 0.04);
     --tasty-surface-accent-soft: var(--tasty-accent-soft);
     --tasty-surface-success: var(--tasty-success-soft);
+    --tasty-surface-warning-subtle: rgba(var(--tasty-warning-rgb), 0.05);
     --tasty-surface-warning: var(--tasty-warning-soft);
     --tasty-surface-danger: var(--tasty-danger-soft);
+    --tasty-surface-progress-track: rgba(var(--tasty-gray-900-rgb), 0.08);
+    --tasty-surface-overlay-soft: rgba(var(--tasty-white-rgb), 0.6);
 
     /* Semantic borders */
     --tasty-border: var(--tasty-gray-300);
@@ -48,6 +53,7 @@
     --tasty-border-subtle: rgba(var(--tasty-gray-600-rgb), 0.18);
     --tasty-border-subtle-strong: rgba(var(--tasty-gray-600-rgb), 0.24);
     --tasty-border-subtle-faint: rgba(var(--tasty-gray-600-rgb), 0.14);
+    --tasty-border-contrast-soft: rgba(var(--tasty-gray-900-rgb), 0.07);
     --tasty-border-accent-soft: rgba(var(--tasty-accent-rgb), 0.18);
     --tasty-border-accent-strong: rgba(var(--tasty-accent-rgb), 0.24);
     --tasty-border-success-soft: rgba(var(--tasty-success-rgb), 0.18);
@@ -102,6 +108,7 @@
     --tasty-control-text: var(--tasty-ctrl-text);
     --tasty-control-text-muted: var(--tasty-ctrl-text-muted);
     --tasty-control-divider: rgba(var(--tasty-ctrl-text-muted-rgb), 0.2);
+    --tasty-control-divider-on-accent: rgba(var(--tasty-white-rgb), 0.26);
     --tasty-control-padding-inline: 12px;
     --tasty-control-padding-inline-roomy: 14px;
 

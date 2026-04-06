@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Fonts;
 
+defined('ABSPATH') || exit;
+
 final class FontFilenameParser
 {
     private const WEIGHT_PATTERNS = [

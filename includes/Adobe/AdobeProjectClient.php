@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Adobe;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use WP_Error;
@@ -154,7 +156,7 @@ final class AdobeProjectClient
             return $cached;
         }
 
-        $response = wp_remote_get(
+        $response = $this->remoteGet(
             $this->getStylesheetUrl($projectId),
             [
                 'timeout' => self::REQUEST_TIMEOUT,
@@ -224,6 +226,13 @@ final class AdobeProjectClient
         $projectId = preg_replace('/[^a-z0-9]+/', '', $projectId) ?? '';
 
         return trim($projectId);
+    }
+
+    private function remoteGet(string $url, array $args = []): mixed
+    {
+        $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);
+
+        return wp_remote_get($url, is_array($filteredArgs) ? $filteredArgs : $args);
     }
 
     private function transientKey(string $projectId): string

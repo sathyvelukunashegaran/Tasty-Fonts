@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace TastyFonts;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyCssParser;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Fonts\AssetService;
+use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
+use TastyFonts\Fonts\NativeUploadedFileValidator;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleCssParser;
@@ -28,6 +33,18 @@ use TastyFonts\Support\Storage;
 
 final class Plugin
 {
+    private const REPOSITORY_URL = 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts';
+    private const SUPPORT_URL = self::REPOSITORY_URL . '/issues';
+    private const RELEASES_URL = self::REPOSITORY_URL . '/releases';
+    private const TRANSIENT_KEYS = [
+        'tasty_fonts_catalog_v2',
+        'tasty_fonts_css_v2',
+        'tasty_fonts_css_hash_v2',
+        'tasty_fonts_regenerate_css_queued',
+        'tasty_fonts_google_catalog_v1',
+        'tasty_fonts_bunny_catalog_v1',
+    ];
+
     private static ?self $instance = null;
 
     private bool $booted = false;
@@ -48,7 +65,9 @@ final class Plugin
     private readonly GoogleFontsClient $googleClient;
     private readonly GoogleImportService $googleImport;
     private readonly RuntimeService $runtime;
+    private readonly BlockEditorFontLibraryService $blockEditorFontLibrary;
     private readonly AdminController $admin;
+    private readonly RestController $rest;
 
     private function __construct()
     {
@@ -100,7 +119,8 @@ final class Plugin
             $this->catalog,
             $this->assets,
             $this->settings,
-            $this->log
+            $this->log,
+            new NativeUploadedFileValidator()
         );
         $this->bunnyImport = new BunnyImportService(
             $this->storage,
@@ -121,6 +141,12 @@ final class Plugin
             $this->log
         );
         $this->runtime = new RuntimeService($this->planner, $this->assets, $this->adobe);
+        $this->blockEditorFontLibrary = new BlockEditorFontLibraryService(
+            $this->storage,
+            $this->imports,
+            $this->settings,
+            $this->log
+        );
         $this->admin = new AdminController(
             $this->storage,
             $this->settings,
@@ -136,6 +162,7 @@ final class Plugin
             $this->googleClient,
             $this->googleImport
         );
+        $this->rest = new RestController($this->admin);
     }
 
     public static function instance(): self
@@ -152,6 +179,17 @@ final class Plugin
         self::instance()->onActivate();
     }
 
+    public static function deactivate(): void
+    {
+        foreach (self::TRANSIENT_KEYS as $transientKey) {
+            delete_transient($transientKey);
+        }
+
+        if (function_exists('wp_clear_scheduled_hook')) {
+            wp_clear_scheduled_hook(AssetService::ACTION_REGENERATE_CSS);
+        }
+    }
+
     public function boot(): void
     {
         if ($this->booted) {
@@ -161,6 +199,7 @@ final class Plugin
         $this->booted = true;
         $this->registerRuntimeHooks();
         $this->registerAdminHooks();
+        $this->registerRestHooks();
         $this->registerCatalogHooks();
     }
 
@@ -176,6 +215,7 @@ final class Plugin
     private function registerRuntimeHooks(): void
     {
         add_action('plugins_loaded', [$this, 'loadTextdomain']);
+        add_action(AssetService::ACTION_REGENERATE_CSS, [$this->assets, 'ensureGeneratedCssFile']);
         add_action('wp_enqueue_scripts', [$this->runtime, 'enqueueFrontend']);
         add_action('wp_head', [$this->runtime, 'outputPreloadHints'], 1);
         add_action('etch/canvas/enqueue_assets', [$this->runtime, 'enqueueEtchCanvas']);
@@ -190,18 +230,14 @@ final class Plugin
         add_action('admin_init', [$this->admin, 'handleAdminActions']);
         add_action('admin_enqueue_scripts', [$this->admin, 'enqueueAssets']);
         add_filter('plugin_action_links_' . plugin_basename(TASTY_FONTS_FILE), [self::class, 'filterPluginActionLinks']);
-        add_action('wp_ajax_tasty_fonts_search_google', [$this->admin, 'ajaxSearchGoogle']);
-        add_action('wp_ajax_tasty_fonts_search_bunny', [$this->admin, 'ajaxSearchBunny']);
-        add_action('wp_ajax_tasty_fonts_get_bunny_family', [$this->admin, 'ajaxGetBunnyFamily']);
-        add_action('wp_ajax_tasty_fonts_import_bunny', [$this->admin, 'ajaxImportBunny']);
-        add_action('wp_ajax_tasty_fonts_import_google', [$this->admin, 'ajaxImportGoogle']);
-        add_action('wp_ajax_tasty_fonts_upload_local', [$this->admin, 'ajaxUploadLocal']);
-        add_action('wp_ajax_tasty_fonts_save_family_fallback', [$this->admin, 'ajaxSaveFamilyFallback']);
-        add_action('wp_ajax_tasty_fonts_save_family_font_display', [$this->admin, 'ajaxSaveFamilyFontDisplay']);
-        add_action('wp_ajax_tasty_fonts_save_family_delivery', [$this->admin, 'ajaxSaveFamilyDelivery']);
-        add_action('wp_ajax_tasty_fonts_save_family_publish_state', [$this->admin, 'ajaxSaveFamilyPublishState']);
-        add_action('wp_ajax_tasty_fonts_delete_delivery_profile', [$this->admin, 'ajaxDeleteDeliveryProfile']);
-        add_action('wp_ajax_tasty_fonts_save_role_draft', [$this->admin, 'ajaxSaveRoleDraft']);
+        add_filter('plugin_row_meta', [self::class, 'filterPluginRowMeta'], 10, 2);
+        add_action('tasty_fonts_after_import', [$this->blockEditorFontLibrary, 'syncImportedFamily'], 10, 2);
+        add_action('tasty_fonts_after_delete_family', [$this->blockEditorFontLibrary, 'deleteSyncedFamily'], 10, 2);
+    }
+
+    private function registerRestHooks(): void
+    {
+        add_action('rest_api_init', [$this->rest, 'registerRoutes']);
     }
 
     public static function filterPluginActionLinks(array $links): array
@@ -213,6 +249,26 @@ final class Plugin
                 esc_url(admin_url('admin.php?page=' . AdminController::MENU_SLUG)),
                 __('Settings', 'tasty-fonts')
             )
+        );
+
+        return $links;
+    }
+
+    public static function filterPluginRowMeta(array $links, string $file): array
+    {
+        if ($file !== plugin_basename(TASTY_FONTS_FILE)) {
+            return $links;
+        }
+
+        $links[] = sprintf(
+            '<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+            esc_url(self::RELEASES_URL),
+            __('GitHub Releases', 'tasty-fonts')
+        );
+        $links[] = sprintf(
+            '<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+            esc_url(self::SUPPORT_URL),
+            __('Support', 'tasty-fonts')
         );
 
         return $links;

@@ -4,18 +4,36 @@ declare(strict_types=1);
 
 namespace TastyFonts\Fonts;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 
 final class AssetService
 {
+    public const ACTION_REGENERATE_CSS = 'tasty_fonts_regenerate_css';
+
     private const TRANSIENT_CSS = 'tasty_fonts_css_v2';
     private const TRANSIENT_HASH = 'tasty_fonts_css_hash_v2';
+    private const TRANSIENT_REGENERATE_CSS_QUEUED = 'tasty_fonts_regenerate_css_queued';
+    private const REGENERATE_CSS_QUEUE_TTL = 30;
 
     private ?string $css = null;
     private ?string $hash = null;
 
+    /**
+     * Create the asset service.
+     *
+     * @since 1.4.0
+     *
+     * @param Storage $storage Storage abstraction for generated stylesheet reads and writes.
+     * @param CatalogService $catalog Catalog service used to invalidate and rebuild font data.
+     * @param SettingsRepository $settings Settings repository used to resolve delivery and role options.
+     * @param CssBuilder $cssBuilder CSS builder used to generate the runtime stylesheet.
+     * @param RuntimeAssetPlanner $planner Planner used to scope runtime and preview catalogs.
+     * @param LogRepository $log Log repository used for generated-file write notices.
+     */
     public function __construct(
         private readonly Storage $storage,
         private readonly CatalogService $catalog,
@@ -26,6 +44,13 @@ final class AssetService
     ) {
     }
 
+    /**
+     * Clear cached generated CSS and hash data from memory and transients.
+     *
+     * @since 1.4.0
+     *
+     * @return void
+     */
     public function invalidate(): void
     {
         delete_transient(self::TRANSIENT_CSS);
@@ -34,6 +59,13 @@ final class AssetService
         $this->hash = null;
     }
 
+    /**
+     * Return the generated CSS payload for the current runtime catalog.
+     *
+     * @since 1.4.0
+     *
+     * @return string Generated CSS payload.
+     */
     public function getCss(): string
     {
         if (is_string($this->css)) {
@@ -58,6 +90,7 @@ final class AssetService
             : $this->settings->getRoles($catalog);
 
         $this->css = $this->cssBuilder->build($localCatalog, $roles, $settings);
+        $this->css = (string) apply_filters('tasty_fonts_generated_css', $this->css, $localCatalog, $roles, $settings);
         $this->hash = hash('crc32b', $this->css);
 
         set_transient(self::TRANSIENT_CSS, $this->css, DAY_IN_SECONDS);
@@ -66,6 +99,13 @@ final class AssetService
         return $this->css;
     }
 
+    /**
+     * Return the cached hash for the generated CSS payload.
+     *
+     * @since 1.4.0
+     *
+     * @return string CRC32b hash for the generated CSS.
+     */
     public function getCssHash(): string
     {
         if ($this->hash !== null) {
@@ -77,13 +117,36 @@ final class AssetService
         return (string) $this->hash;
     }
 
+    /**
+     * Return the hash expected for the versioned generated stylesheet file.
+     *
+     * @since 1.4.0
+     *
+     * @return string CRC32b hash for the version-prefixed generated stylesheet contents.
+     */
     public function expectedFileHash(): string
     {
         return hash('crc32b', $this->getVersionedCss());
     }
 
+    /**
+     * Ensure the generated stylesheet file exists and matches the current CSS payload.
+     *
+     * @since 1.4.0
+     *
+     * @param bool $logWriteResult Whether to record a log entry for file write success or failure.
+     * @return bool True when the generated stylesheet is current or was written successfully.
+     */
     public function ensureGeneratedCssFile(bool $logWriteResult = true): bool
     {
+        $queuedState = get_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
+
+        if (func_num_args() === 0 && is_array($queuedState) && array_key_exists('log_write_result', $queuedState)) {
+            $logWriteResult = !empty($queuedState['log_write_result']);
+        }
+
+        delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
+
         if (!$this->isFileDeliveryEnabled()) {
             return false;
         }
@@ -112,6 +175,15 @@ final class AssetService
         return $written;
     }
 
+    /**
+     * Refresh cached runtime assets after the font library or settings change.
+     *
+     * @since 1.4.0
+     *
+     * @param bool $invalidateCatalog Whether to invalidate the combined catalog before rebuilding CSS.
+     * @param bool $logWriteResult Whether the deferred generated-file refresh should log its outcome.
+     * @return void
+     */
     public function refreshGeneratedAssets(bool $invalidateCatalog = true, bool $logWriteResult = true): void
     {
         if ($invalidateCatalog) {
@@ -119,9 +191,17 @@ final class AssetService
         }
 
         $this->invalidate();
-        $this->ensureGeneratedCssFile($logWriteResult);
+        $this->queueGeneratedCssRegeneration($logWriteResult);
     }
 
+    /**
+     * Enqueue the generated stylesheet or its inline fallback for a WordPress style handle.
+     *
+     * @since 1.4.0
+     *
+     * @param string $handle Style handle that should receive the generated CSS.
+     * @return void
+     */
     public function enqueue(string $handle): void
     {
         $css = $this->getCss();
@@ -144,6 +224,14 @@ final class AssetService
         $this->ensureGeneratedCssFile();
     }
 
+    /**
+     * Enqueue only local @font-face rules for admin previews.
+     *
+     * @since 1.4.0
+     *
+     * @param string $handle Style handle that should receive the preview font-face CSS.
+     * @return void
+     */
     public function enqueueFontFacesOnly(string $handle): void
     {
         $catalog = $this->planner->getLocalPreviewCatalog();
@@ -158,6 +246,19 @@ final class AssetService
         }
     }
 
+    /**
+     * Return filesystem and hash information for the generated stylesheet.
+     *
+     * @since 1.4.0
+     *
+     * @return array{
+     *     path: string,
+     *     url: string,
+     *     exists: bool,
+     *     size: int,
+     *     expected_hash: string
+     * } Generated stylesheet status payload.
+     */
     public function getStatus(): array
     {
         $state = $this->getGeneratedStylesheetState();
@@ -171,6 +272,13 @@ final class AssetService
         ];
     }
 
+    /**
+     * Return the versioned public URL for the generated stylesheet file when available.
+     *
+     * @since 1.4.0
+     *
+     * @return string|null Versioned stylesheet URL, or null when the file delivery path is unavailable.
+     */
     public function getVersionedStylesheetUrl(): ?string
     {
         $state = $this->getGeneratedStylesheetState();
@@ -183,6 +291,13 @@ final class AssetService
         return add_query_arg('ver', (string) $state['expected_hash'], $url);
     }
 
+    /**
+     * Return same-origin preload candidates for the primary heading and body fonts.
+     *
+     * @since 1.4.0
+     *
+     * @return array<int, string> List of font preload URLs.
+     */
     public function getPrimaryFontPreloadUrls(): array
     {
         return $this->planner->getPrimaryFontPreloadUrls();
@@ -191,6 +306,30 @@ final class AssetService
     private function getVersionedCss(): string
     {
         return "/* Version: " . TASTY_FONTS_VERSION . " */\n" . $this->getCss();
+    }
+
+    private function queueGeneratedCssRegeneration(bool $logWriteResult = true): void
+    {
+        if (!$this->isFileDeliveryEnabled()) {
+            delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
+            return;
+        }
+
+        if (get_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED) !== false) {
+            return;
+        }
+
+        set_transient(
+            self::TRANSIENT_REGENERATE_CSS_QUEUED,
+            ['log_write_result' => $logWriteResult ? 1 : 0],
+            self::REGENERATE_CSS_QUEUE_TTL
+        );
+
+        $scheduled = wp_schedule_single_event(time(), self::ACTION_REGENERATE_CSS);
+
+        if ($scheduled === false || is_wp_error($scheduled)) {
+            delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
+        }
     }
 
     private function isFileDeliveryEnabled(): bool

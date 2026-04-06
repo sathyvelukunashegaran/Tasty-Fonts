@@ -4,13 +4,21 @@ declare(strict_types=1);
 
 namespace TastyFonts\Support;
 
+defined('ABSPATH') || exit;
+
 final class Storage
 {
     private ?array $storage = null;
+    private string $lastFilesystemErrorMessage = '';
 
     public function ensureRootDirectory(): bool
     {
         return $this->getRoot() !== null;
+    }
+
+    public function getLastFilesystemErrorMessage(): string
+    {
+        return $this->lastFilesystemErrorMessage;
     }
 
     public function get(): ?array
@@ -151,16 +159,26 @@ final class Storage
 
     public function ensureDirectory(string $path): bool
     {
+        $this->clearFilesystemError();
+
         if (is_dir($path)) {
             return true;
         }
 
-        return wp_mkdir_p($path);
+        if (wp_mkdir_p($path)) {
+            return true;
+        }
+
+        if (!$this->supportsDirectFilesystem($path)) {
+            return false;
+        }
+
+        return false;
     }
 
     public function writeAbsoluteFile(string $path, string $contents): bool
     {
-        if ($path === '' || !$this->initializeFilesystem()) {
+        if ($path === '' || !$this->initializeFilesystem(dirname($path))) {
             return false;
         }
 
@@ -217,7 +235,10 @@ final class Storage
             return true;
         }
 
-        if (!$this->initializeFilesystem()) {
+        $contextPath = $this->pathForRelativePath($paths[0]);
+        $context = is_string($contextPath) ? dirname($contextPath) : null;
+
+        if (!$this->initializeFilesystem($context)) {
             return false;
         }
 
@@ -262,7 +283,7 @@ final class Storage
             return true;
         }
 
-        if (!$this->initializeFilesystem()) {
+        if (!$this->initializeFilesystem(dirname($absolutePath))) {
             return false;
         }
 
@@ -309,15 +330,92 @@ final class Storage
         return ltrim(str_replace('\\', '/', $relativePath), '/');
     }
 
-    private function initializeFilesystem(): bool
+    private function initializeFilesystem(?string $context = null): bool
     {
         global $wp_filesystem;
 
-        if (!function_exists('WP_Filesystem')) {
+        $this->clearFilesystemError();
+
+        if (!$this->supportsDirectFilesystem($context)) {
+            return false;
+        }
+
+        if (!function_exists('WP_Filesystem') || !function_exists('get_filesystem_method')) {
             require_once ABSPATH . 'wp-admin/includes/file.php';
         }
 
-        return (bool) (WP_Filesystem() && $wp_filesystem);
+        $context = $this->filesystemContext($context);
+
+        if (!(WP_Filesystem(false, $context, false) && $wp_filesystem)) {
+            $this->setFilesystemErrorMessage(
+                __('Direct filesystem access could not be initialized. Tasty Fonts cannot manage font files until WordPress can use the direct filesystem method.', 'tasty-fonts')
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function supportsDirectFilesystem(?string $context = null): bool
+    {
+        if (!function_exists('WP_Filesystem') || !function_exists('get_filesystem_method')) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+
+        if (!function_exists('get_filesystem_method')) {
+            $this->setFilesystemErrorMessage(
+                __('Direct filesystem access could not be verified. Tasty Fonts cannot manage font files until WordPress can use the direct filesystem method.', 'tasty-fonts')
+            );
+
+            return false;
+        }
+
+        if (get_filesystem_method([], $this->filesystemContext($context), false) === 'direct') {
+            return true;
+        }
+
+        $this->setFilesystemErrorMessage(
+            __('Direct filesystem access is unavailable on this host. Tasty Fonts cannot write imported font files or generated stylesheets until WordPress can use the direct filesystem method.', 'tasty-fonts')
+        );
+
+        return false;
+    }
+
+    private function filesystemContext(?string $context = null): string
+    {
+        if (is_string($context) && trim($context) !== '') {
+            $context = wp_normalize_path($context);
+
+            return (is_dir($context) || !file_exists($context))
+                ? $context
+                : wp_normalize_path(dirname($context));
+        }
+
+        $root = $this->getRoot();
+
+        if (is_string($root) && $root !== '') {
+            return wp_normalize_path($root);
+        }
+
+        $uploads = wp_get_upload_dir();
+        $baseDir = (string) ($uploads['basedir'] ?? '');
+
+        if ($baseDir !== '') {
+            return wp_normalize_path($baseDir);
+        }
+
+        return '.';
+    }
+
+    private function clearFilesystemError(): void
+    {
+        $this->lastFilesystemErrorMessage = '';
+    }
+
+    private function setFilesystemErrorMessage(string $message): void
+    {
+        $this->lastFilesystemErrorMessage = trim($message);
     }
 
     private function cleanupEmptyDirectories(array $directories): void

@@ -6,8 +6,20 @@ if (!defined('TASTY_FONTS_VERSION')) {
     define('TASTY_FONTS_VERSION', '6.0.1');
 }
 
+if (!defined('ABSPATH')) {
+    define('ABSPATH', dirname(__DIR__) . '/');
+}
+
 if (!defined('TASTY_FONTS_URL')) {
     define('TASTY_FONTS_URL', 'https://example.test/wp-content/plugins/etch-fonts/');
+}
+
+if (!defined('TASTY_FONTS_DIR')) {
+    define('TASTY_FONTS_DIR', dirname(__DIR__) . '/');
+}
+
+if (!defined('TASTY_FONTS_FILE')) {
+    define('TASTY_FONTS_FILE', dirname(__DIR__) . '/plugin.php');
 }
 
 if (!defined('DAY_IN_SECONDS')) {
@@ -36,16 +48,19 @@ use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Admin\AdminPageRenderer;
+use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyCssParser;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Fonts\AssetService;
+use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
+use TastyFonts\Fonts\UploadedFileValidatorInterface;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleCssParser;
@@ -61,7 +76,11 @@ use TastyFonts\Support\Storage;
 if (!class_exists('WP_Error')) {
     class WP_Error extends RuntimeException
     {
-        public function __construct(private readonly string $errorCode = '', string $message = '')
+        public function __construct(
+            private readonly string $errorCode = '',
+            string $message = '',
+            private mixed $errorData = null
+        )
         {
             parent::__construct($message);
         }
@@ -75,13 +94,108 @@ if (!class_exists('WP_Error')) {
         {
             return $this->errorCode;
         }
+
+        public function get_error_data(): mixed
+        {
+            return $this->errorData;
+        }
+
+        public function add_data(mixed $data): void
+        {
+            $this->errorData = $data;
+        }
+    }
+}
+
+if (!class_exists('WP_REST_Response')) {
+    class WP_REST_Response
+    {
+        public function __construct(private mixed $data = null, private int $status = 200)
+        {
+        }
+
+        public function get_data(): mixed
+        {
+            return $this->data;
+        }
+
+        public function get_status(): int
+        {
+            return $this->status;
+        }
+
+        public function set_status(int $status): void
+        {
+            $this->status = $status;
+        }
+    }
+}
+
+if (!class_exists('WP_REST_Request')) {
+    class WP_REST_Request
+    {
+        private array $params = [];
+        private array $fileParams = [];
+
+        public function __construct(private readonly string $method = 'GET', private readonly string $route = '')
+        {
+        }
+
+        public function get_method(): string
+        {
+            return $this->method;
+        }
+
+        public function get_route(): string
+        {
+            return $this->route;
+        }
+
+        public function get_param(string $key): mixed
+        {
+            return $this->params[$key] ?? null;
+        }
+
+        public function get_params(): array
+        {
+            return $this->params;
+        }
+
+        public function set_param(string $key, mixed $value): void
+        {
+            $this->params[$key] = $value;
+        }
+
+        public function set_query_params(array $params): void
+        {
+            $this->params = array_replace($this->params, $params);
+        }
+
+        public function set_body_params(array $params): void
+        {
+            $this->params = array_replace($this->params, $params);
+        }
+
+        public function set_file_params(array $params): void
+        {
+            $this->fileParams = $params;
+        }
+
+        public function get_file_params(): array
+        {
+            return $this->fileParams;
+        }
     }
 }
 
 if (!function_exists('__')) {
     function __(string $text, string $domain = ''): string
     {
-        return $text;
+        global $translationMap;
+
+        return is_array($translationMap) && array_key_exists($text, $translationMap)
+            ? (string) $translationMap[$text]
+            : $text;
     }
 }
 
@@ -367,6 +481,7 @@ if (!function_exists('is_wp_error')) {
 $tests = [];
 $optionStore = [];
 $optionDeleted = [];
+$optionAutoload = [];
 $transientStore = [];
 $transientDeleted = [];
 $transientSet = [];
@@ -378,13 +493,23 @@ $wpdbQueries = [];
 $wp_filesystem = null;
 $remoteGetResponses = [];
 $remoteGetCalls = [];
+$remoteRequestResponses = [];
+$remoteRequestCalls = [];
 $enqueuedStyles = [];
 $registeredStyles = [];
 $inlineStyles = [];
 $enqueuedScripts = [];
 $localizedScripts = [];
+$scriptTranslations = [];
 $redirectLocation = '';
 $isAdminRequest = false;
+$hookCallbacks = [];
+$actionCounts = [];
+$actionCalls = [];
+$registeredRestRoutes = [];
+$scheduledEvents = [];
+$clearedScheduledHooks = [];
+$supportedPostTypes = ['wp_font_family', 'wp_font_face'];
 
 if (!function_exists('get_option')) {
     function get_option(string $option, mixed $default = false): mixed
@@ -398,9 +523,11 @@ if (!function_exists('get_option')) {
 if (!function_exists('update_option')) {
     function update_option(string $option, mixed $value, bool $autoload = false): bool
     {
+        global $optionAutoload;
         global $optionStore;
 
         $optionStore[$option] = $value;
+        $optionAutoload[$option] = $autoload;
 
         return true;
     }
@@ -409,10 +536,12 @@ if (!function_exists('update_option')) {
 if (!function_exists('delete_option')) {
     function delete_option(string $option): bool
     {
+        global $optionAutoload;
         global $optionDeleted;
         global $optionStore;
 
         $optionDeleted[] = $option;
+        unset($optionAutoload[$option]);
         unset($optionStore[$option]);
 
         return true;
@@ -454,16 +583,144 @@ if (!function_exists('delete_transient')) {
     }
 }
 
-if (!function_exists('WP_Filesystem')) {
-    function WP_Filesystem(): bool
+if (!function_exists('add_filter')) {
+    function add_filter(string $hookName, callable $callback, int $priority = 10, int $acceptedArgs = 1): bool
     {
+        global $hookCallbacks;
+
+        $hookCallbacks[$hookName][$priority][] = [
+            'callback' => $callback,
+            'accepted_args' => $acceptedArgs,
+        ];
+
+        return true;
+    }
+}
+
+if (!function_exists('apply_filters')) {
+    function apply_filters(string $hookName, mixed $value, mixed ...$args): mixed
+    {
+        global $hookCallbacks;
+
+        if (!isset($hookCallbacks[$hookName]) || !is_array($hookCallbacks[$hookName])) {
+            return $value;
+        }
+
+        ksort($hookCallbacks[$hookName]);
+
+        foreach ($hookCallbacks[$hookName] as $callbacks) {
+            foreach ((array) $callbacks as $callback) {
+                if (!is_array($callback) || !isset($callback['callback'])) {
+                    continue;
+                }
+
+                $acceptedArgs = max(1, (int) ($callback['accepted_args'] ?? 1));
+                $value = ($callback['callback'])(...array_slice([$value, ...$args], 0, $acceptedArgs));
+            }
+        }
+
+        return $value;
+    }
+}
+
+if (!function_exists('add_action')) {
+    function add_action(string $hookName, callable $callback, int $priority = 10, int $acceptedArgs = 1): bool
+    {
+        return add_filter($hookName, $callback, $priority, $acceptedArgs);
+    }
+}
+
+if (!function_exists('do_action')) {
+    function do_action(string $hookName, mixed ...$args): void
+    {
+        global $actionCalls;
+        global $actionCounts;
+        global $hookCallbacks;
+
+        $actionCounts[$hookName] = (int) ($actionCounts[$hookName] ?? 0) + 1;
+        $actionCalls[$hookName][] = $args;
+
+        if (!isset($hookCallbacks[$hookName]) || !is_array($hookCallbacks[$hookName])) {
+            return;
+        }
+
+        ksort($hookCallbacks[$hookName]);
+
+        foreach ($hookCallbacks[$hookName] as $callbacks) {
+            foreach ((array) $callbacks as $callback) {
+                if (!is_array($callback) || !isset($callback['callback'])) {
+                    continue;
+                }
+
+                $acceptedArgs = max(0, (int) ($callback['accepted_args'] ?? 1));
+                ($callback['callback'])(...array_slice($args, 0, $acceptedArgs));
+            }
+        }
+    }
+}
+
+if (!function_exists('did_action')) {
+    function did_action(string $hookName): int
+    {
+        global $actionCounts;
+
+        return (int) ($actionCounts[$hookName] ?? 0);
+    }
+}
+
+if (!function_exists('wp_schedule_single_event')) {
+    function wp_schedule_single_event(int $timestamp, string $hookName, array $args = [], bool $wpError = false): bool|WP_Error
+    {
+        global $scheduledEvents;
+
+        $scheduledEvents[] = [
+            'timestamp' => $timestamp,
+            'hook' => $hookName,
+            'args' => $args,
+        ];
+
+        return true;
+    }
+}
+
+if (!function_exists('wp_clear_scheduled_hook')) {
+    function wp_clear_scheduled_hook(string $hookName): int
+    {
+        global $clearedScheduledHooks;
+
+        $clearedScheduledHooks[] = $hookName;
+
+        return 1;
+    }
+}
+
+if (!function_exists('WP_Filesystem')) {
+    function WP_Filesystem(mixed $args = false, string|false $context = false, bool $allow_relaxed_file_ownership = false): bool
+    {
+        global $wpFilesystemInitCalls;
+        global $wpFilesystemShouldInit;
         global $wp_filesystem;
+
+        $wpFilesystemInitCalls[] = [
+            'args' => $args,
+            'context' => $context,
+            'allow_relaxed_file_ownership' => $allow_relaxed_file_ownership,
+        ];
 
         if (!$wp_filesystem instanceof TestWpFilesystem) {
             $wp_filesystem = new TestWpFilesystem();
         }
 
-        return true;
+        return $wpFilesystemShouldInit;
+    }
+}
+
+if (!function_exists('get_filesystem_method')) {
+    function get_filesystem_method(mixed $args = [], string $context = '', bool $allow_relaxed_file_ownership = false): string
+    {
+        global $filesystemMethod;
+
+        return is_string($filesystemMethod) && $filesystemMethod !== '' ? $filesystemMethod : 'direct';
     }
 }
 
@@ -489,6 +746,34 @@ if (!function_exists('wp_remote_get')) {
         $remoteGetCalls[] = ['url' => $url, 'args' => $args];
 
         return $remoteGetResponses[$url] ?? new WP_Error('missing_mock', 'No mock response for ' . $url);
+    }
+}
+
+if (!function_exists('wp_remote_request')) {
+    function wp_remote_request(string $url, array $args = []): mixed
+    {
+        global $remoteRequestCalls;
+        global $remoteRequestResponses;
+
+        $method = strtoupper((string) ($args['method'] ?? 'GET'));
+        $remoteRequestCalls[] = [
+            'method' => $method,
+            'url' => $url,
+            'args' => $args,
+        ];
+
+        return $remoteRequestResponses[$method . ' ' . $url]
+            ?? $remoteRequestResponses[$url]
+            ?? new WP_Error('missing_mock', 'No mock response for ' . $method . ' ' . $url);
+    }
+}
+
+if (!function_exists('wp_remote_post')) {
+    function wp_remote_post(string $url, array $args = []): mixed
+    {
+        $args['method'] = 'POST';
+
+        return wp_remote_request($url, $args);
     }
 }
 
@@ -581,6 +866,20 @@ if (!function_exists('wp_localize_script')) {
     }
 }
 
+if (!function_exists('wp_set_script_translations')) {
+    function wp_set_script_translations(string $handle, string $domain = 'default', string $path = ''): bool
+    {
+        global $scriptTranslations;
+
+        $scriptTranslations[$handle] = [
+            'domain' => $domain,
+            'path' => $path,
+        ];
+
+        return true;
+    }
+}
+
 if (!function_exists('add_query_arg')) {
     function add_query_arg(mixed $key, mixed $value = null, string $url = ''): string
     {
@@ -604,10 +903,24 @@ if (!function_exists('add_query_arg')) {
     }
 }
 
+if (!function_exists('plugin_basename')) {
+    function plugin_basename(string $file): string
+    {
+        return basename(dirname($file)) . '/' . basename($file);
+    }
+}
+
 if (!function_exists('admin_url')) {
     function admin_url(string $path = ''): string
     {
         return 'https://example.test/wp-admin/' . ltrim($path, '/');
+    }
+}
+
+if (!function_exists('rest_url')) {
+    function rest_url(string $path = ''): string
+    {
+        return 'https://example.test/wp-json/' . ltrim($path, '/');
     }
 }
 
@@ -643,12 +956,55 @@ if (!function_exists('current_user_can')) {
     }
 }
 
+if (!function_exists('register_rest_route')) {
+    function register_rest_route(string $namespace, string $route, array $args = [], bool $override = false): bool
+    {
+        global $registeredRestRoutes;
+
+        $registeredRestRoutes[$namespace . $route] = [
+            'namespace' => $namespace,
+            'route' => $route,
+            'args' => $args,
+            'override' => $override,
+        ];
+
+        return true;
+    }
+}
+
+if (!function_exists('rest_ensure_response')) {
+    function rest_ensure_response(mixed $response): WP_REST_Response
+    {
+        if ($response instanceof WP_REST_Response) {
+            return $response;
+        }
+
+        return new WP_REST_Response($response);
+    }
+}
+
 if (!function_exists('get_current_user_id')) {
     function get_current_user_id(): int
     {
         global $currentUserId;
 
         return $currentUserId;
+    }
+}
+
+if (!function_exists('post_type_exists')) {
+    function post_type_exists(string $postType): bool
+    {
+        global $supportedPostTypes;
+
+        return in_array($postType, $supportedPostTypes, true);
+    }
+}
+
+if (!function_exists('wp_json_encode')) {
+    function wp_json_encode(mixed $value, int $flags = 0, int $depth = 512): string|false
+    {
+        return json_encode($value, $flags, $depth);
     }
 }
 
@@ -735,6 +1091,16 @@ final class TestWpFilesystem
     }
 }
 
+final class StubUploadedFileValidator implements UploadedFileValidatorInterface
+{
+    public function isUploadedFile(string $tmpName): bool
+    {
+        global $uploadedFilePaths;
+
+        return in_array($tmpName, $uploadedFilePaths, true);
+    }
+}
+
 final class TestWpdb
 {
     public string $options = 'wp_options';
@@ -771,41 +1137,71 @@ function uniqueTestDirectory(string $name): string
 
 function resetTestState(): void
 {
+    global $actionCalls;
+    global $actionCounts;
+    global $filesystemMethod;
     global $enqueuedScripts;
     global $enqueuedStyles;
+    global $hookCallbacks;
     global $inlineStyles;
     global $isAdminRequest;
     global $localizedScripts;
     global $currentUserId;
+    global $optionAutoload;
     global $optionDeleted;
     global $optionStore;
     global $redirectLocation;
     global $registeredStyles;
+    global $registeredRestRoutes;
     global $remoteGetCalls;
     global $remoteGetResponses;
+    global $remoteRequestCalls;
+    global $remoteRequestResponses;
+    global $scheduledEvents;
+    global $clearedScheduledHooks;
+    global $scriptTranslations;
+    global $supportedPostTypes;
     global $transientDeleted;
     global $transientSet;
     global $transientStore;
+    global $translationMap;
     global $uploadedFilePaths;
+    global $wpFilesystemInitCalls;
+    global $wpFilesystemShouldInit;
     global $wpdb;
     global $wpdbQueries;
     global $wp_filesystem;
     global $uploadBaseDir;
 
+    $filesystemMethod = 'direct';
+    $optionAutoload = [];
     $optionStore = [];
     $optionDeleted = [];
     $transientStore = [];
     $transientDeleted = [];
     $transientSet = [];
+    $translationMap = [];
     $remoteGetResponses = [];
     $remoteGetCalls = [];
+    $remoteRequestResponses = [];
+    $remoteRequestCalls = [];
+    $scheduledEvents = [];
+    $clearedScheduledHooks = [];
+    $wpFilesystemInitCalls = [];
+    $wpFilesystemShouldInit = true;
     $enqueuedStyles = [];
     $registeredStyles = [];
     $inlineStyles = [];
     $enqueuedScripts = [];
     $localizedScripts = [];
+    $scriptTranslations = [];
     $redirectLocation = '';
     $isAdminRequest = false;
+    $hookCallbacks = [];
+    $actionCounts = [];
+    $actionCalls = [];
+    $registeredRestRoutes = [];
+    $supportedPostTypes = ['wp_font_family', 'wp_font_face'];
     $uploadBaseDir = uniqueTestDirectory('uploads');
     $uploadedFilePaths = [];
     $currentUserId = 1;
@@ -850,14 +1246,11 @@ function makeServiceGraph(): array
         $assets,
         $settings,
         $log,
-        static function (string $filename): bool {
-            global $uploadedFilePaths;
-
-            return in_array($filename, $uploadedFilePaths, true);
-        }
+        new StubUploadedFileValidator()
     );
     $bunnyImport = new BunnyImportService($storage, $imports, $bunny, new BunnyCssParser(), $catalog, $assets, $log);
     $googleImport = new GoogleImportService($storage, $imports, $google, new GoogleCssParser(), $catalog, $assets, $log);
+    $blockEditorFontLibrary = new BlockEditorFontLibraryService($storage, $imports, $settings, $log);
     $controller = new AdminController(
         $storage,
         $settings,
@@ -873,6 +1266,7 @@ function makeServiceGraph(): array
         $google,
         $googleImport
     );
+    $rest = new RestController($controller);
     $runtime = new RuntimeService($planner, $assets, $adobe);
 
     return [
@@ -890,9 +1284,19 @@ function makeServiceGraph(): array
         'bunny_import' => $bunnyImport,
         'google' => $google,
         'google_import' => $googleImport,
+        'block_editor_font_library' => $blockEditorFontLibrary,
         'controller' => $controller,
+        'rest' => $rest,
         'runtime' => $runtime,
     ];
+}
+
+function resetPluginSingleton(): void
+{
+    $reflection = new ReflectionClass(Plugin::class);
+    $property = $reflection->getProperty('instance');
+    $property->setAccessible(true);
+    $property->setValue(null, null);
 }
 
 $tests['font_filename_parser_detects_weight_and_style'] = static function (): void {
@@ -1108,6 +1512,83 @@ HTML,
     );
 };
 
+$tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_full_family_metadata_on_demand'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteGetResponses;
+    global $transientStore;
+
+    $settings = new SettingsRepository();
+    $settings->saveSettings(['google_api_key' => 'api-key']);
+    $settings->saveGoogleApiKeyStatus('valid', 'Ready');
+    $client = new GoogleFontsClient($settings);
+    $catalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
+    $remoteGetResponses[$catalogUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'application/json'],
+        'body' => json_encode(
+            [
+                'items' => [
+                    [
+                        'family' => 'Inter',
+                        'category' => 'sans-serif',
+                        'variants' => ['regular', '700'],
+                        'subsets' => ['latin'],
+                        'version' => 'v18',
+                        'lastModified' => '2024-01-01',
+                    ],
+                    [
+                        'family' => 'Lora',
+                        'category' => 'serif',
+                        'variants' => ['regular'],
+                        'subsets' => ['latin'],
+                        'version' => 'v35',
+                        'lastModified' => '2024-01-02',
+                    ],
+                ],
+            ]
+        ),
+    ];
+
+    $results = $client->searchFamilies('int', 5);
+    $resultsAgain = $client->searchFamilies('int', 5);
+    $family = (new GoogleFontsClient($settings))->getFamily('Inter');
+
+    assertSameValue(
+        [
+            [
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'category' => 'sans-serif',
+                'variants_count' => 2,
+            ],
+        ],
+        $results,
+        'Google search should return compact search items from the cached catalog index.'
+    );
+    assertSameValue($results, $resultsAgain, 'Repeated Google searches in the same request should reuse the in-memory compact catalog index.');
+    assertSameValue(
+        [
+            'inter' => [
+                'family' => 'Inter',
+                'category' => 'sans-serif',
+                'variants_count' => 2,
+            ],
+            'lora' => [
+                'family' => 'Lora',
+                'category' => 'serif',
+                'variants_count' => 1,
+            ],
+        ],
+        $transientStore['tasty_fonts_google_catalog_v1'] ?? null,
+        'The Google catalog transient should only store the compact search index.'
+    );
+    assertSameValue(2, count($remoteGetCalls), 'Google family metadata lookups should refetch the full catalog when only the compact search index is cached.');
+    assertSameValue(['regular', '700'], $family['variants'] ?? null, 'Google family lookups should still return full variant metadata on demand.');
+    assertSameValue('v18', (string) ($family['version'] ?? ''), 'Google family lookups should still return full catalog metadata on demand.');
+};
+
 $tests['bunny_css_parser_extracts_woff2_faces_and_unicode_ranges'] = static function (): void {
     $css = <<<'CSS'
 @font-face {
@@ -1190,6 +1671,18 @@ CSS,
         'body' => 'bold-font-data',
     ];
 
+    $importProvider = '';
+    $importStatus = '';
+    add_action(
+        'tasty_fonts_after_import',
+        static function (array $result, string $provider) use (&$importProvider, &$importStatus): void {
+            $importProvider = $provider;
+            $importStatus = (string) ($result['status'] ?? '');
+        },
+        10,
+        2
+    );
+
     $result = $services['bunny_import']->importFamily('Inter', ['regular', '700']);
     $import = $services['imports']->get('inter');
     $profile = (array) (($import['delivery_profiles']['bunny-self_hosted'] ?? null) ?: []);
@@ -1209,6 +1702,98 @@ CSS,
     assertContainsValue($latinUrl, implode("\n", $downloadUrls), 'Bunny imports should download the preferred latin regular face.');
     assertContainsValue($boldUrl, implode("\n", $downloadUrls), 'Bunny imports should download the requested bold face.');
     assertNotContainsValue($greekUrl, implode("\n", $downloadUrls), 'Bunny imports should skip lower-priority subset faces for the same axis.');
+    assertSameValue(1, did_action('tasty_fonts_after_import'), 'Bunny imports should fire the tasty_fonts_after_import action.');
+    assertSameValue('bunny', $importProvider, 'Bunny imports should identify the provider when firing tasty_fonts_after_import.');
+    assertSameValue('imported', $importStatus, 'Bunny imports should pass the import result payload to tasty_fonts_after_import.');
+};
+
+$tests['google_import_service_fires_after_import_action'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $cssUrl = $services['google']->buildCssUrl('Inter', ['regular']);
+    $fontUrl = 'https://fonts.gstatic.com/s/inter/v18/inter-400-normal.woff2';
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.gstatic.com/s/inter/v18/inter-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+CSS,
+    ];
+    $remoteGetResponses[$fontUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data',
+    ];
+
+    $importProvider = '';
+    $importResult = [];
+    add_action(
+        'tasty_fonts_after_import',
+        static function (array $result, string $provider) use (&$importProvider, &$importResult): void {
+            $importProvider = $provider;
+            $importResult = $result;
+        },
+        10,
+        2
+    );
+
+    $result = $services['google_import']->importFamily('Inter', ['regular']);
+
+    assertSameValue('imported', (string) ($result['status'] ?? ''), 'Google imports should still succeed when the after-import action is registered.');
+    assertSameValue(1, did_action('tasty_fonts_after_import'), 'Google imports should fire the tasty_fonts_after_import action.');
+    assertSameValue('google', $importProvider, 'Google imports should identify the provider when firing tasty_fonts_after_import.');
+    assertSameValue('imported', (string) ($importResult['status'] ?? ''), 'Google imports should pass the import result payload to tasty_fonts_after_import.');
+};
+
+$tests['bunny_import_service_reports_direct_filesystem_requirement'] = static function (): void {
+    resetTestState();
+
+    global $filesystemMethod;
+    global $remoteGetResponses;
+    global $wpFilesystemInitCalls;
+
+    $filesystemMethod = 'ftpext';
+
+    $services = makeServiceGraph();
+    $cssUrl = $services['bunny']->buildCssUrl('Inter', ['regular']);
+    $latinUrl = 'https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2';
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+CSS,
+    ];
+    $remoteGetResponses[$latinUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data',
+    ];
+
+    $result = $services['bunny_import']->importFamily('Inter', ['regular']);
+
+    assertSameValue(true, is_wp_error($result), 'Bunny imports should fail with a WP_Error when direct filesystem access is unavailable.');
+    assertContainsValue(
+        'Direct filesystem access is unavailable',
+        $result->get_error_message(),
+        'Bunny imports should surface the direct filesystem requirement instead of a generic write failure.'
+    );
+    assertSameValue(0, count($wpFilesystemInitCalls), 'Bunny imports should not initialize WP_Filesystem when the direct method is unavailable.');
 };
 
 $tests['bunny_import_service_skips_existing_variants_and_can_coexist_with_local_faces'] = static function (): void {
@@ -1302,6 +1887,18 @@ CSS,
         'body' => 'latin-font-data',
     ];
 
+    $deletedFamilySlug = '';
+    $deletedFamilyName = '';
+    add_action(
+        'tasty_fonts_after_delete_family',
+        static function (string $familySlug, string $familyName) use (&$deletedFamilySlug, &$deletedFamilyName): void {
+            $deletedFamilySlug = $familySlug;
+            $deletedFamilyName = $familyName;
+        },
+        10,
+        2
+    );
+
     $services['bunny_import']->importFamily('Inter', ['regular']);
     $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('lora/Lora-400-normal.woff2'), 'font-data');
     $services['settings']->saveRoles(
@@ -1320,6 +1917,9 @@ CSS,
     assertSameValue(true, $result, 'Bunny-imported families should be deletable from the library.');
     assertSameValue(null, $services['imports']->get('inter'), 'Deleting a Bunny family should remove its import manifest entry.');
     assertSameValue(false, is_string($familyDirectory) && file_exists($familyDirectory), 'Deleting a Bunny family should remove its provider directory from uploads/fonts.');
+    assertSameValue(1, did_action('tasty_fonts_after_delete_family'), 'Deleting a family should fire the tasty_fonts_after_delete_family action.');
+    assertSameValue('inter', $deletedFamilySlug, 'Deleting a family should pass the deleted slug to tasty_fonts_after_delete_family.');
+    assertSameValue('Inter', $deletedFamilyName, 'Deleting a family should pass the deleted name to tasty_fonts_after_delete_family.');
 };
 
 $tests['adobe_css_parser_groups_families_and_dedupes_faces'] = static function (): void {
@@ -1646,6 +2246,28 @@ $tests['storage_returns_absolute_generated_css_url'] = static function (): void 
     );
 };
 
+$tests['catalog_service_applies_catalog_filter_before_returning_results'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2'), 'font-data');
+
+    add_filter(
+        'tasty_fonts_catalog',
+        static function (array $catalog): array {
+            unset($catalog['Inter']);
+
+            return $catalog;
+        }
+    );
+
+    $catalog = $services['catalog']->getCatalog();
+    $counts = $services['catalog']->getCounts();
+
+    assertSameValue(false, isset($catalog['Inter']), 'Catalog filters should be able to remove families before getCatalog() returns.');
+    assertSameValue(0, (int) ($counts['families'] ?? -1), 'Catalog counts should reflect the filtered catalog payload.');
+};
+
 $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static function (): void {
     resetTestState();
 
@@ -1668,6 +2290,7 @@ $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static f
 $tests['storage_writes_absolute_files_via_wp_filesystem'] = static function (): void {
     resetTestState();
 
+    global $wpFilesystemInitCalls;
     global $wp_filesystem;
 
     $storage = new Storage();
@@ -1677,6 +2300,28 @@ $tests['storage_writes_absolute_files_via_wp_filesystem'] = static function (): 
     assertSameValue(true, $written, 'Storage should write absolute files through the shared filesystem bridge.');
     assertSameValue('font-data', (string) file_get_contents($targetPath), 'Storage writes should persist the provided file contents.');
     assertSameValue(true, in_array(dirname($targetPath), $wp_filesystem->mkdirCalls, true), 'Storage writes should create missing parent directories before writing.');
+    assertSameValue(1, count($wpFilesystemInitCalls), 'Storage writes should initialize the shared filesystem bridge once per write.');
+};
+
+$tests['storage_skips_wp_filesystem_when_direct_method_is_unavailable'] = static function (): void {
+    resetTestState();
+
+    global $filesystemMethod;
+    global $wpFilesystemInitCalls;
+
+    $filesystemMethod = 'ftpext';
+
+    $storage = new Storage();
+    $targetPath = uniqueTestDirectory('storage-no-direct') . '/families/inter/inter-400.woff2';
+    $written = $storage->writeAbsoluteFile($targetPath, 'font-data');
+
+    assertSameValue(false, $written, 'Storage writes should fail fast when WordPress cannot use the direct filesystem method.');
+    assertSameValue(0, count($wpFilesystemInitCalls), 'Storage should not bootstrap WP_Filesystem when the direct method is unavailable.');
+    assertContainsValue(
+        'Direct filesystem access is unavailable',
+        $storage->getLastFilesystemErrorMessage(),
+        'Storage should expose a clear error message when direct filesystem access is unavailable.'
+    );
 };
 
 $tests['storage_can_copy_absolute_files_without_buffering_contents'] = static function (): void {
@@ -1708,6 +2353,101 @@ $tests['google_fonts_client_clears_catalog_cache'] = static function (): void {
 
     assertSameValue(false, array_key_exists('tasty_fonts_google_catalog_v1', $transientStore), 'Google catalog cache clearing should remove the cached catalog transient.');
     assertSameValue(true, in_array('tasty_fonts_google_catalog_v1', $transientDeleted, true), 'Google catalog cache clearing should delete the expected transient key.');
+};
+
+$tests['provider_clients_apply_http_request_args_filters'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteGetResponses;
+
+    add_filter(
+        'tasty_fonts_http_request_args',
+        static function (array $args, string $url): array {
+            $host = (string) (wp_parse_url($url, PHP_URL_HOST) ?? '');
+            $headers = is_array($args['headers'] ?? null) ? $args['headers'] : [];
+            $headers['X-Tasty-Test'] = $host;
+            $args['headers'] = $headers;
+            $args['timeout'] = 99;
+
+            return $args;
+        },
+        10,
+        2
+    );
+
+    $settings = new SettingsRepository();
+    $google = new GoogleFontsClient($settings);
+    $bunny = new BunnyFontsClient();
+    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $googleCatalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
+    $googleCssUrl = $google->buildCssUrl('Inter', ['regular']);
+    $bunnyFamilyUrl = 'https://fonts.bunny.net/family/inter';
+    $bunnyCssUrl = $bunny->buildCssUrl('Inter', ['regular']);
+    $adobeUrl = 'https://use.typekit.net/abc1234.css';
+
+    $remoteGetResponses[$googleCatalogUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'application/json'],
+        'body' => '{"items":[]}',
+    ];
+    $remoteGetResponses[$googleCssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => '@font-face{font-family:"Inter";font-style:normal;font-weight:400;src:url(https://fonts.gstatic.com/s/inter/v1/inter.woff2) format("woff2");}',
+    ];
+    $remoteGetResponses[$bunnyFamilyUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/html'],
+        'body' => <<<'HTML'
+<!doctype html>
+<html>
+<head>
+    <title>Inter | Bunny Fonts</title>
+</head>
+<body>
+    <div class="family"><h3>Sans Serif</h3></div>
+    <div class="styles">1 style</div>
+    <div class="card-main"><h1>Inter</h1></div>
+    <link href="https://fonts.bunny.net/css?family=inter:400," rel="stylesheet" />
+</body>
+</html>
+HTML,
+    ];
+    $remoteGetResponses[$bunnyCssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => '@font-face{font-family:"Inter";font-style:normal;font-weight:400;src:url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format("woff2");}',
+    ];
+    $remoteGetResponses[$adobeUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: "ff-tisa-web-pro";
+  font-style: normal;
+  font-weight: 400;
+  src: url("https://use.typekit.net/af/abc123/000000000000000000000000/30/l?primer=1") format("woff2");
+}
+CSS,
+    ];
+
+    $google->validateApiKey('api-key');
+    $google->fetchCss('Inter', ['regular']);
+    $bunny->getFamily('Inter');
+    $bunny->fetchCss('Inter', ['regular']);
+    $adobe->validateProject('abc1234');
+
+    assertSameValue(5, count($remoteGetCalls), 'The HTTP args filter test should exercise each provider client.');
+
+    foreach ($remoteGetCalls as $call) {
+        $url = (string) ($call['url'] ?? '');
+        $args = (array) ($call['args'] ?? []);
+        $headers = is_array($args['headers'] ?? null) ? $args['headers'] : [];
+
+        assertSameValue(99, (int) ($args['timeout'] ?? 0), 'HTTP request args filters should be able to override timeouts for ' . $url . '.');
+        assertSameValue(true, isset($headers['X-Tasty-Test']) && $headers['X-Tasty-Test'] !== '', 'HTTP request args filters should be able to inject headers for ' . $url . '.');
+    }
 };
 
 $tests['adobe_project_client_validates_project_and_reuses_cached_families'] = static function (): void {
@@ -1794,6 +2534,103 @@ $tests['settings_repository_persists_adobe_project_state'] = static function ():
     assertSameValue(false, $cleared['adobe_enabled'], 'Clearing an Adobe project should disable remote loading.');
     assertSameValue('', $cleared['adobe_project_id'], 'Clearing an Adobe project should remove the saved project ID.');
     assertSameValue('empty', $cleared['adobe_project_status'], 'Clearing an Adobe project should reset the status to empty.');
+};
+
+$tests['settings_repository_persists_google_api_key_data_in_dedicated_option'] = static function (): void {
+    resetTestState();
+
+    global $optionAutoload;
+    global $optionStore;
+
+    $settings = new SettingsRepository();
+    $saved = $settings->saveSettings(['google_api_key' => '  live-key  ']);
+
+    assertSameValue('live-key', $saved['google_api_key'], 'Saving a Google API key should still expose the trimmed key through getSettings/saveSettings.');
+    assertSameValue(
+        false,
+        array_key_exists('google_api_key', (array) ($optionStore[SettingsRepository::OPTION_SETTINGS] ?? [])),
+        'The main settings option should no longer persist the Google API key.'
+    );
+    assertSameValue(
+        [
+            'google_api_key' => 'live-key',
+            'google_api_key_status' => 'unknown',
+            'google_api_key_status_message' => '',
+            'google_api_key_checked_at' => 0,
+        ],
+        $optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA] ?? null,
+        'Google API key data should be stored in its dedicated option row.'
+    );
+    assertSameValue(
+        false,
+        $optionAutoload[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA] ?? null,
+        'The dedicated Google API key option should be saved with autoload disabled.'
+    );
+};
+
+$tests['settings_repository_migrates_legacy_google_api_key_data_when_saving_other_settings'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'preview_sentence' => 'Legacy preview',
+        'google_api_key' => 'legacy-key',
+        'google_api_key_status' => 'valid',
+        'google_api_key_status_message' => 'Ready',
+        'google_api_key_checked_at' => 123,
+    ];
+
+    $settings = new SettingsRepository();
+    $saved = $settings->saveSettings(['preview_sentence' => 'Updated preview']);
+
+    assertSameValue('legacy-key', $saved['google_api_key'], 'Saving unrelated settings should preserve the existing Google API key during migration.');
+    assertSameValue(
+        false,
+        array_key_exists('google_api_key', (array) ($optionStore[SettingsRepository::OPTION_SETTINGS] ?? [])),
+        'Migrated main settings should no longer keep Google API key fields in the shared settings blob.'
+    );
+    assertSameValue('Updated preview', (string) ($optionStore[SettingsRepository::OPTION_SETTINGS]['preview_sentence'] ?? ''), 'Unrelated settings should still save into the main settings option.');
+    assertSameValue(
+        [
+            'google_api_key' => 'legacy-key',
+            'google_api_key_status' => 'valid',
+            'google_api_key_status_message' => 'Ready',
+            'google_api_key_checked_at' => 123,
+        ],
+        $optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA] ?? null,
+        'Saving unrelated settings should migrate legacy Google API key data into the dedicated option.'
+    );
+};
+
+$tests['settings_repository_updates_google_key_status_without_rewriting_main_settings'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'preview_sentence' => 'Keep this',
+    ];
+    $optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA] = [
+        'google_api_key' => 'live-key',
+        'google_api_key_status' => 'unknown',
+        'google_api_key_status_message' => '',
+        'google_api_key_checked_at' => 0,
+    ];
+
+    $settings = new SettingsRepository();
+    $settings->saveGoogleApiKeyStatus('valid', 'Ready');
+
+    assertSameValue(
+        ['preview_sentence' => 'Keep this'],
+        $optionStore[SettingsRepository::OPTION_SETTINGS] ?? null,
+        'Updating Google API key validation state should not rewrite the main settings option.'
+    );
+    assertSameValue(
+        'valid',
+        (string) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_status'] ?? ''),
+        'Updating Google API key validation state should only touch the dedicated option.'
+    );
 };
 
 $tests['settings_repository_persists_delete_files_on_uninstall_preference'] = static function (): void {
@@ -1959,10 +2796,11 @@ $tests['repositories_migrate_legacy_option_keys'] = static function (): void {
     assertSameValue('Legacy log entry', (string) ($log[0]['message'] ?? ''), 'Logs should remain available after migrating the option key.');
 };
 
-$tests['asset_service_refresh_generated_assets_invalidates_caches_and_rewrites_css'] = static function (): void {
+$tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css_regeneration'] = static function (): void {
     resetTestState();
 
     global $optionStore;
+    global $scheduledEvents;
     global $transientDeleted;
     global $transientStore;
 
@@ -1997,17 +2835,63 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_rewrites_c
     $assets->refreshGeneratedAssets();
 
     $generatedPath = $storage->getGeneratedCssPath();
-    $generatedCss = is_string($generatedPath) && file_exists($generatedPath)
-        ? (string) file_get_contents($generatedPath)
-        : '';
 
-    assertSameValue(true, is_string($generatedPath) && file_exists($generatedPath), 'Refreshing generated assets should rewrite the generated CSS file.');
-    assertContainsValue('/* Version: ' . TASTY_FONTS_VERSION . ' */', $generatedCss, 'Refreshing generated assets should write the versioned CSS header.');
+    assertSameValue(false, is_string($generatedPath) && file_exists($generatedPath), 'Refreshing generated assets should defer writing the generated CSS file.');
     assertSameValue(true, in_array('tasty_fonts_catalog_v2', $transientDeleted, true), 'Refreshing generated assets should invalidate the catalog cache first.');
     assertSameValue(true, in_array('tasty_fonts_css_v2', $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS payload.');
     assertSameValue(true, in_array('tasty_fonts_css_hash_v2', $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS hash.');
-    assertSameValue(true, array_key_exists('tasty_fonts_css_v2', $transientStore), 'Refreshing generated assets should rebuild the CSS transient after invalidation.');
-    assertSameValue(true, array_key_exists('tasty_fonts_css_hash_v2', $transientStore), 'Refreshing generated assets should rebuild the CSS hash transient after invalidation.');
+    assertSameValue(false, array_key_exists('tasty_fonts_css_v2', $transientStore), 'Refreshing generated assets should leave CSS transient regeneration to the next request.');
+    assertSameValue(false, array_key_exists('tasty_fonts_css_hash_v2', $transientStore), 'Refreshing generated assets should leave CSS hash regeneration to the next request.');
+    assertSameValue(
+        [
+            [
+                'timestamp' => $scheduledEvents[0]['timestamp'] ?? null,
+                'hook' => AssetService::ACTION_REGENERATE_CSS,
+                'args' => [],
+            ],
+        ],
+        array_map(
+            static fn (array $event): array => [
+                'timestamp' => $event['timestamp'] ?? null,
+                'hook' => $event['hook'] ?? '',
+                'args' => $event['args'] ?? [],
+            ],
+            $scheduledEvents
+        ),
+        'Refreshing generated assets should queue a single background CSS regeneration event.'
+    );
+    assertSameValue(
+        ['log_write_result' => 1],
+        $transientStore['tasty_fonts_regenerate_css_queued'] ?? null,
+        'Refreshing generated assets should set a short-lived cron guard transient.'
+    );
+};
+
+$tests['asset_service_applies_generated_css_filter_before_caching'] = static function (): void {
+    resetTestState();
+
+    global $transientStore;
+
+    $services = makeServiceGraph();
+    $filterReceivedContext = false;
+    add_filter(
+        'tasty_fonts_generated_css',
+        static function (string $css, array $localCatalog, array $roles, array $settings) use (&$filterReceivedContext): string {
+            $filterReceivedContext = array_key_exists('css_delivery_mode', $settings)
+                && is_array($localCatalog)
+                && is_array($roles);
+
+            return $css . "\nbody{letter-spacing:.02em;}";
+        },
+        10,
+        4
+    );
+
+    $css = $services['assets']->getCss();
+
+    assertSameValue(true, $filterReceivedContext, 'Generated CSS filters should receive the runtime catalog, roles, and settings context.');
+    assertContainsValue('body{letter-spacing:.02em;}', $css, 'Generated CSS filters should be able to append CSS before the payload is returned.');
+    assertContainsValue('body{letter-spacing:.02em;}', (string) ($transientStore['tasty_fonts_css_v2'] ?? ''), 'Generated CSS filters should run before the CSS transient is written.');
 };
 
 $tests['asset_service_can_refresh_generated_assets_without_logging_file_writes'] = static function (): void {
@@ -2015,9 +2899,28 @@ $tests['asset_service_can_refresh_generated_assets_without_logging_file_writes']
 
     $services = makeServiceGraph();
     $services['assets']->refreshGeneratedAssets(true, false);
+    $services['assets']->ensureGeneratedCssFile();
     $entries = $services['log']->all();
 
-    assertSameValue(0, count($entries), 'Refreshing generated assets with logging disabled should not add the low-level generated CSS write log entry.');
+    assertSameValue(0, count($entries), 'Deferred CSS regeneration should honor the no-log file write option.');
+};
+
+$tests['asset_service_debounces_background_css_regeneration_events'] = static function (): void {
+    resetTestState();
+
+    global $scheduledEvents;
+    global $transientStore;
+
+    $services = makeServiceGraph();
+    $services['assets']->refreshGeneratedAssets();
+    $services['assets']->refreshGeneratedAssets();
+
+    assertSameValue(1, count($scheduledEvents), 'Repeated asset invalidations in a short window should only queue one background CSS regeneration event.');
+    assertSameValue(
+        ['log_write_result' => 1],
+        $transientStore['tasty_fonts_regenerate_css_queued'] ?? null,
+        'Queued CSS regeneration should keep the short-lived guard transient until the write runs.'
+    );
 };
 
 $tests['admin_controller_merges_adobe_families_into_selectable_role_names'] = static function (): void {
@@ -2161,21 +3064,21 @@ $tests['runtime_service_skips_font_preloads_when_setting_or_live_roles_are_disab
     assertSameValue('', $outputWithPreloadsOff, 'Frontend preload output should stay empty when the preload setting is turned off.');
 };
 
-$tests['admin_controller_falls_back_to_variant_tokens_when_variants_are_missing'] = static function (): void {
+$tests['rest_controller_falls_back_to_variant_tokens_when_variants_are_missing'] = static function (): void {
     resetTestState();
 
-    $_POST['variant_tokens'] = 'regular, 700italic';
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/google/import');
+    $request->set_body_params(['variant_tokens' => 'regular, 700italic']);
+    $variants = invokePrivateMethod($services['rest'], 'getVariantTokens', [$request]);
 
-    $controller = makeAdminControllerTestInstance();
-    $variants = invokePrivateMethod($controller, 'getPostedGoogleVariants');
-
-    assertSameValue(['regular', '700italic'], $variants, 'Google import requests should fall back to the comma-separated variant token field when checkbox values are absent.');
+    assertSameValue(['regular', '700italic'], $variants, 'REST import requests should fall back to the comma-separated variant token field when an explicit variants array is absent.');
 };
 
 $tests['admin_controller_normalizes_uploaded_files_by_sparse_row_index'] = static function (): void {
     resetTestState();
 
-    $_POST['rows'] = [
+    $postedRows = [
         7 => [
             'family' => 'Inter',
             'weight' => '400',
@@ -2183,7 +3086,7 @@ $tests['admin_controller_normalizes_uploaded_files_by_sparse_row_index'] = stati
             'fallback' => 'Arial, sans-serif',
         ],
     ];
-    $_FILES['files'] = [
+    $rawFiles = [
         'name' => [7 => 'inter-400-italic.woff2'],
         'type' => [7 => 'font/woff2'],
         'tmp_name' => [7 => '/tmp/php-font'],
@@ -2191,11 +3094,12 @@ $tests['admin_controller_normalizes_uploaded_files_by_sparse_row_index'] = stati
         'size' => [7 => 2048],
     ];
 
-    $controller = makeAdminControllerTestInstance();
-    $rows = invokePrivateMethod($controller, 'getPostedUploadRows');
+    $services = makeServiceGraph();
+    $rows = $services['controller']->prepareUploadRows($postedRows, $rawFiles);
 
     assertSameValue('Inter', $rows[0]['family'], 'Uploaded row normalization should preserve the family name.');
     assertSameValue('italic', $rows[0]['style'], 'Uploaded row normalization should preserve the submitted style.');
+    assertSameValue('Arial, sans-serif', $rows[0]['fallback'], 'Uploaded row normalization should preserve the submitted fallback.');
     assertSameValue('inter-400-italic.woff2', $rows[0]['file']['name'], 'Uploaded row normalization should attach the correct file payload to a sparse row index.');
     assertSameValue(2048, $rows[0]['file']['size'], 'Uploaded row normalization should preserve the uploaded file size.');
 };
@@ -2627,6 +3531,84 @@ $tests['font_utils_modern_user_agent_tracks_a_recent_chrome_release'] = static f
     assertContainsValue('Chrome/146.0.0.0', FontUtils::MODERN_USER_AGENT, 'The modern browser user agent should stay current enough to trigger Google Fonts CSS2 WOFF2 responses.');
 };
 
+$tests['admin_page_renderer_translates_stored_delivery_profile_labels_at_output'] = static function (): void {
+    resetTestState();
+
+    global $translationMap;
+
+    $translationMap = [
+        'Self-hosted (Google import)' => 'Import Google auto-heberge',
+        'Adobe-hosted' => 'Heberge par Adobe',
+        'Same-origin self-hosted files' => 'Fichiers auto-heberges meme origine',
+        'Adobe-hosted project stylesheet' => 'Feuille de style de projet Adobe hebergee',
+    ];
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'delivery_filter_tokens' => ['google', 'adobe'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'google-self_hosted',
+        'active_delivery' => [
+            'id' => 'google-self_hosted',
+            'label' => 'Self-hosted (Google import)',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-self_hosted',
+                'label' => 'Self-hosted (Google import)',
+                'provider' => 'google',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+            ],
+            [
+                'id' => 'adobe-adobe_hosted',
+                'label' => 'Adobe-hosted',
+                'provider' => 'adobe',
+                'type' => 'adobe_hosted',
+                'variants' => [],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => [],
+                'paths' => [],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            ['heading' => '', 'body' => ''],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('Import Google auto-heberge', $output, 'Stored English delivery labels should be translated when rendered in the family card.');
+    assertContainsValue('Heberge par Adobe', $output, 'Stored English delivery labels should be translated in delivery lists and detail cards.');
+    assertContainsValue('Fichiers auto-heberges meme origine', $output, 'Self-hosted request summaries should stay translatable at render time.');
+    assertContainsValue('Feuille de style de projet Adobe hebergee', $output, 'Adobe request summaries should stay translatable at render time.');
+    assertNotContainsValue('Self-hosted (Google import)', $output, 'The family card should not render the raw stored English Google self-hosted label once translated.');
+    assertNotContainsValue('Adobe-hosted', $output, 'The family card should not render the raw stored English Adobe label once translated.');
+};
+
 $tests['admin_controller_excludes_generated_css_from_snippet_output_panels'] = static function (): void {
     resetTestState();
 
@@ -2697,6 +3679,65 @@ $tests['admin_controller_marks_top_level_generated_css_panel_unavailable_when_si
     );
 };
 
+$tests['admin_controller_reuses_cached_search_results_during_search_cooldown'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+
+    $currentUserId = 42;
+    $services = makeServiceGraph();
+    $resolverCalls = 0;
+
+    $first = invokePrivateMethod(
+        $services['controller'],
+        'resolveRateLimitedSearch',
+        [
+            'google',
+            'Inter',
+            static function (string $query) use (&$resolverCalls): array {
+                $resolverCalls += 1;
+
+                return ['items' => [['family' => $query, 'call' => $resolverCalls]]];
+            },
+        ]
+    );
+    $second = invokePrivateMethod(
+        $services['controller'],
+        'resolveRateLimitedSearch',
+        [
+            'google',
+            'Inter',
+            static function (string $query) use (&$resolverCalls): array {
+                $resolverCalls += 1;
+
+                return ['items' => [['family' => $query, 'call' => $resolverCalls]]];
+            },
+        ]
+    );
+    $third = invokePrivateMethod(
+        $services['controller'],
+        'resolveRateLimitedSearch',
+        [
+            'google',
+            'Lora',
+            static function (string $query) use (&$resolverCalls): array {
+                $resolverCalls += 1;
+
+                return ['items' => [['family' => $query, 'call' => $resolverCalls]]];
+            },
+        ]
+    );
+
+    assertSameValue(2, $resolverCalls, 'Repeated search calls in the cooldown window should reuse the cached result, while new queries should still execute.');
+    assertSameValue($first, $second, 'Repeated search calls in the cooldown window should return the cached response payload.');
+    assertSameValue('Lora', (string) ($third['items'][0]['family'] ?? ''), 'Search cooldown should not block a different query for the same user.');
+    assertSameValue(
+        true,
+        is_array(get_transient('tasty_fonts_search_cooldown_42')),
+        'Search cooldown should be stored in a per-user transient.'
+    );
+};
+
 $tests['admin_controller_enqueues_tokens_before_admin_styles'] = static function (): void {
     resetTestState();
 
@@ -2718,7 +3759,7 @@ $tests['admin_controller_enqueues_tokens_before_admin_styles'] = static function
     );
 };
 
-$tests['admin_controller_localizes_family_font_display_nonce'] = static function (): void {
+$tests['admin_controller_localizes_rest_transport_config'] = static function (): void {
     resetTestState();
 
     global $localizedScripts;
@@ -2727,58 +3768,89 @@ $tests['admin_controller_localizes_family_font_display_nonce'] = static function
     $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
 
     assertSameValue(
-        'nonce:tasty_fonts_save_family_font_display',
-        (string) ($localizedScripts['tasty-fonts-admin']['data']['saveFontDisplayNonce'] ?? ''),
-        'Admin scripts should receive the family font-display nonce for inline saves.'
+        'https://example.test/wp-json/tasty-fonts/v1/',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['restUrl'] ?? ''),
+        'Admin scripts should receive the REST base URL used by the bundled admin client.'
+    );
+    assertSameValue(
+        'nonce:wp_rest',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['restNonce'] ?? ''),
+        'Admin scripts should receive the WordPress REST nonce for authenticated requests.'
+    );
+    assertSameValue(
+        'google/search',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['routes']['searchGoogle'] ?? ''),
+        'Admin scripts should receive the Google search REST route path.'
+    );
+    assertSameValue(
+        'local/upload',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['routes']['uploadLocal'] ?? ''),
+        'Admin scripts should receive the local upload REST route path.'
     );
 };
 
-$tests['admin_controller_localizes_bunny_import_nonce'] = static function (): void {
+$tests['admin_controller_omits_ajax_transport_config_from_localized_admin_data'] = static function (): void {
     resetTestState();
 
     global $localizedScripts;
+
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    $data = is_array($localizedScripts['tasty-fonts-admin']['data'] ?? null)
+        ? $localizedScripts['tasty-fonts-admin']['data']
+        : [];
+
+    assertSameValue(false, isset($data['ajaxUrl']), 'Admin scripts should not receive an admin-ajax endpoint once the plugin is REST-only.');
+
+    foreach (
+        [
+            'searchNonce',
+            'bunnySearchNonce',
+            'googleFamilyNonce',
+            'bunnyFamilyNonce',
+            'importNonce',
+            'bunnyImportNonce',
+            'uploadNonce',
+            'saveFallbackNonce',
+            'saveFontDisplayNonce',
+            'saveRolesNonce',
+            'saveFamilyDeliveryNonce',
+            'saveFamilyPublishStateNonce',
+            'deleteDeliveryProfileNonce',
+        ] as $key
+    ) {
+        assertSameValue(false, isset($data[$key]), sprintf('Admin scripts should not receive the removed "%s" AJAX nonce field.', $key));
+    }
+};
+
+$tests['admin_controller_enqueues_wp_i18n_and_script_translations'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedScripts;
+    global $scriptTranslations;
 
     $services = makeServiceGraph();
     $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
 
     assertSameValue(
-        'nonce:tasty_fonts_import_bunny',
-        (string) ($localizedScripts['tasty-fonts-admin']['data']['bunnyImportNonce'] ?? ''),
-        'Admin scripts should receive the Bunny import nonce for the manual Bunny import panel.'
+        ['wp-i18n'],
+        $enqueuedScripts['tasty-fonts-admin']['deps'] ?? null,
+        'Admin scripts should depend on wp-i18n so script translations are available.'
     );
-};
-
-$tests['admin_controller_localizes_bunny_search_nonce'] = static function (): void {
-    resetTestState();
-
-    global $localizedScripts;
-
-    $services = makeServiceGraph();
-    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
-
     assertSameValue(
-        'nonce:tasty_fonts_search_bunny',
-        (string) ($localizedScripts['tasty-fonts-admin']['data']['bunnySearchNonce'] ?? ''),
-        'Admin scripts should receive the Bunny search nonce for the mirrored Bunny search workflow.'
+        'tasty-fonts',
+        (string) ($scriptTranslations['tasty-fonts-admin']['domain'] ?? ''),
+        'Admin scripts should register WordPress script translations for the tasty-fonts domain.'
     );
-};
-
-$tests['admin_controller_localizes_bunny_family_nonce'] = static function (): void {
-    resetTestState();
-
-    global $localizedScripts;
-
-    $services = makeServiceGraph();
-    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
-
     assertSameValue(
-        'nonce:tasty_fonts_get_bunny_family',
-        (string) ($localizedScripts['tasty-fonts-admin']['data']['bunnyFamilyNonce'] ?? ''),
-        'Admin scripts should receive the Bunny family lookup nonce for manual Bunny family resolution.'
+        TASTY_FONTS_DIR . 'languages',
+        (string) ($scriptTranslations['tasty-fonts-admin']['path'] ?? ''),
+        'Admin scripts should register the plugin languages directory for script translation JSON files.'
     );
 };
 
-$tests['admin_controller_localizes_delivery_button_labels'] = static function (): void {
+$tests['admin_controller_localizes_runtime_admin_strings_only'] = static function (): void {
     resetTestState();
 
     global $localizedScripts;
@@ -2786,35 +3858,183 @@ $tests['admin_controller_localizes_delivery_button_labels'] = static function ()
     $services = makeServiceGraph();
     $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
 
-    $strings = is_array($localizedScripts['tasty-fonts-admin']['data']['strings'] ?? null)
-        ? $localizedScripts['tasty-fonts-admin']['data']['strings']
+    $runtimeStrings = is_array($localizedScripts['tasty-fonts-admin']['data']['runtimeStrings'] ?? null)
+        ? $localizedScripts['tasty-fonts-admin']['data']['runtimeStrings']
         : [];
 
     assertSameValue(
-        'Add Self-Hosted',
-        (string) ($strings['saveDeliverySelfHosted'] ?? ''),
-        'Admin scripts should localize the self-hosted delivery button label.'
+        'Add a Google Fonts API key above to enable search, or use manual import below.',
+        (string) ($runtimeStrings['searchDisabled'] ?? ''),
+        'Admin scripts should still receive the runtime-only search-disabled message from PHP.'
     );
     assertSameValue(
-        'Add Google CDN',
-        (string) ($strings['saveDeliveryGoogleCdn'] ?? ''),
-        'Admin scripts should localize the Google CDN delivery button label.'
+        false,
+        isset($localizedScripts['tasty-fonts-admin']['data']['strings']),
+        'Admin scripts should not receive the legacy static string table once script translations are registered.'
     );
+};
+
+$tests['rest_controller_registers_expected_admin_routes'] = static function (): void {
+    resetTestState();
+
+    global $registeredRestRoutes;
+
+    $services = makeServiceGraph();
+    $services['rest']->registerRoutes();
+
+    $expectedRoutes = [
+        'tasty-fonts/v1/google/search' => 'GET',
+        'tasty-fonts/v1/bunny/search' => 'GET',
+        'tasty-fonts/v1/google/family' => 'GET',
+        'tasty-fonts/v1/bunny/family' => 'GET',
+        'tasty-fonts/v1/google/import' => 'POST',
+        'tasty-fonts/v1/bunny/import' => 'POST',
+        'tasty-fonts/v1/local/upload' => 'POST',
+        'tasty-fonts/v1/families/fallback' => 'PATCH',
+        'tasty-fonts/v1/families/font-display' => 'PATCH',
+        'tasty-fonts/v1/roles/draft' => 'PATCH',
+        'tasty-fonts/v1/families/delivery' => 'PATCH',
+        'tasty-fonts/v1/families/publish-state' => 'PATCH',
+        'tasty-fonts/v1/families/delivery-profile' => 'DELETE',
+    ];
+
     assertSameValue(
-        'Add Bunny CDN',
-        (string) ($strings['saveDeliveryBunnyCdn'] ?? ''),
-        'Admin scripts should localize the Bunny CDN delivery button label.'
+        count($expectedRoutes),
+        count($registeredRestRoutes),
+        'The REST controller should register the full admin route surface.'
     );
-    assertSameValue(
-        'Add to Library',
-        (string) ($strings['importButtonIdle'] ?? ''),
-        'Admin scripts should localize the default import action label.'
+
+    foreach ($expectedRoutes as $route => $method) {
+        assertSameValue(
+            $method,
+            (string) ($registeredRestRoutes[$route]['args']['methods'] ?? ''),
+            'Each REST route should register with the expected HTTP method.'
+        );
+        assertSameValue(
+            true,
+            is_callable($registeredRestRoutes[$route]['args']['callback'] ?? null),
+            'Each REST route should register a callable endpoint handler.'
+        );
+        assertSameValue(
+            true,
+            is_callable($registeredRestRoutes[$route]['args']['permission_callback'] ?? null),
+            'Each REST route should register a callable permission callback.'
+        );
+    }
+};
+
+$tests['rest_controller_returns_native_payloads_for_write_routes'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/families/fallback');
+    $request->set_body_params([
+        'family' => 'Inter',
+        'fallback' => 'serif',
+    ]);
+
+    $response = $services['rest']->saveFamilyFallback($request);
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'REST write routes should return a native REST response object.');
+    assertSameValue('Inter', (string) ($response->get_data()['family'] ?? ''), 'REST write routes should return the saved family in the response body.');
+    assertSameValue('serif', (string) ($response->get_data()['fallback'] ?? ''), 'REST write routes should return the saved fallback in the response body.');
+};
+
+$tests['rest_controller_wraps_missing_family_errors_with_http_status'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/bunny/family');
+    $request->set_query_params(['family' => 'Missing Bunny Family']);
+
+    $response = $services['rest']->fetchBunnyFamily($request);
+
+    assertSameValue(true, is_wp_error($response), 'REST read routes should return WP_Error objects when the underlying lookup fails.');
+    assertSameValue('tasty_fonts_bunny_family_not_found', $response->get_error_code(), 'REST error responses should preserve the original plugin error code.');
+    assertSameValue(404, (int) (($response->get_error_data()['status'] ?? 0)), 'REST error responses should expose the HTTP status expected by the client.');
+};
+
+$tests['rest_controller_upload_route_returns_native_payloads'] = static function (): void {
+    resetTestState();
+
+    global $uploadedFilePaths;
+
+    $services = makeServiceGraph();
+    $tmpName = uniqueTestDirectory('tmp-rest-upload-valid') . '/inter-400-italic.woff2';
+    mkdir(dirname($tmpName), FS_CHMOD_DIR, true);
+    file_put_contents($tmpName, "wOF2test-font");
+    $uploadedFilePaths[] = $tmpName;
+
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/local/upload');
+    $request->set_param('rows', [[
+        'family' => 'Inter',
+        'weight' => '400',
+        'style' => 'italic',
+        'fallback' => 'Arial, sans-serif',
+    ]]);
+    $request->set_file_params([
+        'files' => [
+            'name' => [0 => 'inter-400-italic.woff2'],
+            'type' => [0 => 'font/woff2'],
+            'tmp_name' => [0 => $tmpName],
+            'error' => [0 => UPLOAD_ERR_OK],
+            'size' => [0 => filesize($tmpName)],
+        ],
+    ]);
+
+    $response = $services['rest']->uploadLocalFonts($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The REST upload route should return a native REST response object.');
+    assertSameValue('imported', (string) ($data['rows'][0]['status'] ?? ''), 'The REST upload route should return the imported row result directly in the response body.');
+    assertSameValue(1, (int) ($data['summary']['imported'] ?? 0), 'The REST upload route should return the import summary directly in the response body.');
+};
+
+$tests['google_search_cooldown_cache_is_shared_between_repeated_rest_requests'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+
+    $currentUserId = 42;
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['google_api_key' => 'live-key']);
+    $services['settings']->saveGoogleApiKeyStatus('valid');
+    set_transient(
+        'tasty_fonts_google_catalog_v1',
+        [
+            'inter' => [
+                'family' => 'Inter',
+                'category' => 'sans-serif',
+                'variants_count' => 4,
+            ],
+        ],
+        HOUR_IN_SECONDS
     );
-    assertSameValue(
-        'In Library',
-        (string) ($strings['searchResultInLibrary'] ?? ''),
-        'Admin scripts should localize the imported-family badge label used in search results.'
+
+    $request = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/google/search');
+    $request->set_query_params(['query' => 'Inter']);
+    $firstResponse = $services['rest']->searchGoogle($request);
+    $firstData = $firstResponse instanceof WP_REST_Response ? $firstResponse->get_data() : [];
+
+    set_transient(
+        'tasty_fonts_google_catalog_v1',
+        [
+            'inter' => [
+                'family' => 'Inter',
+                'category' => 'sans-serif',
+                'variants_count' => 8,
+            ],
+        ],
+        HOUR_IN_SECONDS
     );
+
+    $secondRequest = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/google/search');
+    $secondRequest->set_query_params(['query' => 'Inter']);
+    $secondResponse = $services['rest']->searchGoogle($secondRequest);
+    $secondData = $secondResponse instanceof WP_REST_Response ? $secondResponse->get_data() : [];
+
+    assertSameValue(4, (int) ($firstData['items'][0]['variants_count'] ?? 0), 'The first REST search response should reflect the initial cached search result.');
+    assertSameValue(4, (int) ($secondData['items'][0]['variants_count'] ?? 0), 'The second REST search response should reuse the cooldown cache instead of re-reading the mutated catalog.');
 };
 
 $tests['admin_controller_family_font_display_changes_refresh_generated_assets'] = static function (): void {
@@ -2922,6 +4142,302 @@ $tests['plugin_adds_a_settings_link_to_plugin_action_links'] = static function (
     assertContainsValue('Settings', $links[0] ?? '', 'Plugin action links should label the direct admin link as Settings.');
 };
 
+$tests['plugin_adds_row_meta_links_for_releases_and_support'] = static function (): void {
+    $links = Plugin::filterPluginRowMeta([], plugin_basename(TASTY_FONTS_FILE));
+
+    assertContainsValue('/releases', $links[0] ?? '', 'Plugin row meta should expose the GitHub releases page.');
+    assertContainsValue('GitHub Releases', $links[0] ?? '', 'Plugin row meta should label the releases link clearly.');
+    assertContainsValue('/issues', $links[1] ?? '', 'Plugin row meta should expose the support issues page.');
+    assertContainsValue('Support', $links[1] ?? '', 'Plugin row meta should label the support link clearly.');
+};
+
+$tests['plugin_row_meta_ignores_other_plugins'] = static function (): void {
+    $links = Plugin::filterPluginRowMeta(['existing'], 'other-plugin/other-plugin.php');
+
+    assertSameValue(['existing'], $links, 'Plugin row meta should not modify rows for unrelated plugins.');
+};
+
+$tests['plugin_boot_registers_plugin_row_meta_rest_and_font_library_sync_hooks'] = static function (): void {
+    resetTestState();
+    resetPluginSingleton();
+
+    global $hookCallbacks;
+
+    Plugin::instance()->boot();
+
+    assertSameValue(true, isset($hookCallbacks['plugin_row_meta']), 'Boot should register the plugin row meta hook.');
+    assertSameValue(true, isset($hookCallbacks['rest_api_init']), 'Boot should register the REST API init hook.');
+    assertSameValue(true, isset($hookCallbacks['tasty_fonts_after_import']), 'Boot should register the Block Editor Font Library sync hook.');
+    assertSameValue(true, isset($hookCallbacks['tasty_fonts_after_delete_family']), 'Boot should register the Block Editor Font Library delete hook.');
+    foreach (
+        [
+            'wp_ajax_tasty_fonts_search_google',
+            'wp_ajax_tasty_fonts_get_google_family',
+            'wp_ajax_tasty_fonts_search_bunny',
+            'wp_ajax_tasty_fonts_get_bunny_family',
+            'wp_ajax_tasty_fonts_import_bunny',
+            'wp_ajax_tasty_fonts_import_google',
+            'wp_ajax_tasty_fonts_upload_local',
+            'wp_ajax_tasty_fonts_save_family_fallback',
+            'wp_ajax_tasty_fonts_save_family_font_display',
+            'wp_ajax_tasty_fonts_save_family_delivery',
+            'wp_ajax_tasty_fonts_save_family_publish_state',
+            'wp_ajax_tasty_fonts_delete_delivery_profile',
+            'wp_ajax_tasty_fonts_save_role_draft',
+        ] as $hookName
+    ) {
+        assertSameValue(false, isset($hookCallbacks[$hookName]), sprintf('Boot should not register the removed "%s" AJAX hook.', $hookName));
+    }
+
+    resetPluginSingleton();
+};
+
+$tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration_hook'] = static function (): void {
+    resetTestState();
+
+    global $clearedScheduledHooks;
+
+    foreach ([
+        'tasty_fonts_catalog_v2',
+        'tasty_fonts_css_v2',
+        'tasty_fonts_css_hash_v2',
+        'tasty_fonts_regenerate_css_queued',
+        'tasty_fonts_google_catalog_v1',
+        'tasty_fonts_bunny_catalog_v1',
+    ] as $transientKey) {
+        set_transient($transientKey, 'cached', DAY_IN_SECONDS);
+    }
+
+    Plugin::deactivate();
+
+    foreach ([
+        'tasty_fonts_catalog_v2',
+        'tasty_fonts_css_v2',
+        'tasty_fonts_css_hash_v2',
+        'tasty_fonts_regenerate_css_queued',
+        'tasty_fonts_google_catalog_v1',
+        'tasty_fonts_bunny_catalog_v1',
+    ] as $transientKey) {
+        assertSameValue(false, get_transient($transientKey), 'Deactivation should clear known plugin transients.');
+    }
+
+    assertSameValue(
+        true,
+        in_array(AssetService::ACTION_REGENERATE_CSS, $clearedScheduledHooks, true),
+        'Deactivation should clear any queued CSS regeneration cron hook.'
+    );
+};
+
+$tests['block_editor_font_library_sync_registers_managed_font_families_after_import'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteGetResponses;
+    global $remoteRequestCalls;
+    global $remoteRequestResponses;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveFamilyFontDisplay('Inter', 'swap');
+    $family = $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self-hosted',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'label' => 'Self-hosted (Google import)',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'google',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+                'provider' => ['category' => 'sans-serif'],
+            ]],
+            'meta' => ['category' => 'sans-serif'],
+        ],
+        'published',
+        true
+    );
+
+    $remoteGetResponses['https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit'] = [
+        'response' => ['code' => 200],
+        'body' => '[]',
+    ];
+    $remoteRequestResponses['POST https://example.test/wp-json/wp/v2/font-families'] = [
+        'response' => ['code' => 201],
+        'body' => json_encode(['id' => 321]),
+    ];
+    $remoteRequestResponses['POST https://example.test/wp-json/wp/v2/font-families/321/font-faces'] = [
+        'response' => ['code' => 201],
+        'body' => json_encode(['id' => 654]),
+    ];
+
+    $services['block_editor_font_library']->syncImportedFamily(
+        [
+            'status' => 'imported',
+            'family' => 'Inter',
+            'delivery_id' => 'google-self-hosted',
+            'family_record' => $family,
+        ],
+        'google'
+    );
+
+    assertSameValue(
+        'https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit',
+        (string) ($remoteGetCalls[0]['url'] ?? ''),
+        'Font Library sync should look up the managed family slug before creating it.'
+    );
+    assertSameValue(2, count($remoteRequestCalls), 'Font Library sync should create one family and one face for the imported profile.');
+
+    $familyBody = json_decode((string) ($remoteRequestCalls[0]['args']['body']['font_family_settings'] ?? ''), true);
+    $faceBody = json_decode((string) ($remoteRequestCalls[1]['args']['body']['font_face_settings'] ?? ''), true);
+
+    assertSameValue('tasty-fonts-inter', (string) ($familyBody['slug'] ?? ''), 'Font Library sync should register plugin-managed family slugs to avoid collisions.');
+    assertSameValue('Inter', (string) ($familyBody['name'] ?? ''), 'Font Library sync should preserve the family display name.');
+    assertSameValue('"Inter", sans-serif', (string) ($familyBody['fontFamily'] ?? ''), 'Font Library sync should register the family stack for editor presets.');
+    assertSameValue('"Inter"', (string) ($faceBody['fontFamily'] ?? ''), 'Font Library sync should use a quoted family name in font-face definitions.');
+    assertSameValue('swap', (string) ($faceBody['fontDisplay'] ?? ''), 'Font Library sync should carry the plugin font-display setting into editor font faces.');
+    assertSameValue(
+        'https://example.test/wp-content/uploads/fonts/google/inter/inter-400-normal.woff2',
+        (string) (($faceBody['src'][0] ?? '')),
+        'Font Library sync should convert stored relative font paths into public upload URLs.'
+    );
+};
+
+$tests['block_editor_font_library_sync_respects_opt_out_filter'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteRequestCalls;
+
+    add_filter(
+        'tasty_fonts_sync_block_editor_font_library',
+        static function (): bool {
+            return false;
+        }
+    );
+
+    $services = makeServiceGraph();
+    $family = $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self-hosted',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'google',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $services['block_editor_font_library']->syncImportedFamily(
+        [
+            'status' => 'imported',
+            'family' => 'Inter',
+            'delivery_id' => 'google-self-hosted',
+            'family_record' => $family,
+        ],
+        'google'
+    );
+
+    assertSameValue([], $remoteGetCalls, 'The opt-out filter should skip Font Library lookup requests.');
+    assertSameValue([], $remoteRequestCalls, 'The opt-out filter should skip Font Library write requests.');
+};
+
+$tests['block_editor_font_library_sync_skips_when_core_font_post_types_are_unavailable'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteRequestCalls;
+    global $supportedPostTypes;
+
+    $supportedPostTypes = [];
+
+    $services = makeServiceGraph();
+    $family = $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self-hosted',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'google',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $services['block_editor_font_library']->syncImportedFamily(
+        [
+            'status' => 'imported',
+            'family' => 'Inter',
+            'delivery_id' => 'google-self-hosted',
+            'family_record' => $family,
+        ],
+        'google'
+    );
+
+    assertSameValue([], $remoteGetCalls, 'Font Library sync should no-op on WordPress versions without the core font post types.');
+    assertSameValue([], $remoteRequestCalls, 'Font Library sync should no-op on WordPress versions without the core font post types.');
+};
+
+$tests['block_editor_font_library_sync_removes_managed_family_records_on_delete'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $remoteGetCalls;
+    global $remoteRequestCalls;
+    global $remoteRequestResponses;
+
+    $services = makeServiceGraph();
+    $remoteGetResponses['https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode([['id' => 321]]),
+    ];
+    $remoteRequestResponses['DELETE https://example.test/wp-json/wp/v2/font-families/321?force=true'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(['deleted' => true]),
+    ];
+
+    $services['block_editor_font_library']->deleteSyncedFamily('inter', 'Inter');
+
+    assertSameValue(
+        'https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit',
+        (string) ($remoteGetCalls[0]['url'] ?? ''),
+        'Font Library delete sync should look up the managed family slug before deleting it.'
+    );
+    assertSameValue(
+        'DELETE',
+        (string) ($remoteRequestCalls[0]['method'] ?? ''),
+        'Font Library delete sync should issue a DELETE request to the managed core font family.'
+    );
+    assertSameValue(
+        'https://example.test/wp-json/wp/v2/font-families/321?force=true',
+        (string) ($remoteRequestCalls[0]['url'] ?? ''),
+        'Font Library delete sync should force-delete the managed core font family.'
+    );
+};
+
 $tests['log_repository_can_reseed_audit_entry_after_clear'] = static function (): void {
     resetTestState();
 
@@ -2978,6 +4494,12 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
             'delete_uploaded_files_on_uninstall' => false,
             'adobe_project_id' => '',
         ],
+        'tasty_fonts_google_api_key_data' => [
+            'google_api_key' => 'live-key',
+            'google_api_key_status' => 'valid',
+            'google_api_key_status_message' => 'Ready',
+            'google_api_key_checked_at' => 123,
+        ],
         'tasty_fonts_library' => ['Inter' => ['delivery_profiles' => []]],
         'tasty_fonts_imports' => ['legacy' => true],
     ];
@@ -2988,6 +4510,7 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
     require dirname(__DIR__) . '/uninstall.php';
 
     assertSameValue(true, in_array('tasty_fonts_library', $optionDeleted, true), 'Uninstall should delete the live library option key.');
+    assertSameValue(true, in_array('tasty_fonts_google_api_key_data', $optionDeleted, true), 'Uninstall should delete the dedicated Google API key option.');
     assertSameValue(true, in_array('tasty_fonts_imports', $optionDeleted, true), 'Uninstall should continue deleting the legacy imports option key.');
     assertSameValue(true, in_array('tasty_fonts_bunny_catalog_v1', $transientDeleted, true), 'Uninstall should delete the Bunny catalog transient.');
     assertSameValue(2, count($wpdbQueries), 'Uninstall should issue wildcard cleanup queries for Bunny family and admin notice transients.');

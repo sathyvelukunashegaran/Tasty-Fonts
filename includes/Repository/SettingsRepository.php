@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace TastyFonts\Repository;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Support\FontUtils;
 
 final class SettingsRepository
 {
     public const OPTION_SETTINGS = 'tasty_fonts_settings';
     public const OPTION_ROLES = 'tasty_fonts_roles';
+    public const OPTION_GOOGLE_API_KEY_DATA = 'tasty_fonts_google_api_key_data';
     private const LEGACY_OPTION_SETTINGS = 'etch_fonts_settings';
     private const LEGACY_OPTION_ROLES = 'etch_fonts_roles';
     private const DEFAULT_SETTINGS = [
@@ -27,12 +30,20 @@ final class SettingsRepository
         'adobe_project_status' => 'empty',
         'adobe_project_status_message' => '',
         'adobe_project_checked_at' => 0,
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+    ];
+    private const DEFAULT_GOOGLE_API_KEY_DATA = [
         'google_api_key' => '',
         'google_api_key_status' => 'empty',
         'google_api_key_status_message' => '',
         'google_api_key_checked_at' => 0,
-        'family_fallbacks' => [],
-        'family_font_displays' => [],
+    ];
+    private const GOOGLE_API_KEY_FIELDS = [
+        'google_api_key',
+        'google_api_key_status',
+        'google_api_key_status_message',
+        'google_api_key_checked_at',
     ];
     private const DEFAULT_ROLE_FALLBACKS = [
         'heading_fallback' => 'sans-serif',
@@ -45,6 +56,7 @@ final class SettingsRepository
             $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS),
             self::DEFAULT_SETTINGS
         );
+        $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions($settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
         $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
@@ -74,53 +86,73 @@ final class SettingsRepository
     public function saveSettings(array $input): array
     {
         $settings = $this->getSettings();
+        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions($settings);
         $clearGoogleKey = !empty($input['tasty_fonts_clear_google_api_key']);
         $submittedGoogleKey = isset($input['google_api_key'])
             ? sanitize_text_field((string) $input['google_api_key'])
             : null;
+        $settingsChanged = false;
+        $googleApiKeyDataChanged = false;
 
         if ($clearGoogleKey) {
-            $settings['google_api_key'] = '';
-            $settings['google_api_key_status'] = 'empty';
-            $settings['google_api_key_status_message'] = '';
-            $settings['google_api_key_checked_at'] = 0;
+            $googleApiKeyData['google_api_key'] = '';
+            $googleApiKeyData['google_api_key_status'] = 'empty';
+            $googleApiKeyData['google_api_key_status_message'] = '';
+            $googleApiKeyData['google_api_key_checked_at'] = 0;
+            $googleApiKeyDataChanged = true;
         } elseif (is_string($submittedGoogleKey) && trim($submittedGoogleKey) !== '') {
-            $settings['google_api_key'] = trim($submittedGoogleKey);
-            $settings['google_api_key_status'] = 'unknown';
-            $settings['google_api_key_status_message'] = '';
-            $settings['google_api_key_checked_at'] = 0;
+            $googleApiKeyData['google_api_key'] = trim($submittedGoogleKey);
+            $googleApiKeyData['google_api_key_status'] = 'unknown';
+            $googleApiKeyData['google_api_key_status_message'] = '';
+            $googleApiKeyData['google_api_key_checked_at'] = 0;
+            $googleApiKeyDataChanged = true;
         }
 
         if (isset($input['css_delivery_mode'])) {
             $mode = sanitize_text_field((string) $input['css_delivery_mode']);
             $settings['css_delivery_mode'] = in_array($mode, ['file', 'inline'], true) ? $mode : 'file';
+            $settingsChanged = true;
         }
 
         if (isset($input['font_display'])) {
             $settings['font_display'] = $this->normalizeFontDisplay(sanitize_text_field((string) $input['font_display']));
+            $settingsChanged = true;
         }
 
         if (array_key_exists('minify_css_output', $input)) {
             $settings['minify_css_output'] = !empty($input['minify_css_output']);
+            $settingsChanged = true;
         }
 
         if (array_key_exists('preload_primary_fonts', $input)) {
             $settings['preload_primary_fonts'] = !empty($input['preload_primary_fonts']);
+            $settingsChanged = true;
         }
 
         if (array_key_exists('remote_connection_hints', $input)) {
             $settings['remote_connection_hints'] = !empty($input['remote_connection_hints']);
+            $settingsChanged = true;
         }
 
         if (array_key_exists('delete_uploaded_files_on_uninstall', $input)) {
             $settings['delete_uploaded_files_on_uninstall'] = !empty($input['delete_uploaded_files_on_uninstall']);
+            $settingsChanged = true;
         }
 
         if (isset($input['preview_sentence'])) {
             $settings['preview_sentence'] = sanitize_text_field((string) $input['preview_sentence']);
+            $settingsChanged = true;
         }
 
-        return $this->persistSettings($settings);
+        if ($settingsChanged) {
+            update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($settings), false);
+        }
+
+        if ($settingsChanged || $googleApiKeyDataChanged) {
+            $googleApiKeyData = $this->persistGoogleApiKeyData($googleApiKeyData);
+        }
+
+        return $this->mergeGoogleApiKeyDataIntoSettings($this->withoutGoogleApiKeyData($settings), $googleApiKeyData);
     }
 
     public function getRoles(array $catalog): array
@@ -201,9 +233,9 @@ final class SettingsRepository
 
     public function hasGoogleApiKey(): bool
     {
-        $settings = $this->getSettings();
+        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
 
-        return trim((string) $settings['google_api_key']) !== '';
+        return trim((string) $googleApiKeyData['google_api_key']) !== '';
     }
 
     public function isAdobeEnabled(): bool
@@ -269,29 +301,32 @@ final class SettingsRepository
 
     public function getGoogleApiKeyStatus(): array
     {
-        $settings = $this->getSettings();
+        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
 
         return [
-            'state' => (string) ($settings['google_api_key_status'] ?? 'empty'),
-            'message' => (string) ($settings['google_api_key_status_message'] ?? ''),
-            'checked_at' => (int) ($settings['google_api_key_checked_at'] ?? 0),
+            'state' => (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
+            'message' => (string) ($googleApiKeyData['google_api_key_status_message'] ?? ''),
+            'checked_at' => (int) ($googleApiKeyData['google_api_key_checked_at'] ?? 0),
         ];
     }
 
     public function saveGoogleApiKeyStatus(string $state, string $message = ''): array
     {
-        $settings = $this->getSettings();
-        $normalizedState = $this->normalizeGoogleApiKeyStatus($state, (string) ($settings['google_api_key'] ?? ''));
+        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
+        $normalizedState = $this->normalizeGoogleApiKeyStatus($state, (string) ($googleApiKeyData['google_api_key'] ?? ''));
 
-        $settings['google_api_key_status'] = $normalizedState;
-        $settings['google_api_key_status_message'] = $normalizedState === 'empty'
+        $googleApiKeyData['google_api_key_status'] = $normalizedState;
+        $googleApiKeyData['google_api_key_status_message'] = $normalizedState === 'empty'
             ? ''
             : sanitize_text_field($message);
-        $settings['google_api_key_checked_at'] = $normalizedState === 'empty' ? 0 : time();
+        $googleApiKeyData['google_api_key_checked_at'] = $normalizedState === 'empty' ? 0 : time();
+        $googleApiKeyData = $this->persistGoogleApiKeyData($googleApiKeyData);
 
-        $this->persistSettings($settings);
-
-        return $this->getGoogleApiKeyStatus();
+        return [
+            'state' => (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
+            'message' => (string) ($googleApiKeyData['google_api_key_status_message'] ?? ''),
+            'checked_at' => (int) ($googleApiKeyData['google_api_key_checked_at'] ?? 0),
+        ];
     }
 
     public function getFamilyFallback(string $family, string $default = 'sans-serif'): string
@@ -463,9 +498,92 @@ final class SettingsRepository
 
     private function persistSettings(array $settings): array
     {
+        $googleApiKeyData = $this->extractGoogleApiKeyData($settings);
+
+        if ($googleApiKeyData === []) {
+            $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
+        } else {
+            $googleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
+        }
+
+        $settings = $this->withoutGoogleApiKeyData($settings);
+
         update_option(self::OPTION_SETTINGS, $settings, false);
+        $googleApiKeyData = $this->persistGoogleApiKeyData($googleApiKeyData);
+
+        return $this->mergeGoogleApiKeyDataIntoSettings($settings, $googleApiKeyData);
+    }
+
+    private function getGoogleApiKeyDataFromOptions(array $settings = []): array
+    {
+        $googleApiKeyData = get_option(self::OPTION_GOOGLE_API_KEY_DATA, null);
+
+        if (!is_array($googleApiKeyData)) {
+            if ($settings === []) {
+                $settings = $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS);
+            }
+
+            $googleApiKeyData = $this->extractGoogleApiKeyData($settings);
+        }
+
+        return $this->normalizeGoogleApiKeyData($googleApiKeyData);
+    }
+
+    private function persistGoogleApiKeyData(array $googleApiKeyData): array
+    {
+        $googleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
+
+        update_option(self::OPTION_GOOGLE_API_KEY_DATA, $googleApiKeyData, false);
+
+        return $googleApiKeyData;
+    }
+
+    private function mergeGoogleApiKeyDataIntoSettings(array $settings, array $googleApiKeyData): array
+    {
+        foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
+            $settings[$field] = $googleApiKeyData[$field] ?? self::DEFAULT_GOOGLE_API_KEY_DATA[$field];
+        }
 
         return $settings;
+    }
+
+    private function extractGoogleApiKeyData(array $settings): array
+    {
+        $googleApiKeyData = [];
+
+        foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
+            if (!array_key_exists($field, $settings)) {
+                continue;
+            }
+
+            $googleApiKeyData[$field] = $settings[$field];
+        }
+
+        return $googleApiKeyData;
+    }
+
+    private function withoutGoogleApiKeyData(array $settings): array
+    {
+        foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
+            unset($settings[$field]);
+        }
+
+        return $settings;
+    }
+
+    private function normalizeGoogleApiKeyData(mixed $value): array
+    {
+        $googleApiKeyData = is_array($value) ? $value : [];
+        $googleApiKeyData = wp_parse_args($googleApiKeyData, self::DEFAULT_GOOGLE_API_KEY_DATA);
+        $googleApiKeyData['google_api_key'] = trim(sanitize_text_field((string) ($googleApiKeyData['google_api_key'] ?? '')));
+        $googleApiKeyData['google_api_key_status'] = $this->normalizeGoogleApiKeyStatus(
+            (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
+            (string) ($googleApiKeyData['google_api_key'] ?? '')
+        );
+        $googleApiKeyData['google_api_key_status_message'] = $this->sanitizeStatusMessage($googleApiKeyData['google_api_key_status_message'] ?? '');
+        $googleApiKeyData['google_api_key_checked_at'] = $this->normalizeTimestamp($googleApiKeyData['google_api_key_checked_at'] ?? 0);
+
+        return $googleApiKeyData;
     }
 
     private function normalizeFontDisplay(string $display): string

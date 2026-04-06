@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Google;
 
+defined('ABSPATH') || exit;
+
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\HostedImportSupport;
@@ -17,6 +19,19 @@ final class GoogleImportService
 {
     private const MAX_FONT_FILE_BYTES = 10 * MB_IN_BYTES;
 
+    /**
+     * Create the Google import service.
+     *
+     * @since 1.4.0
+     *
+     * @param Storage $storage Storage abstraction for downloaded font files.
+     * @param ImportRepository $imports Repository used to persist delivery profiles.
+     * @param GoogleFontsClient $client Google catalog and CSS client.
+     * @param GoogleCssParser $parser CSS parser for Google-hosted @font-face rules.
+     * @param CatalogService $catalog Catalog service used to inspect existing families.
+     * @param AssetService $assets Asset service used to refresh generated CSS after imports.
+     * @param LogRepository $log Log repository used for import audit entries.
+     */
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
@@ -28,6 +43,28 @@ final class GoogleImportService
     ) {
     }
 
+    /**
+     * Import or update a Google Fonts family in the library.
+     *
+     * @since 1.4.0
+     *
+     * @param string $familyName Google Fonts family name.
+     * @param array<int, string> $variants Variant tokens to import, such as `regular` or `700italic`.
+     * @param string $deliveryMode Delivery mode to save (`self_hosted` or `cdn`).
+     * @return array{
+     *     status: string,
+     *     message: string,
+     *     family: string,
+     *     delivery_type: string,
+     *     faces: int,
+     *     files: int,
+     *     variants: list<string>,
+     *     imported_variants: list<string>,
+     *     skipped_variants: list<string>,
+     *     family_record?: array<string, mixed>,
+     *     delivery_id?: string
+     * }|WP_Error Import result payload, or a WordPress error when the import cannot proceed.
+     */
     public function importFamily(string $familyName, array $variants, string $deliveryMode = 'self_hosted'): array|WP_Error
     {
         $familyName = trim(wp_strip_all_tags($familyName));
@@ -91,6 +128,7 @@ final class GoogleImportService
         }
 
         $this->assets->refreshGeneratedAssets();
+        do_action('tasty_fonts_after_import', $result, 'google');
 
         return $result;
     }
@@ -320,7 +358,7 @@ final class GoogleImportService
         if (!$this->storage->ensureDirectory($familyDirectory)) {
             return $this->error(
                 'tasty_fonts_google_family_dir_failed',
-                __('The Google Fonts import directory could not be created.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The Google Fonts import directory could not be created.', 'tasty-fonts'))
             );
         }
 
@@ -332,7 +370,7 @@ final class GoogleImportService
         if (!$this->storage->ensureRootDirectory()) {
             return $this->error(
                 'tasty_fonts_storage_unavailable',
-                __('The uploads/fonts storage directory could not be created.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The uploads/fonts storage directory could not be created.', 'tasty-fonts'))
             );
         }
 
@@ -341,7 +379,7 @@ final class GoogleImportService
         if (!$googleRoot) {
             return $this->error(
                 'tasty_fonts_storage_unavailable',
-                __('The uploads/fonts storage directory could not be created.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The uploads/fonts storage directory could not be created.', 'tasty-fonts'))
             );
         }
 
@@ -463,7 +501,7 @@ final class GoogleImportService
         if (!$this->storage->writeAbsoluteFile($targetPath, $body)) {
             return $this->error(
                 'tasty_fonts_google_write_failed',
-                __('The imported font file could not be written to uploads/fonts.', 'tasty-fonts')
+                $this->storageErrorMessage(__('The imported font file could not be written to uploads/fonts.', 'tasty-fonts'))
             );
         }
 
@@ -522,6 +560,13 @@ final class GoogleImportService
     private function profileId(string $deliveryMode): string
     {
         return FontUtils::slugify('google-' . $deliveryMode);
+    }
+
+    private function storageErrorMessage(string $fallback): string
+    {
+        $message = trim($this->storage->getLastFilesystemErrorMessage());
+
+        return $message !== '' ? $message : $fallback;
     }
 
     private function error(string $code, string $message): WP_Error

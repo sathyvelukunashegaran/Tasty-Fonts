@@ -42,5 +42,12 @@ spl_autoload_register(
 );
 
 register_activation_hook(__FILE__, ['TastyFonts\\Plugin', 'activate']);
+register_deactivation_hook(__FILE__, ['TastyFonts\\Plugin', 'deactivate']);
 
-TastyFonts\Plugin::instance()->boot();
+add_action(
+    'plugins_loaded',
+    static function (): void {
+        TastyFonts\Plugin::instance()->boot();
+    },
+    0
+);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TastyFonts\Support;
 
+defined('ABSPATH') || exit;
+
 final class FontUtils
 {
     public const FALLBACK_SUGGESTIONS = [
