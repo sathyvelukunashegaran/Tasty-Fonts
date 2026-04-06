@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-04-07
+
 ### Added
 
 - Added a full role preview workspace with editorial, card, reading, interface, and code scenarios, plus draft/live baseline seeding, inline role pickers, preview CSS copy, and quick draft/save actions.
