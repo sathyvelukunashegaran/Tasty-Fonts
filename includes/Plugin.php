@@ -30,6 +30,7 @@ use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
+use TastyFonts\Updates\GitHubUpdater;
 
 final class Plugin
 {
@@ -43,6 +44,8 @@ final class Plugin
         'tasty_fonts_regenerate_css_queued',
         'tasty_fonts_google_catalog_v1',
         'tasty_fonts_bunny_catalog_v1',
+        'tasty_fonts_github_release_v1',
+        'tasty_fonts_github_release_version_v1',
     ];
 
     private static ?self $instance = null;
@@ -68,6 +71,7 @@ final class Plugin
     private readonly BlockEditorFontLibraryService $blockEditorFontLibrary;
     private readonly AdminController $admin;
     private readonly RestController $rest;
+    private readonly GitHubUpdater $updater;
 
     private function __construct()
     {
@@ -147,6 +151,7 @@ final class Plugin
             $this->settings,
             $this->log
         );
+        $this->updater = new GitHubUpdater();
         $this->admin = new AdminController(
             $this->storage,
             $this->settings,
@@ -233,6 +238,7 @@ final class Plugin
         add_filter('plugin_row_meta', [self::class, 'filterPluginRowMeta'], 10, 2);
         add_action('tasty_fonts_after_import', [$this->blockEditorFontLibrary, 'syncImportedFamily'], 10, 2);
         add_action('tasty_fonts_after_delete_family', [$this->blockEditorFontLibrary, 'deleteSyncedFamily'], 10, 2);
+        $this->updater->registerHooks();
     }
 
     private function registerRestHooks(): void

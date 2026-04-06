@@ -90,6 +90,7 @@ The plugin works without Etch, but the Etch canvas bridge is most useful when yo
 4. Open `Tasty Fonts` in the WordPress admin menu.
 
 The packaged plugin directory remains `etch-fonts/` so existing installs can update cleanly.
+GitHub-installed copies can also pick up future stable releases from the normal WordPress `Plugins` screen because the plugin now advertises updates from the attached GitHub Release ZIP.
 
 ### Manual install
 

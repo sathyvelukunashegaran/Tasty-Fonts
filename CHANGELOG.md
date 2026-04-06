@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-04-07
+
+### Added
+
+- Added a WordPress-native GitHub release updater so public GitHub installs can detect newer stable releases from the normal Plugins screen and install the attached release ZIP directly.
+- Expanded the local PHP test harness to cover GitHub release discovery, details-modal metadata, updater caching, and cache invalidation after upgrades.
+
+### Changed
+
+- Advertised the GitHub repository as the plugin update source via `Update URI` and documented that GitHub-installed copies can update from attached stable release ZIPs in the normal WordPress plugins workflow.
+
 ## [1.5.0] - 2026-04-07
 
 ### Added
