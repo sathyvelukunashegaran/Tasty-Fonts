@@ -4476,6 +4476,44 @@ $tests['admin_controller_builds_distinct_sorted_activity_actor_options'] = stati
     );
 };
 
+$tests['admin_controller_preserves_only_allowed_tracked_ui_query_args_in_redirect_urls'] = static function (): void {
+    resetTestState();
+
+    $_GET = [
+        'page' => AdminController::MENU_SLUG,
+        'tf_advanced' => '1',
+        'tf_studio' => 'preview',
+        'tf_preview' => 'card',
+        'tf_output' => 'names',
+        'tf_add_fonts' => '1',
+        'tf_source' => 'google',
+        'tf_google_access' => '1',
+        'tf_adobe_project' => '1',
+        'invalid' => 'kept-out',
+    ];
+
+    $controller = makeAdminControllerTestInstance();
+    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
+    $parts = parse_url($url);
+    $query = [];
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+
+    assertSameValue(
+        [
+            'page' => AdminController::MENU_SLUG,
+            'tf_advanced' => '1',
+            'tf_studio' => 'preview',
+            'tf_preview' => 'card',
+            'tf_add_fonts' => '1',
+            'tf_source' => 'google',
+            'tf_google_access' => '1',
+        ],
+        $query,
+        'Redirect URLs should preserve only the canonical tracked UI query args for the current admin view.'
+    );
+};
+
 $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): void {
     resetTestState();
 

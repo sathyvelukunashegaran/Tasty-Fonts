@@ -35,7 +35,6 @@ final class AdminController
     private const SEARCH_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_search_cooldown_';
     private const SEARCH_COOLDOWN_WINDOW_SECONDS = 0.5;
     private const SEARCH_COOLDOWN_TRANSIENT_TTL = 1;
-
     private readonly AdminPageRenderer $renderer;
 
     public function __construct(
@@ -1752,7 +1751,13 @@ final class AdminController
 
     private function buildAdminPageUrl(): string
     {
-        return add_query_arg(['page' => self::MENU_SLUG], admin_url('admin.php'));
+        return add_query_arg(
+            array_merge(
+                ['page' => self::MENU_SLUG],
+                $this->buildTrackedUiQueryArgs()
+            ),
+            admin_url('admin.php')
+        );
     }
 
     private function buildGeneratedCssDownloadUrl(): string
@@ -1776,6 +1781,70 @@ final class AdminController
         $rawValue = wp_unslash($_GET[$key]);
 
         return is_scalar($rawValue) ? sanitize_text_field((string) $rawValue) : $default;
+    }
+
+    private function buildTrackedUiQueryArgs(): array
+    {
+        $args = [];
+        $advancedOpen = $this->getQueryText('tf_advanced') === '1';
+        $studio = $this->getAllowedTrackedUiTabValue('tf_studio');
+        $preview = $this->getAllowedTrackedUiTabValue('tf_preview');
+        $output = $this->getAllowedTrackedUiTabValue('tf_output');
+        $addFontsOpen = $this->getQueryText('tf_add_fonts') === '1';
+        $source = $this->getAllowedTrackedUiTabValue('tf_source');
+        $googleAccessOpen = $this->getQueryText('tf_google_access') === '1';
+        $adobeProjectOpen = $this->getQueryText('tf_adobe_project') === '1';
+
+        if ($advancedOpen) {
+            $args['tf_advanced'] = '1';
+
+            if ($studio !== '') {
+                $args['tf_studio'] = $studio;
+            }
+
+            if ($studio === 'preview' && $preview !== '') {
+                $args['tf_preview'] = $preview;
+            }
+
+            if ($studio === 'snippets' && $output !== '') {
+                $args['tf_output'] = $output;
+            }
+        }
+
+        if ($addFontsOpen) {
+            $args['tf_add_fonts'] = '1';
+
+            if ($source !== '') {
+                $args['tf_source'] = $source;
+            }
+
+            if ($source === 'google' && $googleAccessOpen) {
+                $args['tf_google_access'] = '1';
+            }
+
+            if ($source === 'adobe' && $adobeProjectOpen) {
+                $args['tf_adobe_project'] = '1';
+            }
+        }
+
+        return $args;
+    }
+
+    private function getAllowedTrackedUiTabValue(string $key): string
+    {
+        $value = $this->getQueryText($key);
+
+        if ($value === '') {
+            return '';
+        }
+
+        return match ($key) {
+            'tf_studio' => in_array($value, ['preview', 'snippets', 'generated', 'system', 'output-settings'], true) ? $value : '',
+            'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface'], true) ? $value : '',
+            'tf_output' => in_array($value, ['usage', 'variables', 'stacks', 'names'], true) ? $value : '',
+            'tf_source' => in_array($value, ['google', 'bunny', 'adobe', 'upload'], true) ? $value : '',
+            default => '',
+        };
     }
 
     private function redirect(): never
