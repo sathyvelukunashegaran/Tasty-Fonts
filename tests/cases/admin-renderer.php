@@ -251,6 +251,11 @@ $tests['admin_page_renderer_renders_class_output_mode_control'] = static functio
         'family_font_display_options' => [],
         'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
         'preview_size' => 32,
+        'css_delivery_mode' => 'inline',
+        'css_delivery_mode_options' => [
+            ['value' => 'file', 'label' => 'Generated file'],
+            ['value' => 'inline', 'label' => 'Inline in page head'],
+        ],
         'font_display' => 'optional',
         'font_display_options' => [],
         'class_output_mode' => 'families',
@@ -278,11 +283,55 @@ $tests['admin_page_renderer_renders_class_output_mode_control'] = static functio
     ]);
     $output = (string) ob_get_clean();
 
+    assertContainsValue('CSS Delivery', $output, 'Output Settings should render the CSS delivery control.');
+    assertContainsValue('name="css_delivery_mode"', $output, 'The CSS delivery control should submit through the shared settings form.');
+    assertContainsValue('<option value="inline" selected="selected">', $output, 'The saved CSS delivery mode should remain selected in Output Settings.');
     assertContainsValue('Class Output Mode', $output, 'Output Settings should render the class output mode control.');
     assertContainsValue('name="class_output_mode"', $output, 'The class output mode control should submit through the shared settings form.');
     assertContainsValue('value="roles"', $output, 'The class output mode control should expose the role class option.');
     assertContainsValue('value="families"', $output, 'The class output mode control should expose the family class option.');
     assertContainsValue('<option value="families" selected="selected">', $output, 'The saved class output mode should remain selected in the Output Settings control.');
+};
+
+$tests['admin_page_renderer_balances_div_wrappers'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'roles' => [],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'minify_css_output' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => false,
+        'training_wheels_off' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertSameValue(substr_count($output, '<div'), substr_count($output, '</div>'), 'Admin page renderer should balance div wrappers so WordPress admin footer markup stays outside the plugin page shell.');
 };
 
 $tests['admin_page_renderer_shows_mono_extended_variable_controls_when_monospace_is_enabled'] = static function (): void {
@@ -855,7 +904,7 @@ $tests['admin_page_renderer_translates_stored_delivery_profile_labels_at_output'
     $translationMap = [
         'Self-hosted (Google import)' => 'Import Google auto-heberge',
         'Adobe-hosted' => 'Heberge par Adobe',
-        'Same-origin self-hosted files' => 'Fichiers auto-heberges meme origine',
+        'Self-hosted files' => 'Fichiers auto-heberges',
         'Adobe-hosted project stylesheet' => 'Feuille de style de projet Adobe hebergee',
     ];
 
@@ -921,7 +970,7 @@ $tests['admin_page_renderer_translates_stored_delivery_profile_labels_at_output'
 
     assertContainsValue('Import Google auto-heberge', $output, 'Stored English delivery labels should be translated when rendered in the family card.');
     assertContainsValue('Heberge par Adobe', $output, 'Stored English delivery labels should be translated in delivery lists and detail cards.');
-    assertContainsValue('Fichiers auto-heberges meme origine', $output, 'Self-hosted request summaries should stay translatable at render time.');
+    assertContainsValue('Fichiers auto-heberges', $output, 'Self-hosted request summaries should stay translatable at render time.');
     assertContainsValue('Feuille de style de projet Adobe hebergee', $output, 'Adobe request summaries should stay translatable at render time.');
     assertNotContainsValue('Self-hosted (Google import)', $output, 'The family card should not render the raw stored English Google self-hosted label once translated.');
     assertNotContainsValue('Adobe-hosted', $output, 'The family card should not render the raw stored English Adobe label once translated.');
@@ -973,19 +1022,19 @@ $tests['admin_page_renderer_exposes_plugin_behavior_tab_and_can_hide_help_ui'] =
     assertContainsValue('Plugin Behavior', $output, 'The advanced tools switcher should expose a dedicated Plugin Behavior tab.');
     assertSameValue(1, substr_count($output, 'Enable Block Editor Font Library Sync'), 'The Plugin Behavior panel should render the editor sync toggle exactly once.');
     assertSameValue(1, substr_count($output, 'Enable Monospace Role'), 'The Plugin Behavior panel should render the monospace toggle exactly once.');
-    assertContainsValue('Training Wheels Off', $output, 'The Plugin Behavior tab should expose the training-wheels toggle.');
+    assertContainsValue('Hide Onboarding Hints', $output, 'The Plugin Behavior tab should expose the onboarding-hints toggle.');
     assertContainsValue('Uninstall Settings', $output, 'The Plugin Behavior tab should group uninstall cleanup controls under an uninstall settings heading.');
     assertSameValue(1, substr_count($output, 'Delete uploaded fonts on uninstall'), 'The uninstall cleanup toggle should appear once in the Plugin Behavior panel instead of being duplicated elsewhere.');
-    assertContainsValue('is-training-wheels-off', $output, 'Training Wheels Off should add the admin state class used to suppress descriptive copy.');
+    assertContainsValue('is-training-wheels-off', $output, 'Hide Onboarding Hints should add the admin state class used to suppress descriptive copy.');
     assertContainsValue('Professional Typography Management For WordPress', $output, 'The hero tagline should remain rendered even when training wheels are turned off.');
-    assertNotContainsValue('tasty-fonts-help-button', $output, 'Training Wheels Off should remove inline help buttons from the rendered admin UI.');
-    assertNotContainsValue('data-help-tooltip=', $output, 'Training Wheels Off should omit passive hover help attributes from the rendered admin UI.');
+    assertNotContainsValue('tasty-fonts-help-button', $output, 'Hide Onboarding Hints should remove inline help buttons from the rendered admin UI.');
+    assertNotContainsValue('data-help-tooltip=', $output, 'Hide Onboarding Hints should omit passive hover help attributes from the rendered admin UI.');
 
     $adminCss = (string) file_get_contents(dirname(__DIR__, 2) . '/assets/css/admin.css');
     assertNotContainsValue(
         '.tasty-fonts-admin.is-training-wheels-off .tasty-fonts-hero-text',
         $adminCss,
-        'Training Wheels Off should not hide the hero tagline.'
+        'Hide Onboarding Hints should not hide the hero tagline.'
     );
 };
 
@@ -1087,7 +1136,7 @@ $tests['admin_page_renderer_restructures_role_toolbar_with_explicit_actions'] = 
 
     assertContainsValue('Apply Sitewide', $output, 'The Font Roles form should expose an explicit apply sitewide action.');
     assertContainsValue('Switch off Sitewide', $output, 'The Font Roles form should expose an explicit switch-off sitewide action.');
-    assertContainsValue('Update Live Roles', $output, 'The Font Roles form should keep a direct publish action in the role actions card.');
+    assertContainsValue('Publish Roles', $output, 'The Font Roles form should keep a direct publish action in the role actions card.');
     assertContainsValue('data-disclosure-toggle="tasty-fonts-role-preview-panel"', $output, 'The utilities card should expose a dedicated preview disclosure button.');
     assertNotContainsValue('>Font Roles<', $output, 'The top panel should no longer render the obsolete Font Roles heading.');
     assertContainsValue('tasty-fonts-studio-section tasty-fonts-role-command-deck', $output, 'Deployment controls should use the shared studio section pattern.');
@@ -1105,7 +1154,7 @@ $tests['admin_page_renderer_restructures_role_toolbar_with_explicit_actions'] = 
     assertSameValue(true, $bodyVariablePosition !== false && $selectionPosition !== false && $bodyVariablePosition > $selectionPosition, 'The body variable pill should live in the role selection summary.');
 };
 
-$tests['admin_page_renderer_only_highlights_update_live_roles_when_changes_are_pending'] = static function (): void {
+$tests['admin_page_renderer_only_highlights_publish_roles_when_changes_are_pending'] = static function (): void {
     resetTestState();
 
     $renderer = new AdminPageRenderer(new Storage());
@@ -1152,8 +1201,8 @@ $tests['admin_page_renderer_only_highlights_update_live_roles_when_changes_are_p
     ]);
     $pendingOutput = (string) ob_get_clean();
 
-    assertContainsValue('button button-primary is-pending-live-change tasty-fonts-scope-button tasty-fonts-scope-button--apply', $pendingOutput, 'Update Live Roles should stay highlighted when the draft differs from the live applied roles.');
-    assertContainsValue('data-role-apply-live aria-disabled="false"', $pendingOutput, 'Update Live Roles should remain active when there are live changes pending.');
+    assertContainsValue('button button-primary is-pending-live-change tasty-fonts-scope-button tasty-fonts-scope-button--apply', $pendingOutput, 'Publish Roles should stay highlighted when the draft differs from the live applied roles.');
+    assertContainsValue('data-role-apply-live aria-disabled="false"', $pendingOutput, 'Publish Roles should remain active when there are live changes pending.');
 
     ob_start();
     $renderer->renderPage([
@@ -1197,11 +1246,326 @@ $tests['admin_page_renderer_only_highlights_update_live_roles_when_changes_are_p
     ]);
     $matchedOutput = (string) ob_get_clean();
 
-    assertContainsValue('class="button tasty-fonts-scope-button tasty-fonts-scope-button--apply"', $matchedOutput, 'Update Live Roles should fall back to the shared neutral button styling when the draft already matches the live applied roles.');
-    assertContainsValue('data-role-apply-live aria-disabled="true" disabled', $matchedOutput, 'Update Live Roles should use the real disabled attribute when there is nothing new to publish.');
-    assertContainsValue('No live role changes to publish.', $matchedOutput, 'The disabled Update Live Roles action should explain why it is unavailable.');
-    assertContainsValue('data-role-save-draft aria-disabled="true" disabled', $matchedOutput, 'Save Roles should start disabled until the draft changes.');
-    assertContainsValue('No draft changes to save.', $matchedOutput, 'The disabled Save Roles action should explain why it is unavailable.');
+    assertContainsValue('class="button tasty-fonts-scope-button tasty-fonts-scope-button--apply"', $matchedOutput, 'Publish Roles should fall back to the shared neutral button styling when the draft already matches the live applied roles.');
+    assertContainsValue('data-role-apply-live aria-disabled="true" disabled', $matchedOutput, 'Publish Roles should use the real disabled attribute when there is nothing new to publish.');
+    assertContainsValue('No live role changes to publish.', $matchedOutput, 'The disabled Publish Roles action should explain why it is unavailable.');
+    assertContainsValue('data-role-save-draft aria-disabled="true" disabled', $matchedOutput, 'Save Draft should start disabled until the draft changes.');
+    assertContainsValue('No draft changes to save.', $matchedOutput, 'The disabled Save Draft action should explain why it is unavailable.');
+};
+
+$tests['admin_page_renderer_keeps_deployment_and_role_selection_ahead_of_library_and_activity'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [
+            'Lora' => [
+                'family' => 'Lora',
+                'slug' => 'lora',
+                'faces' => [],
+                'sources' => ['local'],
+                'delivery_badges' => [],
+                'font_category' => 'serif',
+                'font_category_tokens' => ['serif'],
+                'delivery_filter_tokens' => ['published', 'same-origin'],
+                'publish_state' => 'published',
+            ],
+        ],
+        'available_families' => ['Lora'],
+        'roles' => [
+            'heading' => 'Lora',
+            'heading_fallback' => 'serif',
+            'body' => '',
+            'body_fallback' => 'sans-serif',
+        ],
+        'applied_roles' => [
+            'heading' => 'Lora',
+            'heading_fallback' => 'serif',
+            'body' => '',
+            'body_fallback' => 'sans-serif',
+        ],
+        'logs' => [
+            ['time' => '2026-04-07 09:20:40', 'actor' => 'root', 'message' => 'Fonts rescanned.'],
+        ],
+        'activity_actor_options' => ['root'],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'google_api_state' => 'empty',
+        'google_api_enabled' => false,
+        'google_api_saved' => false,
+        'google_access_expanded' => false,
+        'adobe_project_state' => 'empty',
+        'google_status_label' => '',
+        'google_status_class' => '',
+        'google_access_copy' => '',
+        'google_search_disabled_copy' => '',
+        'adobe_project_enabled' => false,
+        'adobe_project_saved' => false,
+        'adobe_access_expanded' => false,
+        'adobe_project_id' => '',
+        'adobe_status_label' => '',
+        'adobe_status_class' => '',
+        'adobe_access_copy' => '',
+        'adobe_project_link' => 'https://fonts.adobe.com/',
+        'adobe_detected_families' => [],
+        'css_delivery_mode' => 'file',
+        'css_delivery_mode_options' => [],
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'class_output_mode' => 'off',
+        'class_output_mode_options' => [],
+        'minify_css_output' => true,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_weight_tokens_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_sans_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'extended_variable_category_mono_enabled' => false,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => false,
+        'training_wheels_off' => false,
+        'monospace_role_enabled' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => true,
+        'role_deployment' => [
+            'badge' => 'Live',
+            'badge_class' => 'is-success',
+            'title' => 'Live',
+            'copy' => 'Current selections are being served sitewide.',
+        ],
+    ]);
+    $output = (string) ob_get_clean();
+
+    $deploymentPosition = strpos($output, 'Deployment Controls');
+    $selectionPosition = strpos($output, 'Choose the family and fallback for each saved role.');
+    $libraryPosition = strpos($output, 'id="tasty-fonts-library"');
+    $activityPosition = strpos($output, 'class="tasty-fonts-card tasty-fonts-activity-card"');
+
+    assertSameValue(true, $deploymentPosition !== false && $selectionPosition !== false && $deploymentPosition < $selectionPosition, 'Deployment controls should render before role selection.');
+    assertSameValue(true, $selectionPosition !== false && $libraryPosition !== false && $selectionPosition < $libraryPosition, 'Role selection should render before the library section.');
+    assertSameValue(true, $libraryPosition !== false && $activityPosition !== false && $libraryPosition < $activityPosition, 'The library should render before the activity section.');
+};
+
+$tests['admin_page_renderer_closes_the_shell_wrapper_after_rendering_sections'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'roles' => [],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'minify_css_output' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => false,
+        'training_wheels_off' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertSameValue(1, substr_count($output, '<div class="tasty-fonts-shell">'), 'The page should open the shell wrapper once.');
+    assertSameValue(
+        1,
+        preg_match('/<div class="tasty-fonts-shell">.*<\/div>\s*<\/div>\s*$/s', $output),
+        'The shell wrapper should close before the outer admin wrapper ends.'
+    );
+};
+
+$tests['admin_page_renderer_renders_preview_and_advanced_panels_inside_deployment_controls'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => ['Lora', 'Noto Sans'],
+        'roles' => [
+            'heading' => 'Lora',
+            'heading_fallback' => 'serif',
+            'body' => 'Noto Sans',
+            'body_fallback' => 'sans-serif',
+        ],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'preview_panels' => [
+            ['key' => 'editorial', 'label' => 'Editorial', 'active' => true],
+        ],
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'minify_css_output' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => false,
+        'training_wheels_off' => false,
+        'monospace_role_enabled' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    $deploymentPosition = strpos($output, 'Deployment Controls');
+    $previewPanelPosition = strpos($output, 'id="tasty-fonts-role-preview-panel"');
+    $advancedPanelPosition = strpos($output, 'id="tasty-fonts-role-advanced-panel"');
+    $roleSelectionPosition = strpos($output, 'Choose the family and fallback for each saved role.');
+    $libraryPosition = strpos($output, 'id="tasty-fonts-library"');
+
+    assertSameValue(true, $deploymentPosition !== false, 'The deployment controls heading should render.');
+    assertSameValue(true, $previewPanelPosition !== false, 'The preview panel markup should render.');
+    assertSameValue(true, $advancedPanelPosition !== false, 'The advanced tools panel markup should render.');
+    assertSameValue(true, $roleSelectionPosition !== false, 'The role selection heading should render.');
+    assertSameValue(true, $libraryPosition !== false, 'The library section should render.');
+    assertSameValue(true, $deploymentPosition < $previewPanelPosition, 'The preview panel should render within the deployment controls section.');
+    assertSameValue(true, $previewPanelPosition < $advancedPanelPosition, 'The preview panel should render before the advanced tools panel.');
+    assertSameValue(true, $advancedPanelPosition < $roleSelectionPosition, 'The advanced tools panel should render before role selection.');
+    assertSameValue(true, $roleSelectionPosition < $libraryPosition, 'Role selection should still render before the library.');
+};
+
+$tests['admin_page_renderer_keeps_library_identity_and_preview_ahead_of_family_controls'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'Lora',
+        'slug' => 'lora',
+        'delivery_filter_tokens' => ['published', 'same-origin'],
+        'font_category' => 'serif',
+        'font_category_tokens' => ['serif'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'google-self-hosted',
+        'active_delivery' => [
+            'id' => 'google-self-hosted',
+            'label' => 'Self-hosted (Google import)',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular', '700'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-self-hosted',
+                'label' => 'Self-hosted (Google import)',
+                'provider' => 'google',
+                'type' => 'self_hosted',
+                'variants' => ['regular', '700'],
+            ],
+        ],
+        'delivery_badges' => [
+            [
+                'label' => 'In Use',
+                'class' => 'is-success',
+                'copy' => 'In Use',
+            ],
+            [
+                'label' => 'Self-hosted',
+                'class' => '',
+                'copy' => 'Self-hosted',
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => ['woff2' => 'google/lora/lora-400-normal.woff2'],
+                'paths' => ['woff2' => 'google/lora/lora-400-normal.woff2'],
+            ],
+            [
+                'weight' => '700',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => ['woff2' => 'google/lora/lora-700-normal.woff2'],
+                'paths' => ['woff2' => 'google/lora/lora-700-normal.woff2'],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            [
+                'heading' => 'Lora',
+                'body' => '',
+                'heading_fallback' => 'serif',
+                'body_fallback' => 'sans-serif',
+            ],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Inherit Global (Optional)'],
+                ['value' => 'swap', 'label' => 'swap'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            [],
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    $titlePosition = strpos($output, '<h3>Lora</h3>');
+    $previewPosition = strpos($output, 'tasty-fonts-font-inline-preview');
+    $runtimeStatePosition = strpos($output, 'Runtime State');
+    $fallbackPosition = strpos($output, 'Fallback');
+    $fontDisplayPosition = strpos($output, 'Font Display');
+
+    assertSameValue(true, $titlePosition !== false, 'Library cards should render the family title.');
+    assertSameValue(true, $previewPosition !== false, 'Library cards should render the preview block.');
+    assertSameValue(true, $runtimeStatePosition !== false, 'Library cards should render the runtime state control.');
+    assertSameValue(true, $fallbackPosition !== false, 'Library cards should render the fallback control.');
+    assertSameValue(true, $fontDisplayPosition !== false, 'Library cards should render the font display control.');
+    assertSameValue(true, $titlePosition < $runtimeStatePosition, 'Family identity should render before the runtime state controls.');
+    assertSameValue(true, $previewPosition < $runtimeStatePosition, 'Preview content should render before the runtime state controls.');
+    assertSameValue(true, $runtimeStatePosition < $fallbackPosition, 'Runtime state should render before fallback inside the family controls.');
+    assertSameValue(true, $fallbackPosition < $fontDisplayPosition, 'Fallback should render before font display inside the family controls.');
 };
 
 $tests['admin_page_renderer_renders_highlighted_snippet_panels_with_icon_copy_buttons'] = static function (): void {

@@ -587,6 +587,7 @@ $tests['asset_service_enqueue_inlines_css_and_rewrites_the_generated_file_when_t
     assertSameValue(true, is_string($generatedPath) && $generatedPath !== '', 'The generated CSS path should be available for file delivery.');
 
     if (is_string($generatedPath)) {
+        mkdir(dirname($generatedPath), FS_CHMOD_DIR, true);
         file_put_contents($generatedPath, '/* stale */');
     }
 
@@ -599,6 +600,27 @@ $tests['asset_service_enqueue_inlines_css_and_rewrites_the_generated_file_when_t
     );
     assertContainsValue('body{color:red;}', (string) ($inlineStyles['tasty-fonts-runtime'] ?? ''), 'Inline fallback should include the generated runtime CSS payload.');
     assertContainsValue('/* Version: ', (string) file_get_contents((string) $generatedPath), 'Stale generated CSS should be rewritten with the versioned file payload.');
+};
+
+$tests['asset_service_enqueues_inline_css_when_inline_delivery_mode_is_selected'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $inlineStyles;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['css_delivery_mode' => 'inline']);
+
+    add_filter(
+        'tasty_fonts_generated_css',
+        static fn (string $css): string => $css . "\nbody{color:blue;}"
+    );
+
+    $services['assets']->enqueue('tasty-fonts-runtime');
+
+    assertSameValue('', (string) ($enqueuedStyles['tasty-fonts-runtime']['src'] ?? ''), 'Inline delivery should register a handle without a stylesheet URL.');
+    assertContainsValue('body{color:blue;}', (string) ($inlineStyles['tasty-fonts-runtime'] ?? ''), 'Inline delivery should attach the generated CSS to the enqueued handle.');
+    assertSameValue(true, is_file((string) $services['storage']->getGeneratedCssPath()), 'Inline delivery should still keep the generated CSS file on disk.');
 };
 
 $tests['asset_service_applies_generated_css_filter_before_caching'] = static function (): void {
@@ -702,6 +724,43 @@ CSS,
         in_array('https://use.typekit.net/abc1234.css', $canvasStylesheetUrls, true),
         'Etch canvas runtime data should include the Adobe stylesheet URL.'
     );
+};
+
+$tests['runtime_service_skips_font_preload_hints_when_inline_css_delivery_is_enabled'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['css_delivery_mode' => 'inline']);
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self-hosted',
+            'label' => 'Self-hosted (Google import)',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'google',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    ob_start();
+    $services['runtime']->outputPreloadHints();
+    $output = (string) ob_get_clean();
+
+    assertNotContainsValue('rel="preload"', $output, 'Inline CSS delivery should skip font preload hints.');
 };
 
 $tests['runtime_asset_planner_forces_swap_for_admin_preview_stylesheets'] = static function (): void {

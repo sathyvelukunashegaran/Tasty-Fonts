@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 - Added a lightweight zero-dependency JavaScript contract test layer for shared admin helpers and the Etch canvas iframe stylesheet bridge.
 - Added a pull request and branch CI workflow that runs PHP lint, the PHP test suite, and the JavaScript contract tests before changes reach release tagging.
 - Added configurable extended font-output variable controls in Output Settings, including optional global weight tokens, role aliases, and category aliases for sans, serif, and mono stacks.
+- Added dedicated admin context/view builders plus section renderers for the studio, preview, tools, library, and activity areas so the dashboard no longer depends on one monolithic page-render method.
+- Added a reusable uninstall handler and expanded storage/runtime coverage for generated CSS delivery, provider directories, and uninstall cleanup flows.
 
 ### Changed
 
@@ -23,12 +25,18 @@ All notable changes to this project will be documented in this file.
 - Refreshed plugin metadata and the generated translation template so WordPress headers, extracted strings, and the current plugin description stay aligned for version 1.5.1.
 - Updated admin import summaries and search-result metadata to use translation-safe plural strings instead of English-only suffix assembly.
 - Added request-scope settings caching and reused generated stylesheet state during stale-file fallback delivery to reduce repeated normalization and file-state work during admin requests.
+- Refactored the admin page pipeline so `AdminController` delegates page-context construction, `AdminPageRenderer` acts as a thin shell, and renderer sections/templates own the dashboard composition in smaller files.
+- Reworked font storage and generated stylesheet handling to use provider-specific upload directories, a hidden generated CSS directory, optional inline CSS delivery, and matching preload behavior.
+- Standardized dashboard terminology and polished the admin CSS against the shared token system so deployment controls, library cards, activity filters, and notice surfaces stay visually aligned.
 
 ### Fixed
 
 - Restored the shared admin help-tip affordance so contextual help buttons render again across the dashboard instead of silently no-oping.
 - Corrected the GitHub updater slug to `tasty-fonts` while keeping the packaged plugin directory unchanged for install/update continuity.
 - Improved admin accessibility by associating visible labels with preview/snippet code blocks and announcing local-environment notices as live regions.
+- Fixed dashboard section ordering and disclosure placement so Preview and Advanced Tools open inside Deployment Controls in the intended sequence.
+- Fixed malformed admin wrapper markup that allowed the WordPress footer to overlap the dashboard content.
+- Fixed uninstall cleanup so generated CSS, synced block-editor font families, and plugin-managed runtime transients are removed consistently.
 
 ## [1.5.1] - 2026-04-07
 

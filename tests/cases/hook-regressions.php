@@ -21,6 +21,9 @@ $tests['plugin_activation_creates_provider_index_files_and_generated_css'] = sta
     assertTrueValue(is_file($root . '/index.php'), 'Plugin activation should create the root index.php stub.');
     assertTrueValue(is_file($root . '/google/index.php'), 'Plugin activation should create the Google provider index.php stub.');
     assertTrueValue(is_file($root . '/bunny/index.php'), 'Plugin activation should create the Bunny provider index.php stub.');
+    assertTrueValue(is_file($root . '/upload/index.php'), 'Plugin activation should create the local upload index.php stub.');
+    assertTrueValue(is_file($root . '/adobe/index.php'), 'Plugin activation should create the Adobe provider index.php stub.');
+    assertTrueValue(is_file($root . '/.generated/index.php'), 'Plugin activation should create the generated-assets index.php stub.');
     assertContainsValue('Silence is golden', (string) file_get_contents($root . '/index.php'), 'Plugin activation should write the silence-is-golden index stub.');
 
     resetPluginSingleton();

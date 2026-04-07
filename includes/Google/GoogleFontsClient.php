@@ -12,7 +12,7 @@ use WP_Error;
 
 final class GoogleFontsClient
 {
-    private const TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v1';
+    public const TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v1';
     private const CATALOG_TTL = 12 * HOUR_IN_SECONDS;
     private const REQUEST_TIMEOUT = 20;
 

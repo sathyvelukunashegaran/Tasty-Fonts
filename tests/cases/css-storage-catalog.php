@@ -850,9 +850,24 @@ $tests['storage_returns_absolute_generated_css_url'] = static function (): void 
     $url = $storage->getGeneratedCssUrl();
 
     assertSameValue(
-        'https://example.test/wp-content/uploads/fonts/tasty-fonts.css',
+        'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css',
         $url,
         'Generated CSS URL should stay absolute so Etch can pass it to new URL(...).'
+    );
+};
+
+$tests['storage_exposes_local_upload_and_adobe_directories'] = static function (): void {
+    resetTestState();
+
+    $storage = new Storage();
+    $details = $storage->get();
+
+    assertSameValue(
+        true,
+        is_array($details)
+            && str_ends_with((string) ($details['upload_dir'] ?? ''), '/fonts/upload')
+            && str_ends_with((string) ($details['adobe_dir'] ?? ''), '/fonts/adobe'),
+        'Storage details should expose dedicated upload and Adobe directories under uploads/fonts.'
     );
 };
 

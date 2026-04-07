@@ -20,8 +20,11 @@
     const roleBodyFallback = document.getElementById('tasty_fonts_body_fallback');
     const roleMonospaceFallback = document.getElementById('tasty_fonts_monospace_fallback');
     const roleForm = document.querySelector('[data-role-form]');
+    const roleFormId = roleForm ? String(roleForm.getAttribute('id') || '') : '';
     const roleActionTypeInput = document.querySelector('[data-role-action-type]');
-    const roleFormSubmitButtons = roleForm ? Array.from(roleForm.querySelectorAll('button[name="tasty_fonts_action_type"]')) : [];
+    const roleFormSubmitButtons = roleFormId
+        ? Array.from(document.querySelectorAll(`button[name="tasty_fonts_action_type"][form="${roleFormId}"]`))
+        : (roleForm ? Array.from(roleForm.querySelectorAll('button[name="tasty_fonts_action_type"]')) : []);
     const roleApplyLiveButton = document.querySelector('[data-role-apply-live]');
     const roleApplyLiveWrap = document.querySelector('[data-role-apply-live-wrap]');
     const roleSaveDraftButton = document.querySelector('[data-role-save-draft]');
@@ -761,6 +764,55 @@
         if (adobeProjectToggle) {
             setDisclosureState(adobeProjectToggle, adobeProjectOpen);
         }
+    }
+
+    function hasTrackedUiState(state) {
+        return Boolean(state) && typeof state === 'object' && Object.keys(state).length > 0;
+    }
+
+    function resetInitialScrollPosition() {
+        if (typeof window.scrollTo !== 'function') {
+            return;
+        }
+
+        if (window.history && 'scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual';
+        }
+
+        window.requestAnimationFrame(() => {
+            window.scrollTo(0, 0);
+
+            window.setTimeout(() => {
+                window.scrollTo(0, 0);
+            }, 0);
+        });
+    }
+
+    function revealDisclosurePanel(targetId, anchor = null) {
+        if (!targetId) {
+            return;
+        }
+
+        const panel = document.getElementById(targetId);
+
+        if (!panel || typeof window.scrollTo !== 'function') {
+            return;
+        }
+
+        window.setTimeout(() => {
+            const anchorElement = anchor && typeof anchor.closest === 'function'
+                ? (anchor.closest('.tasty-fonts-role-command-deck') || anchor.closest('.tasty-fonts-role-command-card--utilities'))
+                : null;
+            const scrollTarget = anchorElement || panel;
+            const panelTop = scrollTarget.getBoundingClientRect().top + window.scrollY;
+            const topOffset = 24;
+
+            window.scrollTo({
+                top: Math.max(0, panelTop - topOffset),
+                left: 0,
+                behavior: 'smooth',
+            });
+        }, 80);
     }
 
     function captureTrackedUiState() {
@@ -1516,7 +1568,7 @@
         const pendingUiState = consumePendingUiState();
 
         if (!pendingUiState || typeof pendingUiState !== 'object') {
-            return;
+            return false;
         }
 
         if (pendingUiState.type === 'highlight-library-row') {
@@ -1524,6 +1576,8 @@
                 highlightLibraryRow(pendingUiState.familySlug || '');
             }, 120);
         }
+
+        return true;
     }
 
     function findGoogleFamilyMatch(familyName) {
@@ -4998,6 +5052,10 @@
             initializePreviewWorkspace();
         }
 
+        if (nextExpanded && isRoleToolToggle) {
+            revealDisclosurePanel(targetId, disclosureToggle);
+        }
+
         return true;
     }
 
@@ -5998,10 +6056,18 @@
         applyTrackedUiState(initialTrackedUiState);
         syncTrackedUiUrl('replace');
         const previewToggle = disclosureToggleByTargetId('tasty-fonts-role-preview-panel');
+        const advancedToggle = disclosureToggleByTargetId('tasty-fonts-role-advanced-panel');
         if (previewToggle && isDisclosureExpanded(previewToggle)) {
             initializePreviewWorkspace();
+            revealDisclosurePanel('tasty-fonts-role-preview-panel', previewToggle);
+        } else if (advancedToggle && isDisclosureExpanded(advancedToggle)) {
+            revealDisclosurePanel('tasty-fonts-role-advanced-panel', advancedToggle);
         }
-        applyPendingUiState();
+        const appliedPendingUiState = applyPendingUiState();
+
+        if (!appliedPendingUiState && !hasTrackedUiState(initialTrackedUiState)) {
+            resetInitialScrollPosition();
+        }
     }
 
     bootstrap();

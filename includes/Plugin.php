@@ -38,12 +38,12 @@ final class Plugin
     private const SUPPORT_URL = self::REPOSITORY_URL . '/issues';
     private const RELEASES_URL = self::REPOSITORY_URL . '/releases';
     private const TRANSIENT_KEYS = [
-        'tasty_fonts_catalog_v2',
-        'tasty_fonts_css_v2',
-        'tasty_fonts_css_hash_v2',
-        'tasty_fonts_regenerate_css_queued',
-        'tasty_fonts_google_catalog_v1',
-        'tasty_fonts_bunny_catalog_v1',
+        CatalogService::TRANSIENT_CATALOG,
+        AssetService::TRANSIENT_CSS,
+        AssetService::TRANSIENT_HASH,
+        AssetService::TRANSIENT_REGENERATE_CSS_QUEUED,
+        GoogleFontsClient::TRANSIENT_CATALOG,
+        BunnyFontsClient::TRANSIENT_CATALOG,
         'tasty_fonts_github_release_v1',
         'tasty_fonts_github_release_version_v1',
     ];
@@ -308,6 +308,9 @@ final class Plugin
                 trailingslashit($root) . 'index.php',
                 trailingslashit($root) . 'google/index.php',
                 trailingslashit($root) . 'bunny/index.php',
+                trailingslashit($root) . 'upload/index.php',
+                trailingslashit($root) . 'adobe/index.php',
+                trailingslashit($root) . '.generated/index.php',
             ] as $path
         ) {
             if (!file_exists($path)) {

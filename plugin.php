@@ -22,10 +22,21 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TASTY_FONTS_VERSION', '1.5.1');
-define('TASTY_FONTS_FILE', __FILE__);
-define('TASTY_FONTS_DIR', plugin_dir_path(__FILE__));
-define('TASTY_FONTS_URL', plugin_dir_url(__FILE__));
+if (!defined('TASTY_FONTS_VERSION')) {
+    define('TASTY_FONTS_VERSION', '1.5.1');
+}
+
+if (!defined('TASTY_FONTS_FILE')) {
+    define('TASTY_FONTS_FILE', __FILE__);
+}
+
+if (!defined('TASTY_FONTS_DIR')) {
+    define('TASTY_FONTS_DIR', plugin_dir_path(__FILE__));
+}
+
+if (!defined('TASTY_FONTS_URL')) {
+    define('TASTY_FONTS_URL', plugin_dir_url(__FILE__));
+}
 
 spl_autoload_register(
     static function (string $class): void {

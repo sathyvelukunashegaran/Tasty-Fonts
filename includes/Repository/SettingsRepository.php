@@ -14,9 +14,9 @@ final class SettingsRepository
     public const OPTION_SETTINGS = 'tasty_fonts_settings';
     public const OPTION_ROLES = 'tasty_fonts_roles';
     public const OPTION_GOOGLE_API_KEY_DATA = 'tasty_fonts_google_api_key_data';
+    public const LEGACY_OPTION_SETTINGS = 'etch_fonts_settings';
+    public const LEGACY_OPTION_ROLES = 'etch_fonts_roles';
     private const ROLE_FAMILY_KEYS = ['heading', 'body', 'monospace'];
-    private const LEGACY_OPTION_SETTINGS = 'etch_fonts_settings';
-    private const LEGACY_OPTION_ROLES = 'etch_fonts_roles';
     private const DEFAULT_SETTINGS = [
         'auto_apply_roles' => false,
         'applied_roles' => [],

@@ -330,7 +330,7 @@ $tests['local_upload_service_rejects_unverified_tmp_files'] = static function ()
         ],
     ]);
 
-    $savedPath = $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2');
+    $savedPath = $services['storage']->pathForRelativePath('upload/inter/Inter-400-normal.woff2');
 
     assertSameValue(1, (int) ($result['summary']['errors'] ?? 0), 'Uploads should error when PHP cannot verify the temp file as an HTTP upload.');
     assertContainsValue('could not be verified as a valid HTTP upload', (string) ($result['rows'][0]['message'] ?? ''), 'Uploads should explain when the temp file fails the PHP upload-origin guard.');
@@ -363,11 +363,11 @@ $tests['local_upload_service_imports_verified_font_uploads'] = static function (
         ],
     ]);
 
-    $savedPath = $services['storage']->pathForRelativePath('inter/Inter-400-italic.woff2');
+    $savedPath = $services['storage']->pathForRelativePath('upload/inter/Inter-400-italic.woff2');
 
     assertSameValue(1, (int) ($result['summary']['imported'] ?? 0), 'Verified HTTP uploads should be imported into the local library.');
     assertSameValue('imported', (string) ($result['rows'][0]['status'] ?? ''), 'Verified HTTP uploads should produce an imported row result.');
-    assertSameValue(true, is_string($savedPath) && file_exists($savedPath), 'Verified HTTP uploads should be written into uploads/fonts.');
+    assertSameValue(true, is_string($savedPath) && file_exists($savedPath), 'Verified HTTP uploads should be written into the dedicated local upload folder.');
 };
 
 $tests['library_service_blocks_deleting_live_applied_family_when_draft_changed'] = static function (): void {

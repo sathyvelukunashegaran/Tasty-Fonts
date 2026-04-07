@@ -190,15 +190,34 @@
     --tasty-shadow-focus: 0 0 0 2px var(--tasty-surface), 0 0 0 4px var(--tasty-accent);
 
     /* Layout constants */
+    --tasty-admin-max-width: 1360px;
+    --tasty-admin-footer-clearance: 96px;
     --tasty-card-padding: var(--tasty-space-5);
     --tasty-card-padding-tight: var(--tasty-space-4);
     --tasty-panel-gap: var(--tasty-space-4);
     --tasty-section-gap: var(--tasty-space-4);
     --tasty-section-gap-tight: var(--tasty-space-3);
+    --tasty-section-copy-width: 40rem;
     --tasty-sidebar-width: 300px;
     --tasty-action-cluster-width: 344px;
     --tasty-toolbar-search-width: 32rem;
     --tasty-toolbar-field-width: clamp(208px, 20vw, 236px);
+    --tasty-dashboard-intro-primary-min: 280px;
+    --tasty-dashboard-intro-secondary-min: 520px;
+    --tasty-dashboard-hero-copy-basis: 420px;
+    --tasty-dashboard-hero-copy-width: 520px;
+    --tasty-dashboard-hero-text-width: 460px;
+    --tasty-dashboard-summary-width: 44rem;
+    --tasty-dashboard-summary-width-narrow: 38rem;
+    --tasty-dashboard-selection-meta-min: 24rem;
+    --tasty-dashboard-selection-meta-width: 32rem;
+    --tasty-dashboard-title-gap-row: 6px;
+    --tasty-dashboard-title-gap-column: 10px;
+    --tasty-dashboard-version-height: 28px;
+    --tasty-dashboard-version-padding-inline: 10px;
+    --tasty-dashboard-metrics-min-column: 132px;
+    --tasty-dashboard-metric-padding-block: var(--tasty-space-3);
+    --tasty-dashboard-metric-padding-inline: 14px;
     --tasty-library-card-min-width: 18rem;
     --tasty-library-card-padding: var(--tasty-card-padding-tight);
     --tasty-library-card-gap: var(--tasty-space-4);
@@ -216,4 +235,19 @@
     --tasty-library-action-gap: var(--tasty-space-2);
     --tasty-library-action-icon-size: var(--tasty-control-height-regular);
     --tasty-library-action-width: calc(var(--tasty-control-height-regular) * 3.6);
+    --tasty-library-sidebar-padding: 14px;
+    --tasty-library-meta-panel-padding: var(--tasty-space-3);
+    --tasty-library-meta-panel-gap: 10px;
+    --tasty-library-stack-copy-width: 20rem;
+    --tasty-library-monospace-preview-padding-block: 18px;
+    --tasty-library-monospace-preview-padding-inline: var(--tasty-space-5);
+    --tasty-library-monospace-preview-size: clamp(15px, 1.15vw, 18px);
+    --tasty-activity-shell-max-height: clamp(220px, 34vh, 360px);
+    --tasty-activity-shell-max-height-mobile: min(44vh, 320px);
+    --tasty-activity-empty-min-height: 108px;
+    --tasty-activity-log-marker-column: 12px;
+    --tasty-activity-log-marker-size: var(--tasty-space-2);
+    --tasty-activity-log-marker-offset: 5px;
+    --tasty-activity-log-actor-height: 20px;
+    --tasty-activity-log-actor-padding-inline: 7px;
 }

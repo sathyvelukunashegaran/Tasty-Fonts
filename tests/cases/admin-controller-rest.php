@@ -137,7 +137,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
     assertContainsValue('extended variable subsettings updated', $message, 'Settings save messages should explain granular extended-variable changes.');
     assertContainsValue('primary font preloads enabled', $message, 'Settings save messages should explain preload setting changes.');
     assertContainsValue('Block Editor Font Library sync enabled', $message, 'Settings save messages should explain editor sync changes.');
-    assertContainsValue('training wheels off enabled', $message, 'Settings save messages should explain plugin behavior changes.');
+    assertContainsValue('onboarding hints hidden', $message, 'Settings save messages should explain plugin behavior changes.');
     assertContainsValue('preview text updated', $message, 'Settings save messages should explain preview text changes.');
 };
 
@@ -292,7 +292,7 @@ $tests['admin_controller_builds_reordered_overview_metrics'] = static function (
     );
 
     assertSameValue(
-        ['Families', 'Published', 'Paused', 'Self-hosted'],
+        ['Families', 'Published', 'In Library Only', 'Self-hosted'],
         array_values(array_map(static fn (array $metric): string => (string) ($metric['label'] ?? ''), $metrics)),
         'The overview metrics should be reordered around library state and self-hosted counts instead of file size.'
     );
@@ -460,8 +460,8 @@ $tests['admin_controller_builds_role_class_output_panel_content_when_apply_sitew
         $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
     }
 
-    assertContainsValue('.font-heading', $panelValues['classes'] ?? '', 'The Font Classes panel should expose role classes from the saved draft even when Apply Sitewide is off.');
-    assertNotContainsValue('Role classes are unavailable while Apply Sitewide is off.', $panelValues['classes'] ?? '', 'The Font Classes panel should no longer claim role classes are unavailable when Apply Sitewide is off.');
+    assertContainsValue('.font-heading', $panelValues['classes'] ?? '', 'The Font Classes panel should expose role classes from the saved draft even when sitewide delivery is off.');
+    assertNotContainsValue('Role classes are unavailable while Apply Sitewide is off.', $panelValues['classes'] ?? '', 'The Font Classes panel should no longer claim role classes are unavailable when sitewide delivery is off.');
 };
 
 $tests['admin_controller_builds_output_panels_from_applied_roles_when_sitewide_is_on'] = static function (): void {
@@ -516,6 +516,22 @@ $tests['admin_controller_exposes_class_output_mode_in_page_context'] = static fu
         ['off', 'roles', 'families', 'all'],
         array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), (array) ($context['class_output_mode_options'] ?? []))),
         'Page context should expose the supported class output mode options for the Output Settings form.'
+    );
+};
+
+$tests['admin_controller_exposes_css_delivery_mode_in_page_context'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['css_delivery_mode' => 'inline']);
+
+    $context = invokePrivateMethod($services['controller'], 'buildPageContext', []);
+
+    assertSameValue('inline', (string) ($context['css_delivery_mode'] ?? ''), 'Page context should expose the saved CSS delivery mode.');
+    assertSameValue(
+        ['file', 'inline'],
+        array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), (array) ($context['css_delivery_mode_options'] ?? []))),
+        'Page context should expose the supported CSS delivery mode options for the Output Settings form.'
     );
 };
 
@@ -629,9 +645,9 @@ $tests['admin_controller_marks_top_level_generated_css_panel_unavailable_when_si
     );
 
     assertSameValue(
-        'Not generated while Apply Sitewide is off.',
+        'Not generated while sitewide delivery is off.',
         (string) ($panel['value'] ?? ''),
-        'The top-level Generated CSS panel should explain that there is no live sitewide output while Apply Sitewide is off.'
+        'The top-level Generated CSS panel should explain that there is no live sitewide output while sitewide delivery is off.'
     );
 };
 

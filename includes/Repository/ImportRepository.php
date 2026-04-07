@@ -12,7 +12,7 @@ final class ImportRepository
 {
     public const OPTION_LIBRARY = 'tasty_fonts_library';
     public const OPTION_IMPORTS = 'tasty_fonts_imports';
-    private const LEGACY_OPTION_IMPORTS = 'etch_fonts_imports';
+    public const LEGACY_OPTION_IMPORTS = 'etch_fonts_imports';
     private const SUPPORTED_PUBLISH_STATES = ['library_only', 'published', 'role_active'];
     private const SUPPORTED_DELIVERY_TYPES = ['self_hosted', 'cdn', 'adobe_hosted'];
     private const SUPPORTED_PROVIDERS = ['local', 'google', 'bunny', 'adobe'];

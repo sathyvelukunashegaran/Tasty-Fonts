@@ -5,6 +5,7 @@ declare(strict_types=1);
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Support\Storage;
 use TastyFonts\Updates\GitHubUpdater;
 
 $tests['plugin_adds_a_settings_link_to_plugin_action_links'] = static function (): void {
@@ -934,4 +935,63 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
     assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[1] ?? '', 'Uninstall should target the options table when cleaning admin notice transients.');
     assertContainsValue('tasty\\_fonts\\_admin\\_notices\\_', $wpdbQueries[1] ?? '', 'Uninstall should wildcard-match per-user admin notice transients.');
     assertContainsValue('timeout', $wpdbQueries[1] ?? '', 'Uninstall should also remove admin notice transient timeout rows.');
+};
+
+$tests['uninstall_always_deletes_generated_css_and_removes_synced_block_editor_families'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $remoteRequestResponses;
+    global $remoteGetCalls;
+    global $remoteRequestCalls;
+    global $optionStore;
+
+    if (!defined('WP_UNINSTALL_PLUGIN')) {
+        define('WP_UNINSTALL_PLUGIN', 'etch-fonts/plugin.php');
+    }
+
+    $storage = new Storage();
+    $generatedPath = $storage->getGeneratedCssPath();
+
+    if (is_string($generatedPath)) {
+        mkdir(dirname($generatedPath), FS_CHMOD_DIR, true);
+        file_put_contents($generatedPath, 'generated-css');
+    }
+
+    $optionStore = [
+        'tasty_fonts_settings' => [
+            'delete_uploaded_files_on_uninstall' => false,
+            'block_editor_font_library_sync_enabled' => true,
+            'adobe_project_id' => '',
+        ],
+        'tasty_fonts_library' => [
+            'inter' => [
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'delivery_profiles' => [],
+            ],
+        ],
+    ];
+    $remoteGetResponses['https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode([['id' => 321]]),
+    ];
+    $remoteRequestResponses['DELETE https://example.test/wp-json/wp/v2/font-families/321?force=true'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(['deleted' => true]),
+    ];
+
+    require dirname(__DIR__, 2) . '/uninstall.php';
+
+    assertSameValue(false, is_string($generatedPath) && file_exists($generatedPath), 'Uninstall should always delete the generated CSS file.');
+    assertSameValue(
+        'https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit',
+        (string) ($remoteGetCalls[0]['url'] ?? ''),
+        'Uninstall should remove managed Block Editor Font Library families when sync was enabled.'
+    );
+    assertSameValue(
+        'https://example.test/wp-json/wp/v2/font-families/321?force=true',
+        (string) ($remoteRequestCalls[0]['url'] ?? ''),
+        'Uninstall should force-delete the managed Block Editor Font Library family.'
+    );
 };

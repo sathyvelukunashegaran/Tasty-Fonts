@@ -957,6 +957,32 @@ if (!function_exists('plugin_basename')) {
     }
 }
 
+if (!function_exists('plugin_dir_path')) {
+    function plugin_dir_path(string $file): string
+    {
+        return trailingslashit(dirname($file));
+    }
+}
+
+if (!function_exists('plugin_dir_url')) {
+    function plugin_dir_url(string $file): string
+    {
+        return 'https://example.test/wp-content/plugins/' . basename(dirname($file)) . '/';
+    }
+}
+
+if (!function_exists('register_activation_hook')) {
+    function register_activation_hook(string $file, callable $callback): void
+    {
+    }
+}
+
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook(string $file, callable $callback): void
+    {
+    }
+}
+
 if (!function_exists('admin_url')) {
     function admin_url(string $path = ''): string
     {

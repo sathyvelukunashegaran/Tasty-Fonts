@@ -75,7 +75,7 @@ final class LibraryService
         if (!$this->storage->deleteRelativeFiles($relativePaths)) {
             return $this->error(
                 'tasty_fonts_delete_failed',
-                $this->storageErrorMessage(__('The font files could not be deleted from uploads/fonts.', 'tasty-fonts'))
+                $this->storageErrorMessage(__('The font files could not be deleted from the font storage directory.', 'tasty-fonts'))
             );
         }
 
@@ -171,7 +171,7 @@ final class LibraryService
         if (!$this->storage->deleteRelativeFiles($relativePaths)) {
             return $this->error(
                 'tasty_fonts_delete_failed',
-                $this->storageErrorMessage(__('The files for that delivery profile could not be removed from uploads/fonts.', 'tasty-fonts'))
+                $this->storageErrorMessage(__('The files for that delivery profile could not be removed from the font storage directory.', 'tasty-fonts'))
             );
         }
 
@@ -310,7 +310,7 @@ final class LibraryService
         if (!in_array($publishState, self::MANUAL_PUBLISH_STATES, true)) {
             return $this->error(
                 'tasty_fonts_publish_state_invalid',
-                __('Choose either Published or Paused.', 'tasty-fonts')
+                __('Choose either Published or In Library Only.', 'tasty-fonts')
             );
         }
 
@@ -345,7 +345,7 @@ final class LibraryService
         $this->assets->refreshGeneratedAssets();
 
         $message = $publishState === 'library_only'
-            ? sprintf(__('%s is now Paused.', 'tasty-fonts'), $familyName)
+            ? sprintf(__('%s is now In Library Only.', 'tasty-fonts'), $familyName)
             : sprintf(__('%s is now Published.', 'tasty-fonts'), $familyName);
         $this->log->add($message);
 
@@ -488,7 +488,7 @@ final class LibraryService
         if ($relativePaths !== [] && !$this->storage->deleteRelativeFiles($relativePaths)) {
             return $this->error(
                 'tasty_fonts_delete_failed',
-                __('The font files for that variant could not be deleted from uploads/fonts.', 'tasty-fonts')
+                __('The font files for that variant could not be deleted from the font storage directory.', 'tasty-fonts')
             );
         }
 

@@ -12,7 +12,7 @@ use WP_Error;
 
 final class AdobeProjectClient
 {
-    private const TRANSIENT_PREFIX = 'tasty_fonts_adobe_project_v1_';
+    public const TRANSIENT_PREFIX = 'tasty_fonts_adobe_project_v1_';
     private const CACHE_TTL = 12 * HOUR_IN_SECONDS;
     private const REQUEST_TIMEOUT = 20;
 

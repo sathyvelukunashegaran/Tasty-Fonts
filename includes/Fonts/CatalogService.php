@@ -17,7 +17,7 @@ use SplFileInfo;
 
 final class CatalogService
 {
-    private const TRANSIENT_CATALOG = 'tasty_fonts_catalog_v2';
+    public const TRANSIENT_CATALOG = 'tasty_fonts_catalog_v2';
     private const LOCAL_FORMATS = ['woff2', 'woff', 'ttf', 'otf'];
     private const IMPORTED_SOURCES = ['google', 'bunny'];
     private const DEFAULT_COUNTS = [
@@ -602,7 +602,7 @@ final class CatalogService
 
         $badges[] = match ($publishState) {
             'library_only' => [
-                'label' => __('Paused', 'tasty-fonts'),
+                'label' => __('In Library Only', 'tasty-fonts'),
                 'class' => 'is-warning',
                 'copy' => __('This family is saved for previews and configuration, but it is not enqueued on the frontend, editor, or Etch canvas.', 'tasty-fonts'),
             ],
@@ -635,9 +635,9 @@ final class CatalogService
                 'copy' => __('Adobe web fonts stay hosted by Adobe and load from the project stylesheet defined in Adobe Fonts.', 'tasty-fonts'),
             ],
             default => [
-                'label' => __('Same-origin', 'tasty-fonts'),
+                'label' => __('Self-hosted', 'tasty-fonts'),
                 'class' => 'is-success',
-                'copy' => __('The active delivery for this family stays on your own WordPress uploads domain.', 'tasty-fonts'),
+                'copy' => __('The active delivery for this family stays on this WordPress site.', 'tasty-fonts'),
             ],
         };
 

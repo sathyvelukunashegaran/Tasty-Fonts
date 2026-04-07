@@ -42,6 +42,15 @@ final class Storage
         $bunnyDir = wp_normalize_path(trailingslashit($rootDir) . 'bunny');
         $bunnyUrl = $rootUrl . '/bunny';
         $bunnyUrlFull = $rootUrlFull . '/bunny';
+        $uploadDir = wp_normalize_path(trailingslashit($rootDir) . 'upload');
+        $uploadUrl = $rootUrl . '/upload';
+        $uploadUrlFull = $rootUrlFull . '/upload';
+        $adobeDir = wp_normalize_path(trailingslashit($rootDir) . 'adobe');
+        $adobeUrl = $rootUrl . '/adobe';
+        $adobeUrlFull = $rootUrlFull . '/adobe';
+        $generatedDir = wp_normalize_path(trailingslashit($rootDir) . '.generated');
+        $generatedUrl = $rootUrl . '/.generated';
+        $generatedUrlFull = $rootUrlFull . '/.generated';
 
         if (!$this->ensureDirectory($rootDir) || !is_dir($rootDir) || !is_readable($rootDir)) {
             return null;
@@ -57,6 +66,15 @@ final class Storage
             'bunny_dir' => $bunnyDir,
             'bunny_url' => $bunnyUrl,
             'bunny_url_full' => $bunnyUrlFull,
+            'upload_dir' => $uploadDir,
+            'upload_url' => $uploadUrl,
+            'upload_url_full' => $uploadUrlFull,
+            'adobe_dir' => $adobeDir,
+            'adobe_url' => $adobeUrl,
+            'adobe_url_full' => $adobeUrlFull,
+            'generated_dir' => $generatedDir,
+            'generated_url' => $generatedUrl,
+            'generated_url_full' => $generatedUrlFull,
         ];
 
         return $this->storage;
@@ -82,6 +100,16 @@ final class Storage
         return $this->getProviderRoot('bunny');
     }
 
+    public function getUploadRoot(): ?string
+    {
+        return $this->getProviderRoot('upload');
+    }
+
+    public function getAdobeRoot(): ?string
+    {
+        return $this->getProviderRoot('adobe');
+    }
+
     public function getProviderRoot(string $provider): ?string
     {
         $provider = strtolower(trim($provider));
@@ -101,14 +129,14 @@ final class Storage
 
     public function getGeneratedCssPath(): ?string
     {
-        $root = $this->getRoot();
+        $generatedDir = $this->getStorageValue('generated_dir');
 
-        return $root ? trailingslashit($root) . 'tasty-fonts.css' : null;
+        return $generatedDir ? trailingslashit($generatedDir) . 'tasty-fonts.css' : null;
     }
 
     public function getGeneratedCssUrl(): ?string
     {
-        $url = $this->getRootUrlFull();
+        $url = $this->getStorageValue('generated_url_full');
 
         return $url ? untrailingslashit($url) . '/tasty-fonts.css' : null;
     }
@@ -298,6 +326,40 @@ final class Storage
         return $deleted;
     }
 
+    public function deleteAbsolutePath(string $path): bool
+    {
+        $path = wp_normalize_path($path);
+
+        if ($path === '' || !$this->isWithinRoot($path)) {
+            return false;
+        }
+
+        if (!file_exists($path)) {
+            return true;
+        }
+
+        if ($this->initializeFilesystem(dirname($path))) {
+            global $wp_filesystem;
+
+            $deleted = (bool) $wp_filesystem->delete($path, is_dir($path), is_dir($path) ? 'd' : 'f');
+
+            if ($deleted) {
+                $this->cleanupEmptyDirectories([dirname($path)]);
+            }
+
+            return $deleted;
+        }
+
+        $deleted = $this->deleteAbsolutePathDirectly($path);
+
+        if ($deleted) {
+            $this->clearFilesystemError();
+            $this->cleanupEmptyDirectories([dirname($path)]);
+        }
+
+        return $deleted;
+    }
+
     public function isWithinRoot(string $path): bool
     {
         $root = $this->getRoot();
@@ -307,9 +369,9 @@ final class Storage
         }
 
         $path = wp_normalize_path($path);
-        $root = trailingslashit(wp_normalize_path($root));
+        $root = wp_normalize_path($root);
 
-        return str_starts_with($path, $root);
+        return $path === $root || str_starts_with($path, trailingslashit($root));
     }
 
     private function getStorageValue(string $key): ?string
@@ -480,5 +542,30 @@ final class Storage
         }
 
         return count(array_diff($entries, ['.', '..'])) === 0;
+    }
+
+    private function deleteAbsolutePathDirectly(string $path): bool
+    {
+        if (!file_exists($path)) {
+            return true;
+        }
+
+        if (is_dir($path)) {
+            $entries = scandir($path);
+
+            if (!is_array($entries)) {
+                return false;
+            }
+
+            foreach (array_diff($entries, ['.', '..']) as $entry) {
+                if (!$this->deleteAbsolutePathDirectly(wp_normalize_path($path . DIRECTORY_SEPARATOR . $entry))) {
+                    return false;
+                }
+            }
+
+            return rmdir($path);
+        }
+
+        return unlink($path);
     }
 }

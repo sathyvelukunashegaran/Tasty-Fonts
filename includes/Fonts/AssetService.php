@@ -13,10 +13,9 @@ use TastyFonts\Support\Storage;
 final class AssetService
 {
     public const ACTION_REGENERATE_CSS = 'tasty_fonts_regenerate_css';
-
-    private const TRANSIENT_CSS = 'tasty_fonts_css_v2';
-    private const TRANSIENT_HASH = 'tasty_fonts_css_hash_v2';
-    private const TRANSIENT_REGENERATE_CSS_QUEUED = 'tasty_fonts_regenerate_css_queued';
+    public const TRANSIENT_CSS = 'tasty_fonts_css_v2';
+    public const TRANSIENT_HASH = 'tasty_fonts_css_hash_v2';
+    public const TRANSIENT_REGENERATE_CSS_QUEUED = 'tasty_fonts_regenerate_css_queued';
     private const REGENERATE_CSS_QUEUE_TTL = 30;
 
     private ?string $css = null;
@@ -148,10 +147,6 @@ final class AssetService
 
         delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
 
-        if (!$this->isFileDeliveryEnabled()) {
-            return false;
-        }
-
         $state = $this->getGeneratedStylesheetState();
         $path = (string) $state['path'];
 
@@ -200,7 +195,7 @@ final class AssetService
         $url = (string) $state['url'];
         $expectedHash = (string) $state['expected_hash'];
 
-        if (!empty($state['is_current']) && $url !== '') {
+        if (!$this->isInlineDeliveryEnabled() && !empty($state['is_current']) && $url !== '') {
             wp_enqueue_style($handle, $url, [], $expectedHash);
             return;
         }
@@ -294,6 +289,13 @@ final class AssetService
         return $this->planner->getPrimaryFontPreloadUrls();
     }
 
+    public function isInlineDeliveryEnabled(): bool
+    {
+        $settings = $this->settings->getSettings();
+
+        return ($settings['css_delivery_mode'] ?? 'file') === 'inline';
+    }
+
     private function getVersionedCss(): string
     {
         return "/* Version: " . TASTY_FONTS_VERSION . " */\n" . $this->getCss();
@@ -301,11 +303,6 @@ final class AssetService
 
     private function queueGeneratedCssRegeneration(bool $logWriteResult = true): void
     {
-        if (!$this->isFileDeliveryEnabled()) {
-            delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
-            return;
-        }
-
         if (get_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED) !== false) {
             return;
         }
@@ -321,13 +318,6 @@ final class AssetService
         if ($scheduled === false || is_wp_error($scheduled)) {
             delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
         }
-    }
-
-    private function isFileDeliveryEnabled(): bool
-    {
-        $settings = $this->settings->getSettings();
-
-        return ($settings['css_delivery_mode'] ?? 'file') === 'file';
     }
 
     private function getGeneratedStylesheetState(): array

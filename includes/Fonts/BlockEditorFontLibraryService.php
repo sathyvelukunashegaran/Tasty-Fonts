@@ -165,6 +165,31 @@ final class BlockEditorFontLibraryService
         }
     }
 
+    /**
+     * Remove all plugin-managed families from the core Block Editor Font Library.
+     *
+     * @since 1.5.1
+     *
+     * @return void
+     */
+    public function deleteAllSyncedFamilies(): void
+    {
+        foreach ($this->imports->allFamilies() as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $familySlug = (string) ($family['slug'] ?? '');
+            $familyName = (string) ($family['family'] ?? '');
+
+            if ($familySlug === '') {
+                continue;
+            }
+
+            $this->deleteSyncedFamily($familySlug, $familyName);
+        }
+    }
+
     private function shouldSync(array $result, string $provider): bool
     {
         if (!$this->settings->isBlockEditorFontLibrarySyncEnabled()) {

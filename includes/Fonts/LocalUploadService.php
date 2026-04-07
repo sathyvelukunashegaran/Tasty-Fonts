@@ -58,7 +58,7 @@ final class LocalUploadService
         if (!$this->storage->ensureRootDirectory()) {
             return $this->error(
                 'tasty_fonts_upload_storage_unavailable',
-                $this->storageErrorMessage(__('The uploads/fonts storage directory could not be created.', 'tasty-fonts'))
+                $this->storageErrorMessage(__('The font storage directory could not be created.', 'tasty-fonts'))
             );
         }
 
@@ -360,12 +360,12 @@ final class LocalUploadService
         string $style,
         array $validatedFile
     ): bool|WP_Error {
-        $root = $this->storage->getRoot();
+        $root = $this->storage->getUploadRoot();
 
         if (!$root) {
             return $this->error(
                 'tasty_fonts_upload_storage_unavailable',
-                $this->storageErrorMessage(__('The uploads/fonts storage directory could not be created.', 'tasty-fonts'))
+                $this->storageErrorMessage(__('The font storage directory could not be created.', 'tasty-fonts'))
             );
         }
 
@@ -374,7 +374,7 @@ final class LocalUploadService
         if (!$this->storage->ensureDirectory($familyDirectory)) {
             return $this->error(
                 'tasty_fonts_upload_family_directory_failed',
-                $this->storageErrorMessage(__('The font family directory could not be created inside uploads/fonts.', 'tasty-fonts'))
+                $this->storageErrorMessage(__('The font family directory could not be created inside the local upload folder.', 'tasty-fonts'))
             );
         }
 
@@ -393,7 +393,7 @@ final class LocalUploadService
         if (!$this->storage->copyAbsoluteFile($tmpName, $targetPath)) {
             return $this->error(
                 'tasty_fonts_upload_write_failed',
-                $this->storageErrorMessage(__('The uploaded font file could not be copied into uploads/fonts.', 'tasty-fonts'))
+                $this->storageErrorMessage(__('The uploaded font file could not be copied into the local upload folder.', 'tasty-fonts'))
             );
         }
 

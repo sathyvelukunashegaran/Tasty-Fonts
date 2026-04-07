@@ -9,7 +9,7 @@ defined('ABSPATH') || exit;
 final class LogRepository
 {
     public const OPTION_LOG = 'tasty_fonts_log';
-    private const LEGACY_OPTION_LOG = 'etch_fonts_log';
+    public const LEGACY_OPTION_LOG = 'etch_fonts_log';
     private const MAX_ENTRIES = 100;
 
     public function add(string $message, array $context = []): void

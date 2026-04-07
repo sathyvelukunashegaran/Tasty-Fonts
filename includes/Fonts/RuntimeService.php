@@ -65,6 +65,10 @@ final class RuntimeService
             echo '<link rel="preconnect" href="' . esc_url($origin) . '" crossorigin>' . "\n";
         }
 
+        if ($this->assets->isInlineDeliveryEnabled()) {
+            return;
+        }
+
         foreach ($this->assets->getPrimaryFontPreloadUrls() as $url) {
             if (!is_string($url) || trim($url) === '') {
                 continue;
