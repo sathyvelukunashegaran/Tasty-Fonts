@@ -64,6 +64,12 @@ final class CssBuilder
             }
         }
 
+        $classCss = $this->buildClassOutputSnippet($roles, $includeMonospace, $variableFamilies, $settings);
+
+        if ($classCss !== '') {
+            $blocks[] = $classCss;
+        }
+
         $css = implode("\n", $blocks);
 
         if (!empty($settings['minify_css_output'])) {
@@ -138,6 +144,106 @@ final class CssBuilder
         }
 
         return implode("\n", $names);
+    }
+
+    public function buildRoleClassSnippet(array $roles, bool $includeMonospace = false, array $settings = []): string
+    {
+        if (empty($settings['auto_apply_roles'])) {
+            return '';
+        }
+
+        $lines = [
+            '.font-heading {',
+            '  font-family: ' . FontUtils::buildFontStack(
+                (string) ($roles['heading'] ?? ''),
+                (string) ($roles['heading_fallback'] ?? 'sans-serif')
+            ) . ';',
+            '}',
+            '',
+            '.font-body {',
+            '  font-family: ' . FontUtils::buildFontStack(
+                (string) ($roles['body'] ?? ''),
+                (string) ($roles['body_fallback'] ?? 'sans-serif')
+            ) . ';',
+            '}',
+        ];
+
+        if ($includeMonospace) {
+            $lines = [
+                ...$lines,
+                '',
+                '.font-monospace {',
+                '  font-family: ' . FontUtils::buildFontStack(
+                    (string) ($roles['monospace'] ?? ''),
+                    (string) ($roles['monospace_fallback'] ?? 'monospace')
+                ) . ';',
+                '}',
+            ];
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public function buildFamilyClassSnippet(array $families, array $settings = []): string
+    {
+        $lines = [];
+        $seenSelectors = [];
+
+        foreach ($families as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $familyName = trim((string) ($family['family'] ?? ''));
+            $selector = $this->familyClassSelector($familyName);
+
+            if ($familyName === '' || $selector === '' || isset($seenSelectors[$selector])) {
+                continue;
+            }
+
+            $lines = [
+                ...$lines,
+                $selector . ' {',
+                '  font-family: ' . FontUtils::buildFontStack($familyName, $this->resolveFamilyFallback($family, $settings)) . ';',
+                '}',
+                '',
+            ];
+            $seenSelectors[$selector] = true;
+        }
+
+        if ($lines !== [] && end($lines) === '') {
+            array_pop($lines);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public function buildClassOutputSnippet(
+        array $roles,
+        bool $includeMonospace = false,
+        array $families = [],
+        array $settings = []
+    ): string {
+        $mode = $this->classOutputMode($settings);
+        $blocks = [];
+
+        if (in_array($mode, ['roles', 'all'], true)) {
+            $roleClasses = $this->buildRoleClassSnippet($roles, $includeMonospace, $settings);
+
+            if ($roleClasses !== '') {
+                $blocks[] = $roleClasses;
+            }
+        }
+
+        if (in_array($mode, ['families', 'all'], true)) {
+            $familyClasses = $this->buildFamilyClassSnippet($families, $settings);
+
+            if ($familyClasses !== '') {
+                $blocks[] = $familyClasses;
+            }
+        }
+
+        return implode("\n\n", $blocks);
     }
 
     public function formatOutput(string $css, bool $minify = false): string
@@ -593,6 +699,22 @@ final class CssBuilder
         }
 
         return substr($numericProperty, strlen('--weight-'));
+    }
+
+    private function classOutputMode(array $settings): string
+    {
+        $mode = strtolower(trim((string) ($settings['class_output_mode'] ?? 'off')));
+
+        return in_array($mode, ['off', 'roles', 'families', 'all'], true)
+            ? $mode
+            : 'off';
+    }
+
+    private function familyClassSelector(string $family): string
+    {
+        $slug = FontUtils::slugify($family);
+
+        return $slug !== '' ? '.font-' . $slug : '';
     }
 
     private function extendedVariableOutputEnabled(array $settings): bool

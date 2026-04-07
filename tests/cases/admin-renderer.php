@@ -233,6 +233,58 @@ $tests['admin_page_renderer_renders_extended_variable_submenu_controls'] = stati
     assertNotContainsValue('--font-code', $output, 'The role-alias copy should not mention the code alias when the monospace feature is disabled.');
 };
 
+$tests['admin_page_renderer_renders_class_output_mode_control'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'roles' => [],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'class_output_mode' => 'families',
+        'class_output_mode_options' => [
+            ['value' => 'off', 'label' => 'Off'],
+            ['value' => 'roles', 'label' => 'Role classes'],
+            ['value' => 'families', 'label' => 'Family classes'],
+            ['value' => 'all', 'label' => 'Role and family classes'],
+        ],
+        'minify_css_output' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => false,
+        'training_wheels_off' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('Class Output Mode', $output, 'Output Settings should render the class output mode control.');
+    assertContainsValue('name="class_output_mode"', $output, 'The class output mode control should submit through the shared settings form.');
+    assertContainsValue('value="roles"', $output, 'The class output mode control should expose the role class option.');
+    assertContainsValue('value="families"', $output, 'The class output mode control should expose the family class option.');
+    assertContainsValue('<option value="families" selected="selected">', $output, 'The saved class output mode should remain selected in the Output Settings control.');
+};
+
 $tests['admin_page_renderer_shows_mono_extended_variable_controls_when_monospace_is_enabled'] = static function (): void {
     resetTestState();
 
@@ -280,6 +332,86 @@ $tests['admin_page_renderer_shows_mono_extended_variable_controls_when_monospace
 
     assertContainsValue('Mono alias', $output, 'The submenu should show the mono-category toggle when the monospace feature is enabled.');
     assertContainsValue('--font-code', $output, 'The role-alias copy should mention the code alias when the monospace feature is enabled.');
+};
+
+$tests['admin_page_renderer_renders_font_classes_output_tab_content'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => ['Inter'],
+        'roles' => [],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'class_output_mode' => 'off',
+        'minify_css_output' => false,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'training_wheels_off' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [
+            [
+                'key' => 'usage',
+                'label' => 'Site Snippet',
+                'target' => 'tasty-fonts-output-usage',
+                'value' => 'body { font-family: var(--font-body); }',
+                'active' => true,
+            ],
+            [
+                'key' => 'classes',
+                'label' => 'Font Classes',
+                'target' => 'tasty-fonts-output-classes',
+                'value' => 'Class-first output is off. Choose a class output mode in Output Settings.',
+                'active' => false,
+            ],
+            [
+                'key' => 'classes-roles',
+                'label' => 'Font Classes Roles',
+                'target' => 'tasty-fonts-output-classes-roles',
+                'value' => ".font-heading {\n  font-family: \"Inter\", sans-serif;\n}",
+                'active' => false,
+            ],
+            [
+                'key' => 'classes-families',
+                'label' => 'Font Classes Families',
+                'target' => 'tasty-fonts-output-classes-families',
+                'value' => ".font-inter {\n  font-family: \"Inter\", sans-serif;\n}",
+                'active' => false,
+            ],
+            [
+                'key' => 'classes-all',
+                'label' => 'Font Classes All',
+                'target' => 'tasty-fonts-output-classes-all',
+                'value' => ".font-heading {\n  font-family: \"Inter\", sans-serif;\n}\n\n.font-inter {\n  font-family: \"Inter\", sans-serif;\n}",
+                'active' => false,
+            ],
+        ],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('>Font Classes<', $output, 'The snippets tab list should include the Font Classes output tab.');
+    assertContainsValue('Class-first output is off. Choose a class output mode in Output Settings.', $output, 'The Font Classes tab should render the off-state message.');
+    assertContainsValue('data-copy-text=".font-heading {', $output, 'The Font Classes tab should support copying role class snippets.');
+    assertContainsValue('data-copy-text=".font-inter {', $output, 'The Font Classes tab should support copying family class snippets.');
+    assertContainsValue('id="tasty-fonts-output-classes-all"', $output, 'The Font Classes tab should render a dedicated combined role-and-family snippet panel.');
 };
 
 $tests['admin_page_renderer_outputs_migrate_shortcuts_for_cdn_deliveries'] = static function (): void {

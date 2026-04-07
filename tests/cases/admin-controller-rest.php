@@ -105,6 +105,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
             [
                 'css_delivery_mode' => 'file',
                 'font_display' => 'swap',
+                'class_output_mode' => 'off',
                 'minify_css_output' => true,
                 'per_variant_font_variables_enabled' => true,
                 'extended_variable_weight_tokens_enabled' => true,
@@ -116,6 +117,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
             [
                 'css_delivery_mode' => 'inline',
                 'font_display' => 'optional',
+                'class_output_mode' => 'all',
                 'minify_css_output' => false,
                 'per_variant_font_variables_enabled' => false,
                 'extended_variable_weight_tokens_enabled' => false,
@@ -129,6 +131,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
 
     assertContainsValue('delivery mode set to inline CSS', $message, 'Settings save messages should explain delivery-mode changes.');
     assertContainsValue('font-display set to optional', $message, 'Settings save messages should explain font-display changes.');
+    assertContainsValue('class output set to role and family classes', $message, 'Settings save messages should explain class-output changes.');
     assertContainsValue('CSS minification disabled', $message, 'Settings save messages should explain CSS minification changes.');
     assertContainsValue('extended font output variables disabled', $message, 'Settings save messages should explain extended font output changes.');
     assertContainsValue('extended variable subsettings updated', $message, 'Settings save messages should explain granular extended-variable changes.');
@@ -249,6 +252,19 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
         ),
         'Changing granular extended-variable subsettings should trigger a generated CSS refresh because emitted CSS changes.'
     );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['class_output_mode' => 'off', 'minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['class_output_mode' => 'families', 'minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Changing class output mode should trigger a generated CSS refresh because emitted CSS changes.'
+    );
 };
 
 $tests['admin_controller_versions_admin_assets_from_plugin_version'] = static function (): void {
@@ -309,7 +325,7 @@ $tests['admin_controller_excludes_generated_css_from_snippet_output_panels'] = s
     );
 
     assertSameValue(
-        ['usage', 'variables', 'stacks', 'names'],
+        ['usage', 'variables', 'classes', 'stacks', 'names'],
         array_values(array_map(static fn (array $panel): string => (string) ($panel['key'] ?? ''), $panels)),
         'The Snippets panel should only expose the role snippet tabs after Generated CSS is moved to the top tab bar.'
     );
@@ -341,7 +357,97 @@ $tests['admin_controller_builds_monospace_role_output_panels_when_enabled'] = st
 
     assertContainsValue('--font-monospace: monospace;', $panelValues['variables'] ?? '', 'Enabled monospace support should add the monospace variable to the CSS Variables panel.');
     assertContainsValue('code, pre {', $panelValues['usage'] ?? '', 'Enabled monospace support should add the code/pre usage rule to the Site Snippet panel.');
+    assertContainsValue('Class-first output is off', $panelValues['classes'] ?? '', 'The Font Classes panel should explain when the workflow is disabled.');
     assertContainsValue("monospace\n", ($panelValues['stacks'] ?? '') . "\n", 'Enabled monospace support should include the fallback-only monospace stack in the Font Stacks panel.');
+};
+
+$tests['admin_controller_builds_font_class_output_panel_content'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Draft Only',
+        'draft-only',
+        [
+            'id' => 'draft-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Draft Only',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'draft-only/DraftOnly-400-normal.woff2'],
+            ]],
+        ],
+        'library_only',
+        true
+    );
+
+    $roles = [
+        'heading' => 'Inter',
+        'body' => '',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'serif',
+    ];
+    $settings = $services['settings']->saveSettings([
+        'class_output_mode' => 'all',
+        'minify_css_output' => '0',
+        'monospace_role_enabled' => '0',
+    ]);
+    $services['settings']->setAutoApplyRoles(true);
+    $settings['auto_apply_roles'] = true;
+
+    $panels = invokePrivateMethod(
+        $services['controller'],
+        'buildOutputPanels',
+        [$roles, $settings, $services['catalog']->getCatalog()]
+    );
+    $panelValues = [];
+
+    foreach ($panels as $panel) {
+        $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
+    }
+
+    assertContainsValue('.font-heading', $panelValues['classes'] ?? '', 'The Font Classes panel should include role classes when the mode enables them.');
+    assertContainsValue('.font-inter', $panelValues['classes'] ?? '', 'The Font Classes panel should include published family classes when the mode enables them.');
+    assertNotContainsValue('.font-draft-only', $panelValues['classes'] ?? '', 'The Font Classes panel should skip library-only families so it matches frontend output.');
+};
+
+$tests['admin_controller_exposes_class_output_mode_in_page_context'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['class_output_mode' => 'families']);
+
+    $context = invokePrivateMethod($services['controller'], 'buildPageContext', []);
+
+    assertSameValue('families', (string) ($context['class_output_mode'] ?? ''), 'Page context should expose the saved class output mode.');
+    assertSameValue(
+        ['off', 'roles', 'families', 'all'],
+        array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), (array) ($context['class_output_mode_options'] ?? []))),
+        'Page context should expose the supported class output mode options for the Output Settings form.'
+    );
 };
 
 $tests['admin_controller_builds_variant_variable_output_panel_content'] = static function (): void {

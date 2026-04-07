@@ -57,6 +57,158 @@ $tests['css_builder_generates_font_face_and_role_variables'] = static function (
     assertContainsValue('font-weight: var(--weight-regular);', $css, 'CSS builder should emit the shared regular weight token in the body rule.');
 };
 
+$tests['css_builder_builds_role_class_snippets_when_class_output_is_enabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Inter',
+        'body' => '',
+        'monospace' => '',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'class_output_mode' => 'roles',
+    ];
+
+    $css = $builder->buildRoleClassSnippet($roles, true, $settings);
+
+    assertContainsValue(".font-heading {\n  font-family: \"Inter\", serif;\n}", $css, 'Role class output should emit the heading class with the resolved font stack.');
+    assertContainsValue(".font-body {\n  font-family: sans-serif;\n}", $css, 'Role class output should emit fallback-only body classes when no family is selected.');
+    assertContainsValue(".font-monospace {\n  font-family: monospace;\n}", $css, 'Role class output should emit the optional monospace class when the feature is enabled.');
+};
+
+$tests['css_builder_omits_role_class_snippets_when_apply_sitewide_is_off'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+
+    $css = $builder->buildRoleClassSnippet($roles, false, ['auto_apply_roles' => false, 'class_output_mode' => 'roles']);
+
+    assertSameValue('', $css, 'Role classes should be unavailable while Apply Sitewide is off.');
+};
+
+$tests['css_builder_builds_family_class_snippets_for_runtime_visible_families'] = static function (): void {
+    $builder = new CssBuilder();
+    $families = [
+        'Inter' => [
+            'family' => 'Inter',
+            'font_category' => 'sans-serif',
+        ],
+        'JetBrains Mono' => [
+            'family' => 'JetBrains Mono',
+            'font_category' => 'monospace',
+        ],
+        'Inter Duplicate' => [
+            'family' => 'Inter!!!',
+            'font_category' => 'sans-serif',
+        ],
+    ];
+    $settings = [
+        'class_output_mode' => 'families',
+        'family_fallbacks' => ['Inter' => 'system-ui, sans-serif'],
+    ];
+
+    $css = $builder->buildFamilyClassSnippet($families, $settings);
+
+    assertContainsValue(".font-inter {\n  font-family: \"Inter\", system-ui, sans-serif;\n}", $css, 'Family class output should use saved per-family fallbacks.');
+    assertContainsValue(".font-jetbrains-mono {\n  font-family: \"JetBrains Mono\", monospace;\n}", $css, 'Family class output should infer category-aware fallback stacks.');
+    assertSameValue(1, substr_count($css, '.font-inter {'), 'Family class output should avoid duplicate selectors when slugs collide.');
+};
+
+$tests['css_builder_builds_combined_class_output_snippets'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $families = [
+        'Inter' => [
+            'family' => 'Inter',
+            'font_category' => 'sans-serif',
+        ],
+        'Lora' => [
+            'family' => 'Lora',
+            'font_category' => 'serif',
+        ],
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'class_output_mode' => 'all',
+    ];
+
+    $css = $builder->buildClassOutputSnippet($roles, false, $families, $settings);
+
+    assertContainsValue('.font-heading', $css, 'Combined class output should include role classes.');
+    assertContainsValue('.font-inter', $css, 'Combined class output should include family classes.');
+    assertContainsValue("\n\n.font-inter", $css, 'Combined class output should separate role and family blocks with a blank line.');
+};
+
+$tests['css_builder_includes_class_output_in_generated_css_when_enabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'faces' => [[
+                'family' => 'Inter',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'https://example.com/fonts/inter.woff2'],
+            ]],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'font_display' => 'swap',
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'class_output_mode' => 'families',
+    ];
+
+    $css = $builder->build($catalog, $roles, $settings, $catalog);
+
+    assertContainsValue('@font-face', $css, 'Generated CSS should continue to include font faces when class output is enabled.');
+    assertContainsValue(".font-inter {\n  font-family: \"Inter\", sans-serif;\n}", $css, 'Generated CSS should append family classes when class output mode enables them.');
+};
+
+$tests['css_builder_omits_class_output_in_generated_css_when_disabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'font_category' => 'sans-serif',
+            'faces' => [[
+                'family' => 'Inter',
+                'weight' => '400',
+                'style' => 'normal',
+            ]],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+
+    $css = $builder->build([], $roles, ['auto_apply_roles' => true, 'minify_css_output' => false, 'class_output_mode' => 'off'], $catalog);
+
+    assertNotContainsValue('.font-heading', $css, 'Generated CSS should not include role classes when class output mode is off.');
+    assertNotContainsValue('.font-inter', $css, 'Generated CSS should not include family classes when class output mode is off.');
+};
+
 $tests['css_builder_emits_global_weight_tokens_and_semantic_font_aliases_when_enabled'] = static function (): void {
     $builder = new CssBuilder();
     $catalog = [
@@ -554,6 +706,7 @@ $tests['css_builder_minifies_generated_css_without_leaving_layout_whitespace'] =
         'font_display' => 'swap',
         'auto_apply_roles' => true,
         'minify_css_output' => true,
+        'class_output_mode' => 'all',
     ];
 
     $css = $builder->build($catalog, $roles, $settings, $catalog);
@@ -562,6 +715,8 @@ $tests['css_builder_minifies_generated_css_without_leaving_layout_whitespace'] =
     assertSameValue(false, str_contains($css, "\t"), 'Minified CSS should not leave tab characters in the generated output.');
     assertContainsValue('@font-face{font-family:"Inter";font-weight:400;font-style:normal;', $css, 'Minified CSS should collapse @font-face declarations into a compact form.');
     assertContainsValue('body{font-family:var(--font-body);font-weight:var(--weight-regular)}', $css, 'Minified CSS should collapse role usage rules into a compact form.');
+    assertContainsValue('.font-heading{font-family:"Inter",sans-serif}', $css, 'Minified CSS should collapse emitted role class utilities into a compact form.');
+    assertContainsValue('.font-inter{font-family:"Inter",sans-serif}', $css, 'Minified CSS should collapse emitted family class utilities into a compact form.');
 };
 
 $tests['css_builder_format_output_respects_minify_flag'] = static function (): void {

@@ -23,6 +23,7 @@ final class SettingsRepository
         'delete_uploaded_files_on_uninstall' => false,
         'css_delivery_mode' => 'file',
         'font_display' => 'optional',
+        'class_output_mode' => 'off',
         'minify_css_output' => true,
         'per_variant_font_variables_enabled' => true,
         'extended_variable_weight_tokens_enabled' => true,
@@ -71,6 +72,7 @@ final class SettingsRepository
         $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions($settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
         $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
+        $settings['class_output_mode'] = $this->normalizeClassOutputMode((string) ($settings['class_output_mode'] ?? 'off'));
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
         $settings['extended_variable_weight_tokens_enabled'] = !empty($settings['extended_variable_weight_tokens_enabled']);
@@ -139,6 +141,13 @@ final class SettingsRepository
 
         if (isset($input['font_display'])) {
             $settings['font_display'] = $this->normalizeFontDisplay(sanitize_text_field((string) $input['font_display']));
+            $settingsChanged = true;
+        }
+
+        if (isset($input['class_output_mode'])) {
+            $settings['class_output_mode'] = $this->normalizeClassOutputMode(
+                sanitize_text_field((string) $input['class_output_mode'])
+            );
             $settingsChanged = true;
         }
 
@@ -691,6 +700,13 @@ final class SettingsRepository
         return $this->isSupportedFontDisplay($display)
             ? $display
             : 'optional';
+    }
+
+    private function normalizeClassOutputMode(string $mode): string
+    {
+        return in_array($mode, ['off', 'roles', 'families', 'all'], true)
+            ? $mode
+            : 'off';
     }
 
     private function isSupportedFontDisplay(string $display): bool

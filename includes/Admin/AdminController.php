@@ -510,6 +510,7 @@ final class AdminController
                 'tasty_fonts_clear_google_api_key',
                 'css_delivery_mode',
                 'font_display',
+                'class_output_mode',
                 'preview_sentence',
             ] as $field
         ) {
@@ -860,6 +861,8 @@ final class AdminController
             'adobe_detected_families' => $adobeAccessContext['adobe_detected_families'],
             'font_display' => (string) ($settings['font_display'] ?? 'optional'),
             'font_display_options' => $this->buildFontDisplayOptions(),
+            'class_output_mode' => (string) ($settings['class_output_mode'] ?? 'off'),
+            'class_output_mode_options' => $this->buildClassOutputModeOptions(),
             'minify_css_output' => !empty($settings['minify_css_output']),
             'per_variant_font_variables_enabled' => !empty($settings['per_variant_font_variables_enabled']),
             'extended_variable_weight_tokens_enabled' => !empty($settings['extended_variable_weight_tokens_enabled']),
@@ -982,6 +985,7 @@ final class AdminController
     {
         $minifyOutput = !empty($settings['minify_css_output']);
         $includeMonospace = !empty($settings['monospace_role_enabled']);
+        $runtimeFamilies = $this->filterRuntimeVisibleFamilies($catalog);
 
         return [
             [
@@ -1002,6 +1006,13 @@ final class AdminController
                     $this->cssBuilder->buildRoleVariableSnippet($roles, $includeMonospace, $catalog, $settings),
                     $minifyOutput
                 ),
+                'active' => false,
+            ],
+            [
+                'key' => 'classes',
+                'label' => __('Font Classes', 'tasty-fonts'),
+                'target' => 'tasty-fonts-output-classes',
+                'value' => $this->buildClassOutputPanelContent($roles, $settings, $runtimeFamilies, $includeMonospace),
                 'active' => false,
             ],
             [
@@ -1160,6 +1171,13 @@ final class AdminController
             );
         }
 
+        if (($before['class_output_mode'] ?? 'off') !== ($after['class_output_mode'] ?? 'off')) {
+            $changes[] = sprintf(
+                __('class output set to %s', 'tasty-fonts'),
+                $this->formatClassOutputModeLabel((string) ($after['class_output_mode'] ?? 'off'))
+            );
+        }
+
         if (!empty($before['minify_css_output']) !== !empty($after['minify_css_output'])) {
             $changes[] = !empty($after['minify_css_output'])
                 ? __('CSS minification enabled', 'tasty-fonts')
@@ -1230,6 +1248,7 @@ final class AdminController
     {
         return ($before['css_delivery_mode'] ?? 'file') !== ($after['css_delivery_mode'] ?? 'file')
             || ($before['font_display'] ?? 'optional') !== ($after['font_display'] ?? 'optional')
+            || ($before['class_output_mode'] ?? 'off') !== ($after['class_output_mode'] ?? 'off')
             || !empty($before['minify_css_output']) !== !empty($after['minify_css_output'])
             || !empty($before['per_variant_font_variables_enabled']) !== !empty($after['per_variant_font_variables_enabled'])
             || $this->extendedVariableSubsettingsDiffer($before, $after)
@@ -1264,6 +1283,69 @@ final class AdminController
             ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
             ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
         ];
+    }
+
+    private function buildClassOutputModeOptions(): array
+    {
+        return [
+            ['value' => 'off', 'label' => __('Off', 'tasty-fonts')],
+            ['value' => 'roles', 'label' => __('Role classes', 'tasty-fonts')],
+            ['value' => 'families', 'label' => __('Family classes', 'tasty-fonts')],
+            ['value' => 'all', 'label' => __('Role and family classes', 'tasty-fonts')],
+        ];
+    }
+
+    private function buildClassOutputPanelContent(
+        array $roles,
+        array $settings,
+        array $runtimeFamilies,
+        bool $includeMonospace
+    ): string {
+        $mode = (string) ($settings['class_output_mode'] ?? 'off');
+
+        if ($mode === 'off') {
+            return __('Class-first output is off. Choose a class output mode in Output Settings.', 'tasty-fonts');
+        }
+
+        $content = $this->cssBuilder->formatOutput(
+            $this->cssBuilder->buildClassOutputSnippet($roles, $includeMonospace, $runtimeFamilies, $settings),
+            !empty($settings['minify_css_output'])
+        );
+
+        if ($content !== '') {
+            return $content;
+        }
+
+        if (in_array($mode, ['roles', 'all'], true) && empty($settings['auto_apply_roles'])) {
+            return __('Role classes are unavailable while Apply Sitewide is off.', 'tasty-fonts');
+        }
+
+        return __('No font classes are available for the current output mode.', 'tasty-fonts');
+    }
+
+    private function filterRuntimeVisibleFamilies(array $catalog): array
+    {
+        $families = [];
+
+        foreach ($catalog as $key => $family) {
+            if (!is_array($family) || (string) ($family['publish_state'] ?? 'published') === 'library_only') {
+                continue;
+            }
+
+            $families[$key] = $family;
+        }
+
+        return $families;
+    }
+
+    private function formatClassOutputModeLabel(string $mode): string
+    {
+        return match ($mode) {
+            'roles' => __('role classes', 'tasty-fonts'),
+            'families' => __('family classes', 'tasty-fonts'),
+            'all' => __('role and family classes', 'tasty-fonts'),
+            default => __('off', 'tasty-fonts'),
+        };
     }
 
     private function buildFamilyFontDisplayOptions(string $globalDisplay): array

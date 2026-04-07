@@ -55,6 +55,15 @@ final class AdminPageRenderer
         $adobeAccessButtonLabel = $adobeProjectSaved ? __('Project Settings', 'tasty-fonts') : __('Add Project', 'tasty-fonts');
         $fontDisplay = (string) ($context['font_display'] ?? 'optional');
         $fontDisplayOptions = is_array($context['font_display_options'] ?? null) ? $context['font_display_options'] : [];
+        $classOutputMode = (string) ($context['class_output_mode'] ?? 'off');
+        $classOutputModeOptions = is_array($context['class_output_mode_options'] ?? null)
+            ? $context['class_output_mode_options']
+            : [
+                ['value' => 'off', 'label' => __('Off', 'tasty-fonts')],
+                ['value' => 'roles', 'label' => __('Role classes', 'tasty-fonts')],
+                ['value' => 'families', 'label' => __('Family classes', 'tasty-fonts')],
+                ['value' => 'all', 'label' => __('Role and family classes', 'tasty-fonts')],
+            ];
         $minifyCssOutput = !empty($context['minify_css_output']);
         $perVariantFontVariablesEnabled = !array_key_exists('per_variant_font_variables_enabled', $context)
             || !empty($context['per_variant_font_variables_enabled']);
@@ -878,6 +887,19 @@ final class AdminPageRenderer
                                                         </select>
                                                     </span>
                                                     <span class="tasty-fonts-toggle-description"><?php esc_html_e('Default font-display value for generated @font-face rules.', 'tasty-fonts'); ?></span>
+                                                </label>
+                                                <label class="tasty-fonts-stack-field tasty-fonts-stack-field--output">
+                                                    <?php $this->renderFieldLabel(__('Class Output Mode', 'tasty-fonts')); ?>
+                                                    <span class="tasty-fonts-select-field">
+                                                        <select id="tasty-fonts-class-output-mode" name="class_output_mode">
+                                                            <?php foreach ($classOutputModeOptions as $option): ?>
+                                                                <option value="<?php echo esc_attr((string) ($option['value'] ?? '')); ?>" <?php selected($classOutputMode, (string) ($option['value'] ?? '')); ?>>
+                                                                    <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </span>
+                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Emit ready-to-use font-family utility classes without relying on CSS variables.', 'tasty-fonts'); ?></span>
                                                 </label>
                                                 <input type="hidden" name="minify_css_output" value="0">
                                                 <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">

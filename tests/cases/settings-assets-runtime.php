@@ -169,6 +169,26 @@ $tests['settings_repository_persists_preload_primary_fonts_preference'] = static
     assertSameValue(false, !empty($saved['preload_primary_fonts']), 'Settings should persist the primary font preload preference when disabled.');
 };
 
+$tests['settings_repository_defaults_and_normalizes_class_output_mode'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+
+    assertSameValue('off', $settings->getSettings()['class_output_mode'], 'Class output mode should default to off for new installs.');
+
+    $settings->saveSettings(['class_output_mode' => 'roles']);
+    assertSameValue('roles', $settings->getSettings()['class_output_mode'], 'Settings should persist supported class output modes.');
+
+    $settings->saveSettings(['class_output_mode' => 'families']);
+    assertSameValue('families', $settings->getSettings()['class_output_mode'], 'Settings should persist family class output mode.');
+
+    $settings->saveSettings(['class_output_mode' => 'all']);
+    assertSameValue('all', $settings->getSettings()['class_output_mode'], 'Settings should persist combined class output mode.');
+
+    $settings->saveSettings(['class_output_mode' => 'unsupported-value']);
+    assertSameValue('off', $settings->getSettings()['class_output_mode'], 'Invalid class output modes should normalize back to off.');
+};
+
 $tests['settings_repository_enables_per_variant_font_variables_by_default_and_persists_changes'] = static function (): void {
     resetTestState();
 
@@ -295,6 +315,7 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     $settings = new SettingsRepository();
     $settings->saveSettings([
         'minify_css_output' => '0',
+        'class_output_mode' => 'all',
         'per_variant_font_variables_enabled' => '0',
         'extended_variable_weight_tokens_enabled' => '0',
         'extended_variable_role_aliases_enabled' => '0',
@@ -312,6 +333,7 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     $saved = $settings->getSettings();
 
     assertSameValue(false, $saved['minify_css_output'], 'Saving unrelated settings should not re-enable CSS minification.');
+    assertSameValue('all', $saved['class_output_mode'], 'Saving unrelated settings should not overwrite the class output mode.');
     assertSameValue(false, $saved['per_variant_font_variables_enabled'], 'Saving unrelated settings should not re-enable per-variant font variables.');
     assertSameValue(false, $saved['extended_variable_weight_tokens_enabled'], 'Saving unrelated settings should not re-enable extended weight tokens.');
     assertSameValue(false, $saved['extended_variable_role_aliases_enabled'], 'Saving unrelated settings should not re-enable extended role aliases.');
