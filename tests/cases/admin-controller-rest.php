@@ -279,7 +279,8 @@ $tests['admin_controller_versions_admin_assets_from_plugin_version'] = static fu
 $tests['admin_controller_builds_reordered_overview_metrics'] = static function (): void {
     resetTestState();
 
-    $controller = makeAdminControllerTestInstance();
+    $services = makeServiceGraph();
+    $controller = $services['controller'];
     $metrics = invokePrivateMethod(
         $controller,
         'buildOverviewMetrics',
@@ -1102,7 +1103,8 @@ $tests['admin_controller_builds_notice_messages_from_known_keys'] = static funct
 $tests['admin_controller_reads_and_clears_transient_notice_toasts'] = static function (): void {
     resetTestState();
 
-    $controller = makeAdminControllerTestInstance();
+    $services = makeServiceGraph();
+    $controller = $services['controller'];
     $transientKey = invokePrivateMethod($controller, 'getPendingNoticeTransientKey');
 
     set_transient(

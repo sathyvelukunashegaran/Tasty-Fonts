@@ -1828,7 +1828,7 @@ $tests['admin_page_renderer_renders_local_environment_notice_below_activity_with
         'local_environment_notice' => [
             'tone' => 'warning',
             'title' => 'Local environment detected',
-            'message' => 'Turn this on when your local PHP/cURL setup trusts the site certificate.',
+            'message' => 'Turn this on when your local setup trusts this site\'s certificate.',
             'settings_label' => 'Open Plugin Behavior',
             'settings_url' => 'https://example.test/wp-admin/admin.php?page=tasty-custom-fonts&tf_advanced=1&tf_studio=plugin-behavior',
         ],

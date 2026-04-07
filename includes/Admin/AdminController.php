@@ -821,27 +821,6 @@ final class AdminController
 
     private function buildOverviewMetrics(array $counts): array
     {
-        if (!isset($this->pageContextBuilder)) {
-            return [
-                [
-                    'label' => __('Families', 'tasty-fonts'),
-                    'value' => (string) ($counts['families'] ?? 0),
-                ],
-                [
-                    'label' => __('Published', 'tasty-fonts'),
-                    'value' => (string) ($counts['published_families'] ?? 0),
-                ],
-                [
-                    'label' => __('In Library Only', 'tasty-fonts'),
-                    'value' => (string) ($counts['library_only_families'] ?? 0),
-                ],
-                [
-                    'label' => __('Self-hosted', 'tasty-fonts'),
-                    'value' => (string) ($counts['local_families'] ?? 0),
-                ],
-            ];
-        }
-
         return $this->pageContextBuilder->buildOverviewMetrics($counts);
     }
 
@@ -872,46 +851,6 @@ final class AdminController
 
     private function buildNoticeToasts(): array
     {
-        if (!isset($this->pageContextBuilder)) {
-            $transientKey = $this->getPendingNoticeTransientKey();
-            $storedToasts = get_transient($transientKey);
-
-            if ($storedToasts === false) {
-                return [];
-            }
-
-            delete_transient($transientKey);
-
-            if (!is_array($storedToasts)) {
-                return [];
-            }
-
-            $toasts = [];
-
-            foreach ($storedToasts as $toast) {
-                if (!is_array($toast)) {
-                    continue;
-                }
-
-                $message = sanitize_text_field((string) ($toast['message'] ?? ''));
-
-                if ($message === '') {
-                    continue;
-                }
-
-                $tone = (string) ($toast['tone'] ?? 'success');
-                $role = (string) ($toast['role'] ?? ($tone === 'error' ? 'alert' : 'status'));
-
-                $toasts[] = [
-                    'tone' => $tone === 'error' ? 'error' : 'success',
-                    'message' => $message,
-                    'role' => $role === 'alert' ? 'alert' : 'status',
-                ];
-            }
-
-            return $toasts;
-        }
-
         return $this->pageContextBuilder->buildNoticeToasts();
     }
 

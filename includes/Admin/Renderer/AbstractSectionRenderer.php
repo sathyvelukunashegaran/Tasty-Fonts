@@ -20,6 +20,11 @@ abstract class AbstractSectionRenderer
 
     abstract public function render(array $view): void;
 
+    public function setTrainingWheelsOff(bool $trainingWheelsOff): void
+    {
+        $this->trainingWheelsOff = $trainingWheelsOff;
+    }
+
     protected function renderTemplate(string $template, array $view): void
     {
         $this->trainingWheelsOff = !empty($view['trainingWheelsOff']);

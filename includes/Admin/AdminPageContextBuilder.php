@@ -563,8 +563,8 @@ final class AdminPageContextBuilder
             'tone' => 'warning',
             'title' => __('Local environment detected', 'tasty-fonts'),
             'message' => $syncEnabled
-                ? __('Block Editor Font Library sync is enabled on this local site. Keep it on only when this site can complete authenticated loopback REST requests without SSL or certificate errors. If Activity shows cURL 60 or certificate verification failures, open Plugin Behavior and turn the sync back off for local development.', 'tasty-fonts')
-                : __('Block Editor Font Library sync is off by default on local environments because editor sync uses authenticated loopback REST requests, and local HTTPS certificates often fail PHP/cURL verification. Turn it on when you want imported fonts mirrored into the core WordPress Font Library and your local PHP/cURL setup trusts this site certificate.', 'tasty-fonts'),
+                ? __('Block Editor Font Library sync is enabled on this local site. Keep it on only when this site can complete background requests back to this site without SSL or certificate errors. If Activity shows cURL 60 or certificate verification failures, open Plugin Behavior and turn the sync back off for local development.', 'tasty-fonts')
+                : __('Block Editor Font Library sync is off by default on local environments because editor sync uses background requests back to this site, and local HTTPS certificates often fail certificate verification. Turn it on when you want imported fonts mirrored into the core WordPress Font Library and your local setup trusts this site\'s certificate.', 'tasty-fonts'),
             'settings_label' => __('Open Plugin Behavior', 'tasty-fonts'),
             'settings_url' => $this->buildPluginBehaviorUrl(),
         ];

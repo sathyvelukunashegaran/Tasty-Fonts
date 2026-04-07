@@ -7,12 +7,14 @@ namespace TastyFonts\Admin;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\Renderer\SharedRenderHelpers;
+use TastyFonts\Admin\Renderer\LibraryRenderValueHelpers;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 
 final class AdminPageViewBuilder
 {
     use SharedRenderHelpers;
+    use LibraryRenderValueHelpers;
 
     public function __construct(private readonly Storage $storage)
     {

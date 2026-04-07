@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - Updated admin import summaries and search-result metadata to use translation-safe plural strings instead of English-only suffix assembly.
 - Added request-scope settings caching and reused generated stylesheet state during stale-file fallback delivery to reduce repeated normalization and file-state work during admin requests.
 - Refactored the admin page pipeline so `AdminController` delegates page-context construction, `AdminPageRenderer` acts as a thin shell, and renderer sections/templates own the dashboard composition in smaller files.
+- Split the remaining oversized admin rendering helpers into focused library, preview, and tools renderers with dedicated family-card templates so renderer files stay within the accepted size limits without changing dashboard output.
 - Reworked font storage and generated stylesheet handling to use provider-specific upload directories, a hidden generated CSS directory, optional inline CSS delivery, and matching preload behavior.
 - Standardized dashboard terminology and polished the admin CSS against the shared token system so deployment controls, library cards, activity filters, and notice surfaces stay visually aligned.
 
@@ -36,6 +37,7 @@ All notable changes to this project will be documented in this file.
 - Improved admin accessibility by associating visible labels with preview/snippet code blocks and announcing local-environment notices as live regions.
 - Fixed dashboard section ordering and disclosure placement so Preview and Advanced Tools open inside Deployment Controls in the intended sequence.
 - Fixed malformed admin wrapper markup that allowed the WordPress footer to overlap the dashboard content.
+- Removed unreachable admin-controller fallback branches and softened local-environment notice copy so Plugin Behavior guidance uses plain-language site-request and certificate wording.
 - Fixed uninstall cleanup so generated CSS, synced block-editor font families, and plugin-managed runtime transients are removed consistently.
 
 ## [1.5.1] - 2026-04-07

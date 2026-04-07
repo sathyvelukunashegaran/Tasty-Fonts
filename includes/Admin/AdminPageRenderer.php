@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\Renderer\AbstractSectionRenderer;
 use TastyFonts\Admin\Renderer\ActivitySectionRenderer;
+use TastyFonts\Admin\Renderer\FamilyCardRenderer;
 use TastyFonts\Admin\Renderer\LibrarySectionRenderer;
 use TastyFonts\Admin\Renderer\PreviewSectionRenderer;
 use TastyFonts\Admin\Renderer\StudioSectionRenderer;
@@ -20,6 +21,7 @@ final class AdminPageRenderer extends AbstractSectionRenderer
     private readonly StudioSectionRenderer $studioRenderer;
     private readonly PreviewSectionRenderer $previewRenderer;
     private readonly ToolsSectionRenderer $toolsRenderer;
+    private readonly FamilyCardRenderer $familyCardRenderer;
     private readonly LibrarySectionRenderer $libraryRenderer;
     private readonly ActivitySectionRenderer $activityRenderer;
 
@@ -29,6 +31,7 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         ?StudioSectionRenderer $studioRenderer = null,
         ?PreviewSectionRenderer $previewRenderer = null,
         ?ToolsSectionRenderer $toolsRenderer = null,
+        ?FamilyCardRenderer $familyCardRenderer = null,
         ?LibrarySectionRenderer $libraryRenderer = null,
         ?ActivitySectionRenderer $activityRenderer = null
     ) {
@@ -36,8 +39,9 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         $this->viewBuilder = $viewBuilder ?? new AdminPageViewBuilder($storage);
         $this->previewRenderer = $previewRenderer ?? new PreviewSectionRenderer($storage);
         $this->toolsRenderer = $toolsRenderer ?? new ToolsSectionRenderer($storage);
+        $this->familyCardRenderer = $familyCardRenderer ?? new FamilyCardRenderer($storage);
         $this->studioRenderer = $studioRenderer ?? new StudioSectionRenderer($storage, $this->previewRenderer, $this->toolsRenderer);
-        $this->libraryRenderer = $libraryRenderer ?? new LibrarySectionRenderer($storage);
+        $this->libraryRenderer = $libraryRenderer ?? new LibrarySectionRenderer($storage, $this->familyCardRenderer);
         $this->activityRenderer = $activityRenderer ?? new ActivitySectionRenderer($storage);
     }
 
@@ -69,5 +73,78 @@ final class AdminPageRenderer extends AbstractSectionRenderer
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    protected function renderFamilyRow(
+        array $family,
+        array $roles,
+        array $familyFallbacks,
+        array $familyFontDisplays,
+        array $familyFontDisplayOptions,
+        string $previewText,
+        array $categoryAliasOwners = [],
+        array $extendedVariableOptions = [],
+        bool $monospaceRoleEnabled = false
+    ): void {
+        $this->syncRendererState($this->familyCardRenderer);
+        $this->familyCardRenderer->renderFamilyRow(
+            $family,
+            $roles,
+            $familyFallbacks,
+            $familyFontDisplays,
+            $familyFontDisplayOptions,
+            $previewText,
+            $categoryAliasOwners,
+            $extendedVariableOptions,
+            $monospaceRoleEnabled
+        );
+    }
+
+    protected function renderFaceDetailCard(
+        string $familyName,
+        string $familySlug,
+        string $defaultStack,
+        string $facePreviewText,
+        int $faceCount,
+        array $assignedRoleKeys,
+        string $fontCategory,
+        array $categoryAliasOwners,
+        array $extendedVariableOptions,
+        array $activeDelivery,
+        array $face,
+        bool $isMonospace = false
+    ): void {
+        $this->syncRendererState($this->familyCardRenderer);
+        $this->familyCardRenderer->renderFaceDetailCard(
+            $familyName,
+            $familySlug,
+            $defaultStack,
+            $facePreviewText,
+            $faceCount,
+            $assignedRoleKeys,
+            $fontCategory,
+            $categoryAliasOwners,
+            $extendedVariableOptions,
+            $activeDelivery,
+            $face,
+            $isMonospace
+        );
+    }
+
+    protected function renderCodePreviewScene(string $previewText, array $roles, bool $monospaceRoleEnabled): void
+    {
+        $this->syncRendererState($this->previewRenderer);
+        $this->previewRenderer->renderCodePreviewScene($previewText, $roles, $monospaceRoleEnabled);
+    }
+
+    protected function renderCodeEditor(array $panel, array $options = []): void
+    {
+        $this->syncRendererState($this->toolsRenderer);
+        $this->toolsRenderer->renderCodeEditor($panel, $options);
+    }
+
+    private function syncRendererState(AbstractSectionRenderer $renderer): void
+    {
+        $renderer->setTrainingWheelsOff($this->trainingWheelsOff);
     }
 }
