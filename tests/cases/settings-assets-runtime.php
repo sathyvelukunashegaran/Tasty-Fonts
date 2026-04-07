@@ -169,6 +169,52 @@ $tests['settings_repository_persists_preload_primary_fonts_preference'] = static
     assertSameValue(false, !empty($saved['preload_primary_fonts']), 'Settings should persist the primary font preload preference when disabled.');
 };
 
+$tests['settings_repository_enables_per_variant_font_variables_by_default_and_persists_changes'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+
+    assertSameValue(
+        true,
+        !empty($settings->getSettings()['per_variant_font_variables_enabled']),
+        'Per-variant font variables should default to enabled for new installs.'
+    );
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_weight_tokens_enabled']), 'Extended weight tokens should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_aliases_enabled']), 'Extended role aliases should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_sans_enabled']), 'Extended sans category alias should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_serif_enabled']), 'Extended serif category alias should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_mono_enabled']), 'Extended mono category alias should default to enabled.');
+
+    $settings->saveSettings(['per_variant_font_variables_enabled' => '0']);
+    assertSameValue(
+        false,
+        !empty($settings->getSettings()['per_variant_font_variables_enabled']),
+        'Settings should persist disabled per-variant font variable output.'
+    );
+
+    $settings->saveSettings(['per_variant_font_variables_enabled' => '1']);
+    assertSameValue(
+        true,
+        !empty($settings->getSettings()['per_variant_font_variables_enabled']),
+        'Settings should persist enabled per-variant font variable output.'
+    );
+
+    $settings->saveSettings([
+        'extended_variable_weight_tokens_enabled' => '0',
+        'extended_variable_role_aliases_enabled' => '0',
+        'extended_variable_category_sans_enabled' => '0',
+        'extended_variable_category_serif_enabled' => '0',
+        'extended_variable_category_mono_enabled' => '0',
+    ]);
+    $saved = $settings->getSettings();
+
+    assertSameValue(false, $saved['extended_variable_weight_tokens_enabled'], 'Settings should persist disabled extended weight tokens.');
+    assertSameValue(false, $saved['extended_variable_role_aliases_enabled'], 'Settings should persist disabled extended role aliases.');
+    assertSameValue(false, $saved['extended_variable_category_sans_enabled'], 'Settings should persist disabled extended sans aliases.');
+    assertSameValue(false, $saved['extended_variable_category_serif_enabled'], 'Settings should persist disabled extended serif aliases.');
+    assertSameValue(false, $saved['extended_variable_category_mono_enabled'], 'Settings should persist disabled extended mono aliases.');
+};
+
 $tests['settings_repository_defaults_block_editor_font_library_sync_off_on_local_hosts'] = static function (): void {
     resetTestState();
 
@@ -249,6 +295,12 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     $settings = new SettingsRepository();
     $settings->saveSettings([
         'minify_css_output' => '0',
+        'per_variant_font_variables_enabled' => '0',
+        'extended_variable_weight_tokens_enabled' => '0',
+        'extended_variable_role_aliases_enabled' => '0',
+        'extended_variable_category_sans_enabled' => '0',
+        'extended_variable_category_serif_enabled' => '0',
+        'extended_variable_category_mono_enabled' => '0',
         'preload_primary_fonts' => '0',
         'block_editor_font_library_sync_enabled' => '1',
         'delete_uploaded_files_on_uninstall' => '1',
@@ -260,6 +312,12 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     $saved = $settings->getSettings();
 
     assertSameValue(false, $saved['minify_css_output'], 'Saving unrelated settings should not re-enable CSS minification.');
+    assertSameValue(false, $saved['per_variant_font_variables_enabled'], 'Saving unrelated settings should not re-enable per-variant font variables.');
+    assertSameValue(false, $saved['extended_variable_weight_tokens_enabled'], 'Saving unrelated settings should not re-enable extended weight tokens.');
+    assertSameValue(false, $saved['extended_variable_role_aliases_enabled'], 'Saving unrelated settings should not re-enable extended role aliases.');
+    assertSameValue(false, $saved['extended_variable_category_sans_enabled'], 'Saving unrelated settings should not re-enable the sans alias.');
+    assertSameValue(false, $saved['extended_variable_category_serif_enabled'], 'Saving unrelated settings should not re-enable the serif alias.');
+    assertSameValue(false, $saved['extended_variable_category_mono_enabled'], 'Saving unrelated settings should not re-enable the mono alias.');
     assertSameValue(false, $saved['preload_primary_fonts'], 'Saving unrelated settings should not re-enable primary font preloads.');
     assertSameValue(true, $saved['block_editor_font_library_sync_enabled'], 'Saving unrelated settings should not disable the Block Editor Font Library sync preference.');
     assertSameValue(true, $saved['delete_uploaded_files_on_uninstall'], 'Saving unrelated settings should not disable uninstall cleanup.');
@@ -657,6 +715,41 @@ $tests['runtime_service_outputs_primary_font_preloads_for_live_sitewide_roles'] 
     assertContainsValue('href="/wp-content/uploads/fonts/lora/Lora-400.woff2"', $output, 'Frontend preload output should include the primary body WOFF2 file.');
     assertContainsValue('type="font/woff2"', $output, 'Frontend preload output should declare the WOFF2 mime type.');
     assertContainsValue('crossorigin', $output, 'Frontend preload output should include crossorigin so the hint matches the font request mode.');
+};
+
+$tests['runtime_asset_planner_uses_category_aware_fallbacks_for_editor_font_families'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'JetBrains Mono',
+        'jetbrains-mono',
+        [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'JetBrains Mono',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'https://example.com/jetbrains-mono.woff2'],
+            ]],
+            'meta' => ['category' => 'monospace'],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->setAutoApplyRoles(true);
+
+    $families = $services['planner']->getEditorFontFamilies();
+
+    assertContainsValue(
+        '"JetBrains Mono", monospace',
+        (string) ($families[0]['fontFamily'] ?? ''),
+        'Editor font family payloads should default monospace families to the monospace generic fallback when no explicit family fallback is saved.'
+    );
 };
 
 $tests['runtime_service_skips_font_preloads_when_setting_or_live_roles_are_disabled'] = static function (): void {

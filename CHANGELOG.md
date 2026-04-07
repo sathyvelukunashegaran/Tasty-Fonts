@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Added a maintainable multi-file local test harness layout while keeping `php tests/run.php` as the single entry point, plus new direct coverage for hosted CSS parsing, local-environment detection, native upload validation, activation hooks, and generated-asset refresh paths.
 - Added a lightweight zero-dependency JavaScript contract test layer for shared admin helpers and the Etch canvas iframe stylesheet bridge.
 - Added a pull request and branch CI workflow that runs PHP lint, the PHP test suite, and the JavaScript contract tests before changes reach release tagging.
+- Added configurable extended font-output variable controls in Output Settings, including optional global weight tokens, role aliases, and category aliases for sans, serif, and mono stacks.
 
 ### Changed
 
@@ -17,6 +18,8 @@ All notable changes to this project will be documented in this file.
 - Extracted shared admin and canvas runtime helper contracts into standalone browser/Node-compatible scripts so the shipped assets and local smoke tests exercise the same logic.
 - Split the legacy monolithic PHP test file into domain case files so the suite can keep growing without concentrating all coverage in `tests/run.php`.
 - Refined the admin dashboard hero messaging and kept it visible when training wheels are disabled.
+- Updated generated CSS, output snippets, and editor font stacks to emit family-level variables with category-aware fallback defaults, semantic aliases, and shared weight tokens when extended output is enabled.
+- Expanded the PHP coverage for extended output-variable settings, renderer controls, category-aware fallback stacks, and runtime CSS generation.
 
 ## [1.5.1] - 2026-04-07
 

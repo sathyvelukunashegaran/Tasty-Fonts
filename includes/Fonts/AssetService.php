@@ -84,12 +84,13 @@ final class AssetService
 
         $catalog = $this->catalog->getCatalog();
         $localCatalog = $this->planner->getLocalRuntimeCatalog();
+        $variableFamilies = $this->planner->getRuntimeVariableFamilies();
         $settings = $this->settings->getSettings();
         $roles = !empty($settings['auto_apply_roles'])
             ? $this->settings->getAppliedRoles($catalog)
             : $this->settings->getRoles($catalog);
 
-        $this->css = $this->cssBuilder->build($localCatalog, $roles, $settings);
+        $this->css = $this->cssBuilder->build($localCatalog, $roles, $settings, $variableFamilies);
         $this->css = (string) apply_filters('tasty_fonts_generated_css', $this->css, $localCatalog, $roles, $settings);
         $this->hash = hash('crc32b', $this->css);
 

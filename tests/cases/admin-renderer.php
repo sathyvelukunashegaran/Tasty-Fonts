@@ -71,6 +71,7 @@ $tests['admin_page_renderer_uses_inline_delivery_badge_for_single_delivery_famil
                 ['value' => 'swap', 'label' => 'swap'],
             ],
             'The quick brown fox jumps over the lazy dog.',
+            [],
         ]
     );
     $output = (string) ob_get_clean();
@@ -179,6 +180,108 @@ $tests['admin_page_renderer_renders_library_type_filter_and_category_tokens'] = 
     assertContainsValue('>Monospace<', $output, 'Library rows should display the normalized font category badge.');
 };
 
+$tests['admin_page_renderer_renders_extended_variable_submenu_controls'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'roles' => [],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'minify_css_output' => true,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_weight_tokens_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_sans_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'extended_variable_category_mono_enabled' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => false,
+        'training_wheels_off' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('Extended Variable Controls', $output, 'Output Settings should render a nested submenu for extended variable controls.');
+    assertContainsValue('Global weight tokens', $output, 'The submenu should include a granular weight-token toggle.');
+    assertContainsValue('Role alias variables', $output, 'The submenu should include a granular role-alias toggle.');
+    assertContainsValue('Sans alias', $output, 'The submenu should include a granular sans-category toggle.');
+    assertContainsValue('Serif alias', $output, 'The submenu should include a granular serif-category toggle.');
+    assertNotContainsValue('Mono alias', $output, 'The submenu should hide the mono-category toggle when the monospace feature is disabled.');
+    assertNotContainsValue('--font-code', $output, 'The role-alias copy should not mention the code alias when the monospace feature is disabled.');
+};
+
+$tests['admin_page_renderer_shows_mono_extended_variable_controls_when_monospace_is_enabled'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'roles' => [],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'minify_css_output' => true,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_weight_tokens_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_sans_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'extended_variable_category_mono_enabled' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => false,
+        'training_wheels_off' => false,
+        'monospace_role_enabled' => true,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('Mono alias', $output, 'The submenu should show the mono-category toggle when the monospace feature is enabled.');
+    assertContainsValue('--font-code', $output, 'The role-alias copy should mention the code alias when the monospace feature is enabled.');
+};
+
 $tests['admin_page_renderer_outputs_migrate_shortcuts_for_cdn_deliveries'] = static function (): void {
     resetTestState();
 
@@ -229,6 +332,7 @@ $tests['admin_page_renderer_outputs_migrate_shortcuts_for_cdn_deliveries'] = sta
                 ['value' => 'inherit', 'label' => 'Use plugin default'],
             ],
             'The quick brown fox jumps over the lazy dog.',
+            [],
         ]
     );
     $output = (string) ob_get_clean();
@@ -239,6 +343,376 @@ $tests['admin_page_renderer_outputs_migrate_shortcuts_for_cdn_deliveries'] = sta
     assertContainsValue('data-migrate-variants="regular,700"', $output, 'The migration shortcut should preserve the saved variant tokens for self-hosting prefill.');
     assertNotContainsValue('tasty-fonts-font-actions-secondary', $output, 'Library cards should no longer render a dedicated migration action row above the detailed delivery profile actions.');
     assertNotContainsValue('Remote variants are managed by their delivery profile instead of being deleted individually.', $output, 'CDN-backed active faces should no longer be hard-disabled from individual deletion in the detail cards.');
+};
+
+$tests['admin_page_renderer_renders_copy_ready_face_variant_variables'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFaceDetailCard',
+        [
+            'Inter',
+            'inter',
+            '"Inter", sans-serif',
+            'The quick brown fox jumps over the lazy dog.',
+            2,
+            ['body'],
+            'sans-serif',
+            ['--font-sans' => 'Inter'],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
+            ['provider' => 'local', 'type' => 'self_hosted'],
+            [
+                'weight' => '700',
+                'style' => 'italic',
+                'source' => 'local',
+                'files' => ['woff2' => 'inter/Inter-700-italic.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-700-italic.woff2'],
+            ],
+            false,
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('>CSS<', $output, 'Face detail cards should render a dedicated CSS area.');
+    assertContainsValue('data-copy-text="font-family: var(--font-inter);"', $output, 'Face detail cards should expose the family CSS declaration.');
+    assertContainsValue('data-copy-text="font-weight: var(--weight-bold);"', $output, 'Face detail cards should expose the weight CSS declaration.');
+    assertContainsValue('data-copy-text="font-style: italic;"', $output, 'Face detail cards should expose the style CSS declaration.');
+    assertContainsValue('data-copy-text="font-family: var(--font-inter); font-weight: var(--weight-bold); font-style: italic;"', $output, 'Face detail cards should expose the full CSS snippet.');
+    assertNotContainsValue('data-copy-text="--font-interface: var(--font-body);"', $output, 'Face detail cards should no longer expose family-level interface aliases.');
+    assertNotContainsValue('data-copy-text="--font-ui: var(--font-body);"', $output, 'Face detail cards should no longer expose family-level UI aliases.');
+    assertNotContainsValue('data-copy-text="--font-sans: var(--font-inter);"', $output, 'Face detail cards should no longer expose family-level category aliases.');
+};
+
+$tests['admin_page_renderer_renders_copy_ready_family_css_variables'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'JetBrains Mono',
+        'slug' => 'jetbrains-mono',
+        'font_category' => 'monospace',
+        'font_category_tokens' => ['monospace'],
+        'delivery_filter_tokens' => ['published'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'local-self-hosted',
+        'active_delivery' => [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'local-self-hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'local',
+                'files' => ['woff2' => 'jetbrains-mono/JetBrainsMono-400-normal.woff2'],
+                'paths' => ['woff2' => 'jetbrains-mono/JetBrainsMono-400-normal.woff2'],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            ['heading' => '', 'body' => '', 'monospace' => 'JetBrains Mono', 'monospace_fallback' => 'monospace'],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            ['--font-mono' => 'JetBrains Mono'],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
+            true,
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('>CSS Variables<', $output, 'Family details should render a dedicated CSS Variables section.');
+    assertContainsValue('data-copy-text="--font-jetbrains-mono: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should expose the base family variable.');
+    assertContainsValue('data-copy-text="--font-monospace: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should expose the role variable at the family level.');
+    assertContainsValue('data-copy-text="--font-code: var(--font-monospace);"', $output, 'Family details should expose the code alias when the family is assigned to monospace.');
+    assertContainsValue('data-copy-text="--font-mono: var(--font-jetbrains-mono);"', $output, 'Family details should expose the category monospace alias when the family resolves the mono token.');
+};
+
+$tests['admin_page_renderer_hides_extended_family_css_variables_when_disabled'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'JetBrains Mono',
+        'slug' => 'jetbrains-mono',
+        'font_category' => 'monospace',
+        'font_category_tokens' => ['monospace'],
+        'delivery_filter_tokens' => ['published'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'local-self-hosted',
+        'active_delivery' => [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'local-self-hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'local',
+                'files' => ['woff2' => 'jetbrains-mono/JetBrainsMono-400-normal.woff2'],
+                'paths' => ['woff2' => 'jetbrains-mono/JetBrainsMono-400-normal.woff2'],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            ['heading' => '', 'body' => '', 'monospace' => 'JetBrains Mono', 'monospace_fallback' => 'monospace'],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            ['--font-mono' => 'JetBrains Mono'],
+            ['enabled' => false, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
+            true,
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('data-copy-text="--font-jetbrains-mono: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should still expose the base family variable when extended output is disabled.');
+    assertContainsValue('data-copy-text="--font-monospace: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should still expose the active role variable when extended output is disabled.');
+    assertNotContainsValue('data-copy-text="--font-code: var(--font-monospace);"', $output, 'Family details should hide extended code aliases when extended output is disabled.');
+    assertNotContainsValue('data-copy-text="--font-mono: var(--font-jetbrains-mono);"', $output, 'Family details should hide category aliases when extended output is disabled.');
+};
+
+$tests['admin_page_renderer_hides_mono_alias_when_monospace_feature_is_disabled'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'JetBrains Mono',
+        'slug' => 'jetbrains-mono',
+        'font_category' => 'monospace',
+        'font_category_tokens' => ['monospace'],
+        'delivery_filter_tokens' => ['published'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'local-self-hosted',
+        'active_delivery' => [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'local-self-hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'local',
+                'files' => ['woff2' => 'jetbrains-mono/JetBrainsMono-400-normal.woff2'],
+                'paths' => ['woff2' => 'jetbrains-mono/JetBrainsMono-400-normal.woff2'],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            ['heading' => '', 'body' => '', 'monospace' => ''],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            [],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => false],
+            false,
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertNotContainsValue('data-copy-text="--font-mono: var(--font-jetbrains-mono);"', $output, 'Family details should not expose the mono alias when the monospace feature is disabled.');
+    assertNotContainsValue('data-copy-text="--font-code: var(--font-monospace);"', $output, 'Family details should not expose the code alias when the monospace feature is disabled.');
+};
+
+$tests['admin_page_renderer_uses_raw_face_weights_when_extended_variables_are_disabled'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFaceDetailCard',
+        [
+            'Inter',
+            'inter',
+            '"Inter", sans-serif',
+            'The quick brown fox jumps over the lazy dog.',
+            2,
+            ['body'],
+            'sans-serif',
+            ['--font-sans' => 'Inter'],
+            ['enabled' => false, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
+            ['provider' => 'local', 'type' => 'self_hosted'],
+            [
+                'weight' => '700',
+                'style' => 'italic',
+                'source' => 'local',
+                'files' => ['woff2' => 'inter/Inter-700-italic.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-700-italic.woff2'],
+            ],
+            false,
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('data-copy-text="font-weight: 700;"', $output, 'Face detail cards should fall back to raw numeric weights when extended output is disabled.');
+    assertContainsValue('data-copy-text="font-family: var(--font-inter); font-weight: 700; font-style: italic;"', $output, 'Combined face snippets should use raw font-weight values when extended output is disabled.');
+    assertNotContainsValue('data-copy-text="font-weight: var(--weight-bold);"', $output, 'Face detail cards should not expose weight variables when extended output is disabled.');
+};
+
+$tests['admin_page_renderer_hides_category_alias_when_the_family_does_not_win_it'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFaceDetailCard',
+        [
+            'Inter',
+            'inter',
+            '"Inter", sans-serif',
+            'The quick brown fox jumps over the lazy dog.',
+            2,
+            [],
+            'sans-serif',
+            ['--font-sans' => 'Noto Sans'],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
+            ['provider' => 'local', 'type' => 'self_hosted'],
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'local',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ],
+            false,
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertNotContainsValue('data-copy-text="--font-sans: var(--font-inter);"', $output, 'Face detail cards should not show category aliases now that family-scoped variables live in the family detail section.');
+};
+
+$tests['admin_page_renderer_uses_category_aware_family_preview_fallbacks'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'JetBrains Mono',
+        'slug' => 'jetbrains-mono',
+        'font_category' => 'monospace',
+        'font_category_tokens' => ['monospace'],
+        'delivery_filter_tokens' => ['published'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'google-cdn',
+        'active_delivery' => [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => [],
+                'paths' => [],
+            ],
+        ],
+    ];
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderFamilyRow',
+        [
+            $family,
+            ['heading' => '', 'body' => '', 'monospace' => ''],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            [],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
+            true,
+        ]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('data-copy-text="&quot;JetBrains Mono&quot;, monospace"', $output, 'Family preview stacks should default monospace catalog families to the monospace generic fallback.');
 };
 
 $tests['admin_page_renderer_translates_stored_delivery_profile_labels_at_output'] = static function (): void {
@@ -307,6 +781,8 @@ $tests['admin_page_renderer_translates_stored_delivery_profile_labels_at_output'
                 ['value' => 'inherit', 'label' => 'Use plugin default'],
             ],
             'The quick brown fox jumps over the lazy dog.',
+            [],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
         ]
     );
     $output = (string) ob_get_clean();
@@ -1209,6 +1685,8 @@ $tests['admin_page_renderer_family_cards_expose_monospace_assignments_and_varian
                 ['value' => 'swap', 'label' => 'swap'],
             ],
             'The quick brown fox jumps over the lazy dog.',
+            [],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true, 'category_mono' => true],
             true,
         ]
     );

@@ -38,9 +38,19 @@ final class RuntimeAssetPlanner
         return $this->buildSelfHostedCatalog($this->getRuntimeFamilies());
     }
 
+    public function getRuntimeVariableFamilies(): array
+    {
+        return $this->getRuntimeFamilies();
+    }
+
     public function getLocalPreviewCatalog(): array
     {
         return $this->buildSelfHostedCatalog($this->getPreviewFamilies());
+    }
+
+    public function getPreviewVariableFamilies(): array
+    {
+        return $this->getPreviewFamilies();
     }
 
     public function getExternalStylesheets(): array
@@ -69,7 +79,7 @@ final class RuntimeAssetPlanner
                 'slug' => (string) ($family['slug'] ?? FontUtils::slugify($familyName)),
                 'fontFamily' => FontUtils::buildFontStack(
                     $familyName,
-                    $this->settings->getFamilyFallback($familyName, 'sans-serif')
+                    $this->resolveFamilyFallback($family)
                 ),
             ];
         }
@@ -145,6 +155,24 @@ final class RuntimeAssetPlanner
         }
 
         return array_values($origins);
+    }
+
+    private function resolveFamilyFallback(array $family): string
+    {
+        $familyName = trim((string) ($family['family'] ?? ''));
+
+        if ($familyName === '') {
+            return 'sans-serif';
+        }
+
+        $settings = $this->settings->getSettings();
+        $savedFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
+
+        if (array_key_exists($familyName, $savedFallbacks)) {
+            return FontUtils::sanitizeFallback((string) $savedFallbacks[$familyName]);
+        }
+
+        return FontUtils::defaultFallbackForCategory((string) ($family['font_category'] ?? ''));
     }
 
     private function filterFamiliesByPublishState(array $families, bool $includeLibraryOnly): array

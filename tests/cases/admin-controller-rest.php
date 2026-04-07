@@ -106,6 +106,8 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
                 'css_delivery_mode' => 'file',
                 'font_display' => 'swap',
                 'minify_css_output' => true,
+                'per_variant_font_variables_enabled' => true,
+                'extended_variable_weight_tokens_enabled' => true,
                 'preload_primary_fonts' => false,
                 'block_editor_font_library_sync_enabled' => false,
                 'training_wheels_off' => false,
@@ -115,6 +117,8 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
                 'css_delivery_mode' => 'inline',
                 'font_display' => 'optional',
                 'minify_css_output' => false,
+                'per_variant_font_variables_enabled' => false,
+                'extended_variable_weight_tokens_enabled' => false,
                 'preload_primary_fonts' => true,
                 'block_editor_font_library_sync_enabled' => true,
                 'training_wheels_off' => true,
@@ -126,6 +130,8 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
     assertContainsValue('delivery mode set to inline CSS', $message, 'Settings save messages should explain delivery-mode changes.');
     assertContainsValue('font-display set to optional', $message, 'Settings save messages should explain font-display changes.');
     assertContainsValue('CSS minification disabled', $message, 'Settings save messages should explain CSS minification changes.');
+    assertContainsValue('extended font output variables disabled', $message, 'Settings save messages should explain extended font output changes.');
+    assertContainsValue('extended variable subsettings updated', $message, 'Settings save messages should explain granular extended-variable changes.');
     assertContainsValue('primary font preloads enabled', $message, 'Settings save messages should explain preload setting changes.');
     assertContainsValue('Block Editor Font Library sync enabled', $message, 'Settings save messages should explain editor sync changes.');
     assertContainsValue('training wheels off enabled', $message, 'Settings save messages should explain plugin behavior changes.');
@@ -172,8 +178,8 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
             $controller,
             'settingsChangeRequiresAssetRefresh',
             [
-                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
-                ['minify_css_output' => false, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => false, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
             ]
         ),
         'Disabling CSS minification should trigger a generated asset refresh.'
@@ -185,8 +191,8 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
             $controller,
             'settingsChangeRequiresAssetRefresh',
             [
-                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
-                ['minify_css_output' => true, 'font_display' => 'optional', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'optional', 'css_delivery_mode' => 'file'],
             ]
         ),
         'Changing font-display should trigger a generated asset refresh.'
@@ -198,8 +204,8 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
             $controller,
             'settingsChangeRequiresAssetRefresh',
             [
-                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'preload_primary_fonts' => true],
-                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'preload_primary_fonts' => false],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'preload_primary_fonts' => true],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'preload_primary_fonts' => false],
             ]
         ),
         'Preload-only changes should not force a generated CSS refresh.'
@@ -211,11 +217,37 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
             $controller,
             'settingsChangeRequiresAssetRefresh',
             [
-                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'monospace_role_enabled' => false],
-                ['minify_css_output' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'monospace_role_enabled' => true],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'monospace_role_enabled' => false],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file', 'monospace_role_enabled' => true],
             ]
         ),
         'Toggling monospace support should trigger a generated asset refresh because it changes snippets and live CSS output.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => false, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Toggling extended font output should trigger a generated CSS refresh because it changes emitted CSS.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'extended_variable_category_sans_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'extended_variable_category_sans_enabled' => false, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Changing granular extended-variable subsettings should trigger a generated CSS refresh because emitted CSS changes.'
     );
 };
 
@@ -273,7 +305,7 @@ $tests['admin_controller_excludes_generated_css_from_snippet_output_panels'] = s
     $panels = invokePrivateMethod(
         $services['controller'],
         'buildOutputPanels',
-        [$roles, $services['settings']->getSettings()]
+        [$roles, $services['settings']->getSettings(), $services['catalog']->getCatalog()]
     );
 
     assertSameValue(
@@ -299,7 +331,7 @@ $tests['admin_controller_builds_monospace_role_output_panels_when_enabled'] = st
     $panels = invokePrivateMethod(
         $services['controller'],
         'buildOutputPanels',
-        [$roles, $settings]
+        [$roles, $settings, $services['catalog']->getCatalog()]
     );
     $panelValues = [];
 
@@ -310,6 +342,63 @@ $tests['admin_controller_builds_monospace_role_output_panels_when_enabled'] = st
     assertContainsValue('--font-monospace: monospace;', $panelValues['variables'] ?? '', 'Enabled monospace support should add the monospace variable to the CSS Variables panel.');
     assertContainsValue('code, pre {', $panelValues['usage'] ?? '', 'Enabled monospace support should add the code/pre usage rule to the Site Snippet panel.');
     assertContainsValue("monospace\n", ($panelValues['stacks'] ?? '') . "\n", 'Enabled monospace support should include the fallback-only monospace stack in the Font Stacks panel.');
+};
+
+$tests['admin_controller_builds_variant_variable_output_panel_content'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular', '700italic'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                ],
+                [
+                    'family' => 'Inter',
+                    'weight' => '700',
+                    'style' => 'italic',
+                    'files' => ['woff2' => 'inter/Inter-700-italic.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = $services['settings']->saveSettings(['minify_css_output' => '0', 'per_variant_font_variables_enabled' => '1']);
+    $panels = invokePrivateMethod(
+        $services['controller'],
+        'buildOutputPanels',
+        [$roles, $settings, $services['catalog']->getCatalog()]
+    );
+    $panelValues = [];
+
+    foreach ($panels as $panel) {
+        $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
+    }
+
+    assertContainsValue('--font-inter: "Inter", sans-serif;', $panelValues['variables'] ?? '', 'The CSS Variables panel should include the base family variable.');
+    assertContainsValue('--font-interface: var(--font-body);', $panelValues['variables'] ?? '', 'The CSS Variables panel should include interface aliases.');
+    assertContainsValue('--weight-400: 400;', $panelValues['variables'] ?? '', 'The CSS Variables panel should include numeric global weight tokens.');
+    assertContainsValue('--weight-bold: var(--weight-700);', $panelValues['variables'] ?? '', 'The CSS Variables panel should include semantic global weight aliases.');
+    assertNotContainsValue('--font-inter-regular', $panelValues['variables'] ?? '', 'The CSS Variables panel should no longer expose per-family semantic variant aliases.');
 };
 
 $tests['admin_controller_builds_five_preview_panels_including_code'] = static function (): void {

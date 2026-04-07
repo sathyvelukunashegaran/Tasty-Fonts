@@ -518,7 +518,22 @@ final class AdminController
             }
         }
 
-        foreach (['minify_css_output', 'preload_primary_fonts', 'remote_connection_hints', 'block_editor_font_library_sync_enabled', 'delete_uploaded_files_on_uninstall', 'training_wheels_off'] as $field) {
+        foreach (
+            [
+                'minify_css_output',
+                'per_variant_font_variables_enabled',
+                'extended_variable_weight_tokens_enabled',
+                'extended_variable_role_aliases_enabled',
+                'extended_variable_category_sans_enabled',
+                'extended_variable_category_serif_enabled',
+                'extended_variable_category_mono_enabled',
+                'preload_primary_fonts',
+                'remote_connection_hints',
+                'block_editor_font_library_sync_enabled',
+                'delete_uploaded_files_on_uninstall',
+                'training_wheels_off',
+            ] as $field
+        ) {
             if (array_key_exists($field, $_POST)) {
                 $settingsInput[$field] = $_POST[$field];
             }
@@ -846,6 +861,12 @@ final class AdminController
             'font_display' => (string) ($settings['font_display'] ?? 'optional'),
             'font_display_options' => $this->buildFontDisplayOptions(),
             'minify_css_output' => !empty($settings['minify_css_output']),
+            'per_variant_font_variables_enabled' => !empty($settings['per_variant_font_variables_enabled']),
+            'extended_variable_weight_tokens_enabled' => !empty($settings['extended_variable_weight_tokens_enabled']),
+            'extended_variable_role_aliases_enabled' => !empty($settings['extended_variable_role_aliases_enabled']),
+            'extended_variable_category_sans_enabled' => !empty($settings['extended_variable_category_sans_enabled']),
+            'extended_variable_category_serif_enabled' => !empty($settings['extended_variable_category_serif_enabled']),
+            'extended_variable_category_mono_enabled' => !empty($settings['extended_variable_category_mono_enabled']),
             'preload_primary_fonts' => !empty($settings['preload_primary_fonts']),
             'remote_connection_hints' => !empty($settings['remote_connection_hints']),
             'block_editor_font_library_sync_enabled' => !empty($settings['block_editor_font_library_sync_enabled']),
@@ -854,7 +875,7 @@ final class AdminController
             'delete_uploaded_files_on_uninstall' => !empty($settings['delete_uploaded_files_on_uninstall']),
             'diagnostic_items' => $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts),
             'overview_metrics' => $this->buildOverviewMetrics($counts),
-            'output_panels' => $this->buildOutputPanels($roles, $settings),
+            'output_panels' => $this->buildOutputPanels($roles, $settings, $catalog),
             'generated_css_panel' => $this->buildGeneratedCssPanel($settings),
             'preview_panels' => $this->buildPreviewPanels(),
             'local_environment_notice' => $localEnvironmentNotice,
@@ -957,7 +978,7 @@ final class AdminController
         ];
     }
 
-    private function buildOutputPanels(array $roles, array $settings): array
+    private function buildOutputPanels(array $roles, array $settings, array $catalog = []): array
     {
         $minifyOutput = !empty($settings['minify_css_output']);
         $includeMonospace = !empty($settings['monospace_role_enabled']);
@@ -967,14 +988,20 @@ final class AdminController
                 'key' => 'usage',
                 'label' => __('Site Snippet', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-usage',
-                'value' => $this->cssBuilder->formatOutput($this->cssBuilder->buildRoleUsageSnippet($roles, $includeMonospace), $minifyOutput),
+                'value' => $this->cssBuilder->formatOutput(
+                    $this->cssBuilder->buildRoleUsageSnippet($roles, $includeMonospace, $catalog, $settings),
+                    $minifyOutput
+                ),
                 'active' => true,
             ],
             [
                 'key' => 'variables',
                 'label' => __('CSS Variables', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-vars',
-                'value' => $this->cssBuilder->formatOutput($this->cssBuilder->buildRoleVariableSnippet($roles, $includeMonospace), $minifyOutput),
+                'value' => $this->cssBuilder->formatOutput(
+                    $this->cssBuilder->buildRoleVariableSnippet($roles, $includeMonospace, $catalog, $settings),
+                    $minifyOutput
+                ),
                 'active' => false,
             ],
             [
@@ -1139,6 +1166,16 @@ final class AdminController
                 : __('CSS minification disabled', 'tasty-fonts');
         }
 
+        if (!empty($before['per_variant_font_variables_enabled']) !== !empty($after['per_variant_font_variables_enabled'])) {
+            $changes[] = !empty($after['per_variant_font_variables_enabled'])
+                ? __('extended font output variables enabled', 'tasty-fonts')
+                : __('extended font output variables disabled', 'tasty-fonts');
+        }
+
+        if ($this->extendedVariableSubsettingsDiffer($before, $after)) {
+            $changes[] = __('extended variable subsettings updated', 'tasty-fonts');
+        }
+
         if (!empty($before['preload_primary_fonts']) !== !empty($after['preload_primary_fonts'])) {
             $changes[] = !empty($after['preload_primary_fonts'])
                 ? __('primary font preloads enabled', 'tasty-fonts')
@@ -1194,7 +1231,28 @@ final class AdminController
         return ($before['css_delivery_mode'] ?? 'file') !== ($after['css_delivery_mode'] ?? 'file')
             || ($before['font_display'] ?? 'optional') !== ($after['font_display'] ?? 'optional')
             || !empty($before['minify_css_output']) !== !empty($after['minify_css_output'])
+            || !empty($before['per_variant_font_variables_enabled']) !== !empty($after['per_variant_font_variables_enabled'])
+            || $this->extendedVariableSubsettingsDiffer($before, $after)
             || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled']);
+    }
+
+    private function extendedVariableSubsettingsDiffer(array $before, array $after): bool
+    {
+        foreach (
+            [
+                'extended_variable_weight_tokens_enabled',
+                'extended_variable_role_aliases_enabled',
+                'extended_variable_category_sans_enabled',
+                'extended_variable_category_serif_enabled',
+                'extended_variable_category_mono_enabled',
+            ] as $field
+        ) {
+            if (!empty($before[$field]) !== !empty($after[$field])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function buildFontDisplayOptions(): array

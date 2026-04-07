@@ -24,6 +24,12 @@ final class SettingsRepository
         'css_delivery_mode' => 'file',
         'font_display' => 'optional',
         'minify_css_output' => true,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_weight_tokens_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_sans_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'extended_variable_category_mono_enabled' => true,
         'preload_primary_fonts' => true,
         'remote_connection_hints' => true,
         'block_editor_font_library_sync_enabled' => null,
@@ -66,6 +72,12 @@ final class SettingsRepository
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
         $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
+        $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
+        $settings['extended_variable_weight_tokens_enabled'] = !empty($settings['extended_variable_weight_tokens_enabled']);
+        $settings['extended_variable_role_aliases_enabled'] = !empty($settings['extended_variable_role_aliases_enabled']);
+        $settings['extended_variable_category_sans_enabled'] = !empty($settings['extended_variable_category_sans_enabled']);
+        $settings['extended_variable_category_serif_enabled'] = !empty($settings['extended_variable_category_serif_enabled']);
+        $settings['extended_variable_category_mono_enabled'] = !empty($settings['extended_variable_category_mono_enabled']);
         $settings['preload_primary_fonts'] = !empty($settings['preload_primary_fonts']);
         $settings['remote_connection_hints'] = !empty($settings['remote_connection_hints']);
         $settings['block_editor_font_library_sync_enabled'] = $this->normalizeBlockEditorFontLibrarySyncSetting(
@@ -132,6 +144,28 @@ final class SettingsRepository
 
         if (array_key_exists('minify_css_output', $input)) {
             $settings['minify_css_output'] = !empty($input['minify_css_output']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('per_variant_font_variables_enabled', $input)) {
+            $settings['per_variant_font_variables_enabled'] = !empty($input['per_variant_font_variables_enabled']);
+            $settingsChanged = true;
+        }
+
+        foreach (
+            [
+                'extended_variable_weight_tokens_enabled',
+                'extended_variable_role_aliases_enabled',
+                'extended_variable_category_sans_enabled',
+                'extended_variable_category_serif_enabled',
+                'extended_variable_category_mono_enabled',
+            ] as $field
+        ) {
+            if (!array_key_exists($field, $input)) {
+                continue;
+            }
+
+            $settings[$field] = !empty($input[$field]);
             $settingsChanged = true;
         }
 

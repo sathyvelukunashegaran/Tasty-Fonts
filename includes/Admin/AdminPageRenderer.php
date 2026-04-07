@@ -56,6 +56,18 @@ final class AdminPageRenderer
         $fontDisplay = (string) ($context['font_display'] ?? 'optional');
         $fontDisplayOptions = is_array($context['font_display_options'] ?? null) ? $context['font_display_options'] : [];
         $minifyCssOutput = !empty($context['minify_css_output']);
+        $perVariantFontVariablesEnabled = !array_key_exists('per_variant_font_variables_enabled', $context)
+            || !empty($context['per_variant_font_variables_enabled']);
+        $extendedVariableWeightTokensEnabled = !array_key_exists('extended_variable_weight_tokens_enabled', $context)
+            || !empty($context['extended_variable_weight_tokens_enabled']);
+        $extendedVariableRoleAliasesEnabled = !array_key_exists('extended_variable_role_aliases_enabled', $context)
+            || !empty($context['extended_variable_role_aliases_enabled']);
+        $extendedVariableCategorySansEnabled = !array_key_exists('extended_variable_category_sans_enabled', $context)
+            || !empty($context['extended_variable_category_sans_enabled']);
+        $extendedVariableCategorySerifEnabled = !array_key_exists('extended_variable_category_serif_enabled', $context)
+            || !empty($context['extended_variable_category_serif_enabled']);
+        $extendedVariableCategoryMonoEnabled = !array_key_exists('extended_variable_category_mono_enabled', $context)
+            || !empty($context['extended_variable_category_mono_enabled']);
         $preloadPrimaryFonts = !empty($context['preload_primary_fonts']);
         $remoteConnectionHints = !empty($context['remote_connection_hints']);
         $blockEditorFontLibrarySyncEnabled = !empty($context['block_editor_font_library_sync_enabled']);
@@ -125,6 +137,15 @@ final class AdminPageRenderer
             : __('These role selections are saved as a draft and are not yet being served sitewide.', 'tasty-fonts');
         $roleDeploymentAnnouncementId = 'tasty-fonts-role-deployment-announcement';
         $storageErrorMessage = trim($this->storage->getLastFilesystemErrorMessage());
+        $categoryAliasOwners = $this->buildCategoryAliasOwners($catalog, $roles, $monospaceRoleEnabled);
+        $extendedVariableOptions = [
+            'enabled' => $perVariantFontVariablesEnabled,
+            'weight_tokens' => $extendedVariableWeightTokensEnabled,
+            'role_aliases' => $extendedVariableRoleAliasesEnabled,
+            'category_sans' => $extendedVariableCategorySansEnabled,
+            'category_serif' => $extendedVariableCategorySerifEnabled,
+            'category_mono' => $monospaceRoleEnabled && $extendedVariableCategoryMonoEnabled,
+        ];
         $this->trainingWheelsOff = $trainingWheelsOff;
         ?>
         <div class="wrap tasty-fonts-admin<?php echo $trainingWheelsOff ? ' is-training-wheels-off' : ''; ?>">
@@ -873,6 +894,115 @@ final class AdminPageRenderer
                                                         <span class="tasty-fonts-toggle-description"><?php esc_html_e('Keep on unless you need readable CSS while debugging.', 'tasty-fonts'); ?></span>
                                                     </span>
                                                 </label>
+                                                <input type="hidden" name="per_variant_font_variables_enabled" value="0">
+                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="tasty-fonts-toggle-input"
+                                                        name="per_variant_font_variables_enabled"
+                                                        value="1"
+                                                        <?php checked($perVariantFontVariablesEnabled); ?>
+                                                    >
+                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                    <span class="tasty-fonts-toggle-copy">
+                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Emit extended font output variables', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds semantic family aliases like sans and serif plus reusable global weight tokens in generated CSS and snippets.', 'tasty-fonts'); ?></span>
+                                                    </span>
+                                                </label>
+                                                <div class="tasty-fonts-output-settings-submenu<?php echo $perVariantFontVariablesEnabled ? '' : ' is-inactive'; ?>">
+                                                    <div class="tasty-fonts-output-settings-submenu-copy">
+                                                        <h4><?php esc_html_e('Extended Variable Controls', 'tasty-fonts'); ?></h4>
+                                                        <p><?php esc_html_e('Keep the main toggle on, then disable only the variable groups you do not want emitted.', 'tasty-fonts'); ?></p>
+                                                    </div>
+                                                    <div class="tasty-fonts-output-settings-submenu-list">
+                                                        <input type="hidden" name="extended_variable_weight_tokens_enabled" value="0">
+                                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                            <input
+                                                                type="checkbox"
+                                                                class="tasty-fonts-toggle-input"
+                                                                name="extended_variable_weight_tokens_enabled"
+                                                                value="1"
+                                                                <?php checked($extendedVariableWeightTokensEnabled); ?>
+                                                            >
+                                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                            <span class="tasty-fonts-toggle-copy">
+                                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Global weight tokens', 'tasty-fonts'); ?></span>
+                                                                <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls variables like --weight-400 and --weight-bold plus matching weight-based snippets.', 'tasty-fonts'); ?></span>
+                                                            </span>
+                                                        </label>
+                                                        <input type="hidden" name="extended_variable_role_aliases_enabled" value="0">
+                                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                            <input
+                                                                type="checkbox"
+                                                                class="tasty-fonts-toggle-input"
+                                                                name="extended_variable_role_aliases_enabled"
+                                                                value="1"
+                                                                <?php checked($extendedVariableRoleAliasesEnabled); ?>
+                                                            >
+                                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                            <span class="tasty-fonts-toggle-copy">
+                                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Role alias variables', 'tasty-fonts'); ?></span>
+                                                                <span class="tasty-fonts-toggle-description">
+                                                                    <?php echo esc_html($monospaceRoleEnabled
+                                                                        ? __('Controls aliases like --font-interface, --font-ui, and --font-code.', 'tasty-fonts')
+                                                                        : __('Controls aliases like --font-interface and --font-ui.', 'tasty-fonts')); ?>
+                                                                </span>
+                                                            </span>
+                                                        </label>
+                                                        <div class="tasty-fonts-output-settings-submenu-group">
+                                                            <span class="tasty-fonts-output-settings-submenu-group-title"><?php esc_html_e('Category aliases', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-output-settings-submenu-group-list">
+                                                                <input type="hidden" name="extended_variable_category_sans_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        class="tasty-fonts-toggle-input"
+                                                                        name="extended_variable_category_sans_enabled"
+                                                                        value="1"
+                                                                        <?php checked($extendedVariableCategorySansEnabled); ?>
+                                                                    >
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Sans alias', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls --font-sans.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <input type="hidden" name="extended_variable_category_serif_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        class="tasty-fonts-toggle-input"
+                                                                        name="extended_variable_category_serif_enabled"
+                                                                        value="1"
+                                                                        <?php checked($extendedVariableCategorySerifEnabled); ?>
+                                                                    >
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Serif alias', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls --font-serif.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <?php if ($monospaceRoleEnabled): ?>
+                                                                    <input type="hidden" name="extended_variable_category_mono_enabled" value="0">
+                                                                    <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            class="tasty-fonts-toggle-input"
+                                                                            name="extended_variable_category_mono_enabled"
+                                                                            value="1"
+                                                                            <?php checked($extendedVariableCategoryMonoEnabled); ?>
+                                                                        >
+                                                                        <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                        <span class="tasty-fonts-toggle-copy">
+                                                                            <span class="tasty-fonts-toggle-title"><?php esc_html_e('Mono alias', 'tasty-fonts'); ?></span>
+                                                                            <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls --font-mono.', 'tasty-fonts'); ?></span>
+                                                                        </span>
+                                                                    </label>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <input type="hidden" name="preload_primary_fonts" value="0">
                                                 <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                                     <input
@@ -1570,7 +1700,7 @@ final class AdminPageRenderer
                             <div id="tasty-fonts-library-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty-state" hidden><?php esc_html_e('No fonts match the current filters.', 'tasty-fonts'); ?></div>
                             <div class="tasty-fonts-library-grid">
                                 <?php foreach ($catalog as $family): ?>
-                                    <?php $this->renderFamilyRow($family, $roles, $familyFallbacks, $familyFontDisplays, $familyFontDisplayOptions, $previewText, $monospaceRoleEnabled); ?>
+                                    <?php $this->renderFamilyRow($family, $roles, $familyFallbacks, $familyFontDisplays, $familyFontDisplayOptions, $previewText, $categoryAliasOwners, $extendedVariableOptions, $monospaceRoleEnabled); ?>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
@@ -1723,6 +1853,8 @@ final class AdminPageRenderer
         array $familyFontDisplays,
         array $familyFontDisplayOptions,
         string $previewText,
+        array $categoryAliasOwners = [],
+        array $extendedVariableOptions = [],
         bool $monospaceRoleEnabled = false
     ): void
     {
@@ -1762,7 +1894,9 @@ final class AdminPageRenderer
         foreach ($deleteBlockedSelections as $selection) {
             $deleteBlockedMessages[$this->buildRoleSelectionKey($selection)] = $this->buildDeleteBlockedMessage($familyName, $selection);
         }
-        $savedFallback = FontUtils::sanitizeFallback((string) ($familyFallbacks[$familyName] ?? 'sans-serif'));
+        $savedFallback = array_key_exists($familyName, $familyFallbacks)
+            ? FontUtils::sanitizeFallback((string) $familyFallbacks[$familyName])
+            : FontUtils::defaultFallbackForCategory((string) ($family['font_category'] ?? ''));
         $savedFontDisplay = (string) ($familyFontDisplays[$familyName] ?? '');
         $currentFontDisplay = $savedFontDisplay !== '' ? $savedFontDisplay : 'inherit';
         $publishState = (string) ($family['publish_state'] ?? 'published');
@@ -1793,6 +1927,15 @@ final class AdminPageRenderer
         $hiddenFaceSummaryCount = max(0, count($faceSummaryLabels) - count($visibleFaceSummaryLabels));
         $faceCount = count((array) ($family['faces'] ?? []));
         $activeFaces = is_array($family['faces'] ?? null) ? (array) $family['faces'] : [];
+        $familyCssVariableSnippets = $this->buildFamilyCssVariableSnippets(
+            $familyName,
+            $defaultStack,
+            $assignedRoleKeys,
+            $roles,
+            (string) ($family['font_category'] ?? ''),
+            $categoryAliasOwners,
+            $extendedVariableOptions
+        );
         $canChangePublishState = $publishState !== 'role_active';
         $isExpanded = false;
         $detailsId = 'tasty-fonts-family-details-' . sanitize_html_class($familySlug !== '' ? $familySlug : FontUtils::slugify($familyName));
@@ -2144,8 +2287,8 @@ final class AdminPageRenderer
                 </div>
             </div>
 
-            <div id="<?php echo esc_attr($detailsId); ?>" class="tasty-fonts-family-details" <?php echo $isExpanded ? '' : 'hidden'; ?>>
-                <section class="tasty-fonts-detail-group">
+            <div id="<?php echo esc_attr($detailsId); ?>" class="tasty-fonts-family-details<?php echo $familyCssVariableSnippets !== [] ? ' has-family-css-variables' : ''; ?>" <?php echo $isExpanded ? '' : 'hidden'; ?>>
+                <section class="tasty-fonts-detail-group tasty-fonts-detail-group--profiles">
                     <div class="tasty-fonts-detail-group-head">
                         <div class="tasty-fonts-detail-group-copy">
                             <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Saved', 'tasty-fonts'); ?></span>
@@ -2163,7 +2306,28 @@ final class AdminPageRenderer
                     </div>
                 </section>
 
-                <section class="tasty-fonts-detail-group">
+                <?php if ($familyCssVariableSnippets !== []): ?>
+                    <section class="tasty-fonts-detail-group tasty-fonts-detail-group--variables">
+                        <div class="tasty-fonts-detail-group-head">
+                            <div class="tasty-fonts-detail-group-copy">
+                                <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Saved', 'tasty-fonts'); ?></span>
+                                <h4><?php esc_html_e('CSS Variables', 'tasty-fonts'); ?></h4>
+                            </div>
+                            <span class="tasty-fonts-badge">
+                                <?php echo esc_html(sprintf(_n('%d variable', '%d variables', count($familyCssVariableSnippets), 'tasty-fonts'), count($familyCssVariableSnippets))); ?>
+                            </span>
+                        </div>
+                        <div class="tasty-fonts-detail-files">
+                            <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--selection">
+                                <?php foreach ($familyCssVariableSnippets as $label => $snippet) : ?>
+                                    <?php $this->renderFaceVariableCopyPill(__($label, 'tasty-fonts'), (string) $snippet, __('CSS variable copied.', 'tasty-fonts')); ?>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </section>
+                <?php endif; ?>
+
+                <section class="tasty-fonts-detail-group tasty-fonts-detail-group--faces">
                     <div class="tasty-fonts-detail-group-head">
                         <div class="tasty-fonts-detail-group-copy">
                             <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Saved', 'tasty-fonts'); ?></span>
@@ -2176,7 +2340,7 @@ final class AdminPageRenderer
                     <div class="tasty-fonts-detail-card-list tasty-fonts-detail-card-list--faces">
                         <?php foreach ($activeFaces as $face): ?>
                             <?php if (!is_array($face)) { continue; } ?>
-                            <?php $this->renderFaceDetailCard($familyName, $familySlug, $defaultStack, $facePreviewText, $faceCount, $assignedRoleKeys, $activeDelivery, $face, $isMonospace); ?>
+                            <?php $this->renderFaceDetailCard($familyName, $familySlug, $defaultStack, $facePreviewText, $faceCount, $assignedRoleKeys, (string) ($family['font_category'] ?? ''), $categoryAliasOwners, $extendedVariableOptions, $activeDelivery, $face, $isMonospace); ?>
                         <?php endforeach; ?>
                     </div>
                 </section>
@@ -2294,17 +2458,251 @@ final class AdminPageRenderer
 
     private function buildFontVariableReference(string $familyName): string
     {
-        if (trim($familyName) === '') {
-            return '';
+        return FontUtils::fontVariableReference($familyName);
+    }
+
+    private function buildFaceCssCopySnippets(string $familyName, string $weight, string $style, array $extendedVariableOptions = []): array
+    {
+        $familyReference = $this->buildFontVariableReference($familyName);
+        $weightReference = $this->buildWeightReference($weight, $extendedVariableOptions);
+        $styleValue = FontUtils::normalizeStyle($style);
+        $snippets = [];
+
+        if ($familyReference !== '') {
+            $snippets['family'] = 'font-family: ' . $familyReference . ';';
         }
 
-        $slug = FontUtils::slugify($familyName);
-
-        if ($slug === '') {
-            return '';
+        if ($weightReference !== '') {
+            $snippets['weight'] = 'font-weight: ' . $weightReference . ';';
         }
 
-        return sprintf('var(--font-%s)', $slug);
+        if ($styleValue !== '') {
+            $snippets['style'] = 'font-style: ' . $styleValue . ';';
+        }
+
+        if ($snippets !== []) {
+            $snippets['snippet'] = implode(' ', $snippets);
+        }
+
+        return $snippets;
+    }
+
+    private function buildFamilyCssVariableSnippets(
+        string $familyName,
+        string $defaultStack,
+        array $assignedRoleKeys,
+        array $roles,
+        string $fontCategory,
+        array $categoryAliasOwners = [],
+        array $extendedVariableOptions = []
+    ): array {
+        $snippets = [];
+        $familyVariable = FontUtils::fontVariableName($familyName);
+        $familyReference = $this->buildFontVariableReference($familyName);
+
+        if ($familyVariable !== '' && $defaultStack !== '') {
+            $snippets['Family Variable'] = $familyVariable . ': ' . $defaultStack . ';';
+        }
+
+        if (in_array('heading', $assignedRoleKeys, true)) {
+            $snippets['Heading Variable'] = '--font-heading: ' . FontUtils::buildFontStack(
+                $familyName,
+                (string) ($roles['heading_fallback'] ?? 'sans-serif')
+            ) . ';';
+        }
+
+        if (in_array('body', $assignedRoleKeys, true)) {
+            $snippets['Body Variable'] = '--font-body: ' . FontUtils::buildFontStack(
+                $familyName,
+                (string) ($roles['body_fallback'] ?? 'sans-serif')
+            ) . ';';
+
+            if ($this->extendedVariableRoleAliasesEnabled($extendedVariableOptions)) {
+                $snippets['Interface Alias'] = '--font-interface: var(--font-body);';
+                $snippets['UI Alias'] = '--font-ui: var(--font-body);';
+            }
+        }
+
+        if (in_array('monospace', $assignedRoleKeys, true)) {
+            $snippets['Monospace Variable'] = '--font-monospace: ' . FontUtils::buildFontStack(
+                $familyName,
+                (string) ($roles['monospace_fallback'] ?? 'monospace')
+            ) . ';';
+
+            if ($this->extendedVariableRoleAliasesEnabled($extendedVariableOptions)) {
+                $snippets['Code Alias'] = '--font-code: var(--font-monospace);';
+            }
+        }
+
+        $categoryAliasProperty = $this->resolveCategoryAliasProperty($fontCategory);
+
+        if (
+            $this->extendedVariableCategoryAliasEnabled($extendedVariableOptions, $categoryAliasProperty)
+            && $categoryAliasProperty !== ''
+            && $familyReference !== ''
+            && (($categoryAliasOwners[$categoryAliasProperty] ?? '') === $familyName)
+        ) {
+            $snippets['Category Alias'] = $categoryAliasProperty . ': ' . $familyReference . ';';
+        }
+
+        return $snippets;
+    }
+
+    private function buildCategoryAliasOwners(array $families, array $roles, bool $includeMonospace): array
+    {
+        $owners = [];
+        $orderedFamilies = [];
+        $usedKeys = [];
+        $priorityNames = [
+            trim((string) ($roles['heading'] ?? '')),
+            trim((string) ($roles['body'] ?? '')),
+        ];
+
+        if ($includeMonospace) {
+            $priorityNames[] = trim((string) ($roles['monospace'] ?? ''));
+        }
+
+        foreach ($priorityNames as $priorityName) {
+            if ($priorityName === '') {
+                continue;
+            }
+
+            foreach ($families as $familyKey => $family) {
+                if (!is_array($family) || isset($usedKeys[$familyKey])) {
+                    continue;
+                }
+
+                if (trim((string) ($family['family'] ?? '')) !== $priorityName) {
+                    continue;
+                }
+
+                $orderedFamilies[] = $family;
+                $usedKeys[$familyKey] = true;
+                break;
+            }
+        }
+
+        foreach ($families as $familyKey => $family) {
+            if (!is_array($family) || isset($usedKeys[$familyKey])) {
+                continue;
+            }
+
+            $orderedFamilies[] = $family;
+        }
+
+        foreach ($orderedFamilies as $family) {
+            $property = $this->resolveCategoryAliasProperty(
+                $this->resolveFamilyCategory((array) $family)
+            );
+
+            if (
+                $property === ''
+                || (!$includeMonospace && $property === '--font-mono')
+                || isset($owners[$property])
+            ) {
+                continue;
+            }
+
+            $owners[$property] = trim((string) ($family['family'] ?? ''));
+        }
+
+        return $owners;
+    }
+
+    private function resolveFamilyCategory(array $family): string
+    {
+        $category = trim((string) ($family['font_category'] ?? ''));
+
+        if ($category === '' && is_array($family['active_delivery'] ?? null) && is_array($family['active_delivery']['meta'] ?? null)) {
+            $category = trim((string) ($family['active_delivery']['meta']['category'] ?? ''));
+        }
+
+        return $category;
+    }
+
+    private function resolveCategoryAliasProperty(string $category): string
+    {
+        return match (strtolower(trim($category))) {
+            'sans-serif', 'sans serif' => '--font-sans',
+            'serif', 'slab-serif', 'slab serif' => '--font-serif',
+            'monospace' => '--font-mono',
+            default => '',
+        };
+    }
+
+    private function buildWeightReference(string $weight, array $extendedVariableOptions = []): string
+    {
+        if ($this->extendedVariableWeightTokensEnabled($extendedVariableOptions)) {
+            $reference = FontUtils::weightVariableReference($weight);
+
+            if ($reference !== '') {
+                return $reference;
+            }
+        }
+
+        $normalized = FontUtils::normalizeWeight($weight);
+
+        return preg_match('/^\d{1,4}$/', $normalized) === 1 || in_array($normalized, ['normal', 'bold', 'bolder', 'lighter'], true)
+            ? $normalized
+            : '';
+    }
+
+    private function extendedVariableOutputEnabled(array $options): bool
+    {
+        return !array_key_exists('enabled', $options) || !empty($options['enabled']);
+    }
+
+    private function extendedVariableWeightTokensEnabled(array $options): bool
+    {
+        return $this->extendedVariableOutputEnabled($options)
+            && (!array_key_exists('weight_tokens', $options) || !empty($options['weight_tokens']));
+    }
+
+    private function extendedVariableRoleAliasesEnabled(array $options): bool
+    {
+        return $this->extendedVariableOutputEnabled($options)
+            && (!array_key_exists('role_aliases', $options) || !empty($options['role_aliases']));
+    }
+
+    private function extendedVariableCategoryAliasEnabled(array $options, string $categoryAliasProperty): bool
+    {
+        if (!$this->extendedVariableOutputEnabled($options)) {
+            return false;
+        }
+
+        $field = match ($categoryAliasProperty) {
+            '--font-sans' => 'category_sans',
+            '--font-serif' => 'category_serif',
+            '--font-mono' => 'category_mono',
+            default => '',
+        };
+
+        return $field !== ''
+            && (!array_key_exists($field, $options) || !empty($options[$field]));
+    }
+
+    private function renderFaceVariableCopyPill(string $label, string $value, string $successMessage): void
+    {
+        if ($value === '') {
+            return;
+        }
+
+        ?>
+        <span class="tasty-fonts-role-stack">
+            <span class="tasty-fonts-role-stack-label"><?php echo esc_html($label); ?></span>
+            <button
+                type="button"
+                class="tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy"
+                data-copy-text="<?php echo esc_attr($value); ?>"
+                data-copy-success="<?php echo esc_attr($successMessage); ?>"
+                data-copy-static-label="1"
+                aria-label="<?php echo esc_attr(sprintf(__('Copy %s', 'tasty-fonts'), $label)); ?>"
+                title="<?php echo esc_attr($value); ?>"
+            >
+                <?php echo esc_html($value); ?>
+            </button>
+        </span>
+        <?php
     }
 
     private function buildFamilySourceTokens(array $sources, bool $isRoleFamily = false): array
@@ -2484,6 +2882,9 @@ final class AdminPageRenderer
         string $facePreviewText,
         int $faceCount,
         array $assignedRoleKeys,
+        string $fontCategory,
+        array $categoryAliasOwners,
+        array $extendedVariableOptions,
         array $activeDelivery,
         array $face,
         bool $isMonospace = false
@@ -2500,6 +2901,7 @@ final class AdminPageRenderer
         $formats = array_keys((array) ($face['files'] ?? []));
         $paths = (array) ($face['paths'] ?? []);
         $faceTitle = $this->buildFaceTitle($faceWeight, $faceStyle);
+        $faceCssSnippets = $this->buildFaceCssCopySnippets($familyName, $faceWeight, $faceStyle, $extendedVariableOptions);
         ?>
         <article class="tasty-fonts-detail-card tasty-fonts-detail-card--face">
             <div class="tasty-fonts-detail-card-head">
@@ -2563,8 +2965,18 @@ final class AdminPageRenderer
                 </div>
             </dl>
 
+            <div class="tasty-fonts-detail-files tasty-fonts-detail-files--css">
+                <span class="tasty-fonts-detail-files-label"><?php esc_html_e('CSS', 'tasty-fonts'); ?></span>
+                <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--selection">
+                    <?php $this->renderFaceVariableCopyPill(__('Family', 'tasty-fonts'), (string) ($faceCssSnippets['family'] ?? ''), __('Family CSS copied.', 'tasty-fonts')); ?>
+                    <?php $this->renderFaceVariableCopyPill(__('Weight', 'tasty-fonts'), (string) ($faceCssSnippets['weight'] ?? ''), __('Weight CSS copied.', 'tasty-fonts')); ?>
+                    <?php $this->renderFaceVariableCopyPill(__('Style', 'tasty-fonts'), (string) ($faceCssSnippets['style'] ?? ''), __('Style CSS copied.', 'tasty-fonts')); ?>
+                    <?php $this->renderFaceVariableCopyPill(__('Snippet', 'tasty-fonts'), (string) ($faceCssSnippets['snippet'] ?? ''), __('CSS snippet copied.', 'tasty-fonts')); ?>
+                </div>
+            </div>
+
             <?php if ($paths !== []): ?>
-                <div class="tasty-fonts-detail-files">
+                <div class="tasty-fonts-detail-files tasty-fonts-detail-files--paths">
                     <span class="tasty-fonts-detail-files-label"><?php esc_html_e('Files', 'tasty-fonts'); ?></span>
                     <div class="tasty-fonts-detail-file-list">
                         <?php foreach ($paths as $format => $path): ?>

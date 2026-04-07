@@ -44,14 +44,288 @@ $tests['css_builder_generates_font_face_and_role_variables'] = static function (
         'font_display' => 'swap',
         'auto_apply_roles' => true,
         'minify_css_output' => false,
+        'per_variant_font_variables_enabled' => true,
     ];
 
-    $css = $builder->build($catalog, $roles, $settings);
+    $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertContainsValue('@font-face', $css, 'CSS builder should emit @font-face rules.');
     assertContainsValue('font-family:"Inter"', $css, 'CSS builder should include the family name.');
+    assertContainsValue('--font-inter: "Inter", sans-serif;', $css, 'CSS builder should emit the family variable stack.');
     assertContainsValue('--font-heading', $css, 'CSS builder should emit the heading role variable.');
     assertContainsValue('font-family: var(--font-body);', $css, 'CSS builder should emit the body usage rule.');
+    assertContainsValue('font-weight: var(--weight-regular);', $css, 'CSS builder should emit the shared regular weight token in the body rule.');
+};
+
+$tests['css_builder_emits_global_weight_tokens_and_semantic_font_aliases_when_enabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'font_category' => 'sans-serif',
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'weight' => '400',
+                    'style' => 'normal',
+                ],
+                [
+                    'family' => 'Inter',
+                    'weight' => '700',
+                    'style' => 'italic',
+                ],
+            ],
+        ],
+        'Lora' => [
+            'family' => 'Lora',
+            'slug' => 'lora',
+            'font_category' => 'serif',
+            'faces' => [
+                [
+                    'family' => 'Lora',
+                    'weight' => '400',
+                    'style' => 'normal',
+                ],
+            ],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'serif',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'per_variant_font_variables_enabled' => true,
+        'family_fallbacks' => ['Inter' => 'system-ui, sans-serif'],
+    ];
+
+    $css = $builder->build([], $roles, $settings, $catalog);
+
+    assertContainsValue('--font-inter: "Inter", system-ui, sans-serif;', $css, 'Family variables should respect the saved per-family fallback.');
+    assertContainsValue('--font-sans: var(--font-inter);', $css, 'Extended output should expose the active sans family alias.');
+    assertContainsValue('--font-serif: var(--font-lora);', $css, 'Extended output should expose the active serif family alias.');
+    assertContainsValue('--font-interface: var(--font-body);', $css, 'Extended output should expose the interface alias.');
+    assertContainsValue('--font-ui: var(--font-body);', $css, 'Extended output should expose the UI alias.');
+    assertContainsValue('--weight-400: 400;', $css, 'Extended output should emit the concrete numeric weight token.');
+    assertContainsValue('--weight-regular: var(--weight-400);', $css, 'Extended output should emit the semantic regular alias.');
+    assertContainsValue('--weight-700: 700;', $css, 'Extended output should emit imported bold weights as numeric tokens.');
+    assertContainsValue('--weight-bold: var(--weight-700);', $css, 'Extended output should emit the semantic bold alias.');
+    assertNotContainsValue('--font-inter-400', $css, 'Extended output should replace per-family numeric variant variables.');
+    assertNotContainsValue('--font-inter-regular', $css, 'Extended output should replace per-family semantic variant variables.');
+};
+
+$tests['css_builder_can_emit_runtime_weight_variables_without_local_font_faces'] = static function (): void {
+    $builder = new CssBuilder();
+    $variableFamilies = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'font_category' => 'sans-serif',
+            'active_delivery' => [
+                'provider' => 'google',
+                'type' => 'cdn',
+            ],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'weight' => '400',
+                    'style' => 'normal',
+                ],
+                [
+                    'family' => 'Inter',
+                    'weight' => '500',
+                    'style' => 'italic',
+                ],
+            ],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'per_variant_font_variables_enabled' => true,
+    ];
+
+    $css = $builder->build([], $roles, $settings, $variableFamilies);
+
+    assertNotContainsValue('@font-face', $css, 'Variable-only runtime families should not synthesize @font-face rules when the delivery is remote.');
+    assertContainsValue('--weight-400: 400;', $css, 'Runtime variable sources should still emit global weight tokens without local faces.');
+    assertContainsValue('--weight-500: 500;', $css, 'Runtime variable sources should emit every imported concrete weight.');
+    assertContainsValue('--weight-medium: var(--weight-500);', $css, 'Runtime variable sources should emit semantic aliases for imported weights.');
+};
+
+$tests['css_builder_can_disable_extended_variable_emission'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'font_category' => 'sans-serif',
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'weight' => '400',
+                    'style' => 'normal',
+                ],
+            ],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'per_variant_font_variables_enabled' => false,
+    ];
+
+    $css = $builder->build([], $roles, $settings, $catalog);
+
+    assertContainsValue('--font-inter: "Inter", sans-serif;', $css, 'Family variables should still be emitted when extended output is disabled.');
+    assertNotContainsValue('--font-sans', $css, 'Disabling extended output should suppress semantic family aliases.');
+    assertNotContainsValue('--font-interface', $css, 'Disabling extended output should suppress role alias variables.');
+    assertNotContainsValue('--weight-400', $css, 'Disabling extended output should suppress global numeric weight tokens.');
+    assertNotContainsValue('font-weight: var(--weight-regular);', $css, 'Disabling extended output should suppress weight-token usage rules.');
+};
+
+$tests['css_builder_can_granularly_disable_selected_extended_variable_groups'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'font_category' => 'sans-serif',
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'weight' => '400',
+                    'style' => 'normal',
+                ],
+                [
+                    'family' => 'Inter',
+                    'weight' => '700',
+                    'style' => 'normal',
+                ],
+            ],
+        ],
+        'Lora' => [
+            'family' => 'Lora',
+            'slug' => 'lora',
+            'font_category' => 'serif',
+            'faces' => [
+                [
+                    'family' => 'Lora',
+                    'weight' => '400',
+                    'style' => 'normal',
+                ],
+            ],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_weight_tokens_enabled' => false,
+        'extended_variable_role_aliases_enabled' => false,
+        'extended_variable_category_sans_enabled' => false,
+        'extended_variable_category_serif_enabled' => true,
+        'extended_variable_category_mono_enabled' => true,
+    ];
+
+    $css = $builder->build([], $roles, $settings, $catalog);
+
+    assertNotContainsValue('--font-interface', $css, 'Disabling extended role aliases should suppress interface aliases.');
+    assertNotContainsValue('--font-ui', $css, 'Disabling extended role aliases should suppress UI aliases.');
+    assertNotContainsValue('--weight-400', $css, 'Disabling extended weight tokens should suppress numeric weight variables.');
+    assertContainsValue('--font-serif: var(--font-lora);', $css, 'Enabled category aliases should continue to emit allowed category variables.');
+    assertNotContainsValue('--font-sans: var(--font-inter);', $css, 'Disabled category aliases should suppress only their own alias variable.');
+    assertContainsValue("body {\n  font-family: var(--font-body);\n  font-weight: 400;\n}", $css, 'When weight tokens are disabled but extended output stays on, body usage should fall back to raw numeric weights.');
+    assertContainsValue("h1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading);\n  font-weight: 700;\n}", $css, 'When weight tokens are disabled but extended output stays on, heading usage should fall back to raw numeric weights.');
+};
+
+$tests['css_builder_infers_family_variable_fallbacks_from_catalog_category'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'JetBrains Mono' => [
+            'family' => 'JetBrains Mono',
+            'slug' => 'jetbrains-mono',
+            'font_category' => 'monospace',
+            'faces' => [
+                [
+                    'family' => 'JetBrains Mono',
+                    'weight' => '400',
+                    'style' => 'normal',
+                ],
+            ],
+        ],
+    ];
+    $roles = [
+        'heading' => 'JetBrains Mono',
+        'body' => 'JetBrains Mono',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'per_variant_font_variables_enabled' => true,
+    ];
+
+    $css = $builder->build([], $roles, $settings, $catalog);
+
+    assertContainsValue('--font-jetbrains-mono: "JetBrains Mono", monospace;', $css, 'Monospace family variables should default to the monospace generic fallback when no explicit family fallback is saved.');
+};
+
+$tests['css_builder_skips_variable_weight_ranges_when_emitting_global_weight_tokens'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter Variable' => [
+            'family' => 'Inter Variable',
+            'slug' => 'inter-variable',
+            'font_category' => 'sans-serif',
+            'faces' => [
+                [
+                    'family' => 'Inter Variable',
+                    'weight' => '100..900',
+                    'style' => 'normal',
+                ],
+            ],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Inter Variable',
+        'body' => 'Inter Variable',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'per_variant_font_variables_enabled' => true,
+    ];
+
+    $css = $builder->build([], $roles, $settings, $catalog);
+
+    assertNotContainsValue('--weight-variable-range', $css, 'Variable weight ranges should not emit global semantic weight aliases.');
+    assertNotContainsValue('--weight-100-900', $css, 'Variable weight ranges should not emit global numeric weight aliases.');
 };
 
 $tests['css_builder_emits_optional_monospace_role_css_when_enabled'] = static function (): void {
@@ -91,7 +365,7 @@ $tests['css_builder_emits_optional_monospace_role_css_when_enabled'] = static fu
         'monospace_role_enabled' => true,
     ];
 
-    $css = $builder->build($catalog, $roles, $settings);
+    $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertContainsValue('--font-monospace: monospace;', $css, 'Enabled monospace support should emit a fallback-only monospace variable when no family is selected.');
     assertContainsValue("code, pre {\n  font-family: var(--font-monospace);\n}", $css, 'Enabled monospace support should emit the code/pre usage rule.');
@@ -135,9 +409,10 @@ $tests['css_builder_omits_monospace_role_css_when_feature_is_disabled'] = static
         'monospace_role_enabled' => false,
     ];
 
-    $css = $builder->build($catalog, $roles, $settings);
+    $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertNotContainsValue('--font-monospace', $css, 'Disabled monospace support should not emit a monospace role variable.');
+    assertNotContainsValue('--font-mono', $css, 'Disabled monospace support should not emit the mono category alias either.');
     assertNotContainsValue('code, pre {', $css, 'Disabled monospace support should not emit the code/pre usage rule.');
 };
 
@@ -281,12 +556,12 @@ $tests['css_builder_minifies_generated_css_without_leaving_layout_whitespace'] =
         'minify_css_output' => true,
     ];
 
-    $css = $builder->build($catalog, $roles, $settings);
+    $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertSameValue(false, str_contains($css, "\n"), 'Minified CSS should not leave newline characters in the generated output.');
     assertSameValue(false, str_contains($css, "\t"), 'Minified CSS should not leave tab characters in the generated output.');
     assertContainsValue('@font-face{font-family:"Inter";font-weight:400;font-style:normal;', $css, 'Minified CSS should collapse @font-face declarations into a compact form.');
-    assertContainsValue('body{font-family:var(--font-body)}', $css, 'Minified CSS should collapse role usage rules into a compact form.');
+    assertContainsValue('body{font-family:var(--font-body);font-weight:var(--weight-regular)}', $css, 'Minified CSS should collapse role usage rules into a compact form.');
 };
 
 $tests['css_builder_format_output_respects_minify_flag'] = static function (): void {

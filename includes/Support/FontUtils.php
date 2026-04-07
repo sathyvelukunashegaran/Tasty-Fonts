@@ -62,6 +62,88 @@ final class FontUtils
         return '"' . self::escapeFontFamily($family) . '", ' . $sanitizedFallback;
     }
 
+    public static function defaultFallbackForCategory(string $category): string
+    {
+        return match (strtolower(trim($category))) {
+            'serif' => 'serif',
+            'monospace' => 'monospace',
+            'handwriting', 'script', 'cursive' => 'cursive',
+            default => 'sans-serif',
+        };
+    }
+
+    public static function fontVariableName(string $family): string
+    {
+        $slug = self::slugify($family);
+
+        return $slug !== '' ? '--font-' . $slug : '';
+    }
+
+    public static function fontVariableReference(string $family): string
+    {
+        $property = self::fontVariableName($family);
+
+        return $property !== '' ? 'var(' . $property . ')' : '';
+    }
+
+    public static function weightVariableName(string|int $weight): string
+    {
+        $value = self::concreteWeightValue($weight);
+
+        return $value !== '' ? '--weight-' . $value : '';
+    }
+
+    public static function weightSemanticVariableName(string|int $weight): string
+    {
+        $value = self::concreteWeightValue($weight);
+        $slug = $value !== '' ? self::weightNameSlug($value) : '';
+
+        return $slug !== '' ? '--weight-' . $slug : '';
+    }
+
+    public static function weightVariableReference(string|int $weight, bool $preferSemantic = true): string
+    {
+        $property = $preferSemantic
+            ? self::weightSemanticVariableName($weight)
+            : self::weightVariableName($weight);
+
+        if ($property === '') {
+            $property = $preferSemantic
+                ? self::weightVariableName($weight)
+                : self::weightSemanticVariableName($weight);
+        }
+
+        return $property !== '' ? 'var(' . $property . ')' : '';
+    }
+
+    public static function variantVariableNames(string $family, string|int $weight, string $style): array
+    {
+        $familyVariable = self::fontVariableName($family);
+
+        if ($familyVariable === '') {
+            return [
+                'family' => '',
+                'numeric' => '',
+                'named' => '',
+            ];
+        }
+
+        $numeric = $familyVariable
+            . '-'
+            . self::weightVariableSegment($weight)
+            . self::styleVariableSuffix($style);
+        $namedWeight = self::weightNameSlug($weight);
+        $named = $namedWeight !== ''
+            ? $familyVariable . '-' . $namedWeight . self::styleVariableSuffix($style)
+            : $numeric;
+
+        return [
+            'family' => $familyVariable,
+            'numeric' => $numeric,
+            'named' => $named,
+        ];
+    }
+
     public static function normalizeStyle(string $style): string
     {
         $style = strtolower(trim($style));
@@ -94,6 +176,28 @@ final class FontUtils
         return '400';
     }
 
+    public static function weightNameSlug(string|int $weight): string
+    {
+        return match (self::normalizeWeight($weight)) {
+            '100' => 'thin',
+            '200' => 'ultra-light',
+            '300' => 'light',
+            '400', 'normal' => 'regular',
+            '500' => 'medium',
+            '600' => 'semi-bold',
+            '700', 'bold' => 'bold',
+            '800' => 'extra-bold',
+            '900' => 'black',
+            '950' => 'extra-black',
+            '1000' => 'ultra-black',
+            'bolder' => 'bolder',
+            'lighter' => 'lighter',
+            default => preg_match('/^\d{1,4}\.\.\d{1,4}$/', self::normalizeWeight($weight)) === 1
+                ? 'variable-range'
+                : '',
+        };
+    }
+
     public static function variantKey(string|int $weight, string $style, string $unicodeRange = ''): string
     {
         $range = trim($unicodeRange);
@@ -116,6 +220,12 @@ final class FontUtils
     public static function weightSortValue(string|int $weight): int
     {
         $weight = self::normalizeWeight($weight);
+
+        $concreteWeight = self::concreteWeightValue($weight);
+
+        if ($concreteWeight !== '') {
+            return (int) $concreteWeight;
+        }
 
         if (preg_match('/(\d{3})/', $weight, $matches) === 1) {
             return (int) $matches[1];
@@ -251,5 +361,28 @@ final class FontUtils
         );
 
         return $tokens;
+    }
+
+    private static function weightVariableSegment(string|int $weight): string
+    {
+        return str_replace('..', '-', self::normalizeWeight($weight));
+    }
+
+    private static function concreteWeightValue(string|int $weight): string
+    {
+        return match (self::normalizeWeight($weight)) {
+            'normal' => '400',
+            'bold' => '700',
+            default => preg_match('/^\d{1,4}$/', self::normalizeWeight($weight)) === 1
+                ? self::normalizeWeight($weight)
+                : '',
+        };
+    }
+
+    private static function styleVariableSuffix(string $style): string
+    {
+        $normalizedStyle = self::normalizeStyle($style);
+
+        return $normalizedStyle === 'normal' ? '' : '-' . $normalizedStyle;
     }
 }
