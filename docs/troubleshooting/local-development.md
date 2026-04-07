@@ -40,4 +40,4 @@ If it cannot, disable it locally and continue using the plugin’s own runtime a
 
 - [Settings](../settings.md)
 - [Advanced Tools](../advanced-tools.md)
-- [Block Editor Integration](../developer/architecture.md)
+- [Architecture](../developer/architecture.md)

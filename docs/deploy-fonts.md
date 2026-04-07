@@ -46,12 +46,12 @@ Use it to compare:
 
 ### 5. Review Snippet Panels
 
-The Deploy Fonts page also exposes code and snippet panels for:
+The Deploy Fonts page exposes code and snippet panels for:
 
-- role usage snippets
-- role variables
-- role stack snippets
-- class output, when enabled
+- **Role usage snippets**: ready-to-paste CSS or PHP examples showing how to reference the current heading/body/monospace assignments. Use these when integrating the plugin's output with custom templates or theme stylesheets.
+- **Role variables**: the CSS custom property declarations emitted by the plugin, such as `--font-heading`, `--font-body`, and `--font-monospace`. Copy these to verify the correct variable names before referencing them in your own CSS.
+- **Role stack snippets**: the full resolved font-family stack for each role, including the configured fallback sequence. Use these when you need the exact stack string for a custom `font-family` declaration outside the plugin's generated output.
+- **Class output**: when utility class generation is enabled in `Settings -> Output`, this panel shows the generated class names for role, alias, category, and family selectors. Use these to apply typography roles directly in HTML markup without writing additional CSS.
 
 ## Notes
 

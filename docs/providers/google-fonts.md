@@ -36,6 +36,28 @@ After import:
 - choose whether it should be runtime-visible
 - assign it to a role when ready
 
+## Variants and File Details
+
+When you choose **self-hosted** delivery, the plugin fetches the remote CSS from the Google Fonts API using a modern browser user-agent (so the API returns WOFF2-first responses). It then:
+
+1. Parses the returned `@font-face` rules to identify individual variant URLs.
+2. Downloads each WOFF2 file into `wp-content/uploads/fonts/google/<family-slug>/`.
+3. Rewrites the `@font-face` rules to point to the local paths.
+
+When you choose **CDN** delivery, no files are downloaded. The plugin enqueues the Google-hosted stylesheet at runtime. The family still participates in role assignments and admin previews.
+
+The **Google Fonts API key** is required only for live catalog search in the add-font workflow. If you already imported a family via CDN or self-hosted delivery, the stored delivery profile remains valid even if the API key is removed later.
+
+## Common Issues
+
+**Search returns no results** — confirm a valid Google Fonts API key is saved in the plugin. The key needs the Fonts API enabled in the Google Cloud Console.
+
+**Self-hosted import downloads no files** — the plugin fetches variant URLs from the Google API response. If the API key is missing or invalid at import time, the variant list may be empty. Re-run the import after confirming the key is valid.
+
+**CDN delivery stops working on the frontend** — this usually means the family is published but not assigned to a live role, or the draft was not applied sitewide. Confirm the role assignment and apply sitewide if needed.
+
+**Runtime output looks stale after switching from CDN to self-hosted** — use `Advanced Tools -> Generated CSS` to confirm the stylesheet has been refreshed. If it has not, the plugin may need a delivery-mode or output-settings change to trigger a regeneration.
+
 ## Notes
 
 - Self-hosted Google imports are stored under `wp-content/uploads/fonts/google/<family-slug>/`.
@@ -47,3 +69,4 @@ After import:
 - [Font Library](../font-library.md)
 - [Settings](../settings.md)
 - [Imports And Deliveries](../troubleshooting/imports-and-deliveries.md)
+- [Concepts](../concepts.md)

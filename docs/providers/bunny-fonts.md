@@ -30,6 +30,30 @@ After import:
 - decide whether it should stay `Published` or `In Library Only`
 - assign it to draft roles when ready
 
+## Variants and File Details
+
+Bunny Fonts does not require an API key. The plugin reads the Bunny catalog directly.
+
+When you choose **self-hosted** delivery, the plugin:
+
+1. Validates each variant download URL before writing anything.
+2. Downloads WOFF2 files into `wp-content/uploads/fonts/bunny/<family-slug>/`.
+3. Generates local `@font-face` rules pointing to the downloaded files.
+
+When you choose **CDN** delivery, the plugin enqueues the Bunny-hosted stylesheet at runtime. No files are downloaded.
+
+Bunny Fonts is a GDPR-friendly alternative to the Google CDN. If you want CDN delivery without routing through Google infrastructure, Bunny CDN is a straightforward substitute for many of the same families.
+
+## Common Issues
+
+**Family does not appear in the Bunny catalog search** — the Bunny catalog is fetched directly from the Bunny API. If the catalog is unavailable, the search flow will return no results. Try again after a short delay.
+
+**Self-hosted import fails silently** — the plugin validates each download URL before writing files. If a URL fails validation (for example, due to a temporary Bunny outage), the file is not written. Check the activity log for import entries and re-run the import when the provider is reachable.
+
+**CDN delivery shows no output on the frontend** — confirm the family is assigned to a live role and that the draft has been applied sitewide.
+
+**Switching from CDN to self-hosted does not refresh the generated CSS** — use `Advanced Tools -> Generated CSS` to confirm the stylesheet reflects the new delivery mode. If needed, trigger a settings save to force a regeneration.
+
 ## Notes
 
 - Self-hosted Bunny imports are stored under `wp-content/uploads/fonts/bunny/<family-slug>/`.
@@ -41,3 +65,4 @@ After import:
 - [Font Library](../font-library.md)
 - [Generated CSS](../troubleshooting/generated-css.md)
 - [Imports And Deliveries](../troubleshooting/imports-and-deliveries.md)
+- [Concepts](../concepts.md)

@@ -10,6 +10,7 @@ This is the versioned documentation hub for the current plugin codebase.
 
 ## User Guides
 
+- [Concepts](concepts.md)
 - [Getting Started](getting-started.md)
 - [Deploy Fonts](deploy-fonts.md)
 - [Font Library](font-library.md)
@@ -36,14 +37,12 @@ This is the versioned documentation hub for the current plugin codebase.
 - [Release Process](developer/release-process.md)
 - [Translations](developer/translations.md)
 
+## What's New
+
+- [Changelog](../CHANGELOG.md)
+
 ## Notes
 
 - The docs in `main` should always describe the current plugin behavior.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](../README.md) stays shorter and links here for full guidance.
-
-## Related Docs
-
-- [Getting Started](getting-started.md)
-- [Architecture](developer/architecture.md)
-- [Release Process](developer/release-process.md)

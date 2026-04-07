@@ -29,6 +29,12 @@ Families can appear in three main runtime states:
 - `Published`: the family is available for runtime use
 - `In Library Only`: the family stays stored in the library but is not served at runtime
 
+**Decision guide:**
+
+- Use `In Use` state is set automatically when the family is assigned to an applied sitewide role. You do not set this manually.
+- Set a family to `Published` when it should be part of the available runtime output but is not yet assigned to a specific role. For example, a family used in custom CSS or a theme template can stay Published without needing a Heading/Body role assignment.
+- Set a family to `In Library Only` when you want to keep it available for future use without serving any CSS for it right now. This is useful for staging imports before a design decision is made.
+
 ### 3. Switch Active Delivery Profiles
 
 A family can keep multiple delivery profiles side by side. The active delivery profile controls what the plugin serves.
@@ -38,6 +44,10 @@ Common examples:
 - local self-hosted delivery for production
 - Google CDN or Bunny CDN delivery for testing or fallback comparison
 - multiple historical profiles kept for later reuse
+
+**Working with multiple delivery profiles:**
+
+Keeping multiple profiles on one family lets you switch delivery modes without losing your previous configuration. For example, you can import a family as both self-hosted and CDN, keep both profiles saved, and toggle between them to compare performance or troubleshoot delivery issues — without re-importing anything. Only the active profile affects runtime output.
 
 ### 4. Save Fallback Stacks
 

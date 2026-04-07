@@ -29,6 +29,38 @@ Advanced output controls also cover:
 - variable generation
 - variable sub-controls such as role aliases, category aliases, and weight tokens
 
+#### CSS Delivery
+
+**File** (default): the plugin writes generated CSS to `wp-content/uploads/fonts/.generated/tasty-fonts.css` and enqueues it as an external stylesheet. This is the best option for production — the browser can cache the file independently.
+
+**Inline**: generated CSS is injected directly into the page `<head>`. Use inline delivery when file write permissions are unavailable or when you need to debug output without a disk-write step. Inline delivery bypasses browser caching for the generated stylesheet.
+
+#### Default `font-display`
+
+Controls the `font-display` descriptor in generated `@font-face` rules.
+
+- `optional` (default): the browser uses the font only if it loads within a very short window. Eliminates layout shift at the cost of potentially showing a fallback on the first visit. Best for performance-sensitive sites.
+- `swap`: always shows a fallback until the font loads, then swaps. Good for content-heavy sites where the correct typeface matters more than avoiding a visible swap.
+- `fallback`: similar to `swap` but with a shorter invisible period. A balanced middle ground.
+- `block`: hides text until the font loads. Avoid for large or slow fonts.
+- `auto`: defers to the browser default.
+
+Per-family overrides from the library take precedence over this global default.
+
+#### Minify Generated CSS
+
+When enabled (default), the plugin writes compressed CSS without whitespace. Turn this off temporarily when you need to read the generated output by hand — for example, when debugging `@font-face` rule details in `Advanced Tools -> Generated CSS`.
+
+#### Preload Primary Heading and Body Fonts
+
+When enabled, the plugin emits `<link rel="preload" as="font" type="font/woff2">` tags for the WOFF2 files used by the live heading and body roles. This can improve Largest Contentful Paint (LCP) scores for above-the-fold text.
+
+Only applies to self-hosted WOFF2 variants. CDN and Adobe deliveries use remote connection hints instead.
+
+#### Remote Connection Hints
+
+When enabled, the plugin emits `<link rel="preconnect">` tags for active Google, Bunny, and Adobe CDN origins. This tells the browser to open TCP/TLS connections to those origins early, reducing latency for the first CDN stylesheet request. Disable if all your active deliveries are self-hosted.
+
 ### 2. Use The Behavior Tab
 
 The `Behavior` tab controls plugin-level features that are not primarily about generated CSS.
@@ -39,6 +71,20 @@ Key controls include:
 - `Enable Monospace Role`
 - `Hide Onboarding Hints`
 - `Delete uploaded fonts on uninstall`
+
+#### Enable Block Editor Font Library Sync
+
+When enabled, the plugin mirrors managed families into the core WordPress Block Editor Font Library so they appear in the site editor's typography controls. The sync depends on background loopback requests from the server back to itself.
+
+On local development environments, TLS certificate trust issues commonly block these loopback requests. The plugin defaults this off on likely local environments. See [Local Development](troubleshooting/local-development.md) for guidance.
+
+#### Enable Monospace Role
+
+Turns on the third role slot (`Monospace`). When enabled, the role selector, output variables (`--font-monospace`), and related class/alias controls become available. Disable this if you do not need a managed monospace family.
+
+#### Delete Uploaded Fonts On Uninstall
+
+When enabled, uninstalling the plugin also removes plugin-managed font files from `wp-content/uploads/fonts/`. Disable this if you want to keep the files for use with other plugins or after reinstallation.
 
 ### 3. Understand Autosave
 
