@@ -60,15 +60,27 @@ final class AdminPageViewBuilder
         $cssDeliveryModeOptions = is_array($context['css_delivery_mode_options'] ?? null) ? $context['css_delivery_mode_options'] : [];
         $fontDisplay = (string) ($context['font_display'] ?? 'optional');
         $fontDisplayOptions = is_array($context['font_display_options'] ?? null) ? $context['font_display_options'] : [];
-        $classOutputMode = (string) ($context['class_output_mode'] ?? 'off');
-        $classOutputModeOptions = is_array($context['class_output_mode_options'] ?? null)
-            ? $context['class_output_mode_options']
-            : [
-                ['value' => 'off', 'label' => __('Off', 'tasty-fonts')],
-                ['value' => 'roles', 'label' => __('Role classes', 'tasty-fonts')],
-                ['value' => 'families', 'label' => __('Family classes', 'tasty-fonts')],
-                ['value' => 'all', 'label' => __('Role and family classes', 'tasty-fonts')],
-            ];
+        $classOutputEnabled = !empty($context['class_output_enabled']);
+        $classOutputRoleHeadingEnabled = !array_key_exists('class_output_role_heading_enabled', $context)
+            || !empty($context['class_output_role_heading_enabled']);
+        $classOutputRoleBodyEnabled = !array_key_exists('class_output_role_body_enabled', $context)
+            || !empty($context['class_output_role_body_enabled']);
+        $classOutputRoleMonospaceEnabled = !array_key_exists('class_output_role_monospace_enabled', $context)
+            || !empty($context['class_output_role_monospace_enabled']);
+        $classOutputRoleAliasInterfaceEnabled = !array_key_exists('class_output_role_alias_interface_enabled', $context)
+            || !empty($context['class_output_role_alias_interface_enabled']);
+        $classOutputRoleAliasUiEnabled = !array_key_exists('class_output_role_alias_ui_enabled', $context)
+            || !empty($context['class_output_role_alias_ui_enabled']);
+        $classOutputRoleAliasCodeEnabled = !array_key_exists('class_output_role_alias_code_enabled', $context)
+            || !empty($context['class_output_role_alias_code_enabled']);
+        $classOutputCategorySansEnabled = !array_key_exists('class_output_category_sans_enabled', $context)
+            || !empty($context['class_output_category_sans_enabled']);
+        $classOutputCategorySerifEnabled = !array_key_exists('class_output_category_serif_enabled', $context)
+            || !empty($context['class_output_category_serif_enabled']);
+        $classOutputCategoryMonoEnabled = !array_key_exists('class_output_category_mono_enabled', $context)
+            || !empty($context['class_output_category_mono_enabled']);
+        $classOutputFamiliesEnabled = !array_key_exists('class_output_families_enabled', $context)
+            || !empty($context['class_output_families_enabled']);
         $minifyCssOutput = !empty($context['minify_css_output']);
         $perVariantFontVariablesEnabled = !array_key_exists('per_variant_font_variables_enabled', $context)
             || !empty($context['per_variant_font_variables_enabled']);
@@ -158,12 +170,66 @@ final class AdminPageViewBuilder
             'role_aliases' => $extendedVariableRoleAliasesEnabled,
             'category_sans' => $extendedVariableCategorySansEnabled,
             'category_serif' => $extendedVariableCategorySerifEnabled,
-            'category_mono' => $monospaceRoleEnabled && $extendedVariableCategoryMonoEnabled,
         ];
+        if ($monospaceRoleEnabled) {
+            $extendedVariableOptions['category_mono'] = $extendedVariableCategoryMonoEnabled;
+        }
+        $classOutputOptions = [
+            'enabled' => $classOutputEnabled,
+            'role_heading' => $classOutputRoleHeadingEnabled,
+            'role_body' => $classOutputRoleBodyEnabled,
+            'role_alias_interface' => $classOutputRoleAliasInterfaceEnabled,
+            'role_alias_ui' => $classOutputRoleAliasUiEnabled,
+            'category_sans' => $classOutputCategorySansEnabled,
+            'category_serif' => $classOutputCategorySerifEnabled,
+            'families' => $classOutputFamiliesEnabled,
+        ];
+        if ($monospaceRoleEnabled) {
+            $classOutputOptions['role_monospace'] = $classOutputRoleMonospaceEnabled;
+            $classOutputOptions['role_alias_code'] = $classOutputRoleAliasCodeEnabled;
+            $classOutputOptions['category_mono'] = $classOutputCategoryMonoEnabled;
+        }
+        $outputQuickMode = $this->deriveOutputQuickMode($classOutputOptions, $extendedVariableOptions);
 
         $view = get_defined_vars();
         unset($view['context']);
 
         return $view;
+    }
+
+    private function deriveOutputQuickMode(array $classOutputOptions, array $extendedVariableOptions): string
+    {
+        $classEnabled = !empty($classOutputOptions['enabled']);
+        $variableEnabled = !empty($extendedVariableOptions['enabled']);
+
+        if ($classEnabled && $variableEnabled) {
+            $classAllEnabled = !empty($classOutputOptions['role_heading'])
+                && !empty($classOutputOptions['role_body'])
+                && !empty($classOutputOptions['role_alias_interface'])
+                && !empty($classOutputOptions['role_alias_ui'])
+                && !empty($classOutputOptions['category_sans'])
+                && !empty($classOutputOptions['category_serif'])
+                && !empty($classOutputOptions['families'])
+                && (!array_key_exists('role_monospace', $classOutputOptions) || !empty($classOutputOptions['role_monospace']))
+                && (!array_key_exists('role_alias_code', $classOutputOptions) || !empty($classOutputOptions['role_alias_code']))
+                && (!array_key_exists('category_mono', $classOutputOptions) || !empty($classOutputOptions['category_mono']));
+            $variableAllEnabled = !empty($extendedVariableOptions['weight_tokens'])
+                && !empty($extendedVariableOptions['role_aliases'])
+                && !empty($extendedVariableOptions['category_sans'])
+                && !empty($extendedVariableOptions['category_serif'])
+                && (!array_key_exists('category_mono', $extendedVariableOptions) || !empty($extendedVariableOptions['category_mono']));
+
+            return ($classAllEnabled && $variableAllEnabled) ? 'all' : 'custom';
+        }
+
+        if ($variableEnabled && !$classEnabled) {
+            return 'variables';
+        }
+
+        if ($classEnabled && !$variableEnabled) {
+            return 'classes';
+        }
+
+        return 'custom';
     }
 }

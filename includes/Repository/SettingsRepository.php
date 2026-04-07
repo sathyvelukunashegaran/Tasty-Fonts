@@ -17,13 +17,36 @@ final class SettingsRepository
     public const LEGACY_OPTION_SETTINGS = 'etch_fonts_settings';
     public const LEGACY_OPTION_ROLES = 'etch_fonts_roles';
     private const ROLE_FAMILY_KEYS = ['heading', 'body', 'monospace'];
+    private const CLASS_OUTPUT_BOOLEAN_FIELDS = [
+        'class_output_enabled',
+        'class_output_role_heading_enabled',
+        'class_output_role_body_enabled',
+        'class_output_role_monospace_enabled',
+        'class_output_role_alias_interface_enabled',
+        'class_output_role_alias_ui_enabled',
+        'class_output_role_alias_code_enabled',
+        'class_output_category_sans_enabled',
+        'class_output_category_serif_enabled',
+        'class_output_category_mono_enabled',
+        'class_output_families_enabled',
+    ];
     private const DEFAULT_SETTINGS = [
         'auto_apply_roles' => false,
         'applied_roles' => [],
         'delete_uploaded_files_on_uninstall' => false,
         'css_delivery_mode' => 'file',
         'font_display' => 'optional',
-        'class_output_mode' => 'off',
+        'class_output_enabled' => false,
+        'class_output_role_heading_enabled' => true,
+        'class_output_role_body_enabled' => true,
+        'class_output_role_monospace_enabled' => true,
+        'class_output_role_alias_interface_enabled' => true,
+        'class_output_role_alias_ui_enabled' => true,
+        'class_output_role_alias_code_enabled' => true,
+        'class_output_category_sans_enabled' => true,
+        'class_output_category_serif_enabled' => true,
+        'class_output_category_mono_enabled' => true,
+        'class_output_families_enabled' => true,
         'minify_css_output' => true,
         'per_variant_font_variables_enabled' => true,
         'extended_variable_weight_tokens_enabled' => true,
@@ -70,14 +93,15 @@ final class SettingsRepository
             return $this->settingsCache;
         }
 
+        $storedSettings = $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS);
         $settings = wp_parse_args(
-            $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS),
+            $storedSettings,
             self::DEFAULT_SETTINGS
         );
         $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions($settings));
+        $settings = array_replace($settings, $this->normalizeClassOutputSettings($storedSettings, $settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
         $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
-        $settings['class_output_mode'] = $this->normalizeClassOutputMode((string) ($settings['class_output_mode'] ?? 'off'));
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
         $settings['extended_variable_weight_tokens_enabled'] = !empty($settings['extended_variable_weight_tokens_enabled']);
@@ -149,10 +173,8 @@ final class SettingsRepository
             $settingsChanged = true;
         }
 
-        if (isset($input['class_output_mode'])) {
-            $settings['class_output_mode'] = $this->normalizeClassOutputMode(
-                sanitize_text_field((string) $input['class_output_mode'])
-            );
+        if ($this->hasClassOutputInput($input)) {
+            $settings = array_replace($settings, $this->normalizeClassOutputSettings($input, $settings));
             $settingsChanged = true;
         }
 
@@ -622,6 +644,7 @@ final class SettingsRepository
             $googleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
         }
 
+        $settings = array_replace($settings, $this->normalizeClassOutputSettings($settings));
         $settings = $this->withoutGoogleApiKeyData($settings);
 
         update_option(self::OPTION_SETTINGS, $settings, false);
@@ -692,6 +715,8 @@ final class SettingsRepository
             unset($settings[$field]);
         }
 
+        unset($settings['class_output_mode']);
+
         return $settings;
     }
 
@@ -717,16 +742,107 @@ final class SettingsRepository
             : 'optional';
     }
 
-    private function normalizeClassOutputMode(string $mode): string
-    {
-        return in_array($mode, ['off', 'roles', 'families', 'all'], true)
-            ? $mode
-            : 'off';
-    }
-
     private function isSupportedFontDisplay(string $display): bool
     {
         return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true);
+    }
+
+    private function hasClassOutputInput(array $input): bool
+    {
+        if (array_key_exists('class_output_mode', $input)) {
+            return true;
+        }
+
+        foreach (self::CLASS_OUTPUT_BOOLEAN_FIELDS as $field) {
+            if (array_key_exists($field, $input)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizeClassOutputSettings(array $input, ?array $fallback = null): array
+    {
+        $defaults = [];
+
+        foreach (self::CLASS_OUTPUT_BOOLEAN_FIELDS as $field) {
+            $defaults[$field] = self::DEFAULT_SETTINGS[$field];
+        }
+
+        $fallback = is_array($fallback) ? $fallback : [];
+        $normalized = $defaults;
+        $hasBooleanInput = false;
+
+        foreach (self::CLASS_OUTPUT_BOOLEAN_FIELDS as $field) {
+            if (array_key_exists($field, $input)) {
+                $normalized[$field] = !empty($input[$field]);
+                $hasBooleanInput = true;
+                continue;
+            }
+
+            if (array_key_exists($field, $fallback)) {
+                $normalized[$field] = !empty($fallback[$field]);
+            }
+        }
+
+        if (!$hasBooleanInput && array_key_exists('class_output_mode', $input)) {
+            $normalized = $this->classOutputSettingsFromLegacyMode((string) $input['class_output_mode']);
+        } elseif (!$hasBooleanInput && array_key_exists('class_output_mode', $fallback)) {
+            $normalized = $this->classOutputSettingsFromLegacyMode((string) $fallback['class_output_mode']);
+        }
+
+        return $normalized;
+    }
+
+    private function classOutputSettingsFromLegacyMode(string $mode): array
+    {
+        $mode = in_array($mode, ['off', 'roles', 'families', 'all'], true)
+            ? $mode
+            : 'off';
+        $settings = [];
+
+        foreach (self::CLASS_OUTPUT_BOOLEAN_FIELDS as $field) {
+            $settings[$field] = self::DEFAULT_SETTINGS[$field];
+        }
+
+        return match ($mode) {
+            'roles' => array_replace(
+                $settings,
+                [
+                    'class_output_enabled' => true,
+                    'class_output_families_enabled' => false,
+                ]
+            ),
+            'families' => array_replace(
+                $settings,
+                [
+                    'class_output_enabled' => true,
+                    'class_output_role_heading_enabled' => false,
+                    'class_output_role_body_enabled' => false,
+                    'class_output_role_monospace_enabled' => false,
+                    'class_output_role_alias_interface_enabled' => false,
+                    'class_output_role_alias_ui_enabled' => false,
+                    'class_output_role_alias_code_enabled' => false,
+                    'class_output_category_sans_enabled' => false,
+                    'class_output_category_serif_enabled' => false,
+                    'class_output_category_mono_enabled' => false,
+                    'class_output_families_enabled' => true,
+                ]
+            ),
+            'all' => array_replace(
+                $settings,
+                [
+                    'class_output_enabled' => true,
+                ]
+            ),
+            default => array_replace(
+                $settings,
+                [
+                    'class_output_enabled' => false,
+                ]
+            ),
+        };
     }
 
     private function sanitizeAdobeProjectId(string $projectId): string

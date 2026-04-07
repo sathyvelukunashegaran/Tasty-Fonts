@@ -105,7 +105,17 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
             [
                 'css_delivery_mode' => 'file',
                 'font_display' => 'swap',
-                'class_output_mode' => 'off',
+                'class_output_enabled' => false,
+                'class_output_role_heading_enabled' => true,
+                'class_output_role_body_enabled' => true,
+                'class_output_role_monospace_enabled' => true,
+                'class_output_role_alias_interface_enabled' => true,
+                'class_output_role_alias_ui_enabled' => true,
+                'class_output_role_alias_code_enabled' => true,
+                'class_output_category_sans_enabled' => true,
+                'class_output_category_serif_enabled' => true,
+                'class_output_category_mono_enabled' => true,
+                'class_output_families_enabled' => true,
                 'minify_css_output' => true,
                 'per_variant_font_variables_enabled' => true,
                 'extended_variable_weight_tokens_enabled' => true,
@@ -117,7 +127,17 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
             [
                 'css_delivery_mode' => 'inline',
                 'font_display' => 'optional',
-                'class_output_mode' => 'all',
+                'class_output_enabled' => true,
+                'class_output_role_heading_enabled' => true,
+                'class_output_role_body_enabled' => true,
+                'class_output_role_monospace_enabled' => true,
+                'class_output_role_alias_interface_enabled' => true,
+                'class_output_role_alias_ui_enabled' => true,
+                'class_output_role_alias_code_enabled' => false,
+                'class_output_category_sans_enabled' => true,
+                'class_output_category_serif_enabled' => true,
+                'class_output_category_mono_enabled' => true,
+                'class_output_families_enabled' => true,
                 'minify_css_output' => false,
                 'per_variant_font_variables_enabled' => false,
                 'extended_variable_weight_tokens_enabled' => false,
@@ -131,7 +151,8 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
 
     assertContainsValue('delivery mode set to inline CSS', $message, 'Settings save messages should explain delivery-mode changes.');
     assertContainsValue('font-display set to optional', $message, 'Settings save messages should explain font-display changes.');
-    assertContainsValue('class output set to role and family classes', $message, 'Settings save messages should explain class-output changes.');
+    assertContainsValue('class output enabled', $message, 'Settings save messages should explain class-output enablement changes.');
+    assertContainsValue('class output settings updated', $message, 'Settings save messages should explain granular class-output changes.');
     assertContainsValue('CSS minification disabled', $message, 'Settings save messages should explain CSS minification changes.');
     assertContainsValue('extended font output variables disabled', $message, 'Settings save messages should explain extended font output changes.');
     assertContainsValue('extended variable subsettings updated', $message, 'Settings save messages should explain granular extended-variable changes.');
@@ -259,11 +280,11 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
             $controller,
             'settingsChangeRequiresAssetRefresh',
             [
-                ['class_output_mode' => 'off', 'minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
-                ['class_output_mode' => 'families', 'minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['class_output_enabled' => false, 'minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['class_output_enabled' => true, 'class_output_families_enabled' => true, 'minify_css_output' => true, 'per_variant_font_variables_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
             ]
         ),
-        'Changing class output mode should trigger a generated CSS refresh because emitted CSS changes.'
+        'Changing class output settings should trigger a generated CSS refresh because emitted CSS changes.'
     );
 };
 
@@ -358,7 +379,7 @@ $tests['admin_controller_builds_monospace_role_output_panels_when_enabled'] = st
 
     assertContainsValue('--font-monospace: monospace;', $panelValues['variables'] ?? '', 'Enabled monospace support should add the monospace variable to the CSS Variables panel.');
     assertContainsValue('code, pre {', $panelValues['usage'] ?? '', 'Enabled monospace support should add the code/pre usage rule to the Site Snippet panel.');
-    assertContainsValue('Class-first output is off', $panelValues['classes'] ?? '', 'The Font Classes panel should explain when the workflow is disabled.');
+    assertContainsValue('Class output is off', $panelValues['classes'] ?? '', 'The Font Classes panel should explain when the workflow is disabled.');
     assertContainsValue("monospace\n", ($panelValues['stacks'] ?? '') . "\n", 'Enabled monospace support should include the fallback-only monospace stack in the Font Stacks panel.');
 };
 
@@ -412,7 +433,7 @@ $tests['admin_controller_builds_font_class_output_panel_content'] = static funct
         'body_fallback' => 'serif',
     ];
     $settings = $services['settings']->saveSettings([
-        'class_output_mode' => 'all',
+        'class_output_enabled' => '1',
         'minify_css_output' => '0',
         'monospace_role_enabled' => '0',
     ]);
@@ -446,7 +467,8 @@ $tests['admin_controller_builds_role_class_output_panel_content_when_apply_sitew
         'body_fallback' => 'sans-serif',
     ];
     $settings = $services['settings']->saveSettings([
-        'class_output_mode' => 'roles',
+        'class_output_enabled' => '1',
+        'class_output_families_enabled' => '0',
         'minify_css_output' => '0',
     ]);
 
@@ -482,7 +504,8 @@ $tests['admin_controller_builds_output_panels_from_applied_roles_when_sitewide_i
         'body_fallback' => 'sans-serif',
     ];
     $settings = $services['settings']->saveSettings([
-        'class_output_mode' => 'roles',
+        'class_output_enabled' => '1',
+        'class_output_families_enabled' => '0',
         'minify_css_output' => '0',
     ]);
     $settings['auto_apply_roles'] = true;
@@ -504,20 +527,30 @@ $tests['admin_controller_builds_output_panels_from_applied_roles_when_sitewide_i
     assertNotContainsValue('"Draft Heading"', $panelValues['classes'] ?? '', 'Sitewide-on font classes should not reflect unsaved draft-only role changes.');
 };
 
-$tests['admin_controller_exposes_class_output_mode_in_page_context'] = static function (): void {
+$tests['admin_controller_exposes_class_output_settings_in_page_context'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
-    $services['settings']->saveSettings(['class_output_mode' => 'families']);
+    $services['settings']->saveSettings([
+        'class_output_enabled' => '1',
+        'class_output_role_heading_enabled' => '0',
+        'class_output_role_body_enabled' => '0',
+        'class_output_role_monospace_enabled' => '0',
+        'class_output_role_alias_interface_enabled' => '0',
+        'class_output_role_alias_ui_enabled' => '0',
+        'class_output_role_alias_code_enabled' => '0',
+        'class_output_category_sans_enabled' => '0',
+        'class_output_category_serif_enabled' => '0',
+        'class_output_category_mono_enabled' => '0',
+        'class_output_families_enabled' => '1',
+    ]);
 
     $context = invokePrivateMethod($services['controller'], 'buildPageContext', []);
 
-    assertSameValue('families', (string) ($context['class_output_mode'] ?? ''), 'Page context should expose the saved class output mode.');
-    assertSameValue(
-        ['off', 'roles', 'families', 'all'],
-        array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), (array) ($context['class_output_mode_options'] ?? []))),
-        'Page context should expose the supported class output mode options for the Output Settings form.'
-    );
+    assertSameValue(true, !empty($context['class_output_enabled']), 'Page context should expose the class output master toggle.');
+    assertSameValue(false, !empty($context['class_output_role_heading_enabled']), 'Page context should expose granular role class toggles.');
+    assertSameValue(false, !empty($context['class_output_category_serif_enabled']), 'Page context should expose granular category class toggles.');
+    assertSameValue(true, !empty($context['class_output_families_enabled']), 'Page context should expose the family class toggle.');
 };
 
 $tests['admin_controller_exposes_css_delivery_mode_in_page_context'] = static function (): void {

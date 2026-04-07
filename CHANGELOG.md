@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Added a lightweight zero-dependency JavaScript contract test layer for shared admin helpers and the Etch canvas iframe stylesheet bridge.
 - Added a pull request and branch CI workflow that runs PHP lint, the PHP test suite, and the JavaScript contract tests before changes reach release tagging.
 - Added configurable extended font-output variable controls in Output Settings, including optional global weight tokens, role aliases, and category aliases for sans, serif, and mono stacks.
+- Added a unified output-settings workflow with quick presets, separate class and variable master toggles, and granular class controls for roles, aliases, categories, and family utilities.
 - Added dedicated admin context/view builders plus section renderers for the studio, preview, tools, library, and activity areas so the dashboard no longer depends on one monolithic page-render method.
 - Added a reusable uninstall handler and expanded storage/runtime coverage for generated CSS delivery, provider directories, and uninstall cleanup flows.
 
@@ -21,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Split the legacy monolithic PHP test file into domain case files so the suite can keep growing without concentrating all coverage in `tests/run.php`.
 - Refined the admin dashboard hero messaging and kept it visible when training wheels are disabled.
 - Updated generated CSS, output snippets, and editor font stacks to emit family-level variables with category-aware fallback defaults, semantic aliases, and shared weight tokens when extended output is enabled.
+- Replaced the legacy class output mode enum with normalized per-feature settings and aligned class generation with the existing variable alias/category model, including legacy setting migration on read.
 - Expanded the PHP coverage for extended output-variable settings, renderer controls, category-aware fallback stacks, and runtime CSS generation.
 - Refreshed plugin metadata and the generated translation template so WordPress headers, extracted strings, and the current plugin description stay aligned for version 1.5.1.
 - Updated admin import summaries and search-result metadata to use translation-safe plural strings instead of English-only suffix assembly.

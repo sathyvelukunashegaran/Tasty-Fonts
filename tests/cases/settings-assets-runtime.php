@@ -194,24 +194,108 @@ $tests['settings_repository_persists_preload_primary_fonts_preference'] = static
     assertSameValue(false, !empty($saved['preload_primary_fonts']), 'Settings should persist the primary font preload preference when disabled.');
 };
 
-$tests['settings_repository_defaults_and_normalizes_class_output_mode'] = static function (): void {
+$tests['settings_repository_defaults_and_persists_class_output_settings'] = static function (): void {
     resetTestState();
+
+    global $optionStore;
+
+    $settings = new SettingsRepository();
+    $defaults = $settings->getSettings();
+
+    assertSameValue(false, $defaults['class_output_enabled'], 'Class output should default to off for new installs.');
+    assertSameValue(true, $defaults['class_output_role_heading_enabled'], 'Granular class output flags should default to enabled for new installs.');
+    assertSameValue(true, $defaults['class_output_role_alias_interface_enabled'], 'Role alias class flags should default to enabled for new installs.');
+    assertSameValue(true, $defaults['class_output_category_sans_enabled'], 'Category class flags should default to enabled for new installs.');
+    assertSameValue(true, $defaults['class_output_families_enabled'], 'Family class flags should default to enabled for new installs.');
+
+    $saved = $settings->saveSettings([
+        'class_output_enabled' => '1',
+        'class_output_role_heading_enabled' => '1',
+        'class_output_role_body_enabled' => '0',
+        'class_output_role_monospace_enabled' => '1',
+        'class_output_role_alias_interface_enabled' => '1',
+        'class_output_role_alias_ui_enabled' => '0',
+        'class_output_role_alias_code_enabled' => '1',
+        'class_output_category_sans_enabled' => '0',
+        'class_output_category_serif_enabled' => '1',
+        'class_output_category_mono_enabled' => '0',
+        'class_output_families_enabled' => '1',
+    ]);
+
+    assertSameValue(true, $saved['class_output_enabled'], 'Settings should persist enabled class output.');
+    assertSameValue(false, $saved['class_output_role_body_enabled'], 'Settings should persist disabled role-body class output.');
+    assertSameValue(false, $saved['class_output_role_alias_ui_enabled'], 'Settings should persist disabled UI alias class output.');
+    assertSameValue(false, $saved['class_output_category_sans_enabled'], 'Settings should persist disabled sans category class output.');
+    assertSameValue(true, $saved['class_output_families_enabled'], 'Settings should persist enabled family classes.');
+    assertSameValue(
+        false,
+        array_key_exists('class_output_mode', (array) ($optionStore[SettingsRepository::OPTION_SETTINGS] ?? [])),
+        'Saving class output settings should not persist the legacy class_output_mode key.'
+    );
+};
+
+$tests['settings_repository_migrates_legacy_class_output_mode_on_read'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
 
     $settings = new SettingsRepository();
 
-    assertSameValue('off', $settings->getSettings()['class_output_mode'], 'Class output mode should default to off for new installs.');
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'off'];
+    assertSameValue(false, $settings->getSettings()['class_output_enabled'], 'Legacy off mode should normalize to disabled class output.');
 
-    $settings->saveSettings(['class_output_mode' => 'roles']);
-    assertSameValue('roles', $settings->getSettings()['class_output_mode'], 'Settings should persist supported class output modes.');
+    resetTestState();
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'roles'];
+    $settings = new SettingsRepository();
+    $roles = $settings->getSettings();
+    assertSameValue(true, $roles['class_output_enabled'], 'Legacy roles mode should enable class output.');
+    assertSameValue(false, $roles['class_output_families_enabled'], 'Legacy roles mode should disable family classes.');
 
-    $settings->saveSettings(['class_output_mode' => 'families']);
-    assertSameValue('families', $settings->getSettings()['class_output_mode'], 'Settings should persist family class output mode.');
+    resetTestState();
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'families'];
+    $settings = new SettingsRepository();
+    $families = $settings->getSettings();
+    assertSameValue(true, $families['class_output_enabled'], 'Legacy families mode should enable class output.');
+    assertSameValue(false, $families['class_output_role_heading_enabled'], 'Legacy families mode should disable role classes.');
+    assertSameValue(true, $families['class_output_families_enabled'], 'Legacy families mode should keep family classes on.');
 
-    $settings->saveSettings(['class_output_mode' => 'all']);
-    assertSameValue('all', $settings->getSettings()['class_output_mode'], 'Settings should persist combined class output mode.');
+    resetTestState();
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'all'];
+    $settings = new SettingsRepository();
+    $all = $settings->getSettings();
+    assertSameValue(true, $all['class_output_enabled'], 'Legacy all mode should enable class output.');
+    assertSameValue(true, $all['class_output_role_alias_ui_enabled'], 'Legacy all mode should keep alias classes enabled.');
+    assertSameValue(true, $all['class_output_category_serif_enabled'], 'Legacy all mode should keep category classes enabled.');
+    assertSameValue(true, $all['class_output_families_enabled'], 'Legacy all mode should keep family classes enabled.');
+};
 
-    $settings->saveSettings(['class_output_mode' => 'unsupported-value']);
-    assertSameValue('off', $settings->getSettings()['class_output_mode'], 'Invalid class output modes should normalize back to off.');
+$tests['settings_repository_prefers_new_class_output_fields_over_legacy_mode'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'class_output_mode' => 'off',
+        'class_output_enabled' => true,
+        'class_output_role_heading_enabled' => false,
+        'class_output_role_body_enabled' => true,
+        'class_output_role_monospace_enabled' => true,
+        'class_output_role_alias_interface_enabled' => true,
+        'class_output_role_alias_ui_enabled' => true,
+        'class_output_role_alias_code_enabled' => true,
+        'class_output_category_sans_enabled' => true,
+        'class_output_category_serif_enabled' => false,
+        'class_output_category_mono_enabled' => true,
+        'class_output_families_enabled' => false,
+    ];
+
+    $settings = new SettingsRepository();
+    $normalized = $settings->getSettings();
+
+    assertSameValue(true, $normalized['class_output_enabled'], 'Explicit class output booleans should take precedence over the legacy mode.');
+    assertSameValue(false, $normalized['class_output_role_heading_enabled'], 'Explicit class output booleans should not be overridden by the legacy mode.');
+    assertSameValue(false, $normalized['class_output_category_serif_enabled'], 'Explicit category class flags should win over the legacy mode.');
+    assertSameValue(false, $normalized['class_output_families_enabled'], 'Explicit family class flags should win over the legacy mode.');
 };
 
 $tests['settings_repository_enables_per_variant_font_variables_by_default_and_persists_changes'] = static function (): void {
@@ -340,7 +424,17 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     $settings = new SettingsRepository();
     $settings->saveSettings([
         'minify_css_output' => '0',
-        'class_output_mode' => 'all',
+        'class_output_enabled' => '1',
+        'class_output_role_heading_enabled' => '1',
+        'class_output_role_body_enabled' => '1',
+        'class_output_role_monospace_enabled' => '0',
+        'class_output_role_alias_interface_enabled' => '1',
+        'class_output_role_alias_ui_enabled' => '1',
+        'class_output_role_alias_code_enabled' => '0',
+        'class_output_category_sans_enabled' => '1',
+        'class_output_category_serif_enabled' => '0',
+        'class_output_category_mono_enabled' => '0',
+        'class_output_families_enabled' => '1',
         'per_variant_font_variables_enabled' => '0',
         'extended_variable_weight_tokens_enabled' => '0',
         'extended_variable_role_aliases_enabled' => '0',
@@ -358,7 +452,10 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     $saved = $settings->getSettings();
 
     assertSameValue(false, $saved['minify_css_output'], 'Saving unrelated settings should not re-enable CSS minification.');
-    assertSameValue('all', $saved['class_output_mode'], 'Saving unrelated settings should not overwrite the class output mode.');
+    assertSameValue(true, $saved['class_output_enabled'], 'Saving unrelated settings should not disable class output.');
+    assertSameValue(false, $saved['class_output_role_monospace_enabled'], 'Saving unrelated settings should not re-enable disabled class subsettings.');
+    assertSameValue(false, $saved['class_output_role_alias_code_enabled'], 'Saving unrelated settings should not re-enable disabled alias class subsettings.');
+    assertSameValue(false, $saved['class_output_category_serif_enabled'], 'Saving unrelated settings should not re-enable disabled category class subsettings.');
     assertSameValue(false, $saved['per_variant_font_variables_enabled'], 'Saving unrelated settings should not re-enable per-variant font variables.');
     assertSameValue(false, $saved['extended_variable_weight_tokens_enabled'], 'Saving unrelated settings should not re-enable extended weight tokens.');
     assertSameValue(false, $saved['extended_variable_role_aliases_enabled'], 'Saving unrelated settings should not re-enable extended role aliases.');

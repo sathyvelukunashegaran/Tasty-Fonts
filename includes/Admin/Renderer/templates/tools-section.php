@@ -202,19 +202,6 @@
                                                     </span>
                                                     <span class="tasty-fonts-toggle-description"><?php esc_html_e('Default font-display value for generated @font-face rules.', 'tasty-fonts'); ?></span>
                                                 </label>
-                                                <label class="tasty-fonts-stack-field tasty-fonts-stack-field--output">
-                                                    <?php $this->renderFieldLabel(__('Class Output Mode', 'tasty-fonts')); ?>
-                                                    <span class="tasty-fonts-select-field">
-                                                        <select id="tasty-fonts-class-output-mode" name="class_output_mode">
-                                                            <?php foreach ($classOutputModeOptions as $option): ?>
-                                                                <option value="<?php echo esc_attr((string) ($option['value'] ?? '')); ?>" <?php selected($classOutputMode, (string) ($option['value'] ?? '')); ?>>
-                                                                    <?php echo esc_html((string) ($option['label'] ?? '')); ?>
-                                                                </option>
-                                                            <?php endforeach; ?>
-                                                        </select>
-                                                    </span>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Emit ready-to-use font-family utility classes without relying on CSS variables.', 'tasty-fonts'); ?></span>
-                                                </label>
                                                 <input type="hidden" name="minify_css_output" value="0">
                                                 <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                                     <input
@@ -230,6 +217,160 @@
                                                         <span class="tasty-fonts-toggle-description"><?php esc_html_e('Keep on unless you need readable CSS while debugging.', 'tasty-fonts'); ?></span>
                                                     </span>
                                                 </label>
+                                                <div class="tasty-fonts-output-settings-quick" data-output-quick-mode-wrap>
+                                                    <div class="tasty-fonts-output-settings-submenu-copy">
+                                                        <h4><?php esc_html_e('Quick Mode', 'tasty-fonts'); ?></h4>
+                                                        <p><?php esc_html_e('Use a preset for the common cases, or fine-tune classes and variables below.', 'tasty-fonts'); ?></p>
+                                                    </div>
+                                                    <div class="tasty-fonts-output-quick-options" role="radiogroup" aria-label="<?php esc_attr_e('Output quick mode', 'tasty-fonts'); ?>">
+                                                        <?php foreach ([
+                                                            'all' => __('All', 'tasty-fonts'),
+                                                            'variables' => __('Variables only', 'tasty-fonts'),
+                                                            'classes' => __('Classes only', 'tasty-fonts'),
+                                                            'custom' => __('Custom', 'tasty-fonts'),
+                                                        ] as $quickModeValue => $quickModeLabel): ?>
+                                                            <label class="tasty-fonts-output-quick-option<?php echo $outputQuickMode === $quickModeValue ? ' is-active' : ''; ?>">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="tasty_fonts_output_quick_mode"
+                                                                    value="<?php echo esc_attr($quickModeValue); ?>"
+                                                                    data-output-quick-mode
+                                                                    <?php checked($outputQuickMode, $quickModeValue); ?>
+                                                                >
+                                                                <span><?php echo esc_html($quickModeLabel); ?></span>
+                                                            </label>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </div>
+                                                <input type="hidden" name="class_output_enabled" value="0">
+                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="tasty-fonts-toggle-input"
+                                                        name="class_output_enabled"
+                                                        value="1"
+                                                        data-output-master="classes"
+                                                        <?php checked($classOutputEnabled); ?>
+                                                    >
+                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                    <span class="tasty-fonts-toggle-copy">
+                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Emit font utility classes', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds direct utility classes like .font-heading, .font-sans, and per-family selectors.', 'tasty-fonts'); ?></span>
+                                                    </span>
+                                                </label>
+                                                <div class="tasty-fonts-output-settings-submenu<?php echo $classOutputEnabled ? '' : ' is-inactive'; ?>" data-output-panel="classes">
+                                                    <div class="tasty-fonts-output-settings-submenu-copy">
+                                                        <h4><?php esc_html_e('Class Controls', 'tasty-fonts'); ?></h4>
+                                                        <p><?php esc_html_e('Choose exactly which utility class groups should be generated.', 'tasty-fonts'); ?></p>
+                                                    </div>
+                                                    <div class="tasty-fonts-output-settings-submenu-list">
+                                                        <div class="tasty-fonts-output-settings-submenu-group">
+                                                            <span class="tasty-fonts-output-settings-submenu-group-title"><?php esc_html_e('Role classes', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-output-settings-submenu-group-list">
+                                                                <input type="hidden" name="class_output_role_heading_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_heading_enabled" value="1" <?php checked($classOutputRoleHeadingEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Heading class', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls .font-heading.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <input type="hidden" name="class_output_role_body_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_body_enabled" value="1" <?php checked($classOutputRoleBodyEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Body class', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls .font-body.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <input type="hidden" name="class_output_role_monospace_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled'; ?>">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_monospace_enabled" value="1" data-output-mono-dependent <?php checked($classOutputRoleMonospaceEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Monospace class', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php echo esc_html($monospaceRoleEnabled ? __('Controls .font-monospace.', 'tasty-fonts') : __('Enable the monospace role to use .font-monospace.', 'tasty-fonts')); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="tasty-fonts-output-settings-submenu-group">
+                                                            <span class="tasty-fonts-output-settings-submenu-group-title"><?php esc_html_e('Role alias classes', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-output-settings-submenu-group-list">
+                                                                <input type="hidden" name="class_output_role_alias_interface_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_alias_interface_enabled" value="1" <?php checked($classOutputRoleAliasInterfaceEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Interface alias', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls .font-interface.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <input type="hidden" name="class_output_role_alias_ui_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_alias_ui_enabled" value="1" <?php checked($classOutputRoleAliasUiEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('UI alias', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls .font-ui.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <input type="hidden" name="class_output_role_alias_code_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled'; ?>">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_alias_code_enabled" value="1" data-output-mono-dependent <?php checked($classOutputRoleAliasCodeEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Code alias', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php echo esc_html($monospaceRoleEnabled ? __('Controls .font-code.', 'tasty-fonts') : __('Enable the monospace role to use .font-code.', 'tasty-fonts')); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="tasty-fonts-output-settings-submenu-group">
+                                                            <span class="tasty-fonts-output-settings-submenu-group-title"><?php esc_html_e('Category classes', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-output-settings-submenu-group-list">
+                                                                <input type="hidden" name="class_output_category_sans_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_category_sans_enabled" value="1" <?php checked($classOutputCategorySansEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Sans class', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls .font-sans.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <input type="hidden" name="class_output_category_serif_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_category_serif_enabled" value="1" <?php checked($classOutputCategorySerifEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Serif class', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls .font-serif.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                                <input type="hidden" name="class_output_category_mono_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled'; ?>">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_category_mono_enabled" value="1" data-output-mono-dependent <?php checked($classOutputCategoryMonoEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Mono class', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php echo esc_html($monospaceRoleEnabled ? __('Controls .font-mono.', 'tasty-fonts') : __('Enable the monospace role to use .font-mono.', 'tasty-fonts')); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="class_output_families_enabled" value="0">
+                                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_families_enabled" value="1" <?php checked($classOutputFamiliesEnabled); ?>>
+                                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                            <span class="tasty-fonts-toggle-copy">
+                                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Per-family classes', 'tasty-fonts'); ?></span>
+                                                                <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls selectors like .font-inter and .font-ibm-plex-serif.', 'tasty-fonts'); ?></span>
+                                                            </span>
+                                                        </label>
+                                                    </div>
+                                                </div>
                                                 <input type="hidden" name="per_variant_font_variables_enabled" value="0">
                                                 <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                                     <input
@@ -237,17 +378,18 @@
                                                         class="tasty-fonts-toggle-input"
                                                         name="per_variant_font_variables_enabled"
                                                         value="1"
+                                                        data-output-master="variables"
                                                         <?php checked($perVariantFontVariablesEnabled); ?>
                                                     >
                                                     <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                     <span class="tasty-fonts-toggle-copy">
-                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Emit extended font output variables', 'tasty-fonts'); ?></span>
-                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds semantic family aliases like sans and serif plus reusable global weight tokens in generated CSS and snippets.', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Emit font variables', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds semantic variables, role aliases, category aliases, and reusable global weight tokens.', 'tasty-fonts'); ?></span>
                                                     </span>
                                                 </label>
-                                                <div class="tasty-fonts-output-settings-submenu<?php echo $perVariantFontVariablesEnabled ? '' : ' is-inactive'; ?>">
+                                                <div class="tasty-fonts-output-settings-submenu<?php echo $perVariantFontVariablesEnabled ? '' : ' is-inactive'; ?>" data-output-panel="variables">
                                                     <div class="tasty-fonts-output-settings-submenu-copy">
-                                                        <h4><?php esc_html_e('Extended Variable Controls', 'tasty-fonts'); ?></h4>
+                                                        <h4><?php esc_html_e('Variable Controls', 'tasty-fonts'); ?></h4>
                                                         <p><?php esc_html_e('Keep the main toggle on, then disable only the variable groups you do not want emitted.', 'tasty-fonts'); ?></p>
                                                     </div>
                                                     <div class="tasty-fonts-output-settings-submenu-list">
@@ -326,6 +468,7 @@
                                                                             class="tasty-fonts-toggle-input"
                                                                             name="extended_variable_category_mono_enabled"
                                                                             value="1"
+                                                                            data-output-mono-dependent
                                                                             <?php checked($extendedVariableCategoryMonoEnabled); ?>
                                                                         >
                                                                         <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>

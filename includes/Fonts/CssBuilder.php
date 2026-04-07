@@ -148,40 +148,25 @@ final class CssBuilder
 
     public function buildRoleClassSnippet(array $roles, bool $includeMonospace = false, array $settings = []): string
     {
-        // Class utilities are intentionally self-contained: emit direct stacks instead of
-        // var(--font-*) references so themes can use them without also opting into role variables.
-        // Unlike role variables, fallback-only classes are still useful utilities, so keep
-        // emitting them even when no family is selected for a given role.
-        $lines = [
-            '.font-heading {',
-            '  font-family: ' . FontUtils::buildFontStack(
-                (string) ($roles['heading'] ?? ''),
-                (string) ($roles['heading_fallback'] ?? 'sans-serif')
-            ) . ';',
-            '}',
-            '',
-            '.font-body {',
-            '  font-family: ' . FontUtils::buildFontStack(
-                (string) ($roles['body'] ?? ''),
-                (string) ($roles['body_fallback'] ?? 'sans-serif')
-            ) . ';',
-            '}',
-        ];
+        $blocks = [];
 
-        if ($includeMonospace) {
-            $lines = [
-                ...$lines,
-                '',
-                '.font-monospace {',
-                '  font-family: ' . FontUtils::buildFontStack(
-                    (string) ($roles['monospace'] ?? ''),
-                    (string) ($roles['monospace_fallback'] ?? 'monospace')
-                ) . ';',
-                '}',
-            ];
+        if ($this->classOutputRoleEnabled($settings, 'heading')) {
+            $blocks[] = $this->buildClassRule('.font-heading', (string) ($roles['heading'] ?? ''), (string) ($roles['heading_fallback'] ?? 'sans-serif'));
         }
 
-        return implode("\n", $lines);
+        if ($this->classOutputRoleEnabled($settings, 'body')) {
+            $blocks[] = $this->buildClassRule('.font-body', (string) ($roles['body'] ?? ''), (string) ($roles['body_fallback'] ?? 'sans-serif'));
+        }
+
+        if ($includeMonospace && $this->classOutputRoleEnabled($settings, 'monospace')) {
+            $blocks[] = $this->buildClassRule(
+                '.font-monospace',
+                (string) ($roles['monospace'] ?? ''),
+                (string) ($roles['monospace_fallback'] ?? 'monospace')
+            );
+        }
+
+        return implode("\n\n", array_filter($blocks, 'strlen'));
     }
 
     public function buildFamilyClassSnippet(array $families, array $settings = []): string
@@ -224,18 +209,27 @@ final class CssBuilder
         array $families = [],
         array $settings = []
     ): string {
-        $mode = $this->classOutputMode($settings);
         $blocks = [];
 
-        if (in_array($mode, ['roles', 'all'], true)) {
+        if ($this->classOutputEnabled($settings)) {
             $roleClasses = $this->buildRoleClassSnippet($roles, $includeMonospace, $settings);
+            $roleAliasClasses = $this->buildRoleAliasClassSnippet($roles, $includeMonospace, $settings);
+            $categoryClasses = $this->buildCategoryAliasClassSnippet($roles, $includeMonospace, $families, $settings);
 
             if ($roleClasses !== '') {
                 $blocks[] = $roleClasses;
             }
+
+            if ($roleAliasClasses !== '') {
+                $blocks[] = $roleAliasClasses;
+            }
+
+            if ($categoryClasses !== '') {
+                $blocks[] = $categoryClasses;
+            }
         }
 
-        if (in_array($mode, ['families', 'all'], true)) {
+        if ($this->classOutputFamiliesEnabled($settings)) {
             $familyClasses = $this->buildFamilyClassSnippet($families, $settings);
 
             if ($familyClasses !== '') {
@@ -577,6 +571,47 @@ final class CssBuilder
         return $declarations;
     }
 
+    private function buildCategoryAliasClassSnippet(array $roles, bool $includeMonospace, array $families, array $settings = []): string
+    {
+        $blocks = [];
+        $selectors = [
+            'sans' => '.font-sans',
+            'serif' => '.font-serif',
+            'mono' => '.font-mono',
+        ];
+
+        foreach ($this->orderedAliasFamilies($roles, $includeMonospace, $families) as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $categoryKey = $this->resolveCategoryAliasKey($family);
+            $selector = $selectors[$categoryKey] ?? '';
+            $familyName = trim((string) ($family['family'] ?? ''));
+
+            if (
+                $selector === ''
+                || $familyName === ''
+                || ($categoryKey === 'mono' && !$includeMonospace)
+                || !$this->classOutputCategoryAliasEnabled($settings, $categoryKey)
+            ) {
+                continue;
+            }
+
+            if (isset($blocks[$selector])) {
+                continue;
+            }
+
+            $blocks[$selector] = $this->buildClassRule(
+                $selector,
+                $familyName,
+                $this->resolveFamilyFallback($family, $settings)
+            );
+        }
+
+        return implode("\n\n", array_values($blocks));
+    }
+
     private function orderedAliasFamilies(array $roles, bool $includeMonospace, array $families): array
     {
         $orderedFamilies = [];
@@ -701,13 +736,27 @@ final class CssBuilder
         return substr($numericProperty, strlen('--weight-'));
     }
 
-    private function classOutputMode(array $settings): string
+    private function buildRoleAliasClassSnippet(array $roles, bool $includeMonospace = false, array $settings = []): string
     {
-        $mode = strtolower(trim((string) ($settings['class_output_mode'] ?? 'off')));
+        $blocks = [];
+        $bodyFamily = (string) ($roles['body'] ?? '');
+        $bodyFallback = (string) ($roles['body_fallback'] ?? 'sans-serif');
+        $monospaceFamily = (string) ($roles['monospace'] ?? '');
+        $monospaceFallback = (string) ($roles['monospace_fallback'] ?? 'monospace');
 
-        return in_array($mode, ['off', 'roles', 'families', 'all'], true)
-            ? $mode
-            : 'off';
+        if ($this->classOutputRoleAliasEnabled($settings, 'interface')) {
+            $blocks[] = $this->buildClassRule('.font-interface', $bodyFamily, $bodyFallback);
+        }
+
+        if ($this->classOutputRoleAliasEnabled($settings, 'ui')) {
+            $blocks[] = $this->buildClassRule('.font-ui', $bodyFamily, $bodyFallback);
+        }
+
+        if ($includeMonospace && $this->classOutputRoleAliasEnabled($settings, 'code')) {
+            $blocks[] = $this->buildClassRule('.font-code', $monospaceFamily, $monospaceFallback);
+        }
+
+        return implode("\n\n", array_filter($blocks, 'strlen'));
     }
 
     private function familyClassSelector(string $family): string
@@ -721,6 +770,83 @@ final class CssBuilder
     {
         return !array_key_exists('per_variant_font_variables_enabled', $settings)
             || !empty($settings['per_variant_font_variables_enabled']);
+    }
+
+    private function classOutputEnabled(array $settings): bool
+    {
+        return !empty($settings['class_output_enabled']);
+    }
+
+    private function classOutputFamiliesEnabled(array $settings): bool
+    {
+        return $this->classOutputEnabled($settings)
+            && (
+                !array_key_exists('class_output_families_enabled', $settings)
+                || !empty($settings['class_output_families_enabled'])
+            );
+    }
+
+    private function classOutputRoleEnabled(array $settings, string $roleKey): bool
+    {
+        if (!$this->classOutputEnabled($settings)) {
+            return false;
+        }
+
+        $field = match ($roleKey) {
+            'heading' => 'class_output_role_heading_enabled',
+            'body' => 'class_output_role_body_enabled',
+            'monospace' => 'class_output_role_monospace_enabled',
+            default => '',
+        };
+
+        return $field !== ''
+            && (!array_key_exists($field, $settings) || !empty($settings[$field]));
+    }
+
+    private function classOutputRoleAliasEnabled(array $settings, string $aliasKey): bool
+    {
+        if (!$this->classOutputEnabled($settings)) {
+            return false;
+        }
+
+        $field = match ($aliasKey) {
+            'interface' => 'class_output_role_alias_interface_enabled',
+            'ui' => 'class_output_role_alias_ui_enabled',
+            'code' => 'class_output_role_alias_code_enabled',
+            default => '',
+        };
+
+        return $field !== ''
+            && (!array_key_exists($field, $settings) || !empty($settings[$field]));
+    }
+
+    private function classOutputCategoryAliasEnabled(array $settings, string $categoryKey): bool
+    {
+        if (!$this->classOutputEnabled($settings)) {
+            return false;
+        }
+
+        $field = match ($categoryKey) {
+            'sans' => 'class_output_category_sans_enabled',
+            'serif' => 'class_output_category_serif_enabled',
+            'mono' => 'class_output_category_mono_enabled',
+            default => '',
+        };
+
+        return $field !== ''
+            && (!array_key_exists($field, $settings) || !empty($settings[$field]));
+    }
+
+    private function buildClassRule(string $selector, string $family, string $fallback): string
+    {
+        return implode(
+            "\n",
+            [
+                $selector . ' {',
+                '  font-family: ' . FontUtils::buildFontStack($family, $fallback) . ';',
+                '}',
+            ]
+        );
     }
 
     private function extendedVariableWeightTokensEnabled(array $settings): bool

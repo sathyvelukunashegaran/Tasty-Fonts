@@ -224,7 +224,7 @@ $tests['admin_page_renderer_renders_extended_variable_submenu_controls'] = stati
     ]);
     $output = (string) ob_get_clean();
 
-    assertContainsValue('Extended Variable Controls', $output, 'Output Settings should render a nested submenu for extended variable controls.');
+    assertContainsValue('Variable Controls', $output, 'Output Settings should render a nested submenu for variable controls.');
     assertContainsValue('Global weight tokens', $output, 'The submenu should include a granular weight-token toggle.');
     assertContainsValue('Role alias variables', $output, 'The submenu should include a granular role-alias toggle.');
     assertContainsValue('Sans alias', $output, 'The submenu should include a granular sans-category toggle.');
@@ -233,7 +233,7 @@ $tests['admin_page_renderer_renders_extended_variable_submenu_controls'] = stati
     assertNotContainsValue('--font-code', $output, 'The role-alias copy should not mention the code alias when the monospace feature is disabled.');
 };
 
-$tests['admin_page_renderer_renders_class_output_mode_control'] = static function (): void {
+$tests['admin_page_renderer_renders_unified_output_controls'] = static function (): void {
     resetTestState();
 
     $renderer = new AdminPageRenderer(new Storage());
@@ -258,13 +258,17 @@ $tests['admin_page_renderer_renders_class_output_mode_control'] = static functio
         ],
         'font_display' => 'optional',
         'font_display_options' => [],
-        'class_output_mode' => 'families',
-        'class_output_mode_options' => [
-            ['value' => 'off', 'label' => 'Off'],
-            ['value' => 'roles', 'label' => 'Role classes'],
-            ['value' => 'families', 'label' => 'Family classes'],
-            ['value' => 'all', 'label' => 'Role and family classes'],
-        ],
+        'class_output_enabled' => true,
+        'class_output_role_heading_enabled' => false,
+        'class_output_role_body_enabled' => false,
+        'class_output_role_monospace_enabled' => false,
+        'class_output_role_alias_interface_enabled' => false,
+        'class_output_role_alias_ui_enabled' => false,
+        'class_output_role_alias_code_enabled' => false,
+        'class_output_category_sans_enabled' => false,
+        'class_output_category_serif_enabled' => false,
+        'class_output_category_mono_enabled' => false,
+        'class_output_families_enabled' => true,
         'minify_css_output' => true,
         'preload_primary_fonts' => true,
         'remote_connection_hints' => true,
@@ -286,11 +290,11 @@ $tests['admin_page_renderer_renders_class_output_mode_control'] = static functio
     assertContainsValue('CSS Delivery', $output, 'Output Settings should render the CSS delivery control.');
     assertContainsValue('name="css_delivery_mode"', $output, 'The CSS delivery control should submit through the shared settings form.');
     assertContainsValue('<option value="inline" selected="selected">', $output, 'The saved CSS delivery mode should remain selected in Output Settings.');
-    assertContainsValue('Class Output Mode', $output, 'Output Settings should render the class output mode control.');
-    assertContainsValue('name="class_output_mode"', $output, 'The class output mode control should submit through the shared settings form.');
-    assertContainsValue('value="roles"', $output, 'The class output mode control should expose the role class option.');
-    assertContainsValue('value="families"', $output, 'The class output mode control should expose the family class option.');
-    assertContainsValue('<option value="families" selected="selected">', $output, 'The saved class output mode should remain selected in the Output Settings control.');
+    assertContainsValue('Quick Mode', $output, 'Output Settings should render the output quick-mode controls.');
+    assertContainsValue('value="classes"', $output, 'The output quick-mode controls should expose the classes-only option.');
+    assertContainsValue('name="class_output_enabled"', $output, 'The class output master toggle should submit through the shared settings form.');
+    assertContainsValue('name="class_output_families_enabled"', $output, 'The granular family class toggle should submit through the shared settings form.');
+    assertContainsValue('Emit font utility classes', $output, 'Output Settings should render the class output master toggle.');
 };
 
 $tests['admin_page_renderer_balances_div_wrappers'] = static function (): void {
@@ -403,7 +407,7 @@ $tests['admin_page_renderer_renders_font_classes_output_tab_content'] = static f
         'preview_size' => 32,
         'font_display' => 'optional',
         'font_display_options' => [],
-        'class_output_mode' => 'off',
+        'class_output_enabled' => false,
         'minify_css_output' => false,
         'preload_primary_fonts' => true,
         'remote_connection_hints' => true,
@@ -423,7 +427,7 @@ $tests['admin_page_renderer_renders_font_classes_output_tab_content'] = static f
                 'key' => 'classes',
                 'label' => 'Font Classes',
                 'target' => 'tasty-fonts-output-classes',
-                'value' => 'Class-first output is off. Choose a class output mode in Output Settings.',
+                'value' => 'Class output is off. Turn on Classes in Output Settings to generate utility classes.',
                 'active' => false,
             ],
             [
@@ -457,7 +461,7 @@ $tests['admin_page_renderer_renders_font_classes_output_tab_content'] = static f
     $output = (string) ob_get_clean();
 
     assertContainsValue('>Font Classes<', $output, 'The snippets tab list should include the Font Classes output tab.');
-    assertContainsValue('Class-first output is off. Choose a class output mode in Output Settings.', $output, 'The Font Classes tab should render the off-state message.');
+    assertContainsValue('Class output is off. Turn on Classes in Output Settings to generate utility classes.', $output, 'The Font Classes tab should render the off-state message.');
     assertContainsValue('data-copy-text=".font-heading {', $output, 'The Font Classes tab should support copying role class snippets.');
     assertContainsValue('data-copy-text=".font-inter {', $output, 'The Font Classes tab should support copying family class snippets.');
     assertContainsValue('id="tasty-fonts-output-classes-all"', $output, 'The Font Classes tab should render a dedicated combined role-and-family snippet panel.');
@@ -1318,8 +1322,7 @@ $tests['admin_page_renderer_keeps_deployment_and_role_selection_ahead_of_library
         'css_delivery_mode_options' => [],
         'font_display' => 'optional',
         'font_display_options' => [],
-        'class_output_mode' => 'off',
-        'class_output_mode_options' => [],
+        'class_output_enabled' => false,
         'minify_css_output' => true,
         'per_variant_font_variables_enabled' => true,
         'extended_variable_weight_tokens_enabled' => true,

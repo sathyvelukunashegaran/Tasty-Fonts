@@ -97,8 +97,17 @@ final class AdminPageContextBuilder
             'css_delivery_mode_options' => $this->buildCssDeliveryModeOptions(),
             'font_display' => (string) ($settings['font_display'] ?? 'optional'),
             'font_display_options' => $this->buildFontDisplayOptions(),
-            'class_output_mode' => (string) ($settings['class_output_mode'] ?? 'off'),
-            'class_output_mode_options' => $this->buildClassOutputModeOptions(),
+            'class_output_enabled' => !empty($settings['class_output_enabled']),
+            'class_output_role_heading_enabled' => !empty($settings['class_output_role_heading_enabled']),
+            'class_output_role_body_enabled' => !empty($settings['class_output_role_body_enabled']),
+            'class_output_role_monospace_enabled' => !empty($settings['class_output_role_monospace_enabled']),
+            'class_output_role_alias_interface_enabled' => !empty($settings['class_output_role_alias_interface_enabled']),
+            'class_output_role_alias_ui_enabled' => !empty($settings['class_output_role_alias_ui_enabled']),
+            'class_output_role_alias_code_enabled' => !empty($settings['class_output_role_alias_code_enabled']),
+            'class_output_category_sans_enabled' => !empty($settings['class_output_category_sans_enabled']),
+            'class_output_category_serif_enabled' => !empty($settings['class_output_category_serif_enabled']),
+            'class_output_category_mono_enabled' => !empty($settings['class_output_category_mono_enabled']),
+            'class_output_families_enabled' => !empty($settings['class_output_families_enabled']),
             'minify_css_output' => !empty($settings['minify_css_output']),
             'per_variant_font_variables_enabled' => !empty($settings['per_variant_font_variables_enabled']),
             'extended_variable_weight_tokens_enabled' => !empty($settings['extended_variable_weight_tokens_enabled']),
@@ -425,16 +434,6 @@ final class AdminPageContextBuilder
         ];
     }
 
-    public function buildClassOutputModeOptions(): array
-    {
-        return [
-            ['value' => 'off', 'label' => __('Off', 'tasty-fonts')],
-            ['value' => 'roles', 'label' => __('Role classes', 'tasty-fonts')],
-            ['value' => 'families', 'label' => __('Family classes', 'tasty-fonts')],
-            ['value' => 'all', 'label' => __('Role and family classes', 'tasty-fonts')],
-        ];
-    }
-
     public function buildFamilyFontDisplayOptions(string $globalDisplay): array
     {
         return [
@@ -471,16 +470,6 @@ final class AdminPageContextBuilder
         return match ($mode) {
             'inline' => __('inline CSS', 'tasty-fonts'),
             default => __('generated file', 'tasty-fonts'),
-        };
-    }
-
-    public function formatClassOutputModeLabel(string $mode): string
-    {
-        return match ($mode) {
-            'roles' => __('role classes', 'tasty-fonts'),
-            'families' => __('family classes', 'tasty-fonts'),
-            'all' => __('role and family classes', 'tasty-fonts'),
-            default => __('off', 'tasty-fonts'),
         };
     }
 
@@ -710,10 +699,8 @@ final class AdminPageContextBuilder
         array $runtimeFamilies,
         bool $includeMonospace
     ): string {
-        $mode = (string) ($settings['class_output_mode'] ?? 'off');
-
-        if ($mode === 'off') {
-            return __('Class-first output is off. Choose a class output mode in Output Settings.', 'tasty-fonts');
+        if (empty($settings['class_output_enabled'])) {
+            return __('Class output is off. Turn on Classes in Output Settings to generate utility classes.', 'tasty-fonts');
         }
 
         $content = $this->cssBuilder->formatOutput(
@@ -725,7 +712,7 @@ final class AdminPageContextBuilder
             return $content;
         }
 
-        return __('No font classes are available for the current output mode.', 'tasty-fonts');
+        return __('No font classes are available for the current class output settings.', 'tasty-fonts');
     }
 
     private function filterRuntimeVisibleFamilies(array $catalog): array

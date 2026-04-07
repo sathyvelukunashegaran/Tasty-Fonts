@@ -519,7 +519,6 @@ final class AdminController
                 'tasty_fonts_clear_google_api_key',
                 'css_delivery_mode',
                 'font_display',
-                'class_output_mode',
                 'preview_sentence',
             ] as $field
         ) {
@@ -531,6 +530,17 @@ final class AdminController
         foreach (
             [
                 'minify_css_output',
+                'class_output_enabled',
+                'class_output_role_heading_enabled',
+                'class_output_role_body_enabled',
+                'class_output_role_monospace_enabled',
+                'class_output_role_alias_interface_enabled',
+                'class_output_role_alias_ui_enabled',
+                'class_output_role_alias_code_enabled',
+                'class_output_category_sans_enabled',
+                'class_output_category_serif_enabled',
+                'class_output_category_mono_enabled',
+                'class_output_families_enabled',
                 'per_variant_font_variables_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
@@ -872,11 +882,14 @@ final class AdminController
             );
         }
 
-        if (($before['class_output_mode'] ?? 'off') !== ($after['class_output_mode'] ?? 'off')) {
-            $changes[] = sprintf(
-                __('class output set to %s', 'tasty-fonts'),
-                $this->formatClassOutputModeLabel((string) ($after['class_output_mode'] ?? 'off'))
-            );
+        if (!empty($before['class_output_enabled']) !== !empty($after['class_output_enabled'])) {
+            $changes[] = !empty($after['class_output_enabled'])
+                ? __('class output enabled', 'tasty-fonts')
+                : __('class output disabled', 'tasty-fonts');
+        }
+
+        if ($this->classOutputSubsettingsDiffer($before, $after)) {
+            $changes[] = __('class output settings updated', 'tasty-fonts');
         }
 
         if (!empty($before['minify_css_output']) !== !empty($after['minify_css_output'])) {
@@ -949,11 +962,36 @@ final class AdminController
     {
         return ($before['css_delivery_mode'] ?? 'file') !== ($after['css_delivery_mode'] ?? 'file')
             || ($before['font_display'] ?? 'optional') !== ($after['font_display'] ?? 'optional')
-            || ($before['class_output_mode'] ?? 'off') !== ($after['class_output_mode'] ?? 'off')
+            || !empty($before['class_output_enabled']) !== !empty($after['class_output_enabled'])
+            || $this->classOutputSubsettingsDiffer($before, $after)
             || !empty($before['minify_css_output']) !== !empty($after['minify_css_output'])
             || !empty($before['per_variant_font_variables_enabled']) !== !empty($after['per_variant_font_variables_enabled'])
             || $this->extendedVariableSubsettingsDiffer($before, $after)
             || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled']);
+    }
+
+    private function classOutputSubsettingsDiffer(array $before, array $after): bool
+    {
+        foreach (
+            [
+                'class_output_role_heading_enabled',
+                'class_output_role_body_enabled',
+                'class_output_role_monospace_enabled',
+                'class_output_role_alias_interface_enabled',
+                'class_output_role_alias_ui_enabled',
+                'class_output_role_alias_code_enabled',
+                'class_output_category_sans_enabled',
+                'class_output_category_serif_enabled',
+                'class_output_category_mono_enabled',
+                'class_output_families_enabled',
+            ] as $field
+        ) {
+            if (!empty($before[$field]) !== !empty($after[$field])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function extendedVariableSubsettingsDiffer(array $before, array $after): bool
@@ -993,25 +1031,6 @@ final class AdminController
     private function buildCssDeliveryModeOptions(): array
     {
         return $this->pageContextBuilder->buildCssDeliveryModeOptions();
-    }
-
-    private function buildClassOutputModeOptions(): array
-    {
-        return $this->pageContextBuilder->buildClassOutputModeOptions();
-    }
-
-    private function formatClassOutputModeLabel(string $mode): string
-    {
-        if (!isset($this->pageContextBuilder)) {
-            return match ($mode) {
-                'roles' => __('role classes', 'tasty-fonts'),
-                'families' => __('family classes', 'tasty-fonts'),
-                'all' => __('role and family classes', 'tasty-fonts'),
-                default => __('off', 'tasty-fonts'),
-            };
-        }
-
-        return $this->pageContextBuilder->formatClassOutputModeLabel($mode);
     }
 
     private function buildFamilyFontDisplayOptions(string $globalDisplay): array

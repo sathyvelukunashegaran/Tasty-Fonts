@@ -121,6 +121,17 @@
     const activityCount = document.querySelector('[data-activity-count]');
     const activityList = document.querySelector('[data-activity-list]');
     const activityFilteredEmpty = document.getElementById('tasty-fonts-activity-empty-filtered');
+    const outputQuickModeInputs = Array.from(document.querySelectorAll('[data-output-quick-mode]'));
+    const outputQuickModeOptions = Array.from(document.querySelectorAll('.tasty-fonts-output-quick-option'));
+    const outputMasterInputs = {
+        classes: document.querySelector('[data-output-master="classes"]'),
+        variables: document.querySelector('[data-output-master="variables"]'),
+    };
+    const outputPanels = {
+        classes: document.querySelector('[data-output-panel="classes"]'),
+        variables: document.querySelector('[data-output-panel="variables"]'),
+    };
+    const outputMonoDependentInputs = Array.from(document.querySelectorAll('[data-output-mono-dependent]'));
 
     let selectedSearchFamily = null;
     let searchResults = [];
@@ -6016,6 +6027,136 @@
         });
     }
 
+    function setOutputPanelState(panel, enabled) {
+        if (!panel) {
+            return;
+        }
+
+        panel.classList.toggle('is-inactive', !enabled);
+    }
+
+    function outputClassFlagInputs() {
+        return Array.from(document.querySelectorAll(
+            'input[name="class_output_role_heading_enabled"], ' +
+            'input[name="class_output_role_body_enabled"], ' +
+            'input[name="class_output_role_monospace_enabled"], ' +
+            'input[name="class_output_role_alias_interface_enabled"], ' +
+            'input[name="class_output_role_alias_ui_enabled"], ' +
+            'input[name="class_output_role_alias_code_enabled"], ' +
+            'input[name="class_output_category_sans_enabled"], ' +
+            'input[name="class_output_category_serif_enabled"], ' +
+            'input[name="class_output_category_mono_enabled"], ' +
+            'input[name="class_output_families_enabled"]'
+        ));
+    }
+
+    function outputVariableFlagInputs() {
+        return Array.from(document.querySelectorAll(
+            'input[name="extended_variable_weight_tokens_enabled"], ' +
+            'input[name="extended_variable_role_aliases_enabled"], ' +
+            'input[name="extended_variable_category_sans_enabled"], ' +
+            'input[name="extended_variable_category_serif_enabled"], ' +
+            'input[name="extended_variable_category_mono_enabled"]'
+        ));
+    }
+
+    function deriveOutputQuickMode() {
+        const classesEnabled = !!(outputMasterInputs.classes && outputMasterInputs.classes.checked);
+        const variablesEnabled = !!(outputMasterInputs.variables && outputMasterInputs.variables.checked);
+
+        if (classesEnabled && variablesEnabled) {
+            const classFlagsEnabled = outputClassFlagInputs().every((input) => input.disabled || input.checked);
+            const variableFlagsEnabled = outputVariableFlagInputs().every((input) => input.disabled || input.checked);
+
+            return (classFlagsEnabled && variableFlagsEnabled) ? 'all' : 'custom';
+        }
+
+        if (variablesEnabled && !classesEnabled) {
+            return 'variables';
+        }
+
+        if (classesEnabled && !variablesEnabled) {
+            return 'classes';
+        }
+
+        return 'custom';
+    }
+
+    function syncOutputQuickModeUi() {
+        const mode = deriveOutputQuickMode();
+
+        outputQuickModeInputs.forEach((input) => {
+            input.checked = input.value === mode;
+        });
+
+        outputQuickModeOptions.forEach((option) => {
+            const input = option.querySelector('[data-output-quick-mode]');
+            option.classList.toggle('is-active', !!(input && input.checked));
+        });
+    }
+
+    function applyOutputQuickMode(mode) {
+        const classFlags = outputClassFlagInputs();
+        const variableFlags = outputVariableFlagInputs();
+        const enableClasses = mode === 'all' || mode === 'classes';
+        const enableVariables = mode === 'all' || mode === 'variables';
+
+        if (outputMasterInputs.classes) {
+            outputMasterInputs.classes.checked = enableClasses;
+        }
+
+        if (outputMasterInputs.variables) {
+            outputMasterInputs.variables.checked = enableVariables;
+        }
+
+        classFlags.forEach((input) => {
+            if (!input.disabled) {
+                input.checked = enableClasses;
+            }
+        });
+
+        variableFlags.forEach((input) => {
+            if (!input.disabled) {
+                input.checked = enableVariables;
+            }
+        });
+
+        syncOutputSettingsUi();
+    }
+
+    function syncOutputSettingsUi() {
+        setOutputPanelState(outputPanels.classes, !!(outputMasterInputs.classes && outputMasterInputs.classes.checked));
+        setOutputPanelState(outputPanels.variables, !!(outputMasterInputs.variables && outputMasterInputs.variables.checked));
+
+        outputMonoDependentInputs.forEach((input) => {
+            const label = input.closest('.tasty-fonts-toggle-field');
+            if (label) {
+                label.classList.toggle('is-disabled', input.disabled);
+            }
+        });
+
+        syncOutputQuickModeUi();
+    }
+
+    function bindOutputSettingsControls() {
+        outputQuickModeInputs.forEach((input) => {
+            input.addEventListener('change', () => {
+                if (!input.checked || input.value === 'custom') {
+                    syncOutputSettingsUi();
+                    return;
+                }
+
+                applyOutputQuickMode(input.value);
+            });
+        });
+
+        [...outputClassFlagInputs(), ...outputVariableFlagInputs(), ...Object.values(outputMasterInputs).filter(Boolean)].forEach((input) => {
+            input.addEventListener('change', syncOutputSettingsUi);
+        });
+
+        syncOutputSettingsUi();
+    }
+
     // Bootstrap
     function bootstrap() {
         const initialTrackedUiState = readTrackedUiState(window.location);
@@ -6038,6 +6179,7 @@
         bindGoogleImportControls();
         bindBunnyImportControls();
         bindUploadControls();
+        bindOutputSettingsControls();
 
         syncDisclosureToggles();
         initToasts();

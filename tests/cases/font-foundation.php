@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Bunny\BunnyCssParser;
+use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Google\GoogleCssParser;
@@ -190,4 +191,119 @@ $tests['font_utils_modern_user_agent_tracks_a_recent_chrome_release'] = static f
 
     assertSameValue(1, $matched, 'The modern browser user agent should advertise a Chrome version.');
     assertSameValue(true, ((int) ($matches[1] ?? 0)) >= 130, 'The modern browser user agent should stay recent enough to trigger Google Fonts CSS2 WOFF2 responses.');
+};
+
+$tests['css_builder_emits_alias_and_category_classes_when_enabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $families = [
+        ['family' => 'Lora', 'font_category' => 'serif'],
+        ['family' => 'Inter', 'font_category' => 'sans-serif'],
+        ['family' => 'JetBrains Mono', 'font_category' => 'monospace'],
+    ];
+    $settings = ['class_output_enabled' => true];
+
+    $css = $builder->buildClassOutputSnippet($roles, true, $families, $settings);
+
+    assertContainsValue('.font-interface {', $css, 'Class output should emit the interface alias class when enabled.');
+    assertContainsValue('.font-ui {', $css, 'Class output should emit the UI alias class when enabled.');
+    assertContainsValue('.font-code {', $css, 'Class output should emit the code alias class when enabled.');
+    assertContainsValue('.font-sans {', $css, 'Class output should emit the sans category class when enabled.');
+    assertContainsValue('.font-serif {', $css, 'Class output should emit the serif category class when enabled.');
+    assertContainsValue('.font-mono {', $css, 'Class output should emit the mono category class when enabled.');
+};
+
+$tests['css_builder_suppresses_only_the_targeted_class_output_flags'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $families = [
+        ['family' => 'Lora', 'font_category' => 'serif'],
+        ['family' => 'Inter', 'font_category' => 'sans-serif'],
+        ['family' => 'JetBrains Mono', 'font_category' => 'monospace'],
+    ];
+    $settings = [
+        'class_output_enabled' => true,
+        'class_output_role_alias_ui_enabled' => false,
+        'class_output_category_serif_enabled' => false,
+        'class_output_families_enabled' => true,
+    ];
+
+    $css = $builder->buildClassOutputSnippet($roles, true, $families, $settings);
+
+    assertContainsValue('.font-interface {', $css, 'Disabling one alias class should not suppress the other alias classes.');
+    assertNotContainsValue('.font-ui {', $css, 'Disabling the UI alias class should suppress only that selector.');
+    assertNotContainsValue('.font-serif {', $css, 'Disabling the serif category class should suppress only that selector.');
+    assertContainsValue('.font-sans {', $css, 'Disabling one category class should not suppress the other category classes.');
+    assertContainsValue('.font-lora {', $css, 'Disabling specific class groups should not suppress family classes.');
+};
+
+$tests['css_builder_honors_legacy_class_output_mode_migration'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $families = [
+        ['family' => 'Lora', 'font_category' => 'serif'],
+        ['family' => 'Inter', 'font_category' => 'sans-serif'],
+    ];
+    $settings = [
+        'class_output_enabled' => true,
+        'class_output_role_heading_enabled' => false,
+        'class_output_role_body_enabled' => false,
+        'class_output_role_monospace_enabled' => false,
+        'class_output_role_alias_interface_enabled' => false,
+        'class_output_role_alias_ui_enabled' => false,
+        'class_output_role_alias_code_enabled' => false,
+        'class_output_category_sans_enabled' => false,
+        'class_output_category_serif_enabled' => false,
+        'class_output_category_mono_enabled' => false,
+        'class_output_families_enabled' => true,
+    ];
+
+    $css = $builder->buildClassOutputSnippet($roles, false, $families, $settings);
+
+    assertNotContainsValue('.font-heading {', $css, 'Migrated legacy families mode should suppress role classes.');
+    assertContainsValue('.font-lora {', $css, 'Migrated legacy families mode should still emit family classes.');
+    assertContainsValue('.font-inter {', $css, 'Migrated legacy families mode should still emit all family classes.');
+};
+
+$tests['css_builder_omits_mono_and_code_classes_when_monospace_role_is_disabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $families = [
+        ['family' => 'Lora', 'font_category' => 'serif'],
+        ['family' => 'Inter', 'font_category' => 'sans-serif'],
+        ['family' => 'JetBrains Mono', 'font_category' => 'monospace'],
+    ];
+    $settings = ['class_output_enabled' => true];
+
+    $css = $builder->buildClassOutputSnippet($roles, false, $families, $settings);
+
+    assertNotContainsValue('.font-monospace {', $css, 'Class output should not emit the monospace role class when the monospace role is disabled.');
+    assertNotContainsValue('.font-code {', $css, 'Class output should not emit the code alias class when the monospace role is disabled.');
+    assertNotContainsValue('.font-mono {', $css, 'Class output should not emit the mono category class when the monospace role is disabled.');
 };

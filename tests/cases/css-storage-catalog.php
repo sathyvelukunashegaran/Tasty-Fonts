@@ -69,7 +69,8 @@ $tests['css_builder_builds_role_class_snippets_when_class_output_is_enabled'] = 
     ];
     $settings = [
         'auto_apply_roles' => true,
-        'class_output_mode' => 'roles',
+        'class_output_enabled' => true,
+        'class_output_families_enabled' => false,
     ];
 
     $css = $builder->buildRoleClassSnippet($roles, true, $settings);
@@ -88,7 +89,7 @@ $tests['css_builder_emits_role_class_snippets_from_draft_roles_when_apply_sitewi
         'body_fallback' => 'sans-serif',
     ];
 
-    $css = $builder->buildRoleClassSnippet($roles, false, ['auto_apply_roles' => false, 'class_output_mode' => 'roles']);
+    $css = $builder->buildRoleClassSnippet($roles, false, ['auto_apply_roles' => false, 'class_output_enabled' => true]);
 
     assertContainsValue('.font-heading', $css, 'Role classes should still be emitted from the saved role draft while Apply Sitewide is off.');
     assertContainsValue('.font-body', $css, 'Role classes should still include the body role while Apply Sitewide is off.');
@@ -111,7 +112,8 @@ $tests['css_builder_builds_family_class_snippets_for_runtime_visible_families'] 
         ],
     ];
     $settings = [
-        'class_output_mode' => 'families',
+        'class_output_enabled' => true,
+        'class_output_families_enabled' => true,
         'family_fallbacks' => ['Inter' => 'system-ui, sans-serif'],
     ];
 
@@ -142,7 +144,7 @@ $tests['css_builder_builds_combined_class_output_snippets'] = static function ()
     ];
     $settings = [
         'auto_apply_roles' => true,
-        'class_output_mode' => 'all',
+        'class_output_enabled' => true,
     ];
 
     $css = $builder->buildClassOutputSnippet($roles, false, $families, $settings);
@@ -175,7 +177,17 @@ $tests['css_builder_includes_class_output_in_generated_css_when_enabled'] = stat
         'font_display' => 'swap',
         'auto_apply_roles' => true,
         'minify_css_output' => false,
-        'class_output_mode' => 'families',
+        'class_output_enabled' => true,
+        'class_output_role_heading_enabled' => false,
+        'class_output_role_body_enabled' => false,
+        'class_output_role_monospace_enabled' => false,
+        'class_output_role_alias_interface_enabled' => false,
+        'class_output_role_alias_ui_enabled' => false,
+        'class_output_role_alias_code_enabled' => false,
+        'class_output_category_sans_enabled' => false,
+        'class_output_category_serif_enabled' => false,
+        'class_output_category_mono_enabled' => false,
+        'class_output_families_enabled' => true,
     ];
 
     $css = $builder->build($catalog, $roles, $settings, $catalog);
@@ -207,7 +219,8 @@ $tests['css_builder_includes_role_class_output_in_generated_css_when_enabled'] =
         'font_display' => 'swap',
         'auto_apply_roles' => true,
         'minify_css_output' => false,
-        'class_output_mode' => 'roles',
+        'class_output_enabled' => true,
+        'class_output_families_enabled' => false,
     ];
 
     $css = $builder->build($catalog, $roles, $settings, $catalog);
@@ -237,7 +250,7 @@ $tests['css_builder_omits_class_output_in_generated_css_when_disabled'] = static
         'body_fallback' => 'sans-serif',
     ];
 
-    $css = $builder->build([], $roles, ['auto_apply_roles' => true, 'minify_css_output' => false, 'class_output_mode' => 'off'], $catalog);
+    $css = $builder->build([], $roles, ['auto_apply_roles' => true, 'minify_css_output' => false, 'class_output_enabled' => false], $catalog);
 
     assertNotContainsValue('.font-heading', $css, 'Generated CSS should not include role classes when class output mode is off.');
     assertNotContainsValue('.font-inter', $css, 'Generated CSS should not include family classes when class output mode is off.');
@@ -740,7 +753,7 @@ $tests['css_builder_minifies_generated_css_without_leaving_layout_whitespace'] =
         'font_display' => 'swap',
         'auto_apply_roles' => true,
         'minify_css_output' => true,
-        'class_output_mode' => 'all',
+        'class_output_enabled' => true,
     ];
 
     $css = $builder->build($catalog, $roles, $settings, $catalog);
