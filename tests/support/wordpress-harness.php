@@ -3,7 +3,19 @@
 declare(strict_types=1);
 
 if (!defined('TASTY_FONTS_VERSION')) {
-    define('TASTY_FONTS_VERSION', '6.0.1');
+    $pluginVersion = '6.0.1';
+    $pluginFile = dirname(__DIR__, 2) . '/plugin.php';
+    $pluginContents = is_readable($pluginFile) ? file_get_contents($pluginFile) : false;
+
+    if (
+        is_string($pluginContents)
+        && preg_match("/^Version:\\s*(.+)$/m", $pluginContents, $matches) === 1
+        && !empty($matches[1])
+    ) {
+        $pluginVersion = trim((string) $matches[1]);
+    }
+
+    define('TASTY_FONTS_VERSION', $pluginVersion);
 }
 
 if (!defined('ABSPATH')) {

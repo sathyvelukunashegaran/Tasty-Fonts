@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-04-08
+
 ### Added
 
 - Added a maintainable multi-file local test harness layout while keeping `php tests/run.php` as the single entry point, plus new direct coverage for hosted CSS parsing, local-environment detection, native upload validation, activation hooks, and generated-asset refresh paths.
@@ -27,7 +29,7 @@ All notable changes to this project will be documented in this file.
 - Updated generated CSS, output snippets, and editor font stacks to emit family-level variables with category-aware fallback defaults, semantic aliases, and shared weight tokens when extended output is enabled.
 - Replaced the legacy class output mode enum with normalized per-feature settings and aligned class generation with the existing variable alias/category model, including legacy setting migration on read.
 - Expanded the PHP coverage for extended output-variable settings, renderer controls, category-aware fallback stacks, and runtime CSS generation.
-- Refreshed plugin metadata and the generated translation template so WordPress headers, extracted strings, and the current plugin description stay aligned for version 1.5.1.
+- Refreshed plugin metadata and the generated translation template so WordPress headers, extracted strings, and the current plugin description stay aligned for version 1.6.0.
 - Updated admin import summaries and search-result metadata to use translation-safe plural strings instead of English-only suffix assembly.
 - Added request-scope settings caching and reused generated stylesheet state during stale-file fallback delivery to reduce repeated normalization and file-state work during admin requests.
 - Refactored the admin page pipeline so `AdminController` delegates page-context construction, `AdminPageRenderer` acts as a thin shell, and renderer sections/templates own the dashboard composition in smaller files.
@@ -38,6 +40,7 @@ All notable changes to this project will be documented in this file.
 - Updated admin asset versioning in local environments to append file modification times so CSS and JavaScript changes refresh immediately without waiting on plugin version bumps.
 - Updated generated stylesheet diagnostics and runtime enqueueing to recognize legacy `uploads/fonts/tasty-fonts.css` files, report their metadata, and migrate current files into the canonical `.generated` location when possible.
 - Updated local-environment notices and related activity actions to deep-link into the new Settings > Behavior surface instead of the older advanced-tools query flow.
+- Updated the local `bin/release` helper to match indented version constants in `plugin.php` so future releases can bump both version markers successfully.
 
 ### Fixed
 

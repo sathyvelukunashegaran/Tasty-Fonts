@@ -8,6 +8,18 @@ use TastyFonts\Repository\LogRepository;
 use TastyFonts\Support\Storage;
 use TastyFonts\Updates\GitHubUpdater;
 
+$nextPatchVersion = static function (string $version): string {
+    $parts = array_map('intval', explode('.', $version));
+    $parts = array_pad($parts, 3, 0);
+    $parts[2]++;
+
+    return implode('.', $parts);
+};
+
+$secondNextPatchVersion = static function (string $version) use ($nextPatchVersion): string {
+    return $nextPatchVersion($nextPatchVersion($version));
+};
+
 $tests['plugin_adds_a_settings_link_to_plugin_action_links'] = static function (): void {
     $links = Plugin::filterPluginActionLinks(['<a href="https://example.test/deactivate">Deactivate</a>']);
 
@@ -108,26 +120,27 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
     );
 };
 
-$tests['github_updater_injects_a_plugin_update_from_the_latest_stable_release'] = static function (): void {
+$tests['github_updater_injects_a_plugin_update_from_the_latest_stable_release'] = static function () use ($nextPatchVersion): void {
     resetTestState();
     resetPluginSingleton();
 
     global $remoteGetResponses;
+    $releaseVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
 
     $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
         'response' => ['code' => 200],
         'body' => json_encode(
             [
                 [
-                    'tag_name' => '1.6.0',
+                    'tag_name' => $releaseVersion,
                     'draft' => false,
                     'prerelease' => false,
                     'body' => "## What's Changed\n\n- Added updater support.",
                     'published_at' => '2026-04-08T00:00:00Z',
                     'assets' => [
                         [
-                            'name' => 'tasty-fonts-1.6.0.zip',
-                            'browser_download_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/releases/download/1.6.0/tasty-fonts-1.6.0.zip',
+                            'name' => 'tasty-fonts-' . $releaseVersion . '.zip',
+                            'browser_download_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/releases/download/' . $releaseVersion . '/tasty-fonts-' . $releaseVersion . '.zip',
                             'state' => 'uploaded',
                         ],
                     ],
@@ -146,9 +159,9 @@ $tests['github_updater_injects_a_plugin_update_from_the_latest_stable_release'] 
     $result = apply_filters('pre_set_site_transient_update_plugins', $transient);
     $update = $result->response[plugin_basename(TASTY_FONTS_FILE)] ?? null;
 
-    assertSameValue('1.6.0', $update->new_version ?? '', 'Updater should expose the newer GitHub release version to WordPress.');
+    assertSameValue($releaseVersion, $update->new_version ?? '', 'Updater should expose the newer GitHub release version to WordPress.');
     assertSameValue(
-        'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/releases/download/1.6.0/tasty-fonts-1.6.0.zip',
+        'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/releases/download/' . $releaseVersion . '/tasty-fonts-' . $releaseVersion . '.zip',
         $update->package ?? '',
         'Updater should use the attached GitHub release ZIP as the install package.'
     );
@@ -172,14 +185,14 @@ $tests['github_updater_skips_same_or_older_releases'] = static function (): void
         'body' => json_encode(
             [
                 [
-                    'tag_name' => '1.5.1',
+                    'tag_name' => TASTY_FONTS_VERSION,
                     'draft' => false,
                     'prerelease' => false,
                     'body' => '',
                     'published_at' => '2026-04-08T00:00:00Z',
                     'assets' => [
                         [
-                            'name' => 'tasty-fonts-1.5.1.zip',
+                            'name' => 'tasty-fonts-' . TASTY_FONTS_VERSION . '.zip',
                             'browser_download_url' => 'https://example.test/current.zip',
                             'state' => 'uploaded',
                         ],
@@ -236,7 +249,7 @@ $tests['github_updater_skips_latest_stable_releases_without_a_valid_zip_asset'] 
         'body' => json_encode(
             [
                 [
-                    'tag_name' => '1.6.0',
+                    'tag_name' => TASTY_FONTS_VERSION,
                     'draft' => false,
                     'prerelease' => false,
                     'body' => '',
@@ -250,14 +263,14 @@ $tests['github_updater_skips_latest_stable_releases_without_a_valid_zip_asset'] 
                     ],
                 ],
                 [
-                    'tag_name' => '1.5.1',
+                    'tag_name' => TASTY_FONTS_VERSION,
                     'draft' => false,
                     'prerelease' => false,
                     'body' => '',
                     'published_at' => '2026-04-07T00:00:00Z',
                     'assets' => [
                         [
-                            'name' => 'tasty-fonts-1.5.1.zip',
+                            'name' => 'tasty-fonts-' . TASTY_FONTS_VERSION . '.zip',
                             'browser_download_url' => 'https://example.test/older-valid.zip',
                             'state' => 'uploaded',
                         ],
@@ -280,53 +293,55 @@ $tests['github_updater_skips_latest_stable_releases_without_a_valid_zip_asset'] 
     assertSameValue([], $result->response ?? [], 'Updater should ignore the latest stable release when it does not expose the expected install ZIP asset.');
 };
 
-$tests['github_updater_ignores_prereleases_and_drafts_when_finding_updates'] = static function (): void {
+$tests['github_updater_ignores_prereleases_and_drafts_when_finding_updates'] = static function () use ($nextPatchVersion, $secondNextPatchVersion): void {
     resetTestState();
     resetPluginSingleton();
 
     global $remoteGetResponses;
+    $stableVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
+    $draftVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION);
 
     $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
         'response' => ['code' => 200],
         'body' => json_encode(
             [
                 [
-                    'tag_name' => '1.7.0-beta.1',
+                    'tag_name' => $draftVersion . '-beta.1',
                     'draft' => false,
                     'prerelease' => true,
                     'body' => '',
                     'published_at' => '2026-04-09T00:00:00Z',
                     'assets' => [
                         [
-                            'name' => 'tasty-fonts-1.7.0-beta.1.zip',
+                            'name' => 'tasty-fonts-' . $draftVersion . '-beta.1.zip',
                             'browser_download_url' => 'https://example.test/beta.zip',
                             'state' => 'uploaded',
                         ],
                     ],
                 ],
                 [
-                    'tag_name' => '1.6.0',
+                    'tag_name' => $draftVersion,
                     'draft' => true,
                     'prerelease' => false,
                     'body' => '',
                     'published_at' => '2026-04-08T00:00:00Z',
                     'assets' => [
                         [
-                            'name' => 'tasty-fonts-1.6.0.zip',
+                            'name' => 'tasty-fonts-' . $draftVersion . '.zip',
                             'browser_download_url' => 'https://example.test/draft.zip',
                             'state' => 'uploaded',
                         ],
                     ],
                 ],
                 [
-                    'tag_name' => '1.5.2',
+                    'tag_name' => $stableVersion,
                     'draft' => false,
                     'prerelease' => false,
                     'body' => '',
                     'published_at' => '2026-04-07T00:00:00Z',
                     'assets' => [
                         [
-                            'name' => 'tasty-fonts-1.5.2.zip',
+                            'name' => 'tasty-fonts-' . $stableVersion . '.zip',
                             'browser_download_url' => 'https://example.test/stable.zip',
                             'state' => 'uploaded',
                         ],
@@ -346,27 +361,28 @@ $tests['github_updater_ignores_prereleases_and_drafts_when_finding_updates'] = s
     );
     $update = $result->response[plugin_basename(TASTY_FONTS_FILE)] ?? null;
 
-    assertSameValue('1.5.2', $update->new_version ?? '', 'Updater should skip prereleases and drafts and use the latest published stable release.');
+    assertSameValue($stableVersion, $update->new_version ?? '', 'Updater should skip prereleases and drafts and use the latest published stable release.');
 };
 
-$tests['github_updater_returns_plugin_information_for_the_details_modal'] = static function (): void {
+$tests['github_updater_returns_plugin_information_for_the_details_modal'] = static function () use ($nextPatchVersion): void {
     resetTestState();
 
     global $remoteGetResponses;
+    $releaseVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
 
     $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
         'response' => ['code' => 200],
         'body' => json_encode(
             [
                 [
-                    'tag_name' => '1.6.0',
+                    'tag_name' => $releaseVersion,
                     'draft' => false,
                     'prerelease' => false,
                     'body' => "Release notes line one.\nRelease notes line two.",
                     'published_at' => '2026-04-08T00:00:00Z',
                     'assets' => [
                         [
-                            'name' => 'tasty-fonts-1.6.0.zip',
+                            'name' => 'tasty-fonts-' . $releaseVersion . '.zip',
                             'browser_download_url' => 'https://example.test/release.zip',
                             'state' => 'uploaded',
                         ],
@@ -383,8 +399,8 @@ $tests['github_updater_returns_plugin_information_for_the_details_modal'] = stat
 
     assertSameValue('Tasty Custom Fonts', $result->name ?? '', 'Plugin details should expose the plugin name.');
     assertSameValue('tasty-fonts', $result->slug ?? '', 'Plugin details should use the current plugin slug.');
-    assertSameValue('1.6.0', $result->version ?? '', 'Plugin details should report the latest stable release version.');
-    assertSameValue('1.5.1', $result->current_version ?? '', 'Plugin details should include the installed plugin version.');
+    assertSameValue($releaseVersion, $result->version ?? '', 'Plugin details should report the latest stable release version.');
+    assertSameValue(TASTY_FONTS_VERSION, $result->current_version ?? '', 'Plugin details should include the installed plugin version.');
     assertSameValue('https://example.test/release.zip', $result->download_link ?? '', 'Plugin details should expose the release ZIP download link.');
     assertContainsValue('Release notes line one.', $result->sections['changelog'] ?? '', 'Plugin details should render release notes from the GitHub release body.');
 
@@ -550,17 +566,17 @@ $tests['github_updater_handles_network_and_response_failures_quietly'] = static 
     assertSameValue([], $malformedResult->response ?? [], 'Updater should leave the update transient unchanged when GitHub returns malformed JSON.');
 };
 
-$tests['github_updater_clears_cached_release_data_when_the_installed_version_changes'] = static function (): void {
+$tests['github_updater_clears_cached_release_data_when_the_installed_version_changes'] = static function () use ($nextPatchVersion): void {
     resetTestState();
 
-    set_transient('tasty_fonts_github_release_v1', ['version' => '1.6.0'], HOUR_IN_SECONDS);
+    set_transient('tasty_fonts_github_release_v1', ['version' => $nextPatchVersion(TASTY_FONTS_VERSION)], HOUR_IN_SECONDS);
     set_transient('tasty_fonts_github_release_version_v1', '1.4.0', DAY_IN_SECONDS);
 
     $updater = new GitHubUpdater();
     $updater->registerHooks();
 
     assertSameValue(false, get_transient('tasty_fonts_github_release_v1'), 'Updater should clear cached release metadata when the installed plugin version changes.');
-    assertSameValue('1.5.1', get_transient('tasty_fonts_github_release_version_v1'), 'Updater should persist the current installed version after clearing stale updater caches.');
+    assertSameValue(TASTY_FONTS_VERSION, get_transient('tasty_fonts_github_release_version_v1'), 'Updater should persist the current installed version after clearing stale updater caches.');
 };
 
 $tests['block_editor_font_library_sync_registers_managed_font_families_after_import'] = static function (): void {

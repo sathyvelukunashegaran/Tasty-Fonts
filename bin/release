@@ -71,7 +71,7 @@ php -r '
   }
 
   $contents = preg_replace("/^Version:\\s*.*/m", "Version: " . $version, $contents, 1, $headerCount);
-  $contents = preg_replace("/^define\\x28\\x27TASTY_FONTS_VERSION\\x27,\\s*\\x27.*\\x27\\x29;/m", "define('\''TASTY_FONTS_VERSION'\'', '\''" . $version . "'\'');", $contents, 1, $constantCount);
+  $contents = preg_replace("/^\\s*define\\x28\\x27TASTY_FONTS_VERSION\\x27,\\s*\\x27.*\\x27\\x29;/m", "    define('\''TASTY_FONTS_VERSION'\'', '\''" . $version . "'\'');", $contents, 1, $constantCount);
 
   if ($headerCount !== 1 || $constantCount !== 1) {
       fwrite(STDERR, "Could not update both plugin version markers\n");
