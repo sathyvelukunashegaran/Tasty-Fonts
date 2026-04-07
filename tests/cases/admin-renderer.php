@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use TastyFonts\Admin\AdminPageRenderer;
+use TastyFonts\Admin\AdminPageViewBuilder;
 use TastyFonts\Plugin;
 use TastyFonts\Support\Storage;
 
@@ -293,8 +294,117 @@ $tests['admin_page_renderer_renders_unified_output_controls'] = static function 
     assertContainsValue('Quick Mode', $output, 'Output Settings should render the output quick-mode controls.');
     assertContainsValue('value="classes"', $output, 'The output quick-mode controls should expose the classes-only option.');
     assertContainsValue('name="class_output_enabled"', $output, 'The class output master toggle should submit through the shared settings form.');
+    assertContainsValue('Family classes', $output, 'Output Settings should group the per-family class toggle under its own submenu heading.');
     assertContainsValue('name="class_output_families_enabled"', $output, 'The granular family class toggle should submit through the shared settings form.');
     assertContainsValue('Emit font utility classes', $output, 'Output Settings should render the class output master toggle.');
+};
+
+$tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_sets'] = static function (): void {
+    $builder = new AdminPageViewBuilder(new Storage());
+
+    $allMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            [
+                'enabled' => true,
+                'role_heading' => true,
+                'role_body' => true,
+                'role_monospace' => true,
+                'role_alias_interface' => true,
+                'role_alias_ui' => true,
+                'role_alias_code' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+                'category_mono' => true,
+                'families' => true,
+            ],
+            [
+                'enabled' => true,
+                'weight_tokens' => true,
+                'role_aliases' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+                'category_mono' => true,
+            ],
+        ]
+    );
+    assertSameValue('all', $allMode, 'Quick mode should resolve to all when every class and variable subgroup is enabled, including monospace-dependent flags.');
+
+    $variablesMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            [
+                'enabled' => false,
+                'role_heading' => false,
+                'role_body' => false,
+                'role_alias_interface' => false,
+                'role_alias_ui' => false,
+                'category_sans' => false,
+                'category_serif' => false,
+                'families' => false,
+            ],
+            [
+                'enabled' => true,
+                'weight_tokens' => false,
+                'role_aliases' => false,
+                'category_sans' => false,
+                'category_serif' => false,
+            ],
+        ]
+    );
+    assertSameValue('variables', $variablesMode, 'Quick mode should resolve to variables when variable output is enabled and class output is disabled.');
+
+    $classesMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            [
+                'enabled' => true,
+                'role_heading' => false,
+                'role_body' => false,
+                'role_alias_interface' => false,
+                'role_alias_ui' => false,
+                'category_sans' => false,
+                'category_serif' => false,
+                'families' => false,
+            ],
+            [
+                'enabled' => false,
+                'weight_tokens' => false,
+                'role_aliases' => false,
+                'category_sans' => false,
+                'category_serif' => false,
+            ],
+        ]
+    );
+    assertSameValue('classes', $classesMode, 'Quick mode should resolve to classes when class output is enabled and variable output is disabled.');
+
+    $customMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            [
+                'enabled' => true,
+                'role_heading' => true,
+                'role_body' => true,
+                'role_alias_interface' => true,
+                'role_alias_ui' => false,
+                'category_sans' => true,
+                'category_serif' => true,
+                'families' => true,
+            ],
+            [
+                'enabled' => true,
+                'weight_tokens' => true,
+                'role_aliases' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+            ],
+        ]
+    );
+    assertSameValue('custom', $customMode, 'Quick mode should resolve to custom when both outputs are enabled but one granular subgroup is disabled.');
 };
 
 $tests['admin_page_renderer_balances_div_wrappers'] = static function (): void {

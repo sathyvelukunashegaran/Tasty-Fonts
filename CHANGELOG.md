@@ -31,6 +31,7 @@ All notable changes to this project will be documented in this file.
 - Split the remaining oversized admin rendering helpers into focused library, preview, and tools renderers with dedicated family-card templates so renderer files stay within the accepted size limits without changing dashboard output.
 - Reworked font storage and generated stylesheet handling to use provider-specific upload directories, a hidden generated CSS directory, optional inline CSS delivery, and matching preload behavior.
 - Standardized dashboard terminology and polished the admin CSS against the shared token system so deployment controls, library cards, activity filters, and notice surfaces stay visually aligned.
+- Grouped the per-family utility class toggle with the other class-output controls and added direct view-builder coverage for output quick-mode selection across all preset states.
 
 ### Fixed
 
@@ -41,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - Fixed malformed admin wrapper markup that allowed the WordPress footer to overlap the dashboard content.
 - Removed unreachable admin-controller fallback branches and softened local-environment notice copy so Plugin Behavior guidance uses plain-language site-request and certificate wording.
 - Fixed uninstall cleanup so generated CSS, synced block-editor font families, and plugin-managed runtime transients are removed consistently.
+- Aligned role alias utility classes with the variable-output guards so empty body or monospace assignments no longer emit fallback-only alias selectors.
 
 ## [1.5.1] - 2026-04-07
 

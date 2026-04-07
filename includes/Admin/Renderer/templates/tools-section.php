@@ -360,15 +360,20 @@
                                                                 </label>
                                                             </div>
                                                         </div>
-                                                        <input type="hidden" name="class_output_families_enabled" value="0">
-                                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
-                                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_families_enabled" value="1" <?php checked($classOutputFamiliesEnabled); ?>>
-                                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
-                                                            <span class="tasty-fonts-toggle-copy">
-                                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Per-family classes', 'tasty-fonts'); ?></span>
-                                                                <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls selectors like .font-inter and .font-ibm-plex-serif.', 'tasty-fonts'); ?></span>
-                                                            </span>
-                                                        </label>
+                                                        <div class="tasty-fonts-output-settings-submenu-group">
+                                                            <span class="tasty-fonts-output-settings-submenu-group-title"><?php esc_html_e('Family classes', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-output-settings-submenu-group-list">
+                                                                <input type="hidden" name="class_output_families_enabled" value="0">
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_families_enabled" value="1" <?php checked($classOutputFamiliesEnabled); ?>>
+                                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                                    <span class="tasty-fonts-toggle-copy">
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Per-family classes', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Controls selectors like .font-inter and .font-ibm-plex-serif.', 'tasty-fonts'); ?></span>
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <input type="hidden" name="per_variant_font_variables_enabled" value="0">

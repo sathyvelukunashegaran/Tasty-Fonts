@@ -739,20 +739,20 @@ final class CssBuilder
     private function buildRoleAliasClassSnippet(array $roles, bool $includeMonospace = false, array $settings = []): string
     {
         $blocks = [];
-        $bodyFamily = (string) ($roles['body'] ?? '');
+        $bodyFamily = trim((string) ($roles['body'] ?? ''));
         $bodyFallback = (string) ($roles['body_fallback'] ?? 'sans-serif');
-        $monospaceFamily = (string) ($roles['monospace'] ?? '');
+        $monospaceFamily = trim((string) ($roles['monospace'] ?? ''));
         $monospaceFallback = (string) ($roles['monospace_fallback'] ?? 'monospace');
 
-        if ($this->classOutputRoleAliasEnabled($settings, 'interface')) {
+        if ($bodyFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'interface')) {
             $blocks[] = $this->buildClassRule('.font-interface', $bodyFamily, $bodyFallback);
         }
 
-        if ($this->classOutputRoleAliasEnabled($settings, 'ui')) {
+        if ($bodyFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'ui')) {
             $blocks[] = $this->buildClassRule('.font-ui', $bodyFamily, $bodyFallback);
         }
 
-        if ($includeMonospace && $this->classOutputRoleAliasEnabled($settings, 'code')) {
+        if ($includeMonospace && $monospaceFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'code')) {
             $blocks[] = $this->buildClassRule('.font-code', $monospaceFamily, $monospaceFallback);
         }
 

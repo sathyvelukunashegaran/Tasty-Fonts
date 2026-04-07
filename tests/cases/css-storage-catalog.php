@@ -152,6 +152,21 @@ $tests['css_builder_builds_combined_class_output_snippets'] = static function ()
     assertContainsValue('.font-heading', $css, 'Combined class output should include role classes.');
     assertContainsValue('.font-inter', $css, 'Combined class output should include family classes.');
     assertContainsValue("\n\n.font-inter", $css, 'Combined class output should separate role and family blocks with a blank line.');
+    $emptyAliasRoles = [
+        'heading' => 'Inter',
+        'body' => '   ',
+        'monospace' => '',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $emptyAliasCss = $builder->buildClassOutputSnippet($emptyAliasRoles, true, [], [
+        'class_output_enabled' => true,
+    ]);
+
+    assertNotContainsValue('.font-interface', $emptyAliasCss, 'Combined class output should skip the interface alias when no body family is assigned.');
+    assertNotContainsValue('.font-ui', $emptyAliasCss, 'Combined class output should skip the UI alias when no body family is assigned.');
+    assertNotContainsValue('.font-code', $emptyAliasCss, 'Combined class output should skip the code alias when no monospace family is assigned.');
 };
 
 $tests['css_builder_includes_class_output_in_generated_css_when_enabled'] = static function (): void {
