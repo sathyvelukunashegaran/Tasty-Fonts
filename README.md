@@ -2,11 +2,11 @@
 
 Typography management for Etch, Gutenberg, and the frontend.
 
-## 1.7.0 Beta Track
+## Release Rails
 
-Version `1.7.0` is the current beta milestone on the way to `2.0`.
+The latest tagged beta milestone is `1.7.0`, and `main` now tracks the next development line as `1.8.0-dev`.
 
-This release is meant to be used and evaluated seriously, but it should not be read as the final stable `2.0` shape. A few more tagged releases are expected before `2.0` lands, and those releases will continue refining the settings surface, integration workflows, and output defaults that are now in place.
+Stable, beta, and nightly packages are all published from GitHub. The plugin can follow those rails through `Settings -> Behavior -> Update Channel`, with a rollback reinstall action when switching back to a lower rail before it catches up.
 
 Tasty Custom Fonts lets you upload local font files, import Google Fonts or Bunny Fonts as self-hosted or CDN deliveries, connect an Adobe Fonts web project, and manage the live typography stack from one WordPress dashboard. The plugin generates runtime CSS, editor presets, preview tooling, and delivery controls without any build step.
 
@@ -147,7 +147,7 @@ The packaged plugin directory remains `etch-fonts/` so existing installs can upd
 
 ### Updates For GitHub Installs
 
-The plugin advertises its GitHub repository through `Update URI` and includes a GitHub release updater. If your site was installed from a GitHub release ZIP, future stable releases can be detected from the normal WordPress `Plugins` screen and installed from the attached GitHub release ZIP.
+The plugin advertises its GitHub repository through `Update URI` and includes a GitHub release updater. If your site was installed from a GitHub release ZIP, the normal WordPress `Plugins` screen can follow the selected `Stable`, `Beta`, or `Nightly` rail from `Settings -> Behavior -> Update Channel`.
 
 ### Manual Install
 

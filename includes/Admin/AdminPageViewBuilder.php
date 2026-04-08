@@ -101,6 +101,9 @@ final class AdminPageViewBuilder
             || !empty($context['extended_variable_category_mono_enabled']);
         $preloadPrimaryFonts = !empty($context['preload_primary_fonts']);
         $remoteConnectionHints = !empty($context['remote_connection_hints']);
+        $updateChannel = (string) ($context['update_channel'] ?? 'stable');
+        $updateChannelOptions = is_array($context['update_channel_options'] ?? null) ? $context['update_channel_options'] : [];
+        $updateChannelStatus = is_array($context['update_channel_status'] ?? null) ? $context['update_channel_status'] : [];
         $blockEditorFontLibrarySyncEnabled = !empty($context['block_editor_font_library_sync_enabled']);
         $trainingWheelsOff = !empty($context['training_wheels_off']);
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
@@ -160,9 +163,9 @@ final class AdminPageViewBuilder
         $monospaceFamilyVariable = $monospaceFamily !== '' ? $this->buildFontVariableReference($monospaceFamily) : $monospaceStack;
         $pluginVersion = defined('TASTY_FONTS_VERSION') ? (string) TASTY_FONTS_VERSION : '';
         $pluginRepositoryUrl = 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts';
-        $pluginVersionUrl = $pluginVersion !== ''
+        $pluginVersionUrl = $pluginVersion !== '' && !str_contains($pluginVersion, '-dev')
             ? $pluginRepositoryUrl . '/releases/tag/' . rawurlencode($pluginVersion)
-            : $pluginRepositoryUrl;
+            : $pluginRepositoryUrl . '/releases';
         $roleDeploymentBadge = (string) ($roleDeployment['badge'] ?? '');
         $roleDeploymentBadgeClass = (string) ($roleDeployment['badge_class'] ?? '');
         $roleDeploymentTitle = trim((string) ($roleDeployment['title'] ?? ''));

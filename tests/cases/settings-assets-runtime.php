@@ -430,7 +430,7 @@ $tests['developer_tools_clear_plugin_caches_and_regenerate_assets'] = static fun
         AssetService::TRANSIENT_REGENERATE_CSS_QUEUED => true,
         GoogleFontsClient::TRANSIENT_CATALOG => ['Inter'],
         BunnyFontsClient::TRANSIENT_CATALOG => ['Inter'],
-        'tasty_fonts_github_release_v1' => ['version' => '1.0.0'],
+        'tasty_fonts_github_release_manifest_v1' => ['latest_for_channel' => ['stable' => ['version' => '1.0.0']]],
         'tasty_fonts_github_release_version_v1' => '1.0.0',
         BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . 'abc' => ['family' => 'Inter'],
         AdminController::SEARCH_CACHE_TRANSIENT_PREFIX . 'google_inter' => ['Inter'],
@@ -721,6 +721,20 @@ $tests['settings_repository_persists_training_wheels_off_preference'] = static f
     $saved = $settings->getSettings();
 
     assertSameValue(false, !empty($saved['training_wheels_off']), 'Settings should persist the training-wheels-off preference when disabled.');
+};
+
+$tests['settings_repository_defaults_update_channel_to_stable_and_normalizes_invalid_values'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+
+    assertSameValue(SettingsRepository::UPDATE_CHANNEL_STABLE, $settings->getUpdateChannel(), 'New installs should default to the stable update channel.');
+
+    $settings->saveSettings(['update_channel' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY]);
+    assertSameValue(SettingsRepository::UPDATE_CHANNEL_NIGHTLY, $settings->getUpdateChannel(), 'Settings should persist supported update channels.');
+
+    $settings->saveSettings(['update_channel' => 'unsupported']);
+    assertSameValue(SettingsRepository::UPDATE_CHANNEL_STABLE, $settings->getUpdateChannel(), 'Invalid update channels should normalize back to stable.');
 };
 
 $tests['settings_repository_defaults_font_display_to_optional_and_normalizes_invalid_values'] = static function (): void {

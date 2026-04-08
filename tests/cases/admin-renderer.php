@@ -1452,6 +1452,22 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
         'minify_css_output' => true,
         'preload_primary_fonts' => true,
         'remote_connection_hints' => true,
+        'update_channel' => 'beta',
+        'update_channel_options' => [
+            ['value' => 'stable', 'label' => 'Stable'],
+            ['value' => 'beta', 'label' => 'Beta'],
+            ['value' => 'nightly', 'label' => 'Nightly'],
+        ],
+        'update_channel_status' => [
+            'selected_channel' => 'beta',
+            'selected_channel_label' => 'Beta',
+            'installed_version' => '1.7.0',
+            'latest_version' => '1.7.1-beta.2',
+            'state_label' => 'Upgrade Available',
+            'state_class' => 'is-success',
+            'state_copy' => 'A newer package is available for the selected channel through the normal WordPress updates flow.',
+            'can_reinstall' => false,
+        ],
         'block_editor_font_library_sync_enabled' => false,
         'training_wheels_off' => true,
         'delete_uploaded_files_on_uninstall' => false,
@@ -1480,6 +1496,8 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Integrations tab should no longer render a duplicate Gutenberg sync row title.');
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Integrations tab should no longer render a duplicate Automatic.css sync row title.');
     assertContainsValue('Hide Onboarding Hints', $output, 'The Behavior tab should expose the onboarding-hints toggle.');
+    assertContainsValue('Update Channel', $output, 'The Behavior tab should expose the update channel selector.');
+    assertContainsValue('Upgrade Available', $output, 'The Behavior tab should render the current update channel status badge.');
     assertNotContainsValue('Enable Block Editor Font Library Sync', $output, 'The Behavior panel should no longer render the Gutenberg sync toggle after it moves into Integrations.');
     assertContainsValue('Enable Monospace Role', $output, 'The Behavior panel should still render the monospace toggle.');
     assertContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should still render the uninstall cleanup toggle.');

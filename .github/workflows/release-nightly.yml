@@ -1,0 +1,103 @@
+name: Release Nightly
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  publish:
+    needs: quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Derive nightly version
+        id: nightly
+        shell: bash
+        run: |
+          nightly_version="$(./bin/nightly-version)"
+          echo "version=${nightly_version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Stamp nightly version into plugin metadata
+        shell: bash
+        run: ./bin/set-version "${{ steps.nightly.outputs.version }}"
+
+      - name: Build plugin zip from stamped worktree
+        id: build
+        shell: bash
+        run: |
+          zip_name="tasty-fonts-${{ steps.nightly.outputs.version }}.zip"
+          build_root="$(mktemp -d)"
+          mkdir -p "${build_root}/etch-fonts"
+
+          while IFS= read -r -d '' file; do
+            mkdir -p "${build_root}/etch-fonts/$(dirname "${file}")"
+            cp "${file}" "${build_root}/etch-fonts/${file}"
+          done < <(git ls-files -z)
+
+          (
+            cd "${build_root}"
+            zip -qr "${GITHUB_WORKSPACE}/${zip_name}" etch-fonts
+          )
+
+          echo "zip_name=${zip_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate nightly release notes
+        shell: bash
+        run: |
+          previous_nightly="$(
+            git tag --list '*-dev.*' --sort=version:refname | tail -n 1
+          )"
+
+          {
+            echo "## What's Changed"
+            echo
+            if [ -n "${previous_nightly}" ]; then
+              git log --format='- %s (%h)' "${previous_nightly}..${GITHUB_SHA}"
+              echo
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${previous_nightly}...${GITHUB_SHA}"
+            else
+              git log --format='- %s (%h)' -n 20 "${GITHUB_SHA}"
+            fi
+          } > release-notes.md
+
+      - name: Publish nightly prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag_name="${{ steps.nightly.outputs.version }}"
+          release_name="Tasty Custom Fonts ${tag_name}"
+          zip_name="${{ steps.build.outputs.zip_name }}"
+
+          gh release create "${tag_name}" "${zip_name}" \
+            --title "${release_name}" \
+            --notes-file release-notes.md \
+            --prerelease
+
+      - name: Prune older nightly prereleases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mapfile -t old_tags < <(
+            gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+              | jq -r '.[] | select(.prerelease and (.tag_name | test("-dev\\.[0-9]+$"))) | .tag_name' \
+              | sort -rV \
+              | tail -n +11
+          )
+
+          for tag_name in "${old_tags[@]}"; do
+            gh release delete "${tag_name}" --cleanup-tag -y
+          done

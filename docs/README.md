@@ -4,9 +4,9 @@ This is the versioned documentation hub for the current plugin codebase.
 
 ## Current Release Track
 
-`1.7.0` is the active beta milestone for the future `2.0` release.
+`1.7.0` is the latest tagged beta milestone for the future `2.0` release, while `main` tracks the next development line as `1.8.0-dev`.
 
-These docs describe the current beta line clearly, including what is already solid, what is newly introduced in `1.7.0`, and what is still expected to receive a few more release passes before `2.0` is considered stable.
+These docs describe the current beta line clearly, including what is already solid, what shipped in `1.7.0`, and what is still expected to receive more release passes before `2.0` is considered stable.
 
 ---
 

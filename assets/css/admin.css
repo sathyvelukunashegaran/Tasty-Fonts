@@ -7136,6 +7136,16 @@ h3.tasty-fonts-section-title {
     flex-wrap: wrap;
 }
 
+#tasty-fonts-settings-page .tasty-fonts-output-settings-meta {
+    display: grid;
+    gap: var(--tasty-space-2);
+    margin-top: var(--tasty-space-3);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-settings-meta p {
+    margin: 0;
+}
+
 #tasty-fonts-settings-page .tasty-fonts-output-settings-submenu .tasty-fonts-toggle-switch {
     width: 36px;
     height: 20px;

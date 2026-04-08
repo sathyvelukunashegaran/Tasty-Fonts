@@ -16,7 +16,7 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 ## Before You Start
 
-Version `1.7.0` is the active beta step toward `2.0`. It is intended for real use and real testing, but a few more releases are expected before the final `2.0` experience is considered settled.
+Version `1.7.0` is the latest tagged beta step toward `2.0`, while `main` now tracks the next development line as `1.8.0-dev`. The tagged beta builds are intended for real use and real testing, but a few more releases are expected before the final `2.0` experience is considered settled.
 
 **Tip for beginners:** if any term in this guide is unfamiliar, check the [Glossary](glossary.md). The [Concepts](concepts.md) page also explains the three big ideas — delivery profiles, draft/live roles, and the CSS pipeline — before you dive in.
 
@@ -123,7 +123,7 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 
 - Draft role changes do not affect live runtime output until you apply them sitewide.
 - Admin previews force `font-display: swap` for preview safety, even if the live output uses another `font-display` value.
-- GitHub-installed copies can detect future stable releases from the normal WordPress plugins screen through the bundled GitHub updater.
+- GitHub-installed copies can detect future stable, beta, or nightly releases from the normal WordPress plugins screen through the bundled GitHub updater.
 - Because `1.7.0` is part of the beta path toward `2.0`, it is worth rechecking the changelog and docs when upgrading within the `1.7.x` series.
 
 ## Related Docs

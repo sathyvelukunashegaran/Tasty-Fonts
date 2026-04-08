@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: bin/nightly-version
+
+Prints a stamped nightly version derived from plugin.php's committed X.Y.Z-dev base.
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+cd "$repo_root"
+
+base_version="$(sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r')"
+
+if [[ ! "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev$ ]]; then
+  echo "Error: plugin.php must be on an X.Y.Z-dev base version to build a nightly. Found: ${base_version}" >&2
+  exit 1
+fi
+
+printf '%s.%s\n' "$base_version" "$(date -u +%Y%m%d%H%M)"

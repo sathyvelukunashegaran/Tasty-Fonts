@@ -8,30 +8,4 @@ on:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Lint PHP sources
-        shell: bash
-        run: find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
-
-      - name: Run PHP test suite
-        shell: bash
-        run: php tests/run.php
-
-      - name: Run JS contract tests
-        shell: bash
-        run: node --test tests/js/*.test.cjs
+    uses: ./.github/workflows/quality.yml

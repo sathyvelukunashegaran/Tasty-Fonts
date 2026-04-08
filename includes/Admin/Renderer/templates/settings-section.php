@@ -65,6 +65,9 @@
                         </div>
 
                         <?php $showSettingsDescriptions = !$trainingWheelsOff; ?>
+                        <?php $updateChannel = isset($updateChannel) ? (string) $updateChannel : 'stable'; ?>
+                        <?php $updateChannelOptions = isset($updateChannelOptions) && is_array($updateChannelOptions) ? $updateChannelOptions : []; ?>
+                        <?php $updateChannelStatus = isset($updateChannelStatus) && is_array($updateChannelStatus) ? $updateChannelStatus : []; ?>
 
                         <section
                             id="tasty-fonts-settings-panel-output-settings"
@@ -765,6 +768,43 @@
                                     <?php wp_nonce_field('tasty_fonts_save_settings'); ?>
                                     <input type="hidden" name="tasty_fonts_save_settings" value="1">
                                     <div class="tasty-fonts-output-settings-list">
+                                        <div class="tasty-fonts-output-settings-detail-group">
+                                            <div class="tasty-fonts-output-settings-submenu-copy">
+                                                <h4><?php esc_html_e('Update Channel', 'tasty-fonts'); ?></h4>
+                                                <?php if ($showSettingsDescriptions): ?>
+                                                    <p><?php esc_html_e('Choose which GitHub release rail this install should follow for plugin updates.', 'tasty-fonts'); ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="tasty-fonts-output-settings-submenu">
+                                                <label for="tasty-fonts-update-channel" class="screen-reader-text"><?php esc_html_e('Update Channel', 'tasty-fonts'); ?></label>
+                                                <select id="tasty-fonts-update-channel" name="update_channel" class="regular-text">
+                                                    <?php foreach ($updateChannelOptions as $option): ?>
+                                                        <?php $optionValue = (string) ($option['value'] ?? 'stable'); ?>
+                                                        <option value="<?php echo esc_attr($optionValue); ?>" <?php selected($updateChannel, $optionValue); ?>>
+                                                            <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <div class="tasty-fonts-output-settings-meta">
+                                                    <span class="tasty-fonts-badge <?php echo esc_attr((string) ($updateChannelStatus['state_class'] ?? '')); ?>">
+                                                        <?php echo esc_html((string) ($updateChannelStatus['state_label'] ?? __('Unavailable', 'tasty-fonts'))); ?>
+                                                    </span>
+                                                    <p>
+                                                        <?php
+                                                        echo esc_html(
+                                                            sprintf(
+                                                                __('Installed: %1$s. Latest for %2$s: %3$s.', 'tasty-fonts'),
+                                                                (string) ($updateChannelStatus['installed_version'] ?? __('Unknown', 'tasty-fonts')),
+                                                                (string) ($updateChannelStatus['selected_channel_label'] ?? __('Stable', 'tasty-fonts')),
+                                                                (string) ($updateChannelStatus['latest_version'] ?? __('Unavailable', 'tasty-fonts'))
+                                                            )
+                                                        );
+                                                        ?>
+                                                    </p>
+                                                    <p><?php echo esc_html((string) ($updateChannelStatus['state_copy'] ?? '')); ?></p>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <input type="hidden" name="monospace_role_enabled" value="0">
                                         <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="monospace_role_enabled" value="1" <?php checked($monospaceRoleEnabled); ?>>
@@ -800,6 +840,26 @@
                                         </label>
                                     </div>
                                 </form>
+                                <?php if (!empty($updateChannelStatus['can_reinstall'])): ?>
+                                    <div class="tasty-fonts-output-settings-list">
+                                        <div class="tasty-fonts-output-settings-detail-group">
+                                            <div class="tasty-fonts-output-settings-submenu-copy">
+                                                <h4><?php esc_html_e('Rollback Reinstall', 'tasty-fonts'); ?></h4>
+                                                <?php if ($showSettingsDescriptions): ?>
+                                                    <p><?php esc_html_e('When the selected channel is behind the installed version, use this to reinstall the selected channel immediately instead of waiting for a higher version.', 'tasty-fonts'); ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                            <form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form">
+                                                <?php wp_nonce_field('tasty_fonts_reinstall_update_channel', '_tasty_fonts_reinstall_nonce'); ?>
+                                                <div class="tasty-fonts-output-settings-submenu">
+                                                    <div class="tasty-fonts-developer-action-row">
+                                                        <button type="submit" class="button" name="tasty_fonts_reinstall_update_channel" value="1"><?php esc_html_e('Reinstall Selected Channel', 'tasty-fonts'); ?></button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </section>
 

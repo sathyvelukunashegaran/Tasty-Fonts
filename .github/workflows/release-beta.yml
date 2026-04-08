@@ -1,0 +1,96 @@
+name: Release Beta
+
+on:
+  push:
+    tags:
+      - '*.*.*-beta.*'
+
+permissions:
+  contents: write
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  publish:
+    needs: quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate plugin version matches tag
+        shell: bash
+        run: |
+          tag_name="${GITHUB_REF_NAME}"
+          plugin_version="$(sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r')"
+
+          if [[ ! "${tag_name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
+            echo "Beta tags must use X.Y.Z-beta.N format." >&2
+            exit 1
+          fi
+
+          if [ "${tag_name}" != "${plugin_version}" ]; then
+            echo "Tag ${tag_name} does not match plugin version ${plugin_version}" >&2
+            exit 1
+          fi
+
+      - name: Build plugin zip
+        id: build
+        shell: bash
+        run: |
+          zip_name="tasty-fonts-${GITHUB_REF_NAME}.zip"
+          git archive \
+            --format=zip \
+            --worktree-attributes \
+            --prefix=etch-fonts/ \
+            -o "${zip_name}" \
+            "${GITHUB_SHA}"
+
+          echo "zip_name=${zip_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate release notes
+        shell: bash
+        run: |
+          {
+            echo "## What's Changed"
+            echo
+            ./bin/release-notes "${GITHUB_REF_NAME}"
+          } > release-notes.md
+
+          previous_tag="$(
+            git tag --sort=version:refname \
+              | awk -v current="${GITHUB_REF_NAME}" '$0 == current { print previous; exit } { previous = $0 }'
+          )"
+
+          if [ -n "${previous_tag}" ]; then
+            {
+              echo
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${previous_tag}...${GITHUB_REF_NAME}"
+            } >> release-notes.md
+          fi
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag_name="${GITHUB_REF_NAME}"
+          release_name="Tasty Custom Fonts ${tag_name}"
+          zip_name="${{ steps.build.outputs.zip_name }}"
+
+          if gh release view "${tag_name}" >/dev/null 2>&1; then
+            gh release edit "${tag_name}" \
+              --title "${release_name}" \
+              --notes-file release-notes.md \
+              --prerelease
+            gh release upload "${tag_name}" "${zip_name}" --clobber
+          else
+            gh release create "${tag_name}" "${zip_name}" \
+              --title "${release_name}" \
+              --notes-file release-notes.md \
+              --prerelease
+          fi

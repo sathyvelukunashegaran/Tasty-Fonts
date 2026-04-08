@@ -5,6 +5,7 @@ declare(strict_types=1);
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Api\RestController;
 use TastyFonts\Plugin;
+use TastyFonts\Repository\SettingsRepository;
 
 $tests['admin_controller_merges_adobe_families_into_selectable_role_names'] = static function (): void {
     resetTestState();
@@ -1101,6 +1102,23 @@ $tests['rest_controller_settings_reload_toast_mentions_reload_when_needed'] = st
     assertSameValue(true, $response instanceof WP_REST_Response, 'The settings autosave route should return a native REST response object.');
     assertSameValue(true, !empty($data['reload_required']), 'Reload-only settings should return an explicit reload flag for the autosave client.');
     assertContainsValue('Reload the page to apply this change.', (string) ($data['message'] ?? ''), 'Reload-only settings should mention the required page reload in the autosave toast message.');
+};
+
+$tests['rest_controller_settings_reload_flag_covers_update_channel_changes'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_BETA,
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response->get_data();
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The settings autosave route should return a native REST response object.');
+    assertSameValue(true, !empty($data['reload_required']), 'Update channel changes should request a page reload so the server-rendered channel status refreshes.');
+    assertSameValue(SettingsRepository::UPDATE_CHANNEL_BETA, (string) ($data['settings']['update_channel'] ?? ''), 'The settings autosave route should persist the selected update channel.');
 };
 
 $tests['rest_controller_settings_reload_flag_covers_integrations_shell_changes'] = static function (): void {

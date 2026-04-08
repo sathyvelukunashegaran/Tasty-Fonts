@@ -131,7 +131,7 @@ The test runner discovers all `*.test.cjs` files automatically via the glob patt
 ## Notes
 
 - There is no Composer install step and no npm install step for the current repo workflow.
-- The release workflow runs the PHP syntax sweep, the PHP suite, and the JS contract tests before building a release.
+- The shared release quality workflow runs the PHP syntax sweep, the PHP suite, and the JS contract tests before any stable, beta, or nightly package is published.
 
 ## Related Docs
 

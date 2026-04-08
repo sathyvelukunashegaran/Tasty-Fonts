@@ -5,6 +5,7 @@ declare(strict_types=1);
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 use TastyFonts\Updates\GitHubUpdater;
 
@@ -93,7 +94,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_regenerate_css_queued',
         'tasty_fonts_google_catalog_v1',
         'tasty_fonts_bunny_catalog_v1',
-        'tasty_fonts_github_release_v1',
+        'tasty_fonts_github_release_manifest_v1',
         'tasty_fonts_github_release_version_v1',
     ] as $transientKey) {
         set_transient($transientKey, 'cached', DAY_IN_SECONDS);
@@ -108,7 +109,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_regenerate_css_queued',
         'tasty_fonts_google_catalog_v1',
         'tasty_fonts_bunny_catalog_v1',
-        'tasty_fonts_github_release_v1',
+        'tasty_fonts_github_release_manifest_v1',
         'tasty_fonts_github_release_version_v1',
     ] as $transientKey) {
         assertSameValue(false, get_transient($transientKey), 'Deactivation should clear known plugin transients.');
@@ -365,6 +366,169 @@ $tests['github_updater_ignores_prereleases_and_drafts_when_finding_updates'] = s
     assertSameValue($stableVersion, $update->new_version ?? '', 'Updater should skip prereleases and drafts and use the latest published stable release.');
 };
 
+$tests['github_updater_uses_beta_releases_when_the_beta_channel_is_selected'] = static function () use ($nextPatchVersion, $secondNextPatchVersion): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $optionStore;
+
+    $stableVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
+    $betaVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION) . '-beta.2';
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_BETA,
+    ];
+
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [
+                [
+                    'tag_name' => $betaVersion,
+                    'draft' => false,
+                    'prerelease' => true,
+                    'body' => 'Beta release notes.',
+                    'published_at' => '2026-04-09T00:00:00Z',
+                    'assets' => [
+                        [
+                            'name' => 'tasty-fonts-' . $betaVersion . '.zip',
+                            'browser_download_url' => 'https://example.test/' . $betaVersion . '.zip',
+                            'state' => 'uploaded',
+                        ],
+                    ],
+                ],
+                [
+                    'tag_name' => $stableVersion,
+                    'draft' => false,
+                    'prerelease' => false,
+                    'body' => 'Stable release notes.',
+                    'published_at' => '2026-04-08T00:00:00Z',
+                    'assets' => [
+                        [
+                            'name' => 'tasty-fonts-' . $stableVersion . '.zip',
+                            'browser_download_url' => 'https://example.test/' . $stableVersion . '.zip',
+                            'state' => 'uploaded',
+                        ],
+                    ],
+                ],
+            ]
+        ),
+    ];
+
+    $services = makeServiceGraph();
+    $services['updater']->registerHooks();
+
+    $result = apply_filters(
+        'pre_set_site_transient_update_plugins',
+        (object) [
+            'checked' => [plugin_basename(TASTY_FONTS_FILE) => TASTY_FONTS_VERSION],
+            'response' => [],
+        ]
+    );
+    $update = $result->response[plugin_basename(TASTY_FONTS_FILE)] ?? null;
+
+    assertSameValue($betaVersion, $update->new_version ?? '', 'The beta channel should select the newest stable-or-beta release.');
+    assertSameValue('https://example.test/' . $betaVersion . '.zip', $update->package ?? '', 'The beta channel should expose the beta package URL.');
+};
+
+$tests['github_updater_uses_nightly_releases_when_the_nightly_channel_is_selected'] = static function () use ($nextPatchVersion, $secondNextPatchVersion): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $optionStore;
+
+    $stableVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
+    $nightlyVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION) . '-dev.202604091230';
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
+    ];
+
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [
+                [
+                    'tag_name' => $nightlyVersion,
+                    'draft' => false,
+                    'prerelease' => true,
+                    'body' => 'Nightly release notes.',
+                    'published_at' => '2026-04-09T00:00:00Z',
+                    'assets' => [
+                        [
+                            'name' => 'tasty-fonts-' . $nightlyVersion . '.zip',
+                            'browser_download_url' => 'https://example.test/' . $nightlyVersion . '.zip',
+                            'state' => 'uploaded',
+                        ],
+                    ],
+                ],
+                [
+                    'tag_name' => $stableVersion,
+                    'draft' => false,
+                    'prerelease' => false,
+                    'body' => 'Stable release notes.',
+                    'published_at' => '2026-04-08T00:00:00Z',
+                    'assets' => [
+                        [
+                            'name' => 'tasty-fonts-' . $stableVersion . '.zip',
+                            'browser_download_url' => 'https://example.test/' . $stableVersion . '.zip',
+                            'state' => 'uploaded',
+                        ],
+                    ],
+                ],
+            ]
+        ),
+    ];
+
+    $services = makeServiceGraph();
+    $services['updater']->registerHooks();
+
+    $overview = $services['updater']->getChannelOverview(SettingsRepository::UPDATE_CHANNEL_NIGHTLY);
+
+    assertSameValue($nightlyVersion, (string) (($overview['latest_available']['version'] ?? '')), 'The nightly channel should select the newest stable, beta, or nightly release.');
+    assertSameValue('upgrade', (string) ($overview['state'] ?? ''), 'A newer nightly build should surface as an upgrade.');
+};
+
+$tests['github_updater_can_reinstall_the_selected_channel_when_it_requires_a_rollback'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $optionStore;
+    global $pluginUpgraderInstallCalls;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_STABLE,
+    ];
+
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [
+                [
+                    'tag_name' => '1.0.0',
+                    'draft' => false,
+                    'prerelease' => false,
+                    'body' => 'Stable release notes.',
+                    'published_at' => '2026-04-08T00:00:00Z',
+                    'assets' => [
+                        [
+                            'name' => 'tasty-fonts-1.0.0.zip',
+                            'browser_download_url' => 'https://example.test/1.0.0.zip',
+                            'state' => 'uploaded',
+                        ],
+                    ],
+                ],
+            ]
+        ),
+    ];
+
+    $services = makeServiceGraph();
+    $result = $services['controller']->reinstallSelectedUpdateChannelRelease();
+
+    assertSameValue('stable', (string) ($result['channel'] ?? ''), 'Rollback reinstalls should report the selected channel.');
+    assertSameValue('1.0.0', (string) ($result['version'] ?? ''), 'Rollback reinstalls should report the reinstalled version.');
+    assertSameValue('https://example.test/1.0.0.zip', (string) ($pluginUpgraderInstallCalls[0]['package'] ?? ''), 'Rollback reinstalls should pass the selected release package to the WordPress upgrader.');
+    assertSameValue(true, !empty($pluginUpgraderInstallCalls[0]['args']['overwrite_package']), 'Rollback reinstalls should enable package overwrite.');
+};
+
 $tests['github_updater_returns_plugin_information_for_the_details_modal'] = static function () use ($nextPatchVersion): void {
     resetTestState();
 
@@ -462,7 +626,7 @@ $tests['github_updater_reuses_cached_release_metadata_and_clears_cache_after_upg
         ]
     );
 
-    assertSameValue(false, get_transient('tasty_fonts_github_release_v1'), 'Updater should clear cached release metadata after a successful plugin upgrade.');
+    assertSameValue(false, get_transient('tasty_fonts_github_release_manifest_v1'), 'Updater should clear cached release metadata after a successful plugin upgrade.');
 
     apply_filters('pre_set_site_transient_update_plugins', $transient);
 
@@ -507,7 +671,7 @@ $tests['github_updater_ignores_unrelated_upgrader_events'] = static function ():
 
     apply_filters('pre_set_site_transient_update_plugins', $transient);
 
-    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_v1')), 'Updater should populate the release cache before exercising upgrader hook boundaries.');
+    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_manifest_v1')), 'Updater should populate the release cache before exercising upgrader hook boundaries.');
 
     do_action(
         'upgrader_process_complete',
@@ -519,7 +683,7 @@ $tests['github_updater_ignores_unrelated_upgrader_events'] = static function ():
         ]
     );
 
-    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_v1')), 'Updater should ignore non-plugin upgrader events.');
+    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_manifest_v1')), 'Updater should ignore non-plugin upgrader events.');
 
     do_action(
         'upgrader_process_complete',
@@ -531,7 +695,7 @@ $tests['github_updater_ignores_unrelated_upgrader_events'] = static function ():
         ]
     );
 
-    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_v1')), 'Updater should ignore plugin upgrades for other plugins.');
+    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_manifest_v1')), 'Updater should ignore plugin upgrades for other plugins.');
 };
 
 $tests['github_updater_handles_network_and_response_failures_quietly'] = static function (): void {
@@ -570,13 +734,13 @@ $tests['github_updater_handles_network_and_response_failures_quietly'] = static 
 $tests['github_updater_clears_cached_release_data_when_the_installed_version_changes'] = static function () use ($nextPatchVersion): void {
     resetTestState();
 
-    set_transient('tasty_fonts_github_release_v1', ['version' => $nextPatchVersion(TASTY_FONTS_VERSION)], HOUR_IN_SECONDS);
+    set_transient('tasty_fonts_github_release_manifest_v1', ['latest_for_channel' => ['stable' => ['version' => $nextPatchVersion(TASTY_FONTS_VERSION)]]], HOUR_IN_SECONDS);
     set_transient('tasty_fonts_github_release_version_v1', '1.4.0', DAY_IN_SECONDS);
 
     $updater = new GitHubUpdater();
     $updater->registerHooks();
 
-    assertSameValue(false, get_transient('tasty_fonts_github_release_v1'), 'Updater should clear cached release metadata when the installed plugin version changes.');
+    assertSameValue(false, get_transient('tasty_fonts_github_release_manifest_v1'), 'Updater should clear cached release metadata when the installed plugin version changes.');
     assertSameValue(TASTY_FONTS_VERSION, get_transient('tasty_fonts_github_release_version_v1'), 'Updater should persist the current installed version after clearing stale updater caches.');
 };
 

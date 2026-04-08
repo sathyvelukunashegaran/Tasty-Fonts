@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added a three-rail GitHub release workflow with stable, beta, and nightly channels, including a Behavior-tab update-channel selector and rollback reinstall path for channel downgrades.
+
+### Changed
+
+- Split release automation into shared quality checks plus dedicated stable, beta, and nightly publishing workflows, and replaced the local release helper with channel-aware branch, beta, and stable commands.
+
 ## [1.7.0] - 2026-04-09
 
 ### Added

@@ -1,4 +1,4 @@
-name: Release Plugin
+name: Release Stable
 
 on:
   push:
@@ -9,7 +9,13 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  quality:
+    if: ${{ !contains(github.ref_name, '-beta.') && !contains(github.ref_name, '-dev.') }}
+    uses: ./.github/workflows/quality.yml
+
+  publish:
+    if: ${{ !contains(github.ref_name, '-beta.') && !contains(github.ref_name, '-dev.') }}
+    needs: quality
     runs-on: ubuntu-latest
 
     steps:
@@ -18,36 +24,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Lint PHP sources
-        shell: bash
-        run: find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
-
-      - name: Run PHP test suite
-        shell: bash
-        run: php tests/run.php
-
-      - name: Run JS contract tests
-        shell: bash
-        run: node --test tests/js/*.test.cjs
-
       - name: Validate plugin version matches tag
         shell: bash
         run: |
           tag_name="${GITHUB_REF_NAME}"
           plugin_version="$(sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r')"
 
-          if [ -z "${plugin_version}" ]; then
-            echo "Could not read plugin version from plugin.php" >&2
+          if [[ ! "${tag_name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Stable tags must use X.Y.Z format." >&2
             exit 1
           fi
 

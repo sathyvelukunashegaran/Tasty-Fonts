@@ -21,7 +21,8 @@ use WP_Error;
 final class DeveloperToolsService
 {
     private const STORAGE_INDEX_STUB = '<?php // Silence is golden.';
-    private const UPDATER_RELEASE_TRANSIENT = 'tasty_fonts_github_release_v1';
+    private const UPDATER_LEGACY_RELEASE_TRANSIENT = 'tasty_fonts_github_release_v1';
+    private const UPDATER_RELEASE_TRANSIENT = 'tasty_fonts_github_release_manifest_v1';
     private const UPDATER_INSTALLED_VERSION_TRANSIENT = 'tasty_fonts_github_release_version_v1';
 
     public function __construct(
@@ -207,6 +208,7 @@ final class DeveloperToolsService
                 AssetService::TRANSIENT_HASH,
                 AssetService::TRANSIENT_REGENERATE_CSS_QUEUED,
                 BunnyFontsClient::TRANSIENT_CATALOG,
+                self::UPDATER_LEGACY_RELEASE_TRANSIENT,
                 self::UPDATER_RELEASE_TRANSIENT,
                 self::UPDATER_INSTALLED_VERSION_TRANSIENT,
             ] as $transientKey

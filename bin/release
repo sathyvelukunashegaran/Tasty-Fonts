@@ -3,10 +3,15 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: bin/release <version> [--no-push]
+Usage:
+  bin/release branch <X.Y.Z> [--no-push]
+  bin/release beta <X.Y.Z-beta.N> [--no-push]
+  bin/release stable <X.Y.Z> [--no-push]
 
-Updates plugin.php and CHANGELOG.md, commits the release, creates an annotated tag,
-and pushes main plus the tag to origin unless --no-push is provided.
+Commands:
+  branch  Create release/X.Y from main, set the branch to X.Y.Z-beta.1, and bump main to the next minor dev line.
+  beta    Cut a beta release from release/X.Y, promoting the changelog and tagging the version.
+  stable  Cut a stable release from release/X.Y, promoting the changelog and tagging the version.
 EOF
 }
 
@@ -15,8 +20,11 @@ die() {
   exit 1
 }
 
+command_name="${1:-}"
 version=""
 push_release=true
+
+shift $(( $# > 0 ? 1 : 0 )) || true
 
 for arg in "$@"; do
   case "$arg" in
@@ -37,106 +45,165 @@ for arg in "$@"; do
   esac
 done
 
+[[ -n "$command_name" ]] || {
+  usage >&2
+  exit 1
+}
+
 [[ -n "$version" ]] || {
   usage >&2
   exit 1
 }
 
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Version must use X.Y.Z format."
-
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "$repo_root"
 
-[[ "$(git branch --show-current)" == "main" ]] || die "Release script must run from main."
+set_version_script="${script_dir}/set-version"
+promote_changelog_script="${script_dir}/promote-changelog"
 
-git diff --quiet || die "Working tree has unstaged changes."
-git diff --cached --quiet || die "Index has staged changes."
+current_branch() {
+  git branch --show-current
+}
 
-git rev-parse -q --verify "refs/tags/${version}" >/dev/null && die "Tag ${version} already exists locally."
+ensure_clean_worktree() {
+  git diff --quiet || die "Working tree has unstaged changes."
+  git diff --cached --quiet || die "Index has staged changes."
+}
 
-if $push_release; then
-  remote_tag_refs="$(git ls-remote --tags origin "refs/tags/${version}" "refs/tags/${version}^{}")"
-  [[ -z "$remote_tag_refs" ]] || die "Tag ${version} already exists on origin."
-fi
+validate_stable_version() {
+  [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Stable versions must use X.Y.Z format."
+}
 
-php -r '
-  $version = $argv[1];
-  $file = "plugin.php";
-  $contents = file_get_contents($file);
+validate_beta_version() {
+  [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]] || die "Beta versions must use X.Y.Z-beta.N format."
+}
 
-  if ($contents === false) {
-      fwrite(STDERR, "Could not read plugin.php\n");
-      exit(1);
-  }
+release_line_from_version() {
+  php -r '
+    $version = $argv[1];
+    if (preg_match("/^([0-9]+)\.([0-9]+)\.[0-9]+(?:-.+)?$/", $version, $matches) !== 1) {
+        fwrite(STDERR, "Could not derive release line from version\n");
+        exit(1);
+    }
+    echo $matches[1] . "." . $matches[2];
+  ' "$1"
+}
 
-  $contents = preg_replace("/^Version:\\s*.*/m", "Version: " . $version, $contents, 1, $headerCount);
-  $contents = preg_replace("/^\\s*define\\x28\\x27TASTY_FONTS_VERSION\\x27,\\s*\\x27.*\\x27\\x29;/m", "    define('\''TASTY_FONTS_VERSION'\'', '\''" . $version . "'\'');", $contents, 1, $constantCount);
+next_minor_dev_version() {
+  php -r '
+    if (preg_match("/^([0-9]+)\.([0-9]+)\.[0-9]+$/", $argv[1], $matches) !== 1) {
+        fwrite(STDERR, "Could not derive next dev version\n");
+        exit(1);
+    }
+    echo $matches[1] . "." . ((int) $matches[2] + 1) . ".0-dev";
+  ' "$1"
+}
 
-  if ($headerCount !== 1 || $constantCount !== 1) {
-      fwrite(STDERR, "Could not update both plugin version markers\n");
-      exit(1);
-  }
+tag_exists_anywhere() {
+  local tag_name="$1"
 
-  file_put_contents($file, $contents);
-' "$version"
+  git rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null && return 0
 
-php -r '
-  $version = $argv[1];
-  $date = $argv[2];
-  $file = "CHANGELOG.md";
-  $contents = file_get_contents($file);
+  if $push_release; then
+    local remote_tag_refs
+    remote_tag_refs="$(git ls-remote --tags origin "refs/tags/${tag_name}" "refs/tags/${tag_name}^{}")"
+    [[ -n "$remote_tag_refs" ]] && return 0
+  fi
 
-  if ($contents === false) {
-      fwrite(STDERR, "Could not read CHANGELOG.md\n");
-      exit(1);
-  }
+  return 1
+}
 
-  $marker = "## [Unreleased]\n";
-  $start = strpos($contents, $marker);
+run_quality_gates() {
+  find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l >/dev/null
+  php tests/run.php
+  node --test tests/js/*.test.cjs
+}
 
-  if ($start === false) {
-      fwrite(STDERR, "CHANGELOG.md is missing the Unreleased section\n");
-      exit(1);
-  }
+commit_and_tag_release() {
+  local target_version="$1"
+  local branch_name="$2"
 
-  $bodyStart = $start + strlen($marker);
-  while (isset($contents[$bodyStart]) && $contents[$bodyStart] === "\n") {
-      $bodyStart++;
-  }
+  tag_exists_anywhere "$target_version" && die "Tag ${target_version} already exists."
 
-  $nextHeading = strpos($contents, "\n## [", $bodyStart);
-  $body = $nextHeading === false
-      ? trim(substr($contents, $bodyStart))
-      : trim(substr($contents, $bodyStart, $nextHeading - $bodyStart));
+  "$set_version_script" "$target_version"
+  "$promote_changelog_script" "$target_version"
+  run_quality_gates
 
-  if ($body === "") {
-      fwrite(STDERR, "CHANGELOG.md has no Unreleased notes to publish\n");
-      exit(1);
-  }
+  git add plugin.php CHANGELOG.md
+  git commit -m "Release ${target_version}"
+  git tag -a "${target_version}" -m "Release ${target_version}"
 
-  $prefix = substr($contents, 0, $start);
-  $suffix = $nextHeading === false ? "" : substr($contents, $nextHeading + 1);
-  $updated = rtrim($prefix, "\n")
-      . "\n\n## [Unreleased]\n\n## [" . $version . "] - " . $date . "\n\n"
-      . $body
-      . ($suffix === "" ? "\n" : "\n\n" . ltrim($suffix, "\n"));
+  if $push_release; then
+    git push origin "${branch_name}"
+    git push origin "${target_version}"
+    echo "Released ${target_version} from ${branch_name}."
+  else
+    echo "Prepared ${target_version} locally on ${branch_name} without pushing."
+  fi
+}
 
-  file_put_contents($file, $updated);
-' "$version" "$(date +%F)"
+cut_release_branch() {
+  local stable_version="$1"
+  local branch_name="release/$(release_line_from_version "$stable_version")"
+  local beta_version="${stable_version}-beta.1"
+  local next_dev_version
 
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l >/dev/null
-php tests/run.php
-node --test tests/js/*.test.cjs
+  validate_stable_version "$stable_version"
+  [[ "$(current_branch)" == "main" ]] || die "Release branch cuts must start from main."
 
-git add plugin.php CHANGELOG.md
-git commit -m "Release version ${version}"
-git tag -a "${version}" -m "Release ${version}"
+  local current_version
+  current_version="$(sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r')"
+  [[ "$current_version" =~ -dev$ ]] || die "main must be on an X.Y.Z-dev version before cutting a release branch."
 
-if $push_release; then
-  git push origin main
-  git push origin "${version}"
-  echo "Released ${version} to origin."
-else
-  echo "Prepared ${version} locally without pushing."
-fi
+  git show-ref --verify --quiet "refs/heads/${branch_name}" && die "Branch ${branch_name} already exists locally."
+
+  if $push_release; then
+    git ls-remote --exit-code --heads origin "${branch_name}" >/dev/null 2>&1 && die "Branch ${branch_name} already exists on origin."
+  fi
+
+  next_dev_version="$(next_minor_dev_version "$stable_version")"
+
+  git switch -c "${branch_name}"
+  "$set_version_script" "$beta_version"
+  git add plugin.php
+  git commit -m "Start ${branch_name} beta line"
+
+  git switch main
+  "$set_version_script" "$next_dev_version"
+  git add plugin.php
+  git commit -m "Begin ${next_dev_version} development"
+
+  if $push_release; then
+    git push origin "${branch_name}"
+    git push origin main
+    echo "Created ${branch_name} at ${beta_version} and advanced main to ${next_dev_version}."
+  else
+    echo "Created ${branch_name} at ${beta_version} and advanced main to ${next_dev_version} locally without pushing."
+  fi
+}
+
+case "$command_name" in
+  branch)
+    ensure_clean_worktree
+    cut_release_branch "$version"
+    ;;
+  beta)
+    ensure_clean_worktree
+    validate_beta_version "$version"
+    branch_name="release/$(release_line_from_version "$version")"
+    [[ "$(current_branch)" == "$branch_name" ]] || die "Beta releases must be cut from ${branch_name}."
+    commit_and_tag_release "$version" "$branch_name"
+    ;;
+  stable)
+    ensure_clean_worktree
+    validate_stable_version "$version"
+    branch_name="release/$(release_line_from_version "$version")"
+    [[ "$(current_branch)" == "$branch_name" ]] || die "Stable releases must be cut from ${branch_name}."
+    commit_and_tag_release "$version" "$branch_name"
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

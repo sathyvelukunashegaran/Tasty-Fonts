@@ -19,6 +19,7 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\SiteEnvironment;
 use TastyFonts\Support\Storage;
+use TastyFonts\Updates\GitHubUpdater;
 
 final class AdminPageContextBuilder
 {
@@ -36,7 +37,8 @@ final class AdminPageContextBuilder
         private readonly GoogleFontsClient $googleClient,
         private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
-        private readonly OxygenIntegrationService $oxygenIntegration
+        private readonly OxygenIntegrationService $oxygenIntegration,
+        private readonly ?GitHubUpdater $updater = null
     ) {
     }
 
@@ -64,6 +66,8 @@ final class AdminPageContextBuilder
         $acssIntegration = $this->buildAcssIntegrationContext($settings);
         $bricksIntegration = $this->buildBricksIntegrationContext($settings);
         $oxygenIntegration = $this->buildOxygenIntegrationContext($settings);
+        $updateChannel = (string) ($settings['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE);
+        $updateChannelStatus = $this->buildUpdateChannelStatus($updateChannel);
         $previewBaselineSource = $applyEverywhere ? 'live_sitewide' : 'draft';
         $previewBaselineLabel = $applyEverywhere
             ? __('Live sitewide', 'tasty-fonts')
@@ -130,6 +134,9 @@ final class AdminPageContextBuilder
             'extended_variable_category_mono_enabled' => !empty($settings['extended_variable_category_mono_enabled']),
             'preload_primary_fonts' => !empty($settings['preload_primary_fonts']),
             'remote_connection_hints' => !empty($settings['remote_connection_hints']),
+            'update_channel' => $updateChannel,
+            'update_channel_options' => $this->buildUpdateChannelOptions(),
+            'update_channel_status' => $updateChannelStatus,
             'block_editor_font_library_sync_enabled' => !empty($settings['block_editor_font_library_sync_enabled']),
             'training_wheels_off' => !empty($settings['training_wheels_off']),
             'monospace_role_enabled' => !empty($settings['monospace_role_enabled']),
@@ -239,6 +246,75 @@ final class AdminPageContextBuilder
                 'value' => (string) ($settings['font_display'] ?? 'optional'),
                 'code' => false,
             ],
+        ];
+    }
+
+    public function buildUpdateChannelOptions(): array
+    {
+        return [
+            ['value' => SettingsRepository::UPDATE_CHANNEL_STABLE, 'label' => $this->formatUpdateChannelLabel(SettingsRepository::UPDATE_CHANNEL_STABLE)],
+            ['value' => SettingsRepository::UPDATE_CHANNEL_BETA, 'label' => $this->formatUpdateChannelLabel(SettingsRepository::UPDATE_CHANNEL_BETA)],
+            ['value' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY, 'label' => $this->formatUpdateChannelLabel(SettingsRepository::UPDATE_CHANNEL_NIGHTLY)],
+        ];
+    }
+
+    public function formatUpdateChannelLabel(string $channel): string
+    {
+        return match ($channel) {
+            SettingsRepository::UPDATE_CHANNEL_BETA => __('Beta', 'tasty-fonts'),
+            SettingsRepository::UPDATE_CHANNEL_NIGHTLY => __('Nightly', 'tasty-fonts'),
+            default => __('Stable', 'tasty-fonts'),
+        };
+    }
+
+    private function buildUpdateChannelStatus(string $selectedChannel): array
+    {
+        $installedVersion = defined('TASTY_FONTS_VERSION')
+            ? (string) TASTY_FONTS_VERSION
+            : '';
+        $latestAvailable = null;
+        $state = 'unavailable';
+
+        if ($this->updater instanceof GitHubUpdater) {
+            $overview = $this->updater->getChannelOverview($selectedChannel);
+            $installedVersion = (string) ($overview['installed_version'] ?? $installedVersion);
+            $latestAvailable = is_array($overview['latest_available'] ?? null) ? $overview['latest_available'] : null;
+            $state = (string) ($overview['state'] ?? $state);
+        }
+
+        $stateLabel = match ($state) {
+            'upgrade' => __('Upgrade Available', 'tasty-fonts'),
+            'rollback' => __('Rollback Available', 'tasty-fonts'),
+            'current' => __('Current', 'tasty-fonts'),
+            default => __('Unavailable', 'tasty-fonts'),
+        };
+        $stateClass = match ($state) {
+            'upgrade' => 'is-success',
+            'rollback' => 'is-warning',
+            'current' => 'is-role',
+            default => '',
+        };
+        $stateCopy = match ($state) {
+            'upgrade' => __('A newer package is available for the selected channel through the normal WordPress updates flow.', 'tasty-fonts'),
+            'rollback' => __('The selected channel points to an older package than the one installed now. Use the reinstall action below to switch immediately.', 'tasty-fonts'),
+            'current' => __('This channel is already aligned with the installed version.', 'tasty-fonts'),
+            default => __('No installable package is available for the selected channel right now.', 'tasty-fonts'),
+        };
+
+        return [
+            'selected_channel' => $selectedChannel,
+            'selected_channel_label' => $this->formatUpdateChannelLabel($selectedChannel),
+            'installed_version' => $installedVersion,
+            'latest_version' => is_array($latestAvailable) ? (string) ($latestAvailable['version'] ?? '') : '',
+            'latest_channel' => is_array($latestAvailable) ? (string) ($latestAvailable['channel'] ?? '') : '',
+            'latest_channel_label' => is_array($latestAvailable)
+                ? $this->formatUpdateChannelLabel((string) ($latestAvailable['channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE))
+                : '',
+            'state' => $state,
+            'state_label' => $stateLabel,
+            'state_class' => $stateClass,
+            'state_copy' => $stateCopy,
+            'can_reinstall' => $state === 'rollback' && is_array($latestAvailable),
         ];
     }
 

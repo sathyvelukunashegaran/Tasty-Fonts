@@ -34,6 +34,7 @@ coverage/
 .nyc_output/
 test-results/
 playwright-report/
+output/
 output/playwright/
 .playwright-cli/
 

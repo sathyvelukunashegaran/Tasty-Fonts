@@ -10,6 +10,9 @@ use TastyFonts\Support\FontUtils;
 
 final class SettingsRepository
 {
+    public const UPDATE_CHANNEL_STABLE = 'stable';
+    public const UPDATE_CHANNEL_BETA = 'beta';
+    public const UPDATE_CHANNEL_NIGHTLY = 'nightly';
     public const OPTION_SETTINGS = 'tasty_fonts_settings';
     public const OPTION_ROLES = 'tasty_fonts_roles';
     public const OPTION_GOOGLE_API_KEY_DATA = 'tasty_fonts_google_api_key_data';
@@ -57,6 +60,7 @@ final class SettingsRepository
         'extended_variable_category_mono_enabled' => true,
         'preload_primary_fonts' => true,
         'remote_connection_hints' => true,
+        'update_channel' => self::UPDATE_CHANNEL_STABLE,
         'block_editor_font_library_sync_enabled' => null,
         'bricks_integration_enabled' => null,
         'oxygen_integration_enabled' => null,
@@ -120,6 +124,7 @@ final class SettingsRepository
         $settings['extended_variable_category_mono_enabled'] = !empty($settings['extended_variable_category_mono_enabled']);
         $settings['preload_primary_fonts'] = !empty($settings['preload_primary_fonts']);
         $settings['remote_connection_hints'] = !empty($settings['remote_connection_hints']);
+        $settings['update_channel'] = $this->normalizeUpdateChannel((string) ($settings['update_channel'] ?? self::UPDATE_CHANNEL_STABLE));
         $settings['block_editor_font_library_sync_enabled'] = $this->normalizeBlockEditorFontLibrarySyncSetting(
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
@@ -241,6 +246,11 @@ final class SettingsRepository
             $settingsChanged = true;
         }
 
+        if (array_key_exists('update_channel', $input)) {
+            $settings['update_channel'] = $this->normalizeUpdateChannel((string) $input['update_channel']);
+            $settingsChanged = true;
+        }
+
         if (array_key_exists('block_editor_font_library_sync_enabled', $input)) {
             $settings['block_editor_font_library_sync_enabled'] = !empty($input['block_editor_font_library_sync_enabled']);
             $settingsChanged = true;
@@ -310,6 +320,11 @@ final class SettingsRepository
             $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES),
             $catalog
         );
+    }
+
+    public function getUpdateChannel(): string
+    {
+        return (string) ($this->getSettings()['update_channel'] ?? self::UPDATE_CHANNEL_STABLE);
     }
 
     public function saveRoles(array $input, array $catalog): array
@@ -710,6 +725,21 @@ final class SettingsRepository
         }
 
         return !empty($value);
+    }
+
+    private function normalizeUpdateChannel(string $channel): string
+    {
+        $channel = strtolower(trim($channel));
+
+        return in_array(
+            $channel,
+            [
+                self::UPDATE_CHANNEL_STABLE,
+                self::UPDATE_CHANNEL_BETA,
+                self::UPDATE_CHANNEL_NIGHTLY,
+            ],
+            true
+        ) ? $channel : self::UPDATE_CHANNEL_STABLE;
     }
 
     private function extractFamilyNames(array $catalog): array

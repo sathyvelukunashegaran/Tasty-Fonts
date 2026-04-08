@@ -49,6 +49,7 @@ final class Plugin
         GoogleFontsClient::TRANSIENT_CATALOG,
         BunnyFontsClient::TRANSIENT_CATALOG,
         'tasty_fonts_github_release_v1',
+        'tasty_fonts_github_release_manifest_v1',
         'tasty_fonts_github_release_version_v1',
     ];
 
@@ -178,7 +179,7 @@ final class Plugin
             $this->blockEditorFontLibrary,
             $this->googleClient
         );
-        $this->updater = new GitHubUpdater();
+        $this->updater = new GitHubUpdater($this->settings);
         $this->admin = new AdminController(
             $this->storage,
             $this->settings,
@@ -196,7 +197,8 @@ final class Plugin
             $this->acssIntegration,
             $this->bricksIntegration,
             $this->oxygenIntegration,
-            $this->developerTools
+            $this->developerTools,
+            $this->updater
         );
         $this->rest = new RestController($this->admin);
     }

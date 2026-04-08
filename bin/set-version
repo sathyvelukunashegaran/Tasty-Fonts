@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: bin/set-version <version>
+
+Updates the plugin version header and TASTY_FONTS_VERSION constant in plugin.php.
+EOF
+}
+
+version="${1:-}"
+
+if [[ -z "$version" || "$version" == "-h" || "$version" == "--help" ]]; then
+  usage
+  [[ -n "$version" ]] && exit 0
+  exit 1
+fi
+
+if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+|-dev(\.[0-9]+)?)?$ ]]; then
+  echo "Error: Unsupported version format: $version" >&2
+  exit 1
+fi
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+cd "$repo_root"
+
+php -r '
+  $version = $argv[1];
+  $file = "plugin.php";
+  $contents = file_get_contents($file);
+
+  if ($contents === false) {
+      fwrite(STDERR, "Could not read plugin.php\n");
+      exit(1);
+  }
+
+  $contents = preg_replace("/^Version:\\s*.*/m", "Version: " . $version, $contents, 1, $headerCount);
+  $contents = preg_replace("/^\\s*define\\x28\\x27TASTY_FONTS_VERSION\\x27,\\s*\\x27.*\\x27\\x29;/m", "    define('\''TASTY_FONTS_VERSION'\'', '\''" . $version . "'\'');", $contents, 1, $constantCount);
+
+  if ($headerCount !== 1 || $constantCount !== 1) {
+      fwrite(STDERR, "Could not update both plugin version markers\n");
+      exit(1);
+  }
+
+  file_put_contents($file, $contents);
+' "$version"

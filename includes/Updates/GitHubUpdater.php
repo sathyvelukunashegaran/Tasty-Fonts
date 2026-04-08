@@ -6,15 +6,22 @@ namespace TastyFonts\Updates;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\SettingsRepository;
+use WP_Error;
 use stdClass;
 
 final class GitHubUpdater
 {
+    public const CHANNEL_STABLE = SettingsRepository::UPDATE_CHANNEL_STABLE;
+    public const CHANNEL_BETA = SettingsRepository::UPDATE_CHANNEL_BETA;
+    public const CHANNEL_NIGHTLY = SettingsRepository::UPDATE_CHANNEL_NIGHTLY;
+
     private const PLUGIN_SLUG = 'tasty-fonts';
     private const REPOSITORY = 'sathyvelukunashegaran/Tasty-Custom-Fonts';
     private const REPOSITORY_URL = 'https://github.com/' . self::REPOSITORY;
     private const API_RELEASES_URL = 'https://api.github.com/repos/' . self::REPOSITORY . '/releases';
-    private const TRANSIENT_RELEASE = 'tasty_fonts_github_release_v1';
+    private const TRANSIENT_LEGACY_RELEASE = 'tasty_fonts_github_release_v1';
+    private const TRANSIENT_RELEASE_MANIFEST = 'tasty_fonts_github_release_manifest_v1';
     private const TRANSIENT_INSTALLED_VERSION = 'tasty_fonts_github_release_version_v1';
     private const CACHE_TTL = 6 * HOUR_IN_SECONDS;
     private const INSTALLED_VERSION_TTL = 30 * DAY_IN_SECONDS;
@@ -22,6 +29,10 @@ final class GitHubUpdater
     private const PACKAGE_NAME_PATTERN = 'tasty-fonts-%s.zip';
 
     private ?array $pluginMetadata = null;
+
+    public function __construct(private readonly ?SettingsRepository $settings = null)
+    {
+    }
 
     public function registerHooks(): void
     {
@@ -38,7 +49,7 @@ final class GitHubUpdater
             $transient = new stdClass();
         }
 
-        $release = $this->getLatestStableRelease();
+        $release = $this->getLatestReleaseForChannel($this->selectedChannel());
 
         if ($release === null || !$this->hasNewerVersion((string) ($release['version'] ?? ''))) {
             return $transient;
@@ -78,7 +89,7 @@ final class GitHubUpdater
             return $result;
         }
 
-        $release = $this->getLatestStableRelease();
+        $release = $this->getLatestReleaseForChannel($this->selectedChannel());
 
         if ($release === null) {
             return $result;
@@ -109,9 +120,119 @@ final class GitHubUpdater
         ];
     }
 
+    public function getChannelOverview(?string $channel = null): array
+    {
+        $channel = $this->resolveChannel($channel);
+        $installedVersion = $this->installedVersion();
+        $latestRelease = $this->getLatestReleaseForChannel($channel);
+        $state = 'unavailable';
+
+        if (is_array($latestRelease)) {
+            $comparison = version_compare((string) ($latestRelease['version'] ?? ''), $installedVersion);
+
+            if ($comparison > 0) {
+                $state = 'upgrade';
+            } elseif ($comparison < 0) {
+                $state = 'rollback';
+            } else {
+                $state = 'current';
+            }
+        }
+
+        return [
+            'selected_channel' => $channel,
+            'installed_version' => $installedVersion,
+            'latest_available' => $latestRelease,
+            'state' => $state,
+            'can_reinstall' => $state === 'rollback' && is_array($latestRelease),
+        ];
+    }
+
+    public function reinstallReleaseForChannel(?string $channel = null): array|WP_Error
+    {
+        if (!current_user_can('manage_options')) {
+            return new WP_Error(
+                'tasty_fonts_update_channel_forbidden',
+                __('You do not have permission to reinstall this plugin.', 'tasty-fonts')
+            );
+        }
+
+        $overview = $this->getChannelOverview($channel);
+        $release = is_array($overview['latest_available'] ?? null) ? $overview['latest_available'] : null;
+
+        if ($release === null) {
+            return new WP_Error(
+                'tasty_fonts_release_unavailable',
+                __('No installable release is available for the selected update channel.', 'tasty-fonts')
+            );
+        }
+
+        if (($overview['state'] ?? 'unavailable') !== 'rollback') {
+            return new WP_Error(
+                'tasty_fonts_release_reinstall_not_needed',
+                __('The selected update channel does not require a rollback reinstall right now.', 'tasty-fonts')
+            );
+        }
+
+        $packageUrl = trim((string) ($release['package_url'] ?? ''));
+
+        if ($packageUrl === '') {
+            return new WP_Error(
+                'tasty_fonts_release_package_missing',
+                __('The selected release does not expose a valid install package.', 'tasty-fonts')
+            );
+        }
+
+        $this->loadUpgraderDependencies();
+
+        $skin = class_exists('Automatic_Upgrader_Skin') ? new \Automatic_Upgrader_Skin() : null;
+        $upgrader = class_exists('Plugin_Upgrader') ? new \Plugin_Upgrader($skin) : null;
+
+        if ($upgrader === null || !method_exists($upgrader, 'install')) {
+            return new WP_Error(
+                'tasty_fonts_upgrader_unavailable',
+                __('The WordPress plugin upgrader is unavailable on this site.', 'tasty-fonts')
+            );
+        }
+
+        $result = $upgrader->install(
+            $packageUrl,
+            [
+                'clear_update_cache' => true,
+                'overwrite_package' => true,
+            ]
+        );
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        if ($result !== true) {
+            $skinError = $this->extractUpgraderSkinError($skin);
+
+            if ($skinError instanceof WP_Error) {
+                return $skinError;
+            }
+
+            return new WP_Error(
+                'tasty_fonts_release_install_failed',
+                __('The selected release could not be reinstalled.', 'tasty-fonts')
+            );
+        }
+
+        $this->clearReleaseCache();
+        set_transient(self::TRANSIENT_INSTALLED_VERSION, $this->installedVersion(), self::INSTALLED_VERSION_TTL);
+
+        return [
+            'channel' => (string) ($overview['selected_channel'] ?? self::CHANNEL_STABLE),
+            'version' => (string) ($release['version'] ?? ''),
+            'package_url' => $packageUrl,
+        ];
+    }
+
     public function handleUpgraderProcessComplete(mixed $upgrader, array $hookExtra): void
     {
-        if (($hookExtra['action'] ?? '') !== 'update' || ($hookExtra['type'] ?? '') !== 'plugin') {
+        if (!in_array(($hookExtra['action'] ?? ''), ['update', 'install'], true) || ($hookExtra['type'] ?? '') !== 'plugin') {
             return;
         }
 
@@ -142,12 +263,30 @@ final class GitHubUpdater
 
     private function clearReleaseCache(): void
     {
-        delete_transient(self::TRANSIENT_RELEASE);
+        delete_transient(self::TRANSIENT_LEGACY_RELEASE);
+        delete_transient(self::TRANSIENT_RELEASE_MANIFEST);
     }
 
-    private function getLatestStableRelease(): ?array
+    private function getLatestReleaseForChannel(string $channel): ?array
     {
-        $cached = get_transient(self::TRANSIENT_RELEASE);
+        $manifest = $this->getReleaseManifest();
+
+        if (!is_array($manifest)) {
+            return null;
+        }
+
+        $latestForChannel = is_array($manifest['latest_for_channel'] ?? null)
+            ? $manifest['latest_for_channel']
+            : [];
+
+        $release = $latestForChannel[$channel] ?? null;
+
+        return is_array($release) ? $release : null;
+    }
+
+    private function getReleaseManifest(): ?array
+    {
+        $cached = get_transient(self::TRANSIENT_RELEASE_MANIFEST);
 
         if (is_array($cached)) {
             return $cached;
@@ -174,34 +313,65 @@ final class GitHubUpdater
             return null;
         }
 
+        $manifest = [
+            'latest_by_type' => [
+                self::CHANNEL_STABLE => null,
+                self::CHANNEL_BETA => null,
+                self::CHANNEL_NIGHTLY => null,
+            ],
+            'latest_for_channel' => [
+                self::CHANNEL_STABLE => null,
+                self::CHANNEL_BETA => null,
+                self::CHANNEL_NIGHTLY => null,
+            ],
+        ];
+
         foreach ($payload as $release) {
-            if (!is_array($release) || ($release['draft'] ?? false) || ($release['prerelease'] ?? false)) {
+            if (!is_array($release) || ($release['draft'] ?? false)) {
                 continue;
             }
 
             $normalized = $this->normalizeRelease($release);
 
-            if ($normalized !== null) {
-                set_transient(self::TRANSIENT_RELEASE, $normalized, self::CACHE_TTL);
+            if ($normalized === null) {
+                continue;
             }
 
-            return $normalized;
+            $channel = (string) ($normalized['channel'] ?? self::CHANNEL_STABLE);
+            $current = $manifest['latest_by_type'][$channel] ?? null;
+            $manifest['latest_by_type'][$channel] = $this->pickNewerRelease(
+                is_array($current) ? $current : null,
+                $normalized
+            );
         }
 
-        return null;
+        $latestByType = is_array($manifest['latest_by_type'] ?? null) ? $manifest['latest_by_type'] : [];
+        $stable = is_array($latestByType[self::CHANNEL_STABLE] ?? null) ? $latestByType[self::CHANNEL_STABLE] : null;
+        $beta = is_array($latestByType[self::CHANNEL_BETA] ?? null) ? $latestByType[self::CHANNEL_BETA] : null;
+        $nightly = is_array($latestByType[self::CHANNEL_NIGHTLY] ?? null) ? $latestByType[self::CHANNEL_NIGHTLY] : null;
+
+        $manifest['latest_for_channel'][self::CHANNEL_STABLE] = $stable;
+        $manifest['latest_for_channel'][self::CHANNEL_BETA] = $this->pickNewerRelease($stable, $beta);
+        $manifest['latest_for_channel'][self::CHANNEL_NIGHTLY] = $this->pickNewestRelease([$stable, $beta, $nightly]);
+
+        set_transient(self::TRANSIENT_RELEASE_MANIFEST, $manifest, self::CACHE_TTL);
+
+        return $manifest;
     }
 
     private function normalizeRelease(array $release): ?array
     {
         $version = $this->normalizeVersion((string) ($release['tag_name'] ?? ''));
+        $channel = $this->classifyReleaseChannel($version);
         $packageUrl = $this->findPackageUrl($version, $release['assets'] ?? []);
 
-        if ($version === '' || $packageUrl === '') {
+        if ($version === '' || $channel === '' || $packageUrl === '') {
             return null;
         }
 
         return [
             'version' => $version,
+            'channel' => $channel,
             'package_url' => $packageUrl,
             'body' => (string) ($release['body'] ?? ''),
             'published_at' => (string) ($release['published_at'] ?? ''),
@@ -238,6 +408,23 @@ final class GitHubUpdater
     private function hasNewerVersion(string $version): bool
     {
         return $version !== '' && version_compare($version, $this->installedVersion(), '>');
+    }
+
+    private function classifyReleaseChannel(string $version): string
+    {
+        if (preg_match('/^[0-9]+\.[0-9]+\.[0-9]+$/', $version) === 1) {
+            return self::CHANNEL_STABLE;
+        }
+
+        if (preg_match('/^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$/', $version) === 1) {
+            return self::CHANNEL_BETA;
+        }
+
+        if (preg_match('/^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$/', $version) === 1) {
+            return self::CHANNEL_NIGHTLY;
+        }
+
+        return '';
     }
 
     private function normalizeVersion(string $version): string
@@ -309,6 +496,94 @@ final class GitHubUpdater
     private function pluginBasename(): string
     {
         return plugin_basename(TASTY_FONTS_FILE);
+    }
+
+    private function resolveChannel(?string $channel): string
+    {
+        $channel = strtolower(trim((string) $channel));
+
+        return in_array($channel, [self::CHANNEL_STABLE, self::CHANNEL_BETA, self::CHANNEL_NIGHTLY], true)
+            ? $channel
+            : self::CHANNEL_STABLE;
+    }
+
+    private function selectedChannel(): string
+    {
+        if ($this->settings instanceof SettingsRepository) {
+            return $this->resolveChannel($this->settings->getUpdateChannel());
+        }
+
+        return self::CHANNEL_STABLE;
+    }
+
+    private function pickNewestRelease(array $releases): ?array
+    {
+        $winner = null;
+
+        foreach ($releases as $release) {
+            if (!is_array($release)) {
+                continue;
+            }
+
+            $winner = $this->pickNewerRelease($winner, $release);
+        }
+
+        return $winner;
+    }
+
+    private function pickNewerRelease(?array $left, ?array $right): ?array
+    {
+        if (!is_array($left)) {
+            return is_array($right) ? $right : null;
+        }
+
+        if (!is_array($right)) {
+            return $left;
+        }
+
+        return version_compare((string) ($right['version'] ?? ''), (string) ($left['version'] ?? ''), '>')
+            ? $right
+            : $left;
+    }
+
+    private function loadUpgraderDependencies(): void
+    {
+        if (class_exists('Plugin_Upgrader')) {
+            return;
+        }
+
+        foreach (
+            [
+                ABSPATH . 'wp-admin/includes/file.php',
+                ABSPATH . 'wp-admin/includes/misc.php',
+                ABSPATH . 'wp-admin/includes/class-wp-upgrader.php',
+            ] as $path
+        ) {
+            if (is_string($path) && $path !== '' && is_readable($path)) {
+                require_once $path;
+            }
+        }
+    }
+
+    private function extractUpgraderSkinError(mixed $skin): ?WP_Error
+    {
+        if (!is_object($skin)) {
+            return null;
+        }
+
+        foreach (['get_errors', 'get_error'] as $method) {
+            if (!method_exists($skin, $method)) {
+                continue;
+            }
+
+            $error = $skin->{$method}();
+
+            if ($error instanceof WP_Error) {
+                return $error;
+            }
+        }
+
+        return null;
     }
 
     private function installedVersion(): string

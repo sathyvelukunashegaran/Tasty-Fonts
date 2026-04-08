@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: bin/promote-changelog <version> [date]
+
+Promotes CHANGELOG.md's Unreleased notes into a dated version section.
+EOF
+}
+
+version="${1:-}"
+release_date="${2:-$(date +%F)}"
+
+if [[ -z "$version" || "$version" == "-h" || "$version" == "--help" ]]; then
+  usage
+  [[ -n "$version" ]] && exit 0
+  exit 1
+fi
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+cd "$repo_root"
+
+php -r '
+  $version = $argv[1];
+  $date = $argv[2];
+  $file = "CHANGELOG.md";
+  $contents = file_get_contents($file);
+
+  if ($contents === false) {
+      fwrite(STDERR, "Could not read CHANGELOG.md\n");
+      exit(1);
+  }
+
+  $marker = "## [Unreleased]\n";
+  $start = strpos($contents, $marker);
+
+  if ($start === false) {
+      fwrite(STDERR, "CHANGELOG.md is missing the Unreleased section\n");
+      exit(1);
+  }
+
+  $bodyStart = $start + strlen($marker);
+  while (isset($contents[$bodyStart]) && $contents[$bodyStart] === "\n") {
+      $bodyStart++;
+  }
+
+  $nextHeading = strpos($contents, "\n## [", $bodyStart);
+  $body = $nextHeading === false
+      ? trim(substr($contents, $bodyStart))
+      : trim(substr($contents, $bodyStart, $nextHeading - $bodyStart));
+
+  if ($body === "") {
+      fwrite(STDERR, "CHANGELOG.md has no Unreleased notes to publish\n");
+      exit(1);
+  }
+
+  $prefix = substr($contents, 0, $start);
+  $suffix = $nextHeading === false ? "" : substr($contents, $nextHeading + 1);
+  $updated = rtrim($prefix, "\n")
+      . "\n\n## [Unreleased]\n\n## [" . $version . "] - " . $date . "\n\n"
+      . $body
+      . ($suffix === "" ? "\n" : "\n\n" . ltrim($suffix, "\n"));
+
+  file_put_contents($file, $updated);
+' "$version" "$release_date"

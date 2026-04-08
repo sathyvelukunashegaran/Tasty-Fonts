@@ -150,9 +150,20 @@ The `Behavior` tab controls plugin-level features that are not primarily about g
 
 Key controls include:
 
+- `Update Channel`
 - `Enable Monospace Role`
 - `Hide Onboarding Hints`
 - `Delete uploaded fonts on uninstall`
+
+#### Update Channel
+
+Choose which GitHub release rail the updater should follow:
+
+- `Stable` only accepts final `X.Y.Z` releases
+- `Beta` accepts stable releases plus `X.Y.Z-beta.N` prereleases
+- `Nightly` accepts stable, beta, and stamped nightly builds from `main`
+
+If the selected channel points to an older version than the one currently installed, the Behavior tab exposes a rollback reinstall button so you can switch channels immediately instead of waiting for the lower channel to catch up.
 
 #### Enable Monospace Role
 
@@ -207,6 +218,8 @@ Integration settings can affect:
 
 Behavior settings can affect:
 
+- which release rail the GitHub updater follows
+- whether a rollback reinstall action is exposed for channel switches
 - whether monospace-specific roles and output exist
 - whether onboarding hints remain visible
 - whether plugin-managed uploaded files are removed during uninstall

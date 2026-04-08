@@ -213,6 +213,49 @@ if (!class_exists('WP_REST_Request')) {
     }
 }
 
+if (!class_exists('Automatic_Upgrader_Skin')) {
+    class Automatic_Upgrader_Skin
+    {
+        private ?WP_Error $error = null;
+
+        public function set_error(WP_Error $error): void
+        {
+            $this->error = $error;
+        }
+
+        public function get_error(): ?WP_Error
+        {
+            return $this->error;
+        }
+    }
+}
+
+if (!class_exists('Plugin_Upgrader')) {
+    class Plugin_Upgrader
+    {
+        public function __construct(public mixed $skin = null)
+        {
+        }
+
+        public function install(string $package, array $args = []): mixed
+        {
+            global $pluginUpgraderInstallCalls;
+            global $pluginUpgraderInstallResult;
+
+            $pluginUpgraderInstallCalls[] = [
+                'package' => $package,
+                'args' => $args,
+            ];
+
+            if ($pluginUpgraderInstallResult instanceof WP_Error && $this->skin instanceof Automatic_Upgrader_Skin) {
+                $this->skin->set_error($pluginUpgraderInstallResult);
+            }
+
+            return $pluginUpgraderInstallResult;
+        }
+    }
+}
+
 if (!function_exists('__')) {
     function __(string $text, string $domain = ''): string
     {
@@ -547,6 +590,9 @@ $siteTransientSet = [];
 $uploadBaseDir = sys_get_temp_dir() . '/tasty-fonts-tests/uploads';
 $uploadedFilePaths = [];
 $currentUserId = 1;
+$currentUserCapabilities = ['manage_options' => true];
+$pluginUpgraderInstallCalls = [];
+$pluginUpgraderInstallResult = true;
 $wpdb = null;
 $wpdbQueries = [];
 $wp_filesystem = null;
@@ -1141,6 +1187,12 @@ if (!function_exists('check_admin_referer')) {
 if (!function_exists('current_user_can')) {
     function current_user_can(string $capability): bool
     {
+        global $currentUserCapabilities;
+
+        if (is_array($currentUserCapabilities) && array_key_exists($capability, $currentUserCapabilities)) {
+            return !empty($currentUserCapabilities[$capability]);
+        }
+
         return true;
     }
 }
@@ -1400,10 +1452,13 @@ function resetTestState(): void
     global $menuPageCalls;
     global $currentPostId;
     global $currentUserId;
+    global $currentUserCapabilities;
     global $oxygenGlobalSettings;
     global $optionAutoload;
     global $optionDeleted;
     global $optionStore;
+    global $pluginUpgraderInstallCalls;
+    global $pluginUpgraderInstallResult;
     global $redirectLocation;
     global $registeredStyles;
     global $registeredRestRoutes;
@@ -1471,7 +1526,10 @@ function resetTestState(): void
     $uploadedFilePaths = [];
     $currentPostId = 0;
     $currentUserId = 1;
+    $currentUserCapabilities = ['manage_options' => true];
     $oxygenGlobalSettings = [];
+    $pluginUpgraderInstallCalls = [];
+    $pluginUpgraderInstallResult = true;
     $wpdb = new TestWpdb();
     $wpdbQueries = [];
     $wp_filesystem = new TestWpFilesystem();
@@ -1530,6 +1588,7 @@ function makeServiceGraph(): array
         $blockEditorFontLibrary,
         $google
     );
+    $updater = new GitHubUpdater($settings);
     $controller = new AdminController(
         $storage,
         $settings,
@@ -1547,7 +1606,8 @@ function makeServiceGraph(): array
         $acssIntegration,
         $bricksIntegration,
         $oxygenIntegration,
-        $developerTools
+        $developerTools,
+        $updater
     );
     $rest = new RestController($controller);
     $runtime = new RuntimeService($planner, $assets, $adobe, $settings, $bricksIntegration, $oxygenIntegration);
@@ -1572,6 +1632,7 @@ function makeServiceGraph(): array
         'oxygen_integration' => $oxygenIntegration,
         'block_editor_font_library' => $blockEditorFontLibrary,
         'developer_tools' => $developerTools,
+        'updater' => $updater,
         'controller' => $controller,
         'rest' => $rest,
         'runtime' => $runtime,

@@ -26,6 +26,7 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\SiteEnvironment;
 use TastyFonts\Support\Storage;
+use TastyFonts\Updates\GitHubUpdater;
 use WP_Error;
 
 final class AdminController
@@ -73,7 +74,8 @@ final class AdminController
         private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration,
-        private readonly DeveloperToolsService $developerTools
+        private readonly DeveloperToolsService $developerTools,
+        private readonly ?GitHubUpdater $updater = null
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
         $this->pageContextBuilder = new AdminPageContextBuilder(
@@ -87,7 +89,8 @@ final class AdminController
             $this->googleClient,
             $this->acssIntegration,
             $this->bricksIntegration,
-            $this->oxygenIntegration
+            $this->oxygenIntegration,
+            $this->updater
         );
     }
 
@@ -252,6 +255,10 @@ final class AdminController
         }
 
         if ($this->handleResetSuppressedNoticesAction()) {
+            return;
+        }
+
+        if ($this->handleReinstallUpdateChannelAction()) {
             return;
         }
 
@@ -683,6 +690,37 @@ final class AdminController
         return ['message' => $message];
     }
 
+    public function reinstallSelectedUpdateChannelRelease(): array|WP_Error
+    {
+        if (!$this->updater instanceof GitHubUpdater) {
+            return new WP_Error(
+                'tasty_fonts_updater_unavailable',
+                __('The GitHub updater is unavailable in this environment.', 'tasty-fonts')
+            );
+        }
+
+        $result = $this->updater->reinstallReleaseForChannel($this->settings->getUpdateChannel());
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $channel = (string) ($result['channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE);
+        $version = (string) ($result['version'] ?? '');
+        $message = sprintf(
+            __('Reinstalled the %1$s channel release (%2$s).', 'tasty-fonts'),
+            $this->formatUpdateChannelLabel($channel),
+            $version !== '' ? $version : __('latest available', 'tasty-fonts')
+        );
+        $this->log->add($message);
+
+        return [
+            'message' => $message,
+            'channel' => $channel,
+            'version' => $version,
+        ];
+    }
+
     public function saveFamilyDeliveryValue(string $familySlug, string $deliveryId): array|WP_Error
     {
         return $this->library->saveFamilyDelivery($familySlug, $deliveryId);
@@ -847,6 +885,23 @@ final class AdminController
         $result = $this->resetSuppressedNotices();
 
         $this->redirectWithSuccess((string) ($result['message'] ?? __('Suppressed notices reset.', 'tasty-fonts')));
+    }
+
+    private function handleReinstallUpdateChannelAction(): bool
+    {
+        if (!isset($_POST['tasty_fonts_reinstall_update_channel'])) {
+            return false;
+        }
+
+        check_admin_referer('tasty_fonts_reinstall_update_channel', '_tasty_fonts_reinstall_nonce');
+
+        $result = $this->reinstallSelectedUpdateChannelRelease();
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
+
+        $this->redirectWithSuccess((string) ($result['message'] ?? __('Selected channel release reinstalled.', 'tasty-fonts')));
     }
 
     private function handleSaveSettingsAction(): bool
@@ -1229,6 +1284,13 @@ final class AdminController
                 : __('remote connection hints disabled', 'tasty-fonts');
         }
 
+        if (($before['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE) !== ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE)) {
+            $changes[] = sprintf(
+                __('update channel set to %s', 'tasty-fonts'),
+                $this->formatUpdateChannelLabel((string) ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE))
+            );
+        }
+
         if (!empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])) {
             $changes[] = !empty($after['block_editor_font_library_sync_enabled'])
                 ? __('Block Editor Font Library sync enabled', 'tasty-fonts')
@@ -1307,6 +1369,7 @@ final class AdminController
     {
         return !empty($before['training_wheels_off']) !== !empty($after['training_wheels_off'])
             || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled'])
+            || ($before['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE) !== ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE)
             || !empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])
             || ($before['bricks_integration_enabled'] ?? null) !== ($after['bricks_integration_enabled'] ?? null)
             || ($before['oxygen_integration_enabled'] ?? null) !== ($after['oxygen_integration_enabled'] ?? null)
@@ -1424,6 +1487,19 @@ final class AdminController
         }
 
         return $this->pageContextBuilder->formatCssDeliveryModeLabel($mode);
+    }
+
+    private function formatUpdateChannelLabel(string $channel): string
+    {
+        if (isset($this->pageContextBuilder)) {
+            return $this->pageContextBuilder->formatUpdateChannelLabel($channel);
+        }
+
+        return match ($channel) {
+            SettingsRepository::UPDATE_CHANNEL_BETA => __('Beta', 'tasty-fonts'),
+            SettingsRepository::UPDATE_CHANNEL_NIGHTLY => __('Nightly', 'tasty-fonts'),
+            default => __('Stable', 'tasty-fonts'),
+        };
     }
 
     private function assetVersionFor(string $relativePath = ''): string
@@ -1830,6 +1906,7 @@ final class AdminController
                 'css_delivery_mode',
                 'font_display',
                 'preview_sentence',
+                'update_channel',
             ] as $field
         ) {
             if (!array_key_exists($field, $submittedValues)) {
