@@ -549,17 +549,17 @@ final class BlockEditorFontLibraryService
         if (SiteEnvironment::isLoopbackTlsTrustError($message)) {
             $this->log->add(
                 sprintf(
-                    __('Block Editor Font Library sync failed for %1$s because PHP could not verify this site\'s HTTPS certificate during the editor sync request. Open Plugin Behavior to turn this feature off for local development, or turn it back on after PHP/cURL trusts the site certificate.', 'tasty-fonts'),
+                    __('Block Editor Font Library sync failed for %1$s because PHP could not verify this site\'s HTTPS certificate during the editor sync request. Open Integrations to turn this feature off for local development, or turn it back on after PHP/cURL trusts the site certificate.', 'tasty-fonts'),
                     $familyName
                 ),
-                $this->buildPluginBehaviorLogAction()
+                $this->buildIntegrationsLogAction()
             );
 
             return;
         }
 
         $context = SiteEnvironment::isLikelyLocalEnvironment($this->restBaseUrl(), SiteEnvironment::currentEnvironmentType())
-            ? $this->buildPluginBehaviorLogAction()
+            ? $this->buildIntegrationsLogAction()
             : [];
 
         $this->log->add(
@@ -572,19 +572,19 @@ final class BlockEditorFontLibraryService
         );
     }
 
-    private function buildPluginBehaviorLogAction(): array
+    private function buildIntegrationsLogAction(): array
     {
         if (!function_exists('admin_url')) {
             return [];
         }
 
         return [
-            'action_label' => __('Open Plugin Behavior', 'tasty-fonts'),
+            'action_label' => __('Open Integrations', 'tasty-fonts'),
             'action_url' => add_query_arg(
                 [
                     'page' => AdminController::MENU_SLUG,
                     'tf_page' => AdminController::PAGE_SETTINGS,
-                    'tf_studio' => 'plugin-behavior',
+                    'tf_studio' => 'integrations',
                 ],
                 admin_url('admin.php')
             ),

@@ -108,6 +108,9 @@ final class AdminPageViewBuilder
         $generatedCssPanel = is_array($context['generated_css_panel'] ?? null) ? $context['generated_css_panel'] : [];
         $previewPanels = is_array($context['preview_panels'] ?? null) ? $context['preview_panels'] : [];
         $localEnvironmentNotice = is_array($context['local_environment_notice'] ?? null) ? $context['local_environment_notice'] : [];
+        $gutenbergIntegration = is_array($context['gutenberg_integration'] ?? null) ? $context['gutenberg_integration'] : [];
+        $etchIntegration = is_array($context['etch_integration'] ?? null) ? $context['etch_integration'] : [];
+        $acssIntegration = is_array($context['acss_integration'] ?? null) ? $context['acss_integration'] : [];
         $toasts = is_array($context['toasts'] ?? null) ? $context['toasts'] : [];
         $applyEverywhere = !empty($context['apply_everywhere']);
         $previewBaselineSource = (string) ($context['preview_baseline_source'] ?? ($applyEverywhere ? 'live_sitewide' : 'draft'));

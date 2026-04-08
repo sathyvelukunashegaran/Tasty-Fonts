@@ -171,8 +171,10 @@
     let previewDirty = false;
     let previewFollowsDraft = false;
     let defaultTrackedUiState = null;
+    let pageReloadScheduled = false;
     const settingsAutosaveDelay = 450;
     const pendingUiStateKey = 'tastyFontsPendingUiState';
+    const reloadQueryKey = 'tf_reload';
     const trackedUiQueryKeys = [
         'tf_page',
         'tf_advanced',
@@ -671,6 +673,7 @@
             'preload_primary_fonts',
             'remote_connection_hints',
             'block_editor_font_library_sync_enabled',
+            'acss_font_role_sync_enabled',
             'delete_uploaded_files_on_uninstall',
             'training_wheels_off',
             'monospace_role_enabled'
@@ -734,6 +737,11 @@
 
             applySavedSettingsState(payload.settings || {});
             showToast(payload.message || getString('settingsSaved', 'Plugin settings saved.'), 'success');
+
+            if (payload && payload.reload_required) {
+                reloadPageSoon(650, captureTrackedUiState());
+            }
+
             return true;
         } catch (error) {
             showToast(getErrorMessage(error, getString('settingsSaveError', 'The settings could not be saved.')), 'error');
@@ -1751,12 +1759,20 @@
     }
 
     function reloadPageSoon(delay = 900, pendingUiState = null) {
+        if (pageReloadScheduled) {
+            return;
+        }
+
+        pageReloadScheduled = true;
+
         if (pendingUiState) {
             savePendingUiState(pendingUiState);
         }
 
         window.setTimeout(() => {
-            window.location.reload();
+            const reloadUrl = new URL(window.location.href);
+            reloadUrl.searchParams.set(reloadQueryKey, String(Date.now()));
+            window.location.replace(reloadUrl.toString());
         }, delay);
     }
 

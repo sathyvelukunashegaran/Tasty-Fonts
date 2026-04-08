@@ -449,9 +449,23 @@ final class Storage
         if (is_string($context) && trim($context) !== '') {
             $context = wp_normalize_path($context);
 
-            return (is_dir($context) || !file_exists($context))
-                ? $context
-                : wp_normalize_path(dirname($context));
+            if (file_exists($context) && !is_dir($context)) {
+                $context = wp_normalize_path(dirname($context));
+            }
+
+            while ($context !== '' && !file_exists($context)) {
+                $parent = wp_normalize_path(dirname($context));
+
+                if ($parent === $context) {
+                    break;
+                }
+
+                $context = $parent;
+            }
+
+            if ($context !== '') {
+                return $context;
+            }
         }
 
         $root = $this->getRoot();

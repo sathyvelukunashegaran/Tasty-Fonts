@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
     getIframeDocument,
     normalizeStylesheetUrls,
+    requiresCrossOriginStylesheetAccess,
     syncIframeStylesheets,
 } = require('../../assets/js/canvas-contracts.js');
 
@@ -13,6 +14,7 @@ class FakeLink {
         this.parentNode = null;
         this.href = '';
         this.rel = '';
+        this.crossOrigin = null;
     }
 
     getAttribute(name) {
@@ -21,6 +23,10 @@ class FakeLink {
 
     setAttribute(name, value) {
         this.attributes[name] = String(value);
+    }
+
+    removeAttribute(name) {
+        delete this.attributes[name];
     }
 }
 
@@ -42,6 +48,9 @@ function createFakeDocument(urls = []) {
 
     const document = {
         head,
+        location: {
+            href: 'https://example.test/?etch=1',
+        },
         createElement(tagName) {
             assert.equal(tagName, 'link');
 
@@ -97,6 +106,19 @@ test('canvas contracts guard iframe documents without a head element', () => {
     assert.equal(getIframeDocument({ contentDocument: document }), document);
 });
 
+test('canvas contracts detect when runtime stylesheets need crossorigin access', () => {
+    const { document } = createFakeDocument();
+
+    assert.equal(
+        requiresCrossOriginStylesheetAccess(document, 'https://fonts.googleapis.com/css2?family=Inter'),
+        true
+    );
+    assert.equal(
+        requiresCrossOriginStylesheetAccess(document, 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css'),
+        false
+    );
+});
+
 test('canvas contracts sync iframe stylesheets by updating and pruning runtime links', () => {
     const { document, links } = createFakeDocument([
         'https://example.test/old-a.css',
@@ -120,4 +142,19 @@ test('canvas contracts sync iframe stylesheets by updating and pruning runtime l
         links.map((link) => link.getAttribute('data-tasty-fonts-runtime-index')),
         ['0', '1']
     );
+    assert.equal(links[0].crossOrigin, null);
+    assert.equal(links[1].crossOrigin, null);
+});
+
+test('canvas contracts mark cross-origin runtime stylesheets anonymous for iframe access', () => {
+    const { document, links } = createFakeDocument();
+
+    assert.equal(
+        syncIframeStylesheets(document, [
+            'https://fonts.googleapis.com/css2?family=JetBrains+Mono',
+        ]),
+        true
+    );
+
+    assert.equal(links[0].crossOrigin, 'anonymous');
 });

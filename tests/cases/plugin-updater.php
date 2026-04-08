@@ -55,6 +55,7 @@ $tests['plugin_boot_registers_plugin_row_meta_rest_and_font_library_sync_hooks']
     assertSameValue(true, isset($hookCallbacks['plugins_api']), 'Boot should register the plugin information hook.');
     assertSameValue(true, isset($hookCallbacks['upgrader_process_complete']), 'Boot should register the upgrader completion hook.');
     assertSameValue(true, isset($hookCallbacks['rest_api_init']), 'Boot should register the REST API init hook.');
+    assertSameValue(true, isset($hookCallbacks['enqueue_block_assets']), 'Boot should register the block editor content-assets hook for Gutenberg iframe styles.');
     assertSameValue(true, isset($hookCallbacks['tasty_fonts_after_import']), 'Boot should register the Block Editor Font Library sync hook.');
     assertSameValue(true, isset($hookCallbacks['tasty_fonts_after_delete_family']), 'Boot should register the Block Editor Font Library delete hook.');
     foreach (
@@ -659,11 +660,13 @@ $tests['block_editor_font_library_sync_registers_managed_font_families_after_imp
     );
 };
 
-$tests['block_editor_font_library_sync_is_disabled_by_default_on_local_hosts'] = static function (): void {
+$tests['block_editor_font_library_sync_is_enabled_by_default_on_local_hosts'] = static function (): void {
     resetTestState();
 
     global $remoteGetCalls;
+    global $remoteGetResponses;
     global $remoteRequestCalls;
+    global $remoteRequestResponses;
 
     $services = makeServiceGraph();
     $family = $services['imports']->saveProfile(
@@ -687,6 +690,19 @@ $tests['block_editor_font_library_sync_is_disabled_by_default_on_local_hosts'] =
         true
     );
 
+    $remoteGetResponses['https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit'] = [
+        'response' => ['code' => 200],
+        'body' => '[]',
+    ];
+    $remoteRequestResponses['POST https://example.test/wp-json/wp/v2/font-families'] = [
+        'response' => ['code' => 201],
+        'body' => json_encode(['id' => 321]),
+    ];
+    $remoteRequestResponses['POST https://example.test/wp-json/wp/v2/font-families/321/font-faces'] = [
+        'response' => ['code' => 201],
+        'body' => json_encode(['id' => 654]),
+    ];
+
     $services['block_editor_font_library']->syncImportedFamily(
         [
             'status' => 'imported',
@@ -697,8 +713,12 @@ $tests['block_editor_font_library_sync_is_disabled_by_default_on_local_hosts'] =
         'google'
     );
 
-    assertSameValue([], $remoteGetCalls, 'Local installs should leave Block Editor Font Library sync off until the user enables it.');
-    assertSameValue([], $remoteRequestCalls, 'No Block Editor Font Library requests should run while the local default remains off.');
+    assertSameValue(
+        'https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit',
+        (string) ($remoteGetCalls[0]['url'] ?? ''),
+        'Local installs should now attempt Gutenberg Font Library sync immediately because the default is on.'
+    );
+    assertSameValue(2, count($remoteRequestCalls), 'With the default on, local installs should create one family and one face in the core Font Library when loopback requests succeed.');
 };
 
 $tests['block_editor_font_library_sync_respects_opt_out_filter'] = static function (): void {
@@ -802,10 +822,10 @@ $tests['block_editor_font_library_sync_logs_actionable_certificate_failures'] = 
     $entries = $services['log']->all();
 
     assertContainsValue('could not verify this site', (string) ($entries[0]['message'] ?? ''), 'TLS trust failures should be rewritten into actionable log messages.');
-    assertSameValue('Open Plugin Behavior', (string) ($entries[0]['action_label'] ?? ''), 'TLS trust failures should include a direct action label for the settings panel.');
+    assertSameValue('Open Integrations', (string) ($entries[0]['action_label'] ?? ''), 'TLS trust failures should include a direct action label for the settings panel.');
     assertContainsValue('page=tasty-custom-fonts', (string) ($entries[0]['action_url'] ?? ''), 'TLS trust failures should point to the unified admin page.');
     assertContainsValue('tf_page=settings', (string) ($entries[0]['action_url'] ?? ''), 'TLS trust failures should activate the Settings tab.');
-    assertContainsValue('tf_studio=plugin-behavior', (string) ($entries[0]['action_url'] ?? ''), 'TLS trust failures should deep-link to the Plugin Behavior tab.');
+    assertContainsValue('tf_studio=integrations', (string) ($entries[0]['action_url'] ?? ''), 'TLS trust failures should deep-link to the Integrations tab.');
 };
 
 $tests['block_editor_font_library_sync_skips_when_core_font_post_types_are_unavailable'] = static function (): void {

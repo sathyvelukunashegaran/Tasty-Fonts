@@ -17,6 +17,7 @@ use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Google\GoogleImportService;
+use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -61,7 +62,8 @@ final class AdminController
         private readonly BunnyFontsClient $bunnyClient,
         private readonly BunnyImportService $bunnyImport,
         private readonly GoogleFontsClient $googleClient,
-        private readonly GoogleImportService $googleImport
+        private readonly GoogleImportService $googleImport,
+        private readonly AcssIntegrationService $acssIntegration
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
         $this->pageContextBuilder = new AdminPageContextBuilder(
@@ -72,7 +74,8 @@ final class AdminController
             $this->assets,
             $this->cssBuilder,
             $this->adobe,
-            $this->googleClient
+            $this->googleClient,
+            $this->acssIntegration
         );
     }
 
@@ -481,6 +484,15 @@ final class AdminController
             $this->assets->refreshGeneratedAssets(false, false);
         }
 
+        $integrationMessage = $this->syncAcssIntegrationAfterSettingsSave($previousSettings, $savedSettings, $settingsInput);
+
+        if (is_wp_error($integrationMessage)) {
+            return $integrationMessage;
+        }
+
+        $savedSettings = $this->settings->getSettings();
+        $reloadRequired = $this->settingsChangeRequiresReload($previousSettings, $savedSettings);
+
         if ($clearGoogleKey) {
             $this->settings->saveGoogleApiKeyStatus('empty');
             $message = $this->buildNoticeMessage('google_key_cleared');
@@ -489,6 +501,7 @@ final class AdminController
             return [
                 'message' => $message,
                 'settings' => $this->settings->getSettings(),
+                'reload_required' => $reloadRequired,
             ];
         }
 
@@ -507,6 +520,7 @@ final class AdminController
                 return [
                     'message' => $message,
                     'settings' => $this->settings->getSettings(),
+                    'reload_required' => $reloadRequired,
                 ];
             }
 
@@ -522,11 +536,17 @@ final class AdminController
         }
 
         $settingsMessage = $this->buildSettingsSavedMessage($previousSettings, $savedSettings);
+
+        if ($integrationMessage !== '') {
+            $settingsMessage .= ' ' . $integrationMessage;
+        }
+
         $this->log->add($settingsMessage);
 
         return [
             'message' => $settingsMessage,
             'settings' => $savedSettings,
+            'reload_required' => $reloadRequired,
         ];
     }
 
@@ -561,6 +581,9 @@ final class AdminController
         if (!current_user_can('manage_options')) {
             return;
         }
+
+        $this->initializeDetectedIntegrations();
+        $this->reconcileAcssIntegrationDrift();
 
         if ($this->shouldRedirectNonCanonicalPageRequest()) {
             wp_safe_redirect($this->buildAdminPageUrl($this->resolveRequestedPageType()));
@@ -779,6 +802,17 @@ final class AdminController
             : [];
         $this->library->syncLiveRolePublishStates($liveRoles, $sitewideEnabled);
 
+        $integrationMessage = '';
+
+        if ($actionType === 'apply' || $actionType === 'disable') {
+            $integrationSettings = $this->settings->getSettings();
+            $integrationMessage = $this->syncAcssIntegrationForRuntimeState($integrationSettings);
+
+            if (is_wp_error($integrationMessage)) {
+                $this->redirectWithError($integrationMessage->get_error_message());
+            }
+        }
+
         $this->assets->refreshGeneratedAssets(false);
 
         $message = $this->buildRolesSavedMessage(
@@ -787,6 +821,10 @@ final class AdminController
             $appliedRoles,
             $wasAppliedSitewide
         );
+
+        if ($integrationMessage !== '') {
+            $message .= ' ' . $integrationMessage;
+        }
 
         $this->log->add($message);
 
@@ -854,6 +892,9 @@ final class AdminController
                         'tf_source' => 'google',
                     ]),
                     self::PAGE_SETTINGS => $this->buildPageUrl(self::PAGE_SETTINGS),
+                    self::PAGE_SETTINGS . '_integrations' => $this->buildPageUrl(self::PAGE_SETTINGS, [
+                        'tf_studio' => 'integrations',
+                    ]),
                     self::PAGE_SETTINGS . '_behavior' => $this->buildPageUrl(self::PAGE_SETTINGS, [
                         'tf_studio' => 'plugin-behavior',
                     ]),
@@ -977,6 +1018,12 @@ final class AdminController
                 : __('monospace role disabled', 'tasty-fonts');
         }
 
+        if (($before['acss_font_role_sync_enabled'] ?? null) !== ($after['acss_font_role_sync_enabled'] ?? null)) {
+            $changes[] = ($after['acss_font_role_sync_enabled'] ?? null) === true
+                ? __('Automatic.css font sync enabled', 'tasty-fonts')
+                : __('Automatic.css font sync disabled', 'tasty-fonts');
+        }
+
         if (($before['preview_sentence'] ?? '') !== ($after['preview_sentence'] ?? '')) {
             $changes[] = __('preview text updated', 'tasty-fonts');
         }
@@ -1016,7 +1063,10 @@ final class AdminController
     private function settingsChangeRequiresReload(array $before, array $after): bool
     {
         return !empty($before['training_wheels_off']) !== !empty($after['training_wheels_off'])
-            || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled']);
+            || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled'])
+            || !empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])
+            || ($before['acss_font_role_sync_enabled'] ?? null) !== ($after['acss_font_role_sync_enabled'] ?? null)
+            || !empty($before['acss_font_role_sync_applied']) !== !empty($after['acss_font_role_sync_applied']);
     }
 
     private function classOutputSubsettingsDiffer(array $before, array $after): bool
@@ -1573,6 +1623,7 @@ final class AdminController
                 'preload_primary_fonts',
                 'remote_connection_hints',
                 'block_editor_font_library_sync_enabled',
+                'acss_font_role_sync_enabled',
                 'delete_uploaded_files_on_uninstall',
                 'training_wheels_off',
             ] as $field
@@ -1612,6 +1663,192 @@ final class AdminController
         }
 
         return $normalized;
+    }
+
+    private function initializeDetectedIntegrations(): void
+    {
+        $settings = $this->settings->getSettings();
+
+        if (($settings['acss_font_role_sync_enabled'] ?? null) !== null || !$this->acssIntegration->isAvailable()) {
+            return;
+        }
+
+        $current = $this->acssIntegration->getCurrentSettings();
+        $settings = $this->settings->saveAcssFontRoleSyncState(true, false, $current['heading'], $current['body']);
+        $message = __('Automatic.css detected. Automatic.css font sync has been enabled in Integrations.', 'tasty-fonts');
+        $syncMessage = $this->syncAcssIntegrationForRuntimeState($settings);
+
+        if (is_wp_error($syncMessage)) {
+            $message .= ' ' . $syncMessage->get_error_message();
+            $this->queueNoticeToast('error', $message, 'alert');
+            $this->log->add(__('Automatic.css integration was detected, but its font sync could not be completed automatically.', 'tasty-fonts'));
+            return;
+        }
+
+        if ($syncMessage !== '') {
+            $message .= ' ' . $syncMessage;
+        }
+
+        $this->queueNoticeToast('success', $message, 'status');
+        $this->log->add(__('Automatic.css integration detected. Font sync enabled automatically.', 'tasty-fonts'));
+    }
+
+    private function reconcileAcssIntegrationDrift(): void
+    {
+        $settings = $this->settings->getSettings();
+
+        if (($settings['acss_font_role_sync_enabled'] ?? null) !== true) {
+            return;
+        }
+
+        if (empty($settings['acss_font_role_sync_applied']) || !$this->acssIntegration->isAvailable()) {
+            return;
+        }
+
+        $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
+        $state = $this->acssIntegration->readState($sitewideRolesEnabled, true, true);
+
+        if (($state['status'] ?? '') !== 'out_of_sync') {
+            return;
+        }
+
+        $this->settings->saveAcssFontRoleSyncState(
+            false,
+            false,
+            (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+        );
+
+        $message = __('Automatic.css font sync was turned off because its font-family settings no longer match the managed Tasty Fonts values. Enable it again to reapply the mapping.', 'tasty-fonts');
+        $this->queueNoticeToast('success', $message, 'status');
+        $this->log->add(__('Automatic.css sync turned off after its font-family settings changed outside Tasty Fonts.', 'tasty-fonts'));
+    }
+
+    private function syncAcssIntegrationAfterSettingsSave(array $previousSettings, array $savedSettings, array $settingsInput): string|WP_Error
+    {
+        if (!array_key_exists('acss_font_role_sync_enabled', $settingsInput)) {
+            return '';
+        }
+
+        $enabled = ($savedSettings['acss_font_role_sync_enabled'] ?? null) === true;
+        $wasEnabled = ($previousSettings['acss_font_role_sync_enabled'] ?? null) === true;
+
+        if (!$enabled && !$wasEnabled) {
+            return '';
+        }
+
+        return $this->syncAcssIntegrationForRuntimeState($savedSettings, true);
+    }
+
+    private function syncAcssIntegrationForRuntimeState(array $settings, bool $clearBackupWhenDisabled = false): string|WP_Error
+    {
+        $enabled = ($settings['acss_font_role_sync_enabled'] ?? null) === true;
+        $applied = !empty($settings['acss_font_role_sync_applied']);
+        $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
+
+        if (!$enabled) {
+            if ($applied && $this->acssIntegration->isAvailable()) {
+                $restore = $this->restoreAcssIntegration($settings);
+
+                if (is_wp_error($restore)) {
+                    return $restore;
+                }
+            }
+
+            $this->settings->saveAcssFontRoleSyncState(
+                false,
+                false,
+                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
+                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+            );
+
+            return $applied
+                ? __('Previous Automatic.css font-family values were restored.', 'tasty-fonts')
+                : __('Automatic.css sync is off. Existing Automatic.css settings were left unchanged.', 'tasty-fonts');
+        }
+
+        if (!$this->acssIntegration->isAvailable()) {
+            $this->settings->saveAcssFontRoleSyncState(
+                true,
+                false,
+                (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
+                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+            );
+
+            return __('Automatic.css sync is enabled and will apply when Automatic.css is active on this site.', 'tasty-fonts');
+        }
+
+        if (!$sitewideRolesEnabled) {
+            if ($applied) {
+                $restore = $this->restoreAcssIntegration($settings);
+
+                if (is_wp_error($restore)) {
+                    return $restore;
+                }
+            }
+
+            $this->settings->saveAcssFontRoleSyncState(
+                true,
+                false,
+                (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
+                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+            );
+
+            return $applied
+                ? __('Sitewide role delivery is off, so Automatic.css was restored to its previous font-family values until those role variables are live again.', 'tasty-fonts')
+                : __('Automatic.css sync is enabled and will apply after sitewide role delivery is turned on.', 'tasty-fonts');
+        }
+
+        $state = $this->acssIntegration->readState($sitewideRolesEnabled, $enabled, $applied);
+
+        if ($applied && !empty($state['synced'])) {
+            return '';
+        }
+
+        $settings = $this->captureAcssIntegrationBackupValues($settings);
+        $result = $this->acssIntegration->applyRoleVariableSync();
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $this->settings->saveAcssFontRoleSyncState(
+            true,
+            true,
+            (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+        );
+
+        return $applied
+            ? __('Automatic.css font-family mapping was reapplied.', 'tasty-fonts')
+            : __('Automatic.css now uses Tasty Fonts role variables for heading and body typography.', 'tasty-fonts');
+    }
+
+    private function captureAcssIntegrationBackupValues(array $settings): array
+    {
+        $hasHeadingBackup = trim((string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? '')) !== '';
+        $hasTextBackup = trim((string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')) !== '';
+
+        if ($hasHeadingBackup || $hasTextBackup) {
+            return $settings;
+        }
+
+        $current = $this->acssIntegration->getCurrentSettings();
+
+        return $this->settings->saveAcssFontRoleSyncState(
+            true,
+            !empty($settings['acss_font_role_sync_applied']),
+            $current['heading'],
+            $current['body']
+        );
+    }
+
+    private function restoreAcssIntegration(array $settings): array|WP_Error
+    {
+        return $this->acssIntegration->restoreFontSettings(
+            (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+        );
     }
 
     private function buildFamilyFontDisplaySavedMessage(string $family, string $savedDisplay, string $effectiveDisplay): string
@@ -1793,7 +2030,7 @@ final class AdminController
             }
         }
 
-        if ($pageType === self::PAGE_SETTINGS && in_array($studio, ['output-settings', 'plugin-behavior'], true)) {
+        if ($pageType === self::PAGE_SETTINGS && in_array($studio, ['output-settings', 'integrations', 'plugin-behavior'], true)) {
             $args['tf_studio'] = $studio;
         }
 
@@ -1835,7 +2072,7 @@ final class AdminController
 
         return match ($key) {
             'tf_page' => in_array($value, [self::PAGE_ROLES, self::PAGE_LIBRARY, self::PAGE_SETTINGS, self::PAGE_DIAGNOSTICS], true) ? $value : '',
-            'tf_studio' => in_array($value, ['preview', 'snippets', 'generated', 'system', 'activity', 'output-settings', 'plugin-behavior'], true) ? $value : '',
+            'tf_studio' => in_array($value, ['preview', 'snippets', 'generated', 'system', 'activity', 'output-settings', 'integrations', 'plugin-behavior'], true) ? $value : '',
             'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface', 'code'], true) ? $value : '',
             'tf_output' => in_array($value, ['usage', 'variables', 'stacks', 'names'], true) ? $value : '',
             'tf_source' => in_array($value, ['google', 'bunny', 'adobe', 'upload'], true) ? $value : '',
@@ -1870,7 +2107,7 @@ final class AdminController
 
         $studio = $this->getAllowedTrackedUiTabValue('tf_studio');
 
-        if (in_array($studio, ['output-settings', 'plugin-behavior'], true)) {
+        if (in_array($studio, ['output-settings', 'integrations', 'plugin-behavior'], true)) {
             return self::PAGE_SETTINGS;
         }
 

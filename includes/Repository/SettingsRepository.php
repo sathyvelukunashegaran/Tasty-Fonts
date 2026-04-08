@@ -7,7 +7,6 @@ namespace TastyFonts\Repository;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
-use TastyFonts\Support\SiteEnvironment;
 
 final class SettingsRepository
 {
@@ -59,6 +58,10 @@ final class SettingsRepository
         'block_editor_font_library_sync_enabled' => null,
         'training_wheels_off' => false,
         'monospace_role_enabled' => false,
+        'acss_font_role_sync_enabled' => null,
+        'acss_font_role_sync_applied' => false,
+        'acss_font_role_sync_previous_heading_font_family' => '',
+        'acss_font_role_sync_previous_text_font_family' => '',
         'preview_sentence' => 'The quick brown fox jumps over the lazy dog. 1234567890',
         'adobe_enabled' => false,
         'adobe_project_id' => '',
@@ -116,6 +119,10 @@ final class SettingsRepository
         );
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
+        $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($settings['acss_font_role_sync_enabled'] ?? null);
+        $settings['acss_font_role_sync_applied'] = !empty($settings['acss_font_role_sync_applied']);
+        $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_family'] ?? '');
+        $settings['acss_font_role_sync_previous_text_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_text_font_family'] ?? '');
         $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
         $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
         $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
@@ -232,6 +239,11 @@ final class SettingsRepository
 
         if (array_key_exists('monospace_role_enabled', $input)) {
             $settings['monospace_role_enabled'] = !empty($input['monospace_role_enabled']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('acss_font_role_sync_enabled', $input)) {
+            $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($input['acss_font_role_sync_enabled']);
             $settingsChanged = true;
         }
 
@@ -363,6 +375,17 @@ final class SettingsRepository
     public function isBlockEditorFontLibrarySyncEnabled(): bool
     {
         return !empty($this->getSettings()['block_editor_font_library_sync_enabled']);
+    }
+
+    public function saveAcssFontRoleSyncState(?bool $enabled, bool $applied, string $previousHeading = '', string $previousText = ''): array
+    {
+        $settings = $this->getSettings();
+        $settings['acss_font_role_sync_enabled'] = $enabled;
+        $settings['acss_font_role_sync_applied'] = $applied;
+        $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($previousHeading);
+        $settings['acss_font_role_sync_previous_text_font_family'] = $this->sanitizeTextValue($previousText);
+
+        return $this->persistSettings($settings);
     }
 
     public function getAdobeProjectId(): string
@@ -577,14 +600,7 @@ final class SettingsRepository
 
     private function defaultBlockEditorFontLibrarySyncEnabled(): bool
     {
-        if (!function_exists('rest_url')) {
-            return true;
-        }
-
-        return !SiteEnvironment::isLikelyLocalEnvironment(
-            rest_url(''),
-            SiteEnvironment::currentEnvironmentType()
-        );
+        return true;
     }
 
     private function normalizeRoleFallback(mixed $value, string $default): string
@@ -601,6 +617,15 @@ final class SettingsRepository
     private function sanitizeTextValue(mixed $value): string
     {
         return sanitize_text_field(wp_unslash((string) $value));
+    }
+
+    private function normalizeOptionalBoolean(mixed $value): ?bool
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return !empty($value);
     }
 
     private function extractFamilyNames(array $catalog): array

@@ -105,6 +105,23 @@ final class RuntimeService
     }
 
     /**
+     * Enqueue content styles that Gutenberg hoists into the editor canvas iframe.
+     *
+     * @since 1.4.0
+     *
+     * @return void
+     */
+    public function enqueueBlockEditorContent(): void
+    {
+        if (!is_admin()) {
+            return;
+        }
+
+        $this->assets->enqueue('tasty-fonts-editor-content');
+        $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets(), 'editor-content');
+    }
+
+    /**
      * Enqueue preview fonts for the plugin's admin screens.
      *
      * @since 1.4.0
@@ -153,6 +170,15 @@ final class RuntimeService
         );
     }
 
+    public function filterExternalStylesheetTag(string $html, string $handle, string $href, string $media): string
+    {
+        if (!$this->isExternalStylesheetHandle($handle) || str_contains($html, ' crossorigin=')) {
+            return $html;
+        }
+
+        return preg_replace('/(?=\s*\/?>$)/', ' crossorigin="anonymous"', $html, 1) ?: $html;
+    }
+
     private function enqueueEtchCanvasBridge(): void
     {
         $stylesheetUrls = $this->getCanvasStylesheetUrls();
@@ -187,14 +213,14 @@ final class RuntimeService
         );
     }
 
-    private function enqueueExternalStylesheets(array $stylesheets): void
+    private function enqueueExternalStylesheets(array $stylesheets, string $handleSuffix = ''): void
     {
         foreach ($stylesheets as $stylesheet) {
             if (!is_array($stylesheet)) {
                 continue;
             }
 
-            $handle = (string) ($stylesheet['handle'] ?? '');
+            $handle = $this->stylesheetHandle($stylesheet, $handleSuffix);
             $url = (string) ($stylesheet['url'] ?? '');
 
             if ($handle === '' || $url === '') {
@@ -236,6 +262,30 @@ final class RuntimeService
         return $provider === 'adobe'
             ? $this->adobe->getEnqueueVersion()
             : TASTY_FONTS_VERSION;
+    }
+
+    private function stylesheetHandle(array $stylesheet, string $handleSuffix = ''): string
+    {
+        $handle = trim((string) ($stylesheet['handle'] ?? ''));
+
+        if ($handle === '' || $handleSuffix === '') {
+            return $handle;
+        }
+
+        $suffix = strtolower(trim((string) preg_replace('/[^a-z0-9_-]+/i', '-', $handleSuffix), '-'));
+
+        return $suffix === '' ? $handle : $handle . '-' . $suffix;
+    }
+
+    private function isExternalStylesheetHandle(string $handle): bool
+    {
+        foreach (['google', 'bunny', 'adobe'] as $provider) {
+            if (str_starts_with($handle, 'tasty-fonts-' . $provider . '-')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasEtchCanvasRequest(): bool

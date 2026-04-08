@@ -11,6 +11,7 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Google\GoogleFontsClient;
+use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -30,7 +31,8 @@ final class AdminPageContextBuilder
         private readonly AssetService $assets,
         private readonly CssBuilder $cssBuilder,
         private readonly AdobeProjectClient $adobe,
-        private readonly GoogleFontsClient $googleClient
+        private readonly GoogleFontsClient $googleClient,
+        private readonly AcssIntegrationService $acssIntegration
     ) {
     }
 
@@ -53,6 +55,9 @@ final class AdminPageContextBuilder
         $googleAccessContext = $this->buildGoogleAccessContext();
         $roleDeploymentContext = $this->buildRoleDeploymentContext($roles, $appliedRoles, $applyEverywhere, $settings);
         $localEnvironmentNotice = $this->buildLocalEnvironmentNotice($settings);
+        $gutenbergIntegration = $this->buildGutenbergIntegrationContext($settings);
+        $etchIntegration = $this->buildEtchIntegrationContext();
+        $acssIntegration = $this->buildAcssIntegrationContext($settings);
         $previewBaselineSource = $applyEverywhere ? 'live_sitewide' : 'draft';
         $previewBaselineLabel = $applyEverywhere
             ? __('Live sitewide', 'tasty-fonts')
@@ -127,6 +132,9 @@ final class AdminPageContextBuilder
             'generated_css_panel' => $this->buildGeneratedCssPanel($settings),
             'preview_panels' => $this->buildPreviewPanels(),
             'local_environment_notice' => $localEnvironmentNotice,
+            'gutenberg_integration' => $gutenbergIntegration,
+            'etch_integration' => $etchIntegration,
+            'acss_integration' => $acssIntegration,
             'toasts' => $this->buildNoticeToasts(),
         ];
     }
@@ -560,11 +568,66 @@ final class AdminPageContextBuilder
             'tone' => 'warning',
             'title' => __('Local environment detected', 'tasty-fonts'),
             'message' => $syncEnabled
-                ? __('Block Editor Font Library sync is enabled on this local site. Keep it on only when this site can complete background requests back to this site without SSL or certificate errors. If Activity shows cURL 60 or certificate verification failures, open Plugin Behavior and turn the sync back off for local development.', 'tasty-fonts')
-                : __('Block Editor Font Library sync is off by default on local environments because editor sync uses background requests back to this site, and local HTTPS certificates often fail certificate verification. Turn it on when you want imported fonts mirrored into the core WordPress Font Library and your local setup trusts this site\'s certificate.', 'tasty-fonts'),
-            'settings_label' => __('Open Plugin Behavior', 'tasty-fonts'),
-            'settings_url' => $this->buildPluginBehaviorUrl(),
+                ? __('Gutenberg Font Library sync is enabled on this local site. Keep it on only when this site can complete background requests back to this site without SSL or certificate errors. If Activity shows cURL 60 or certificate verification failures, open Integrations and turn the Gutenberg sync off for local development.', 'tasty-fonts')
+                : __('Gutenberg Font Library sync is off on this local site. Turn it back on in Integrations when you want imported fonts mirrored into WordPress typography controls and your local setup trusts this site\'s certificate.', 'tasty-fonts'),
+            'settings_label' => __('Open Integrations', 'tasty-fonts'),
+            'settings_url' => $this->buildIntegrationsUrl(),
         ];
+    }
+
+    public function buildGutenbergIntegrationContext(array $settings): array
+    {
+        $enabled = !empty($settings['block_editor_font_library_sync_enabled']);
+        $isLocal = SiteEnvironment::isLikelyLocalEnvironment(rest_url(''), SiteEnvironment::currentEnvironmentType());
+
+        return [
+            'enabled' => $enabled,
+            'is_local' => $isLocal,
+            'title' => __('Gutenberg Font Library', 'tasty-fonts'),
+            'description' => __('Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.', 'tasty-fonts'),
+            'status_label' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
+            'status_copy' => $enabled
+                ? ($isLocal
+                    ? __('Sync is on. If this local site hits loopback SSL or certificate errors, turn it off here until PHP/cURL trusts the site certificate again.', 'tasty-fonts')
+                    : __('Sync is on. Imported families will be mirrored into the WordPress Font Library when core font-library support is available.', 'tasty-fonts'))
+                : __('Sync is off. Tasty Fonts will keep Gutenberg font library writes disabled until you enable them again here.', 'tasty-fonts'),
+        ];
+    }
+
+    public function buildEtchIntegrationContext(): array
+    {
+        $available = class_exists(\Etch\Services\StylesheetService::class);
+
+        if (function_exists('apply_filters')) {
+            $available = (bool) apply_filters('tasty_fonts_etch_integration_available', $available);
+        }
+
+        return [
+            'available' => $available,
+            'status' => $available ? 'active' : 'inactive',
+            'title' => __('Etch Canvas Bridge', 'tasty-fonts'),
+            'description' => $available
+                ? __('Etch is active. Tasty Fonts will keep its generated and remote font stylesheets mirrored into Etch canvas iframes automatically.', 'tasty-fonts')
+                : __('Etch is not active on this site. If you install Etch later, the canvas bridge will turn on automatically.', 'tasty-fonts'),
+        ];
+    }
+
+    public function buildAcssIntegrationContext(array $settings): array
+    {
+        $enabled = ($settings['acss_font_role_sync_enabled'] ?? null) === true;
+        $applied = !empty($settings['acss_font_role_sync_applied']);
+        $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
+        $state = $this->acssIntegration->readState($sitewideRolesEnabled, $enabled, $applied);
+
+        return array_merge(
+            $state,
+            [
+                'title' => __('Automatic.css', 'tasty-fonts'),
+                'description' => __('Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.', 'tasty-fonts'),
+                'status_label' => $this->buildAcssIntegrationStatusLabel((string) ($state['status'] ?? 'disabled')),
+                'status_copy' => $this->buildAcssIntegrationStatusCopy((string) ($state['status'] ?? 'disabled'), $state),
+            ]
+        );
     }
 
     public function buildPreviewContext(array $settings): array
@@ -745,6 +808,36 @@ final class AdminPageContextBuilder
             'invalid' => __('Invalid Key', 'tasty-fonts'),
             'unknown' => __('Needs Check', 'tasty-fonts'),
             default => __('API Key Needed', 'tasty-fonts'),
+        };
+    }
+
+    private function buildAcssIntegrationStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'synced' => __('Synced', 'tasty-fonts'),
+            'ready' => __('Ready to Apply', 'tasty-fonts'),
+            'out_of_sync' => __('Needs Reapply', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Waiting for Sitewide Roles', 'tasty-fonts'),
+            'unavailable' => __('Not Active', 'tasty-fonts'),
+            default => __('Off', 'tasty-fonts'),
+        };
+    }
+
+    private function buildAcssIntegrationStatusCopy(string $status, array $state): string
+    {
+        $current = is_array($state['current'] ?? null) ? $state['current'] : ['heading' => '', 'body' => ''];
+
+        return match ($status) {
+            'synced' => __('Automatic.css is using `var(--font-heading)` and `var(--font-body)` now. Tasty Fonts will restore the previous ACSS values if sitewide role delivery is turned off.', 'tasty-fonts'),
+            'ready' => __('Automatic.css is active and the sync is enabled. Save or re-open settings to apply the variable mapping.', 'tasty-fonts'),
+            'out_of_sync' => __('Automatic.css is active, but its current font-family values differ from the managed Tasty Fonts mapping. Re-save the integration to reapply it.', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Automatic.css sync is enabled, but Tasty Fonts only exposes `--font-heading` and `--font-body` when sitewide role delivery is on. Publish roles sitewide first, then the sync will apply.', 'tasty-fonts'),
+            'unavailable' => __('Automatic.css is not active on this site, so there is nothing to sync yet.', 'tasty-fonts'),
+            default => sprintf(
+                __('Automatic.css currently uses heading `%1$s` and text `%2$s`.', 'tasty-fonts'),
+                $current['heading'] !== '' ? $current['heading'] : __('empty', 'tasty-fonts'),
+                $current['body'] !== '' ? $current['body'] : __('empty', 'tasty-fonts')
+            ),
         };
     }
 
@@ -947,6 +1040,18 @@ final class AdminPageContextBuilder
                 'page' => AdminController::MENU_SLUG,
                 'tf_page' => AdminController::PAGE_SETTINGS,
                 'tf_studio' => 'plugin-behavior',
+            ],
+            admin_url('admin.php')
+        );
+    }
+
+    private function buildIntegrationsUrl(): string
+    {
+        return add_query_arg(
+            [
+                'page' => AdminController::MENU_SLUG,
+                'tf_page' => AdminController::PAGE_SETTINGS,
+                'tf_studio' => 'integrations',
             ],
             admin_url('admin.php')
         );

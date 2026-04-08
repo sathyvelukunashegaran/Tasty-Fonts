@@ -26,6 +26,7 @@ use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleCssParser;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Google\GoogleImportService;
+use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -67,6 +68,7 @@ final class Plugin
     private readonly BunnyImportService $bunnyImport;
     private readonly GoogleFontsClient $googleClient;
     private readonly GoogleImportService $googleImport;
+    private readonly AcssIntegrationService $acssIntegration;
     private readonly RuntimeService $runtime;
     private readonly BlockEditorFontLibraryService $blockEditorFontLibrary;
     private readonly AdminController $admin;
@@ -144,6 +146,7 @@ final class Plugin
             $this->assets,
             $this->log
         );
+        $this->acssIntegration = new AcssIntegrationService();
         $this->runtime = new RuntimeService($this->planner, $this->assets, $this->adobe);
         $this->blockEditorFontLibrary = new BlockEditorFontLibraryService(
             $this->storage,
@@ -165,7 +168,8 @@ final class Plugin
             $this->bunnyClient,
             $this->bunnyImport,
             $this->googleClient,
-            $this->googleImport
+            $this->googleImport,
+            $this->acssIntegration
         );
         $this->rest = new RestController($this->admin);
     }
@@ -225,8 +229,10 @@ final class Plugin
         add_action('wp_head', [$this->runtime, 'outputPreloadHints'], 1);
         add_action('etch/canvas/enqueue_assets', [$this->runtime, 'enqueueEtchCanvas']);
         add_action('enqueue_block_editor_assets', [$this->runtime, 'enqueueBlockEditor']);
+        add_action('enqueue_block_assets', [$this->runtime, 'enqueueBlockEditorContent']);
         add_action('admin_enqueue_scripts', [$this->runtime, 'enqueueAdminScreenFonts']);
         add_filter('wp_theme_json_data_theme', [$this->runtime, 'injectEditorFontPresets']);
+        add_filter('style_loader_tag', [$this->runtime, 'filterExternalStylesheetTag'], 10, 4);
     }
 
     private function registerAdminHooks(): void

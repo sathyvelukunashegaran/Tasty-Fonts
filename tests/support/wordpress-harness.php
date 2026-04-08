@@ -78,6 +78,7 @@ use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleCssParser;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Google\GoogleImportService;
+use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
@@ -1460,6 +1461,7 @@ function makeServiceGraph(): array
     );
     $bunnyImport = new BunnyImportService($storage, $imports, $bunny, new BunnyCssParser(), $catalog, $assets, $log);
     $googleImport = new GoogleImportService($storage, $imports, $google, new GoogleCssParser(), $catalog, $assets, $log);
+    $acssIntegration = new AcssIntegrationService();
     $blockEditorFontLibrary = new BlockEditorFontLibraryService($storage, $imports, $settings, $log);
     $controller = new AdminController(
         $storage,
@@ -1474,7 +1476,8 @@ function makeServiceGraph(): array
         $bunny,
         $bunnyImport,
         $google,
-        $googleImport
+        $googleImport,
+        $acssIntegration
     );
     $rest = new RestController($controller);
     $runtime = new RuntimeService($planner, $assets, $adobe);
@@ -1494,6 +1497,7 @@ function makeServiceGraph(): array
         'bunny_import' => $bunnyImport,
         'google' => $google,
         'google_import' => $googleImport,
+        'acss_integration' => $acssIntegration,
         'block_editor_font_library' => $blockEditorFontLibrary,
         'controller' => $controller,
         'rest' => $rest,

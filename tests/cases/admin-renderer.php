@@ -260,12 +260,14 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
     assertContainsValue('<h2 class="tasty-fonts-section-title">Settings</h2>', $output, 'The Settings panel should keep a stable section heading regardless of tab activation order.');
     assertSameValue(4, substr_count($output, 'id="tasty-fonts-page-tab-'), 'The unified admin page should render four top-level page tabs.');
     assertSameValue(1, preg_match('/id="tasty-fonts-page-tab-library"[\s\S]*?tabindex="0"/', $output), 'All top-level page tabs should remain in the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-plugin-behavior"[\s\S]*?tabindex="0"/', $output), 'The Settings sub-tabs should keep both buttons in the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-integrations"[\s\S]*?tabindex="0"/', $output), 'The Settings sub-tabs should keep the Integrations button in the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-plugin-behavior"[\s\S]*?tabindex="0"/', $output), 'The Settings sub-tabs should keep the Behavior button in the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-preview-tab-code"[\s\S]*?tabindex="0"/', $output), 'Inactive preview tabs should remain in the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-add-font-tab-bunny"[\s\S]*?tabindex="0"/', $output), 'Inactive add-font tabs should remain in the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-tab-system"[\s\S]*?tabindex="0"/', $output), 'Inactive diagnostics tabs should remain in the normal keyboard tab order.');
     assertSameValue(1, preg_match('/Version [0-9]+\.[0-9]+\.[0-9]+/', $output), 'The page heading should include the current plugin version for assistive technologies.');
     assertContainsValue('data-settings-autosave="output"', $output, 'The Settings tab should render the output settings form with autosave enabled.');
+    assertContainsValue('data-settings-autosave="integrations"', $output, 'The Settings tab should render the integrations settings form with autosave enabled.');
     assertContainsValue('data-settings-autosave="behavior"', $output, 'The Settings tab should render the behavior settings form with autosave enabled.');
     assertNotContainsValue('Save Output Settings', $output, 'The Settings tab should no longer render a dedicated output save button.');
     assertNotContainsValue('Save Behavior Settings', $output, 'The Settings tab should no longer render a dedicated behavior save button.');
@@ -1439,8 +1441,13 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     $output = (string) ob_get_clean();
 
     assertContainsValue('Behavior', $output, 'The settings switcher should expose the dedicated Behavior tab.');
+    assertContainsValue('Integrations', $output, 'The settings switcher should expose the dedicated Integrations tab.');
+    assertContainsValue('Gutenberg Font Library', $output, 'The Integrations tab should expose the Gutenberg integration card.');
+    assertContainsValue('Automatic.css', $output, 'The Integrations tab should expose the Automatic.css integration card.');
+    assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Integrations tab should no longer render a duplicate Gutenberg sync row title.');
+    assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Integrations tab should no longer render a duplicate Automatic.css sync row title.');
     assertContainsValue('Hide Onboarding Hints', $output, 'The Behavior tab should expose the onboarding-hints toggle.');
-    assertContainsValue('Enable Block Editor Font Library Sync', $output, 'The Behavior panel should still render the editor sync toggle.');
+    assertNotContainsValue('Enable Block Editor Font Library Sync', $output, 'The Behavior panel should no longer render the Gutenberg sync toggle after it moves into Integrations.');
     assertContainsValue('Enable Monospace Role', $output, 'The Behavior panel should still render the monospace toggle.');
     assertContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should still render the uninstall cleanup toggle.');
     assertNotContainsValue('Editor Integrations', $output, 'The Behavior panel should no longer render the editor integrations subsection title.');
@@ -1452,8 +1459,85 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertNotContainsValue('Typography Workspace', $output, 'The masthead should omit the eyebrow label in the streamlined header layout.');
     assertNotContainsValue('Professional Typography Management For WordPress', $output, 'The streamlined masthead should omit the legacy hero tagline.');
     assertNotContainsValue('Deploy fonts, manage your library, and fine-tune output from one polished workspace.', $output, 'The streamlined masthead should omit the supporting summary copy.');
+    assertNotContainsValue('Choose whether the generated stylesheet loads as a file or is printed inline in the page head.', $output, 'Hide Onboarding Hints should omit output setting descriptions from the rendered HTML.');
+    assertNotContainsValue('Keep builder and framework integrations aligned with Tasty Fonts role variables.', $output, 'Hide Onboarding Hints should omit integrations tab summary descriptions from the rendered HTML.');
+    assertNotContainsValue('Hides helper tips and extra info buttons.', $output, 'Hide Onboarding Hints should omit behavior toggle descriptions from the rendered HTML.');
+    assertNotContainsValue('tasty-fonts-toggle-description', $output, 'Hide Onboarding Hints should omit settings toggle description elements from the rendered HTML.');
     assertNotContainsValue('tasty-fonts-help-button', $output, 'Hide Onboarding Hints should remove inline help buttons from the rendered admin UI.');
     assertNotContainsValue('data-help-tooltip=', $output, 'Hide Onboarding Hints should omit passive hover help attributes from the rendered admin UI.');
+};
+
+$tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'roles' => [],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'minify_css_output' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'block_editor_font_library_sync_enabled' => true,
+        'training_wheels_off' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'local_environment_notice' => [],
+        'toasts' => [],
+        'apply_everywhere' => false,
+        'gutenberg_integration' => [
+            'title' => 'Gutenberg Font Library',
+            'description' => 'Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.',
+            'status_label' => 'On',
+            'enabled' => true,
+        ],
+        'acss_integration' => [
+            'title' => 'Automatic.css',
+            'description' => 'Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.',
+            'status_label' => 'Synced',
+            'enabled' => true,
+            'current' => [
+                'heading' => 'Inter, sans-serif',
+                'body' => 'System UI, sans-serif',
+            ],
+            'desired' => [
+                \TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_FAMILY => 'var(--font-heading)',
+                \TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_FAMILY => 'var(--font-body)',
+            ],
+        ],
+        'role_deployment' => [
+            'badge' => 'Live',
+            'badge_class' => 'is-success',
+            'title' => 'Live',
+            'copy' => 'Current selections are being served sitewide.',
+        ],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.', $output, 'The Gutenberg integration summary should still explain the integration.');
+    assertContainsValue('On', $output, 'The Gutenberg integration row should still surface its current status.');
+    assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Gutenberg integration should no longer render a second row title.');
+    assertSameValue(1, substr_count($output, 'Gutenberg Font Library'), 'The Gutenberg integration should render a single main title.');
+    assertContainsValue('Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.', $output, 'The Automatic.css integration summary should still explain the integration.');
+    assertContainsValue('Synced', $output, 'The Automatic.css integration row should still surface its current status.');
+    assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Automatic.css integration should no longer render a second row title.');
+    assertNotContainsValue('Sets ACSS `heading-font-family` to `var(--font-heading)` and `text-font-family` to `var(--font-body)` while the integration is enabled.', $output, 'The Automatic.css integration should no longer render a second explanatory line.');
 };
 
 $tests['admin_page_renderer_keeps_dashboard_titles_and_buttons_in_title_case'] = static function (): void {
@@ -2432,8 +2516,8 @@ $tests['admin_page_renderer_renders_local_environment_notice_below_activity_with
             'tone' => 'warning',
             'title' => 'Local environment detected',
             'message' => 'Turn this on when your local setup trusts this site\'s certificate.',
-            'settings_label' => 'Open Plugin Behavior',
-            'settings_url' => 'https://example.test/wp-admin/admin.php?page=tasty-custom-fonts&tf_page=settings&tf_studio=plugin-behavior',
+            'settings_label' => 'Open Integrations',
+            'settings_url' => 'https://example.test/wp-admin/admin.php?page=tasty-custom-fonts&tf_page=settings&tf_studio=integrations',
         ],
         'toasts' => [],
         'apply_everywhere' => false,
@@ -2444,13 +2528,13 @@ $tests['admin_page_renderer_renders_local_environment_notice_below_activity_with
     $noticePosition = strpos($output, 'Local environment detected');
 
     assertContainsValue('Local environment detected', $output, 'The admin page should surface a dedicated notice for local environments.');
-    assertContainsValue('Open Plugin Behavior', $output, 'The local-environment notice should include a direct action to open the Plugin Behavior panel.');
+    assertContainsValue('Open Integrations', $output, 'The local-environment notice should include a direct action to open the Integrations panel.');
     assertContainsValue('Remind Tomorrow', $output, 'The local-environment notice should allow users to snooze the reminder until tomorrow.');
     assertContainsValue('Remind in 1 Week', $output, 'The local-environment notice should allow users to snooze the reminder for one week.');
     assertContainsValue('Never Show Again', $output, 'The local-environment notice should allow users to hide the reminder permanently for their account.');
     assertContainsValue('page=tasty-custom-fonts', $output, 'The local-environment notice action should deep-link to the unified admin page.');
     assertContainsValue('tf_page=settings', $output, 'The local-environment notice action should activate the Settings tab.');
-    assertContainsValue('tf_studio=plugin-behavior', $output, 'The local-environment notice action should deep-link to the Behavior tab.');
+    assertContainsValue('tf_studio=integrations', $output, 'The local-environment notice action should deep-link to the Integrations tab.');
     assertContainsValue('role="alert"', $output, 'Warning notices should render as announced alert regions.');
     assertContainsValue('aria-live="assertive"', $output, 'Warning notices should use assertive live-region semantics.');
     assertSameValue(true, $activityPosition !== false && $noticePosition !== false && $activityPosition < $noticePosition, 'The local-environment notice should render after the Activity section.');
@@ -2511,8 +2595,8 @@ $tests['admin_page_renderer_renders_activity_log_action_links'] = static functio
             'time' => '2026-04-06 15:00:00',
             'message' => 'Block Editor Font Library sync failed.',
             'actor' => 'System',
-            'action_label' => 'Open Plugin Behavior',
-            'action_url' => 'https://example.test/wp-admin/admin.php?page=tasty-custom-fonts&tf_page=settings&tf_studio=plugin-behavior',
+            'action_label' => 'Open Integrations',
+            'action_url' => 'https://example.test/wp-admin/admin.php?page=tasty-custom-fonts&tf_page=settings&tf_studio=integrations',
         ]],
         'activity_actor_options' => [],
         'family_fallbacks' => [],
@@ -2540,7 +2624,7 @@ $tests['admin_page_renderer_renders_activity_log_action_links'] = static functio
     ]);
     $output = (string) ob_get_clean();
 
-    assertContainsValue('Open Plugin Behavior', $output, 'Activity log entries should render an inline action link when one is provided.');
+    assertContainsValue('Open Integrations', $output, 'Activity log entries should render an inline action link when one is provided.');
     assertContainsValue('tasty-fonts-log-action', $output, 'Activity log action links should use the dedicated styling hook.');
     assertContainsValue('class="button tasty-fonts-button-danger tasty-fonts-font-action-button--icon tasty-fonts-activity-clear-button"', $output, 'The activity toolbar should render the clear-log action as an icon-only destructive button.');
     assertContainsValue('<span class="screen-reader-text">Clear Log</span>', $output, 'The icon-only clear-log action should keep an accessible text label.');

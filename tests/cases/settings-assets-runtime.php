@@ -17,6 +17,35 @@ use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 
+if (!class_exists('Automatic_CSS\\API')) {
+    eval(<<<'PHP'
+namespace Automatic_CSS;
+
+class API
+{
+    public static function get_setting($setting_key)
+    {
+        global $automaticCssSettings;
+
+        return is_array($automaticCssSettings) ? ($automaticCssSettings[$setting_key] ?? '') : '';
+    }
+
+    public static function update_settings($new_vars, $options = array(), $settings = null)
+    {
+        global $automaticCssSettings;
+
+        $automaticCssSettings = is_array($automaticCssSettings) ? $automaticCssSettings : array();
+
+        foreach ((array) $new_vars as $key => $value) {
+            $automaticCssSettings[$key] = $value;
+        }
+
+        return $automaticCssSettings;
+    }
+}
+PHP);
+}
+
 $tests['settings_repository_persists_adobe_project_state'] = static function (): void {
     resetTestState();
 
@@ -138,6 +167,26 @@ $tests['settings_repository_updates_google_key_status_without_rewriting_main_set
         (string) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_status'] ?? ''),
         'Updating Google API key validation state should only touch the dedicated option.'
     );
+};
+
+$tests['settings_repository_tracks_acss_font_sync_state'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $defaults = $settings->getSettings();
+
+    assertSameValue(null, $defaults['acss_font_role_sync_enabled'], 'Automatic.css sync should start unconfigured so first-run detection can opt users in once.');
+    assertSameValue(false, $defaults['acss_font_role_sync_applied'], 'Automatic.css sync should start unapplied.');
+
+    $saved = $settings->saveSettings(['acss_font_role_sync_enabled' => '1']);
+
+    assertSameValue(true, $saved['acss_font_role_sync_enabled'], 'Saving the Automatic.css sync toggle should persist an explicit enabled state.');
+
+    $saved = $settings->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif');
+
+    assertSameValue(true, $saved['acss_font_role_sync_applied'], 'Automatic.css sync state should record when the managed ACSS values are currently applied.');
+    assertSameValue('Inter, sans-serif', $saved['acss_font_role_sync_previous_heading_font_family'], 'Automatic.css sync state should preserve the previous heading font-family value for later restore.');
+    assertSameValue('system-ui, sans-serif', $saved['acss_font_role_sync_previous_text_font_family'], 'Automatic.css sync state should preserve the previous text font-family value for later restore.');
 };
 
 $tests['settings_repository_reuses_request_scoped_settings_until_a_write_invalidates_the_cache'] = static function (): void {
@@ -345,15 +394,15 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
     assertSameValue(false, $saved['extended_variable_category_mono_enabled'], 'Settings should persist disabled extended mono aliases.');
 };
 
-$tests['settings_repository_defaults_block_editor_font_library_sync_off_on_local_hosts'] = static function (): void {
+$tests['settings_repository_defaults_block_editor_font_library_sync_on_by_default'] = static function (): void {
     resetTestState();
 
     $settings = new SettingsRepository();
 
     assertSameValue(
-        false,
+        true,
         !empty($settings->getSettings()['block_editor_font_library_sync_enabled']),
-        'Local .test installs should default Block Editor Font Library sync to off until the user enables it explicitly.'
+        'New installs should default Block Editor Font Library sync to on until the user turns it off explicitly.'
     );
 };
 
@@ -824,7 +873,8 @@ $tests['admin_page_context_builder_uses_asset_status_metadata_for_generated_css_
         $services['assets'],
         new CssBuilder(),
         $services['adobe'],
-        $services['google']
+        $services['google'],
+        $services['acss_integration']
     );
 
     $items = $builder->buildDiagnosticItems(
@@ -842,6 +892,114 @@ $tests['admin_page_context_builder_uses_asset_status_metadata_for_generated_css_
 
     assertSameValue('2.0 KB', (string) ($items[2]['value'] ?? ''), 'Generated stylesheet diagnostics should use the provided asset status size instead of re-checking the filesystem path.');
     assertSameValue('2024-03-09 16:00:00', (string) ($items[3]['value'] ?? ''), 'Generated stylesheet diagnostics should use the provided asset status timestamp instead of calling filemtime on the path again.');
+};
+
+$tests['admin_page_context_builder_reports_acss_sync_waiting_for_sitewide_roles'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => '',
+        'text-font-family' => '',
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->saveAcssFontRoleSyncState(true, false, '', '');
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration']
+    );
+
+    $context = $builder->build();
+
+    assertSameValue('waiting_for_sitewide_roles', (string) ($context['acss_integration']['status'] ?? ''), 'Automatic.css sync should report that it is waiting when sitewide role delivery is still off.');
+    assertSameValue('', (string) ($context['acss_integration']['current']['heading'] ?? ''), 'Automatic.css integration context should expose the current heading font-family value.');
+    assertSameValue('', (string) ($context['acss_integration']['current']['body'] ?? ''), 'Automatic.css integration context should expose the current text font-family value.');
+};
+
+$tests['admin_controller_applies_acss_font_mapping_when_sync_is_enabled'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => 'Inter, sans-serif',
+        'text-font-family' => 'system-ui, sans-serif',
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+
+    $result = $services['controller']->saveSettingsValues([
+        'acss_font_role_sync_enabled' => '1',
+    ]);
+
+    assertSameValue('var(--font-heading)', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Enabling Automatic.css sync should push the heading role variable into Automatic.css.');
+    assertSameValue('var(--font-body)', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Enabling Automatic.css sync should push the body role variable into Automatic.css.');
+    assertSameValue(true, (bool) ($result['settings']['acss_font_role_sync_applied'] ?? false), 'Controller saves should mark Automatic.css sync as applied after the ACSS settings update succeeds.');
+    assertSameValue('Inter, sans-serif', (string) ($result['settings']['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'The previous ACSS heading value should be backed up before Tasty Fonts overwrites it.');
+    assertContainsValue('Automatic.css now uses Tasty Fonts role variables', (string) ($result['message'] ?? ''), 'The settings response should explain that Automatic.css is now mapped to Tasty Fonts variables.');
+};
+
+$tests['admin_controller_restores_previous_acss_font_values_when_sitewide_roles_are_disabled'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => 'var(--font-heading)',
+        'text-font-family' => 'var(--font-body)',
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $settings = $services['settings']->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif');
+    $settings = $services['settings']->setAutoApplyRoles(false);
+    $result = invokePrivateMethod($services['controller'], 'syncAcssIntegrationForRuntimeState', [$settings]);
+    $saved = $services['settings']->getSettings();
+
+    assertSameValue('Inter, sans-serif', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Disabling sitewide roles should restore the previous Automatic.css heading font-family value.');
+    assertSameValue('system-ui, sans-serif', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Disabling sitewide roles should restore the previous Automatic.css text font-family value.');
+    assertSameValue(false, (bool) ($saved['acss_font_role_sync_applied'] ?? true), 'Automatic.css sync should mark itself unapplied after restoring the previous ACSS values.');
+    assertContainsValue('restored to its previous font-family values', (string) $result, 'The runtime sync helper should explain that ACSS was restored after sitewide roles were turned off.');
+};
+
+$tests['admin_controller_turns_off_acss_sync_when_acss_drifts_outside_tasty_fonts'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => '',
+        'text-font-family' => '',
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif');
+
+    invokePrivateMethod($services['controller'], 'reconcileAcssIntegrationDrift');
+
+    $saved = $services['settings']->getSettings();
+
+    assertSameValue(false, (bool) ($saved['acss_font_role_sync_enabled'] ?? true), 'Managed Automatic.css sync should turn itself off when ACSS no longer matches the Tasty Fonts mapping.');
+    assertSameValue(false, (bool) ($saved['acss_font_role_sync_applied'] ?? true), 'Managed Automatic.css sync should clear its applied flag after drift is detected.');
+    assertSameValue('Inter, sans-serif', (string) ($saved['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'Drift detection should preserve the last backed-up heading value so re-enabling can still restore cleanly.');
 };
 
 $tests['asset_service_debounces_background_css_regeneration_events'] = static function (): void {
@@ -909,6 +1067,37 @@ CSS,
     );
 };
 
+$tests['runtime_service_marks_external_font_stylesheet_links_cors_readable'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $html = "<link rel='stylesheet' id='tasty-fonts-google-jetbrains-mono-cdn-css' href='https://fonts.googleapis.com/css2?family=JetBrains+Mono' media='all' />";
+
+    $filtered = $services['runtime']->filterExternalStylesheetTag(
+        $html,
+        'tasty-fonts-google-jetbrains-mono-cdn',
+        'https://fonts.googleapis.com/css2?family=JetBrains+Mono',
+        'all'
+    );
+
+    assertContainsValue(
+        'crossorigin="anonymous"',
+        $filtered,
+        'External Google font stylesheets should opt into anonymous CORS so builder integrations can inspect their rules.'
+    );
+
+    assertSameValue(
+        "<link rel='stylesheet' id='tasty-fonts-frontend-css' href='/wp-content/uploads/fonts/.generated/tasty-fonts.css' media='all' />",
+        $services['runtime']->filterExternalStylesheetTag(
+            "<link rel='stylesheet' id='tasty-fonts-frontend-css' href='/wp-content/uploads/fonts/.generated/tasty-fonts.css' media='all' />",
+            'tasty-fonts-frontend',
+            '/wp-content/uploads/fonts/.generated/tasty-fonts.css',
+            'all'
+        ),
+        'Generated local stylesheets should be left unchanged by the external stylesheet tag filter.'
+    );
+};
+
 $tests['runtime_service_skips_font_preload_hints_when_inline_css_delivery_is_enabled'] = static function (): void {
     resetTestState();
 
@@ -973,6 +1162,43 @@ $tests['runtime_asset_planner_forces_swap_for_admin_preview_stylesheets'] = stat
 
     assertContainsValue('display=optional', $runtimeUrl, 'Frontend runtime stylesheets should continue honoring the saved font-display policy.');
     assertContainsValue('display=swap', $previewUrl, 'Admin preview stylesheets should force swap so previews remain visible after reload.');
+};
+
+$tests['runtime_service_enqueues_block_editor_content_styles_for_gutenberg_iframe'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $isAdminRequest;
+
+    $services = makeServiceGraph();
+    $isAdminRequest = true;
+    $services['imports']->saveProfile(
+        'JetBrains Mono',
+        'jetbrains-mono',
+        [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular', '700'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+
+    $services['runtime']->enqueueBlockEditorContent();
+
+    assertSameValue(
+        true,
+        isset($enqueuedStyles['tasty-fonts-editor-content']),
+        'Gutenberg iframe styles should enqueue a dedicated generated CSS handle during enqueue_block_assets.'
+    );
+    assertSameValue(
+        true,
+        isset($enqueuedStyles['tasty-fonts-google-jetbrains-mono-cdn-editor-content']),
+        'Gutenberg iframe styles should enqueue remote font stylesheets with iframe-specific handles so WordPress hoists them into the canvas.'
+    );
 };
 
 $tests['asset_service_forces_swap_for_self_hosted_admin_preview_font_faces'] = static function (): void {

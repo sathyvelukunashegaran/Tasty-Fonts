@@ -1070,6 +1070,7 @@ $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): 
     assertSameValue('swap', (string) ($data['settings']['font_display'] ?? ''), 'The settings autosave route should return the saved font-display mode.');
     assertSameValue(true, !empty($data['settings']['class_output_enabled']), 'The settings autosave route should continue to persist class output via explicit booleans rather than a removed all preset.');
     assertSameValue(true, !empty($data['settings']['per_variant_font_variables_enabled']), 'The settings autosave route should continue to persist variable output via explicit booleans rather than a removed all preset.');
+    assertSameValue(false, !empty($data['reload_required']), 'Settings that only patch client-synced controls should not ask the autosave client to reload the page.');
     assertContainsValue('Plugin settings saved', (string) ($data['message'] ?? ''), 'The settings autosave route should return the save summary message.');
 };
 
@@ -1086,7 +1087,24 @@ $tests['rest_controller_settings_reload_toast_mentions_reload_when_needed'] = st
     $data = $response->get_data();
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'The settings autosave route should return a native REST response object.');
+    assertSameValue(true, !empty($data['reload_required']), 'Reload-only settings should return an explicit reload flag for the autosave client.');
     assertContainsValue('Reload the page to apply this change.', (string) ($data['message'] ?? ''), 'Reload-only settings should mention the required page reload in the autosave toast message.');
+};
+
+$tests['rest_controller_settings_reload_flag_covers_integrations_shell_changes'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'block_editor_font_library_sync_enabled' => '0',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response->get_data();
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The settings autosave route should return a native REST response object.');
+    assertSameValue(true, !empty($data['reload_required']), 'Integration settings that update server-rendered status rows should request an automatic rerender reload.');
 };
 
 $tests['rest_controller_roles_draft_accepts_and_returns_monospace_fields'] = static function (): void {
@@ -1389,6 +1407,26 @@ $tests['admin_controller_preserves_plugin_behavior_studio_tab_in_redirect_urls']
     assertSameValue('plugin-behavior', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the Behavior tab selection when it is active.');
 };
 
+$tests['admin_controller_preserves_integrations_studio_tab_in_redirect_urls'] = static function (): void {
+    resetTestState();
+
+    $_GET = [
+        'page' => AdminController::MENU_SLUG,
+        'tf_studio' => 'integrations',
+    ];
+
+    $controller = makeAdminControllerTestInstance();
+    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
+    $parts = parse_url($url);
+    $query = [];
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+
+    assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'Integration deep links should canonicalize to the single admin page.');
+    assertSameValue(AdminController::PAGE_SETTINGS, (string) ($query['tf_page'] ?? ''), 'Integration deep links should activate the Settings top-level tab.');
+    assertSameValue('integrations', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the Integrations tab selection when it is active.');
+};
+
 $tests['admin_controller_maps_legacy_diagnostics_tabs_to_the_diagnostics_page'] = static function (): void {
     resetTestState();
 
@@ -1535,9 +1573,10 @@ $tests['admin_controller_builds_local_environment_notice_again_when_snooze_expir
     $notice = invokePrivateMethod($services['controller'], 'buildLocalEnvironmentNotice', [$services['settings']->getSettings()]);
 
     assertSameValue('Local environment detected', (string) ($notice['title'] ?? ''), 'Expired snoozes should allow the local-environment reminder to appear again.');
-    assertSameValue('Open Plugin Behavior', (string) ($notice['settings_label'] ?? ''), 'The rebuilt reminder should still offer the Behavior deep link.');
+    assertSameValue('Open Integrations', (string) ($notice['settings_label'] ?? ''), 'The rebuilt reminder should offer the Integrations deep link.');
     assertContainsValue('page=' . AdminController::MENU_SLUG, (string) ($notice['settings_url'] ?? ''), 'The reminder deep link should point to the unified admin page.');
     assertContainsValue('tf_page=' . AdminController::PAGE_SETTINGS, (string) ($notice['settings_url'] ?? ''), 'The reminder deep link should activate the Settings tab.');
+    assertContainsValue('tf_studio=integrations', (string) ($notice['settings_url'] ?? ''), 'The reminder deep link should activate the Integrations panel.');
 };
 
 $tests['admin_controller_resolves_sitewide_toggle_submissions_into_role_actions'] = static function (): void {
