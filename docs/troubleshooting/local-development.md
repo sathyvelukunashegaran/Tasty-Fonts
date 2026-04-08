@@ -10,9 +10,9 @@ Troubleshoot local environment behavior, especially Block Editor Font Library sy
 
 ## Steps
 
-### 1. Check The Behavior Setting
+### 1. Check The Integrations Setting
 
-Open `Settings -> Behavior` and review `Enable Block Editor Font Library Sync`.
+Open `Settings -> Integrations` and review `Block Editor Font Library Sync`.
 
 On likely local environments, the plugin defaults this off because the sync depends on background requests back to the same site.
 

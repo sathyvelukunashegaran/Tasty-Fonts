@@ -2,6 +2,12 @@
 
 Typography management for Etch, Gutenberg, and the frontend.
 
+## 1.7.0 Beta Track
+
+Version `1.7.0` is the current beta milestone on the way to `2.0`.
+
+This release is meant to be used and evaluated seriously, but it should not be read as the final stable `2.0` shape. A few more tagged releases are expected before `2.0` lands, and those releases will continue refining the settings surface, integration workflows, and output defaults that are now in place.
+
 Tasty Custom Fonts lets you upload local font files, import Google Fonts or Bunny Fonts as self-hosted or CDN deliveries, connect an Adobe Fonts web project, and manage the live typography stack from one WordPress dashboard. The plugin generates runtime CSS, editor presets, preview tooling, and delivery controls without any build step.
 
 ![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php&logoColor=white)
@@ -9,7 +15,7 @@ Tasty Custom Fonts lets you upload local font files, import Google Fonts or Bunn
 ![License: GPLv2+](https://img.shields.io/badge/License-GPLv2%2B-green)
 ![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
 
-**Works especially well with [EtchWP](https://etch.com) and [Automatic CSS](https://automaticcss.com).**
+**Works especially well with [EtchWP](https://etch.com), [Automatic CSS](https://automaticcss.com), Bricks, and Oxygen.**
 
 ## Documentation
 
@@ -36,9 +42,9 @@ Use the repo-native docs for the full knowledge base:
 - Generate CSS variables, optional utility classes, editor presets, preloads, and connection hints from the same settings surface.
 - Inspect generated CSS and system details directly from the dashboard.
 
-## Dashboard Layout In 1.6.0
+## Dashboard Layout In 1.7.0 Beta
 
-The admin UI is now organized into four top-level pages:
+The admin UI is organized into four top-level pages:
 
 ### Deploy Fonts
 
@@ -58,9 +64,11 @@ The admin UI is now organized into four top-level pages:
 
 ### Settings
 
-- Adjust output controls such as CSS delivery mode, global `font-display`, minification, preloads, connection hints, variable output, and utility class output.
-- Adjust behavior controls such as Block Editor Font Library sync, monospace-role support, onboarding hints, and uninstall cleanup.
-- Output and behavior settings autosave through the plugin REST API instead of relying on full page refreshes.
+- `Output`: adjust CSS delivery mode, global `font-display`, minification, preloads, connection hints, the minimal output preset, variable output, and utility class output.
+- `Integrations`: manage Block Editor Font Library sync, Automatic.css font-role sync, and the Bricks/Oxygen builder integrations.
+- `Behavior`: control monospace-role support, onboarding hints, and uninstall cleanup.
+- `Developer`: clear caches, reset notices, restore plugin defaults, wipe the managed library, and reset integration detection with explicit confirmation phrases.
+- Standard settings changes autosave through the plugin REST API instead of relying on full page refreshes.
 
 ### Advanced Tools
 
@@ -105,17 +113,22 @@ Each family in the library can store one or more delivery profiles. The active d
 Tasty Custom Fonts can generate:
 
 - role variables such as `--font-heading`, `--font-body`, and `--font-monospace`
+- a minimal output preset that emits only the core heading/body variables
 - optional family variables and category aliases
 - optional global weight tokens
+- optional role font-weight usage rules for heading/body selectors
 - optional utility classes for roles, aliases, categories, and families
 - minified or readable CSS output depending on settings
 
 Per-family fallback stacks and per-family `font-display` overrides are managed from the library, while the global output model lives in the Settings page.
 
-## Block Editor And Etch Integration
+## Integrations
 
 - The plugin registers runtime families as editor typography presets.
 - Managed families can optionally sync into the core Block Editor Font Library.
+- Automatic.css can map its heading and body font-family settings to `var(--font-heading)` and `var(--font-body)`.
+- Bricks integration can expose published Tasty Fonts families in builder selectors and mirror matching Bricks typography choices into Gutenberg editor styles.
+- Oxygen integration can expose published Tasty Fonts families through the compatibility shim and mirror matching Oxygen global font choices into Gutenberg editor styles.
 - Block Editor sync is aware of local-development loopback/TLS issues and provides guidance in the dashboard when sync is likely to fail.
 - Admin previews always force `font-display: swap` for preview safety, even when the live runtime output uses another global setting.
 
@@ -207,6 +220,12 @@ Pull requests are welcome. For larger changes, open an issue first so the direct
 - Match the WordPress conventions already used in the plugin.
 - Run `php tests/run.php` before submitting changes.
 - Update `README.md` and the relevant pages under `docs/` when user-facing behavior changes.
+
+During the current `1.7.x` beta line, feedback is especially useful when it helps stabilize the path to `2.0`, particularly around:
+
+- builder integrations and editor mirroring
+- the new Settings and Developer workflows
+- the minimal output preset and advanced output controls
 
 ## License
 

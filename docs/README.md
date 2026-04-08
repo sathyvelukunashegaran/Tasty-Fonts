@@ -2,6 +2,12 @@
 
 This is the versioned documentation hub for the current plugin codebase.
 
+## Current Release Track
+
+`1.7.0` is the active beta milestone for the future `2.0` release.
+
+These docs should describe the current beta line clearly, including what is already solid, what is newly introduced in `1.7.0`, and what is still expected to receive a few more release passes before `2.0` is considered stable.
+
 ## Use This Page When
 
 - you want the main entry point for the plugin knowledge base
@@ -44,5 +50,6 @@ This is the versioned documentation hub for the current plugin codebase.
 ## Notes
 
 - The docs in `main` should always describe the current plugin behavior.
+- The current docs should explain the `1.7.x` beta track in plain language so testers understand that more releases are expected before `2.0`.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](../README.md) stays shorter and links here for full guidance.

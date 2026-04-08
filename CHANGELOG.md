@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Positioned `1.7.0` as a beta milestone on the road to `2.0`, with a few more releases expected before the final major version is considered stable.
 - Moved Gutenberg Font Library sync controls and related local-environment guidance into the dedicated Integrations tab, including updated deep links from notices and activity log actions.
 - Simplified Settings > Integrations so Gutenberg Font Library and Automatic.css each render as a single primary settings row with inline status, reducing duplicated copy and visual repetition.
 - Removed the horizontal separator treatment across the Settings surfaces in favor of spacing-only grouping for a cleaner layout.
