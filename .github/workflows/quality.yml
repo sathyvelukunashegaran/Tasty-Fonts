@@ -32,3 +32,7 @@ jobs:
       - name: Run JS contract tests
         shell: bash
         run: node --test tests/js/*.test.cjs
+
+      - name: Run bin script tests
+        shell: bash
+        run: bash tests/bin/release-scripts.test.sh

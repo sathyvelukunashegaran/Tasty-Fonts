@@ -46,6 +46,11 @@ php -r '
       $bodyStart++;
   }
 
+  if (strncmp(substr($contents, $bodyStart), "## [", 4) === 0) {
+      fwrite(STDERR, "CHANGELOG.md has no Unreleased notes to publish\n");
+      exit(1);
+  }
+
   $nextHeading = strpos($contents, "\n## [", $bodyStart);
   $body = $nextHeading === false
       ? trim(substr($contents, $bodyStart))

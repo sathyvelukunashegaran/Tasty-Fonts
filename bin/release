@@ -118,6 +118,7 @@ run_quality_gates() {
   find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l >/dev/null
   php tests/run.php
   node --test tests/js/*.test.cjs
+  bash tests/bin/release-scripts.test.sh
 }
 
 commit_and_tag_release() {

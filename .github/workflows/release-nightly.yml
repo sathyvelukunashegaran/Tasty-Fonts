@@ -38,18 +38,14 @@ jobs:
         shell: bash
         run: |
           zip_name="tasty-fonts-${{ steps.nightly.outputs.version }}.zip"
-          build_root="$(mktemp -d)"
-          mkdir -p "${build_root}/etch-fonts"
 
-          while IFS= read -r -d '' file; do
-            mkdir -p "${build_root}/etch-fonts/$(dirname "${file}")"
-            cp "${file}" "${build_root}/etch-fonts/${file}"
-          done < <(git ls-files -z)
-
-          (
-            cd "${build_root}"
-            zip -qr "${GITHUB_WORKSPACE}/${zip_name}" etch-fonts
-          )
+          git add plugin.php
+          git archive \
+            --format=zip \
+            --prefix=etch-fonts/ \
+            -o "${zip_name}" \
+            "$(git write-tree)"
+          git restore --staged plugin.php
 
           echo "zip_name=${zip_name}" >> "${GITHUB_OUTPUT}"
 
