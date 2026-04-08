@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use TastyFonts\Google\GoogleCssParser;
-use TastyFonts\Google\GoogleImportService;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 
@@ -308,6 +306,11 @@ $tests['import_repository_delete_profile_reassigns_active_delivery_when_active_p
         'published',
         false
     );
+
+    // Explicitly ensure bunny-cdn is the active delivery before deleting it.
+    $repo->setActiveDelivery('cabin', 'bunny-cdn');
+    $beforeDelete = $repo->getFamily('cabin');
+    assertSameValue('bunny-cdn', (string) ($beforeDelete['active_delivery_id'] ?? ''), 'Test setup should confirm bunny-cdn is the active delivery before it is deleted.');
 
     // Delete the active profile.
     $remaining = $repo->deleteProfile('cabin', 'bunny-cdn');
