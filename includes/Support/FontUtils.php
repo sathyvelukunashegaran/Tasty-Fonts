@@ -329,6 +329,100 @@ final class FontUtils
         return self::normalizeAxesMap($face['axes'] ?? []) !== [];
     }
 
+    public static function facesHaveVariableMetadata(array $faces): bool
+    {
+        foreach ($faces as $face) {
+            if (is_array($face) && self::faceIsVariable($face)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function facesHaveStaticMetadata(array $faces): bool
+    {
+        foreach ($faces as $face) {
+            if (!is_array($face) || self::faceIsVariable($face)) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function resolveProfileFormat(array $profile): string
+    {
+        $format = strtolower(trim((string) ($profile['format'] ?? '')));
+
+        if (in_array($format, ['static', 'variable'], true)) {
+            return $format;
+        }
+
+        return self::facesHaveVariableMetadata((array) ($profile['faces'] ?? [])) ? 'variable' : 'static';
+    }
+
+    public static function resolveFormatAvailability(array $entry): array
+    {
+        $formats = [];
+
+        foreach ((array) ($entry['formats'] ?? []) as $key => $value) {
+            if (!is_string($key) || !is_array($value)) {
+                continue;
+            }
+
+            $normalizedKey = strtolower(trim($key));
+
+            if (!in_array($normalizedKey, ['static', 'variable'], true)) {
+                continue;
+            }
+
+            $formats[$normalizedKey] = [
+                'label' => sanitize_text_field((string) ($value['label'] ?? ucfirst($normalizedKey))),
+                'available' => !empty($value['available']),
+                'source_only' => !empty($value['source_only']),
+            ];
+        }
+
+        if ($formats !== []) {
+            return $formats;
+        }
+
+        if (self::facesHaveStaticMetadata((array) ($entry['faces'] ?? []))) {
+            $formats['static'] = [
+                'label' => 'Static',
+                'available' => true,
+                'source_only' => false,
+            ];
+        }
+
+        if (
+            !empty($entry['has_variable_faces'])
+            || !empty($entry['is_variable'])
+            || self::normalizeAxesMap($entry['variation_axes'] ?? []) !== []
+            || self::normalizeAxesMap($entry['axes'] ?? []) !== []
+            || self::facesHaveVariableMetadata((array) ($entry['faces'] ?? []))
+        ) {
+            $formats['variable'] = [
+                'label' => 'Variable',
+                'available' => true,
+                'source_only' => false,
+            ];
+        }
+
+        if ($formats === []) {
+            $formats['static'] = [
+                'label' => 'Static',
+                'available' => true,
+                'source_only' => false,
+            ];
+        }
+
+        return $formats;
+    }
+
     public static function weightNameSlug(string|int $weight): string
     {
         return match (self::normalizeWeight($weight)) {

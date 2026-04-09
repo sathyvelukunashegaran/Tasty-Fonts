@@ -12,12 +12,17 @@ use WP_Error;
 
 final class GoogleFontsClient
 {
-    public const TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v1';
+    public const TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v2';
+    public const LEGACY_TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v1';
+    public const TRANSIENT_METADATA = 'tasty_fonts_google_metadata_v1';
     private const CATALOG_TTL = 12 * HOUR_IN_SECONDS;
+    private const METADATA_TTL = 12 * HOUR_IN_SECONDS;
+    private const METADATA_URL = 'https://fonts.google.com/metadata/fonts';
     private const REQUEST_TIMEOUT = 20;
 
     private ?array $catalogIndex = null;
     private ?array $catalogItems = null;
+    private ?array $metadataIndex = null;
 
     public function __construct(private readonly SettingsRepository $settings)
     {
@@ -44,7 +49,10 @@ final class GoogleFontsClient
     {
         $this->catalogIndex = null;
         $this->catalogItems = null;
+        $this->metadataIndex = null;
         delete_transient(self::TRANSIENT_CATALOG);
+        delete_transient(self::LEGACY_TRANSIENT_CATALOG);
+        delete_transient(self::TRANSIENT_METADATA);
     }
 
     public function validateApiKey(string $apiKey): array
@@ -153,9 +161,15 @@ final class GoogleFontsClient
         return null;
     }
 
-    public function fetchCss(string $familyName, array $variants, string $display = 'swap', array $familyMetadata = []): string|WP_Error
+    public function fetchCss(
+        string $familyName,
+        array $variants,
+        string $display = 'swap',
+        array $familyMetadata = [],
+        string $formatMode = 'static'
+    ): string|WP_Error
     {
-        $url = $this->buildCssUrl($familyName, $variants, $display, $familyMetadata);
+        $url = $this->buildCssUrl($familyName, $variants, $display, $familyMetadata, $formatMode);
 
         $response = $this->remoteGet(
             $url,
@@ -193,11 +207,17 @@ final class GoogleFontsClient
         return $body;
     }
 
-    public function buildCssUrl(string $familyName, array $variants, string $display = 'swap', array $familyMetadata = []): string
+    public function buildCssUrl(
+        string $familyName,
+        array $variants,
+        string $display = 'swap',
+        array $familyMetadata = [],
+        string $formatMode = 'static'
+    ): string
     {
         $familyQuery = str_replace('%20', '+', rawurlencode($familyName));
         $url = 'https://fonts.googleapis.com/css2?family=' . $familyQuery;
-        $variableAxes = $this->buildVariableCssRequest($variants, $familyMetadata);
+        $variableAxes = $this->buildVariableCssRequest($variants, $familyMetadata, $formatMode);
 
         if ($variableAxes !== null) {
             $url .= ':' . $variableAxes['axis_list'] . '@' . implode(';', $variableAxes['rows']);
@@ -271,7 +291,23 @@ final class GoogleFontsClient
 
     private function normalizeCatalogItem(array $item): array
     {
+        $item = $this->enrichCatalogItemWithMetadata($item);
         $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
+        $formats = [
+            'static' => [
+                'label' => 'Static',
+                'available' => true,
+                'source_only' => false,
+            ],
+        ];
+
+        if ($axes !== []) {
+            $formats['variable'] = [
+                'label' => 'Variable',
+                'available' => true,
+                'source_only' => false,
+            ];
+        }
 
         return [
             'family' => (string) ($item['family'] ?? ''),
@@ -282,19 +318,41 @@ final class GoogleFontsClient
             'lastModified' => (string) ($item['lastModified'] ?? ''),
             'is_variable' => $axes !== [],
             'axes' => $axes,
+            'formats' => $formats,
+            'import_options' => $formats,
         ];
     }
 
     private function normalizeSearchResultItem(string $slug, array $item): array
     {
+        $item = $this->enrichCatalogItemWithMetadata($item);
+        $axes = FontUtils::normalizeAxesMap((array) ($item['axes'] ?? []));
+        $formats = [
+            'static' => [
+                'label' => 'Static',
+                'available' => true,
+                'source_only' => false,
+            ],
+        ];
+
+        if ($axes !== []) {
+            $formats['variable'] = [
+                'label' => 'Variable',
+                'available' => true,
+                'source_only' => false,
+            ];
+        }
+
         return [
-            'family' => (string) ($item['family'] ?? ''),
-            'slug' => $slug,
-            'category' => (string) ($item['category'] ?? ''),
-            'variants_count' => max(0, (int) ($item['variants_count'] ?? 0)),
-            'variants' => FontUtils::normalizeVariantTokens((array) ($item['variants'] ?? [])),
-            'is_variable' => !empty($item['is_variable']),
-            'axes' => FontUtils::normalizeAxesMap((array) ($item['axes'] ?? [])),
+                'family' => (string) ($item['family'] ?? ''),
+                'slug' => $slug,
+                'category' => (string) ($item['category'] ?? ''),
+                'variants_count' => max(0, (int) ($item['variants_count'] ?? 0)),
+                'variants' => FontUtils::normalizeVariantTokens((array) ($item['variants'] ?? [])),
+                'is_variable' => $axes !== [] || !empty($item['is_variable']),
+                'axes' => $axes,
+                'formats' => $formats,
+                'import_options' => $formats,
         ];
     }
 
@@ -368,14 +426,17 @@ final class GoogleFontsClient
     private function buildCatalogIndex(array $items): array
     {
         $index = [];
+        $metadataIndex = $this->fetchMetadataIndex();
 
         foreach ($items as $item) {
             if (!is_array($item)) {
                 continue;
             }
 
+            $item = $this->enrichCatalogItemWithMetadata($item, $metadataIndex);
             $family = trim((string) ($item['family'] ?? ''));
             $slug = FontUtils::slugify($family);
+            $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
 
             if ($family === '' || $slug === '') {
                 continue;
@@ -386,8 +447,8 @@ final class GoogleFontsClient
                 'category' => (string) ($item['category'] ?? ''),
                 'variants_count' => count(FontUtils::normalizeVariantTokens((array) ($item['variants'] ?? []))),
                 'variants' => FontUtils::normalizeVariantTokens((array) ($item['variants'] ?? [])),
-                'is_variable' => $this->normalizeCatalogAxes((array) ($item['axes'] ?? [])) !== [],
-                'axes' => $this->normalizeCatalogAxes((array) ($item['axes'] ?? [])),
+                'is_variable' => $axes !== [],
+                'axes' => $axes,
             ];
         }
 
@@ -423,18 +484,164 @@ final class GoogleFontsClient
         return false;
     }
 
+    private function fetchMetadataIndex(): array
+    {
+        if (is_array($this->metadataIndex)) {
+            return $this->metadataIndex;
+        }
+
+        $cached = get_transient(self::TRANSIENT_METADATA);
+
+        if ($this->isMetadataIndex($cached)) {
+            $this->metadataIndex = $cached;
+
+            return $this->metadataIndex;
+        }
+
+        $response = $this->remoteGet(
+            self::METADATA_URL,
+            [
+                'timeout' => self::REQUEST_TIMEOUT,
+                'headers' => [
+                    'Accept' => 'application/json,text/plain,*/*;q=0.1',
+                    'User-Agent' => $this->modernUserAgent(),
+                ],
+            ]
+        );
+
+        if (is_wp_error($response)) {
+            return [];
+        }
+
+        if ((int) wp_remote_retrieve_response_code($response) !== 200) {
+            return [];
+        }
+
+        $decoded = $this->decodeMetadataPayload((string) wp_remote_retrieve_body($response));
+        $familyMetadata = is_array($decoded['familyMetadataList'] ?? null)
+            ? (array) $decoded['familyMetadataList']
+            : [];
+        $index = [];
+
+        foreach ($familyMetadata as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $family = trim((string) ($item['family'] ?? ''));
+            $slug = FontUtils::slugify($family);
+            $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
+
+            if ($family === '' || $slug === '') {
+                continue;
+            }
+
+            $index[$slug] = [
+                'family' => $family,
+                'axes' => $axes,
+            ];
+        }
+
+        if ($index !== []) {
+            $this->metadataIndex = $index;
+            set_transient(self::TRANSIENT_METADATA, $this->metadataIndex, self::METADATA_TTL);
+        }
+
+        return $this->metadataIndex ?? [];
+    }
+
+    private function isMetadataIndex(mixed $cached): bool
+    {
+        if (!is_array($cached) || $cached === []) {
+            return false;
+        }
+
+        foreach ($cached as $slug => $item) {
+            if (
+                !is_string($slug)
+                || !is_array($item)
+                || !array_key_exists('family', $item)
+                || !array_key_exists('axes', $item)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function decodeMetadataPayload(string $payload): array
+    {
+        $payload = ltrim($payload);
+
+        if (str_starts_with($payload, ")]}'")) {
+            $newlinePosition = strpos($payload, "\n");
+
+            if ($newlinePosition === false) {
+                return [];
+            }
+
+            $payload = substr($payload, $newlinePosition + 1);
+        }
+
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function enrichCatalogItemWithMetadata(array $item, ?array $metadataIndex = null): array
+    {
+        $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
+
+        if ($axes !== []) {
+            $item['axes'] = $axes;
+            $item['is_variable'] = true;
+
+            return $item;
+        }
+
+        $family = trim((string) ($item['family'] ?? ''));
+        $slug = FontUtils::slugify($family);
+
+        if ($family === '' || $slug === '') {
+            $item['axes'] = [];
+            $item['is_variable'] = false;
+
+            return $item;
+        }
+
+        $metadataIndex = is_array($metadataIndex) ? $metadataIndex : $this->fetchMetadataIndex();
+        $metadata = is_array($metadataIndex[$slug] ?? null) ? (array) $metadataIndex[$slug] : [];
+        $metadataAxes = $this->normalizeCatalogAxes((array) ($metadata['axes'] ?? []));
+
+        $item['axes'] = $metadataAxes;
+        $item['is_variable'] = $metadataAxes !== [];
+
+        return $item;
+    }
+
     private function buildCatalogRequestUrl(string $apiKey): string
     {
-        return 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&capability=VF&key=' . rawurlencode($apiKey);
+        return 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=' . rawurlencode($apiKey);
     }
 
     private function normalizeCatalogAxes(array $axes): array
     {
-        return FontUtils::normalizeHostedAxisList($axes);
+        $normalizedHostedAxes = FontUtils::normalizeHostedAxisList($axes);
+
+        if ($normalizedHostedAxes !== []) {
+            return $normalizedHostedAxes;
+        }
+
+        return FontUtils::normalizeAxesMap($axes);
     }
 
-    private function buildVariableCssRequest(array $variants, array $familyMetadata): ?array
+    private function buildVariableCssRequest(array $variants, array $familyMetadata, string $formatMode = 'static'): ?array
     {
+        if (strtolower(trim($formatMode)) !== 'variable') {
+            return null;
+        }
+
         $familyAxes = FontUtils::normalizeAxesMap((array) ($familyMetadata['axes'] ?? []));
         $faces = is_array($familyMetadata['faces'] ?? null) ? (array) $familyMetadata['faces'] : [];
         $hasVariableFaces = array_filter(

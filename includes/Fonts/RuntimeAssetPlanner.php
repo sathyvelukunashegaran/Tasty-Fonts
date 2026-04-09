@@ -35,7 +35,7 @@ final class RuntimeAssetPlanner
 
     public function getLocalRuntimeCatalog(): array
     {
-        return $this->buildSelfHostedCatalog($this->getRuntimeFamilies());
+        return $this->buildFontFaceCatalog($this->getRuntimeFamilies());
     }
 
     public function getRuntimeVariableFamilies(): array
@@ -45,7 +45,7 @@ final class RuntimeAssetPlanner
 
     public function getLocalPreviewCatalog(): array
     {
-        return $this->buildSelfHostedCatalog($this->getPreviewFamilies());
+        return $this->buildFontFaceCatalog($this->getPreviewFamilies());
     }
 
     public function getPreviewVariableFamilies(): array
@@ -109,11 +109,24 @@ final class RuntimeAssetPlanner
 
         foreach (
             [
-                ['family' => (string) ($roles['heading'] ?? ''), 'weight' => $this->resolvePrimaryRoleWeight($roles, 'heading', 700)],
-                ['family' => (string) ($roles['body'] ?? ''), 'weight' => $this->resolvePrimaryRoleWeight($roles, 'body', 400)],
+                [
+                    'family' => (string) ($roles['heading'] ?? ''),
+                    'delivery_id' => (string) ($roles['heading_delivery_id'] ?? ''),
+                    'weight' => $this->resolvePrimaryRoleWeight($roles, 'heading', 700),
+                ],
+                [
+                    'family' => (string) ($roles['body'] ?? ''),
+                    'delivery_id' => (string) ($roles['body_delivery_id'] ?? ''),
+                    'weight' => $this->resolvePrimaryRoleWeight($roles, 'body', 400),
+                ],
             ] as $target
         ) {
-            $face = $this->findBestPreloadFace($catalog, $target['family'], (int) $target['weight']);
+            $face = $this->findBestPreloadFace(
+                $catalog,
+                $target['family'],
+                (string) ($target['delivery_id'] ?? ''),
+                (int) $target['weight']
+            );
 
             if ($face === null) {
                 continue;
@@ -146,7 +159,7 @@ final class RuntimeAssetPlanner
             $provider = strtolower(trim((string) ($activeDelivery['provider'] ?? '')));
             $type = strtolower(trim((string) ($activeDelivery['type'] ?? '')));
 
-            if ($type === 'self_hosted') {
+            if ($type === 'self_hosted' || in_array($provider, ['google', 'bunny'], true)) {
                 continue;
             }
 
@@ -204,33 +217,54 @@ final class RuntimeAssetPlanner
         return $filtered;
     }
 
-    private function buildSelfHostedCatalog(array $families): array
+    private function buildFontFaceCatalog(array $families): array
     {
         $catalog = [];
+        $settings = $this->settings->getSettings();
+        $variableFontsEnabled = !empty($settings['variable_fonts_enabled']);
 
-        foreach ($families as $key => $family) {
+        foreach ($families as $family) {
             if (!is_array($family)) {
                 continue;
             }
 
-            $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+            foreach ((array) ($family['available_deliveries'] ?? []) as $delivery) {
+                if (!is_array($delivery)) {
+                    continue;
+                }
 
-            if (!$this->isSelfHostedDelivery($activeDelivery)) {
-                continue;
+                $provider = strtolower(trim((string) ($delivery['provider'] ?? '')));
+                $type = strtolower(trim((string) ($delivery['type'] ?? '')));
+                $format = FontUtils::resolveProfileFormat($delivery);
+
+                if ($provider === 'adobe' || $type === 'adobe_hosted') {
+                    continue;
+                }
+
+                if (!$variableFontsEnabled && $format === 'variable') {
+                    continue;
+                }
+
+                $deliveryId = (string) ($delivery['id'] ?? '');
+
+                if ($deliveryId === '') {
+                    continue;
+                }
+
+                $catalog[$this->catalogDeliveryKey((string) ($family['family'] ?? ''), $deliveryId)] = [
+                    'family' => (string) ($family['family'] ?? ''),
+                    'slug' => (string) ($family['slug'] ?? ''),
+                    'publish_state' => (string) ($family['publish_state'] ?? 'published'),
+                    'active_delivery_id' => (string) ($family['active_delivery_id'] ?? ''),
+                    'delivery_id' => $deliveryId,
+                    'active_delivery' => $delivery,
+                    'available_deliveries' => (array) ($family['available_deliveries'] ?? []),
+                    'delivery_badges' => (array) ($family['delivery_badges'] ?? []),
+                    'delivery_filter_tokens' => (array) ($family['delivery_filter_tokens'] ?? []),
+                    'sources' => [$delivery['provider'] ?? 'local'],
+                    'faces' => is_array($delivery['faces'] ?? null) ? $delivery['faces'] : [],
+                ];
             }
-
-            $catalog[$key] = [
-                'family' => (string) ($family['family'] ?? ''),
-                'slug' => (string) ($family['slug'] ?? ''),
-                'publish_state' => (string) ($family['publish_state'] ?? 'published'),
-                'active_delivery_id' => (string) ($family['active_delivery_id'] ?? ''),
-                'active_delivery' => $activeDelivery,
-                'available_deliveries' => (array) ($family['available_deliveries'] ?? []),
-                'delivery_badges' => (array) ($family['delivery_badges'] ?? []),
-                'delivery_filter_tokens' => (array) ($family['delivery_filter_tokens'] ?? []),
-                'sources' => [$activeDelivery['provider'] ?? 'local'],
-                'faces' => is_array($activeDelivery['faces'] ?? null) ? $activeDelivery['faces'] : [],
-            ];
         }
 
         return $catalog;
@@ -409,9 +443,9 @@ final class RuntimeAssetPlanner
         return $normalizedWeight;
     }
 
-    private function findBestPreloadFace(array $catalog, string $familyName, int $targetWeight): ?array
+    private function findBestPreloadFace(array $catalog, string $familyName, string $deliveryId, int $targetWeight): ?array
     {
-        $family = $this->findCatalogFamily($catalog, $familyName);
+        $family = $this->findCatalogFamily($catalog, $familyName, $deliveryId);
 
         if ($family === null) {
             return null;
@@ -443,18 +477,26 @@ final class RuntimeAssetPlanner
         return $bestFace;
     }
 
-    private function findCatalogFamily(array $catalog, string $familyName): ?array
+    private function findCatalogFamily(array $catalog, string $familyName, string $deliveryId = ''): ?array
     {
         if ($familyName === '') {
             return null;
         }
 
-        if (isset($catalog[$familyName]) && is_array($catalog[$familyName])) {
-            return $catalog[$familyName];
+        if ($deliveryId !== '') {
+            $deliveryKey = $this->catalogDeliveryKey($familyName, $deliveryId);
+
+            if (isset($catalog[$deliveryKey]) && is_array($catalog[$deliveryKey])) {
+                return $catalog[$deliveryKey];
+            }
         }
 
         foreach ($catalog as $family) {
-            if (!is_array($family) || ($family['family'] ?? '') !== $familyName) {
+            if (
+                !is_array($family)
+                || ($family['family'] ?? '') !== $familyName
+                || ($deliveryId !== '' && (string) ($family['delivery_id'] ?? '') !== $deliveryId)
+            ) {
                 continue;
             }
 
@@ -603,5 +645,10 @@ final class RuntimeAssetPlanner
         }
 
         return 0;
+    }
+
+    private function catalogDeliveryKey(string $familyName, string $deliveryId): string
+    {
+        return FontUtils::slugify($familyName) . '::' . FontUtils::slugify($deliveryId);
     }
 }

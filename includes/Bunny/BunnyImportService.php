@@ -65,7 +65,11 @@ final class BunnyImportService
      *     delivery_id?: string
      * }|WP_Error Import result payload, or a WordPress error when the import cannot proceed.
      */
-    public function importFamily(string $familyName, array $variants, string $deliveryMode = 'self_hosted'): array|WP_Error
+    public function importFamily(
+        string $familyName,
+        array $variants,
+        string $deliveryMode = 'self_hosted'
+    ): array|WP_Error
     {
         $familyName = trim(wp_strip_all_tags($familyName));
 
@@ -75,6 +79,7 @@ final class BunnyImportService
 
         $familySlug = FontUtils::slugify($familyName);
         $deliveryMode = $this->normalizeDeliveryMode($deliveryMode);
+
         $normalizedVariants = FontUtils::normalizeVariantTokens($variants);
         $requestedVariants = $normalizedVariants === [] ? ['regular'] : $normalizedVariants;
         $existingFamily = $this->imports->getFamily($familySlug);
@@ -152,6 +157,7 @@ final class BunnyImportService
         $provider = $this->buildProviderMetadata($metadata, $variantPlan['import']);
         $newManifestFaces = [];
         $downloadedFiles = 0;
+        $profileId = $this->resolveProfileId($existingFamily, 'self_hosted');
 
         foreach ($faces as $face) {
             $manifestFace = $this->buildManifestFace(
@@ -196,9 +202,10 @@ final class BunnyImportService
             $familyName,
             $familySlug,
             [
-                'id' => $this->profileId('self_hosted'),
+                'id' => $profileId,
                 'provider' => 'bunny',
                 'type' => 'self_hosted',
+                'format' => 'static',
                 'label' => __('Self-hosted (Bunny import)', 'tasty-fonts'),
                 'variants' => $allVariants,
                 'faces' => $mergedFaces,
@@ -238,7 +245,7 @@ final class BunnyImportService
             'family' => $familyName,
             'family_record' => $savedFamily,
             'delivery_type' => 'self_hosted',
-            'delivery_id' => $this->profileId('self_hosted'),
+            'delivery_id' => $profileId,
             'faces' => $faceCount,
             'files' => $downloadedFiles,
             'variants' => $allVariants,
@@ -258,6 +265,7 @@ final class BunnyImportService
     ): array|WP_Error {
         $provider = $this->buildProviderMetadata($metadata, $variantPlan['import']);
         $cdnFaces = [];
+        $profileId = $this->resolveProfileId($existingFamily, 'cdn');
 
         foreach ($faces as $face) {
             if (!is_array($face)) {
@@ -296,9 +304,10 @@ final class BunnyImportService
             $familyName,
             $familySlug,
             [
-                'id' => $this->profileId('cdn'),
+                'id' => $profileId,
                 'provider' => 'bunny',
                 'type' => 'cdn',
+                'format' => 'static',
                 'label' => __('Bunny CDN', 'tasty-fonts'),
                 'variants' => $allVariants,
                 'faces' => $mergedFaces,
@@ -336,7 +345,7 @@ final class BunnyImportService
             'family' => $familyName,
             'family_record' => $savedFamily,
             'delivery_type' => 'cdn',
-            'delivery_id' => $this->profileId('cdn'),
+            'delivery_id' => $profileId,
             'faces' => $faceCount,
             'files' => 0,
             'variants' => $allVariants,
@@ -615,6 +624,17 @@ final class BunnyImportService
     private function profileId(string $deliveryMode): string
     {
         return FontUtils::slugify('bunny-' . $deliveryMode);
+    }
+
+    private function resolveProfileId(?array $family, string $deliveryMode): string
+    {
+        $existing = $this->findDeliveryProfile($family, 'bunny', $deliveryMode);
+
+        if (is_array($existing) && trim((string) ($existing['id'] ?? '')) !== '') {
+            return (string) $existing['id'];
+        }
+
+        return $this->profileId($deliveryMode);
     }
 
     private function error(string $code, string $message): WP_Error

@@ -82,10 +82,14 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             )
         );
         $isRoleFamily = $assignedRoleKeys !== [];
+        $fontTypeDescriptor = $this->buildFontTypeDescriptor($family);
         $sourceTokens = array_values(array_unique(array_filter((array) ($family['delivery_filter_tokens'] ?? []), 'strlen')));
         $categoryTokens = array_values(array_unique(array_filter((array) ($family['font_category_tokens'] ?? []), 'strlen')));
+        if (!empty($fontTypeDescriptor['has_variable'])) {
+            $categoryTokens[] = 'variable';
+        }
+        $categoryTokens = array_values(array_unique($categoryTokens));
         $fontCategoryLabel = $this->formatLibraryCategoryLabel((string) ($family['font_category'] ?? ''));
-        $fontTypeDescriptor = $this->buildFontTypeDescriptor($family);
         $deleteBlockedMessage = $this->buildDeleteBlockedMessage($familyName, $assignedRoleKeys);
         $deleteBlockedMessages = [];
         $deleteBlockedSelections = [
@@ -117,17 +121,6 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $deliveryCount = count($availableDeliveries);
         $activeDeliveryLabel = $this->translateProfileLabel((string) ($activeDelivery['label'] ?? ''));
         $activeDeliveryLabel = $activeDeliveryLabel !== '' ? $activeDeliveryLabel : __('Unavailable', 'tasty-fonts');
-        $availableDeliveryLabels = array_values(
-            array_filter(
-                array_map(
-                    fn (mixed $profile): string => is_array($profile)
-                        ? $this->translateProfileLabel((string) ($profile['label'] ?? ''))
-                        : '',
-                    $availableDeliveries
-                ),
-                'strlen'
-            )
-        );
         $supportsFontDisplayOverride = strtolower(trim((string) ($activeDelivery['provider'] ?? ''))) !== 'adobe';
         $defaultStack = FontUtils::buildFontStack($familyName, $savedFallback);
         $previewLabel = $isMonospace ? __('Code Preview', 'tasty-fonts') : __('Preview', 'tasty-fonts');

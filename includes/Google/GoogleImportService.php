@@ -65,7 +65,12 @@ final class GoogleImportService
      *     delivery_id?: string
      * }|WP_Error Import result payload, or a WordPress error when the import cannot proceed.
      */
-    public function importFamily(string $familyName, array $variants, string $deliveryMode = 'self_hosted'): array|WP_Error
+    public function importFamily(
+        string $familyName,
+        array $variants,
+        string $deliveryMode = 'self_hosted',
+        string $formatMode = 'static'
+    ): array|WP_Error
     {
         $familyName = trim(wp_strip_all_tags($familyName));
 
@@ -75,10 +80,11 @@ final class GoogleImportService
 
         $familySlug = FontUtils::slugify($familyName);
         $deliveryMode = $this->normalizeDeliveryMode($deliveryMode);
+        $formatMode = $this->normalizeFormatMode($formatMode);
         $requestedVariants = FontUtils::normalizeVariantTokens($variants);
         $existingFamily = $this->imports->getFamily($familySlug);
-        $existingProfile = $this->findDeliveryProfile($existingFamily, 'google', $deliveryMode);
-        $variantPlan = $this->buildVariantPlan($requestedVariants, $existingProfile);
+        $existingProfile = $this->findDeliveryProfile($existingFamily, 'google', $deliveryMode, $formatMode);
+        $variantPlan = $this->buildVariantPlan($requestedVariants, $existingProfile, $formatMode);
 
         if ($variantPlan['import'] === []) {
             $message = $deliveryMode === 'cdn'
@@ -105,7 +111,8 @@ final class GoogleImportService
             $familyName,
             $variantPlan['import'],
             'swap',
-            is_array($metadata) ? $metadata : []
+            is_array($metadata) ? $metadata : [],
+            $formatMode
         );
 
         if (is_wp_error($css)) {
@@ -156,6 +163,7 @@ final class GoogleImportService
         $provider = $this->buildProviderMetadata($metadata, $variantPlan['import']);
         $newManifestFaces = [];
         $downloadedFiles = 0;
+        $profileId = $this->resolveProfileId($existingFamily, 'self_hosted', (string) ($variantPlan['format_mode'] ?? 'static'));
 
         foreach ($faces as $face) {
             $manifestFace = $this->buildManifestFace(
@@ -200,9 +208,10 @@ final class GoogleImportService
             $familyName,
             $familySlug,
             [
-                'id' => $this->profileId('self_hosted'),
+                'id' => $profileId,
                 'provider' => 'google',
                 'type' => 'self_hosted',
+                'format' => (string) ($variantPlan['format_mode'] ?? 'static'),
                 'label' => __('Self-hosted (Google import)', 'tasty-fonts'),
                 'variants' => $allVariants,
                 'faces' => $mergedFaces,
@@ -244,7 +253,7 @@ final class GoogleImportService
             'family' => $familyName,
             'family_record' => $savedFamily,
             'delivery_type' => 'self_hosted',
-            'delivery_id' => $this->profileId('self_hosted'),
+            'delivery_id' => $profileId,
             'faces' => $faceCount,
             'files' => $downloadedFiles,
             'variants' => $allVariants,
@@ -264,6 +273,7 @@ final class GoogleImportService
     ): array|WP_Error {
         $provider = $this->buildProviderMetadata($metadata, $variantPlan['import']);
         $cdnFaces = [];
+        $profileId = $this->resolveProfileId($existingFamily, 'cdn', (string) ($variantPlan['format_mode'] ?? 'static'));
 
         foreach ($faces as $face) {
             if (!is_array($face)) {
@@ -302,9 +312,10 @@ final class GoogleImportService
             $familyName,
             $familySlug,
             [
-                'id' => $this->profileId('cdn'),
+                'id' => $profileId,
                 'provider' => 'google',
                 'type' => 'cdn',
+                'format' => (string) ($variantPlan['format_mode'] ?? 'static'),
                 'label' => __('Google CDN', 'tasty-fonts'),
                 'variants' => $allVariants,
                 'faces' => $mergedFaces,
@@ -344,7 +355,7 @@ final class GoogleImportService
             'family' => $familyName,
             'family_record' => $savedFamily,
             'delivery_type' => 'cdn',
-            'delivery_id' => $this->profileId('cdn'),
+            'delivery_id' => $profileId,
             'faces' => $faceCount,
             'files' => 0,
             'variants' => $allVariants,
@@ -549,7 +560,14 @@ final class GoogleImportService
         return in_array($deliveryMode, ['self_hosted', 'cdn'], true) ? $deliveryMode : 'self_hosted';
     }
 
-    private function findDeliveryProfile(?array $family, string $provider, string $type): ?array
+    private function normalizeFormatMode(string $formatMode): string
+    {
+        $formatMode = strtolower(trim($formatMode));
+
+        return $formatMode === 'variable' ? 'variable' : 'static';
+    }
+
+    private function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = 'static'): ?array
     {
         if (!is_array($family)) {
             return null;
@@ -560,6 +578,7 @@ final class GoogleImportService
                 is_array($profile)
                 && strtolower(trim((string) ($profile['provider'] ?? ''))) === $provider
                 && strtolower(trim((string) ($profile['type'] ?? ''))) === $type
+                && FontUtils::resolveProfileFormat($profile) === $formatMode
             ) {
                 return $profile;
             }
@@ -571,6 +590,43 @@ final class GoogleImportService
     private function profileId(string $deliveryMode): string
     {
         return FontUtils::slugify('google-' . $deliveryMode);
+    }
+
+    private function resolveProfileId(?array $family, string $deliveryMode, string $formatMode): string
+    {
+        $existing = $this->findDeliveryProfile($family, 'google', $deliveryMode, $formatMode);
+
+        if (is_array($existing) && trim((string) ($existing['id'] ?? '')) !== '') {
+            return (string) $existing['id'];
+        }
+
+        $baseId = $this->profileId($deliveryMode);
+        $hasBaseConflict = $this->findLegacyProfileConflict($family, 'google', $deliveryMode);
+
+        if (!$hasBaseConflict) {
+            return $baseId;
+        }
+
+        return FontUtils::slugify($baseId . '-' . $formatMode);
+    }
+
+    private function findLegacyProfileConflict(?array $family, string $provider, string $type): bool
+    {
+        if (!is_array($family)) {
+            return false;
+        }
+
+        foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
+            if (
+                is_array($profile)
+                && strtolower(trim((string) ($profile['provider'] ?? ''))) === $provider
+                && strtolower(trim((string) ($profile['type'] ?? ''))) === $type
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function storageErrorMessage(string $fallback): string
@@ -598,7 +654,7 @@ final class GoogleImportService
         ];
     }
 
-    private function buildVariantPlan(array $requestedVariants, ?array $existingProfile): array
+    private function buildVariantPlan(array $requestedVariants, ?array $existingProfile, string $formatMode = 'static'): array
     {
         $existingKeys = [];
 
@@ -613,7 +669,11 @@ final class GoogleImportService
         $toImport = [];
         $skipped = [];
 
-        foreach ($requestedVariants as $variant) {
+        $normalizedRequested = $formatMode === 'variable'
+            ? $this->normalizeVariableRequestVariants($requestedVariants)
+            : $requestedVariants;
+
+        foreach ($normalizedRequested as $variant) {
             $faceKey = HostedImportSupport::faceKeyFromVariant($variant);
 
             if ($faceKey === null) {
@@ -631,6 +691,28 @@ final class GoogleImportService
         return [
             'import' => array_values(array_unique($toImport)),
             'skipped' => array_values(array_unique($skipped)),
+            'format_mode' => $formatMode,
         ];
+    }
+
+    private function normalizeVariableRequestVariants(array $requestedVariants): array
+    {
+        $styles = [];
+
+        foreach ($requestedVariants as $variant) {
+            $axis = FontUtils::googleVariantToAxis((string) $variant);
+
+            if ($axis === null) {
+                continue;
+            }
+
+            $styles[$axis['style'] ?? 'normal'] = ($axis['style'] ?? 'normal') === 'italic' ? 'italic' : 'regular';
+        }
+
+        if ($styles === []) {
+            return ['regular'];
+        }
+
+        return array_values($styles);
     }
 }

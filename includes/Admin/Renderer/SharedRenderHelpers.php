@@ -166,6 +166,7 @@ trait SharedRenderHelpers
     {
         return [
             ['value' => 'all', 'label' => __('All Types', 'tasty-fonts')],
+            ['value' => 'variable', 'label' => __('Variable', 'tasty-fonts')],
             ['value' => 'sans-serif', 'label' => __('Sans-serif', 'tasty-fonts')],
             ['value' => 'serif', 'label' => __('Serif', 'tasty-fonts')],
             ['value' => 'monospace', 'label' => __('Monospace', 'tasty-fonts')],

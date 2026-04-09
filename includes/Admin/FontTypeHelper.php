@@ -12,12 +12,27 @@ final class FontTypeHelper
 {
     public static function describeEntry(array $entry, string $context = 'library'): array
     {
-        return self::describe(self::entryHasVariableMetadata($entry), $context);
+        $formats = FontUtils::resolveFormatAvailability($entry);
+        $hasStatic = !empty($formats['static']['available']);
+        $hasVariable = !empty($formats['variable']['available']);
+
+        return self::describe($hasVariable, $context, $hasStatic);
     }
 
-    public static function describe(bool $hasVariableMetadata, string $context = 'library'): array
+    public static function describe(bool $hasVariableMetadata, string $context = 'library', bool $hasStaticMetadata = true): array
     {
         $normalizedContext = strtolower(trim($context));
+
+        if ($hasVariableMetadata && $hasStaticMetadata) {
+            return [
+                'type' => 'mixed',
+                'label' => __('Static + Variable', 'tasty-fonts'),
+                'badge_class' => 'is-success',
+                'has_variable' => true,
+                'has_static' => true,
+                'is_source_only' => false,
+            ];
+        }
 
         if (!$hasVariableMetadata) {
             return [
@@ -25,6 +40,7 @@ final class FontTypeHelper
                 'label' => __('Static', 'tasty-fonts'),
                 'badge_class' => '',
                 'has_variable' => false,
+                'has_static' => true,
                 'is_source_only' => false,
             ];
         }
@@ -35,6 +51,7 @@ final class FontTypeHelper
                 'label' => __('Variable Source', 'tasty-fonts'),
                 'badge_class' => 'is-warning',
                 'has_variable' => true,
+                'has_static' => $hasStaticMetadata,
                 'is_source_only' => true,
             ];
         }
@@ -44,6 +61,7 @@ final class FontTypeHelper
             'label' => __('Variable', 'tasty-fonts'),
             'badge_class' => 'is-role',
             'has_variable' => true,
+            'has_static' => $hasStaticMetadata,
             'is_source_only' => false,
         ];
     }

@@ -213,12 +213,14 @@ final class Storage
         global $wp_filesystem;
 
         $directory = dirname($path);
+        $directoryPermissions = $this->directoryPermissions();
+        $filePermissions = $this->filePermissions();
 
-        if (!$wp_filesystem->is_dir($directory) && !$wp_filesystem->mkdir($directory, FS_CHMOD_DIR)) {
+        if (!$wp_filesystem->is_dir($directory) && !$wp_filesystem->mkdir($directory, $directoryPermissions)) {
             return false;
         }
 
-        return (bool) $wp_filesystem->put_contents($path, $contents, FS_CHMOD_FILE);
+        return (bool) $wp_filesystem->put_contents($path, $contents, $filePermissions);
     }
 
     public function copyAbsoluteFile(string $sourcePath, string $targetPath): bool
@@ -243,7 +245,7 @@ final class Storage
             return false;
         }
 
-        chmod($targetPath, FS_CHMOD_FILE);
+        chmod($targetPath, $this->filePermissions());
 
         return true;
     }
@@ -487,6 +489,16 @@ final class Storage
     private function clearFilesystemError(): void
     {
         $this->lastFilesystemErrorMessage = '';
+    }
+
+    private function directoryPermissions(): int
+    {
+        return \defined('FS_CHMOD_DIR') ? (int) \constant('FS_CHMOD_DIR') : 0755;
+    }
+
+    private function filePermissions(): int
+    {
+        return \defined('FS_CHMOD_FILE') ? (int) \constant('FS_CHMOD_FILE') : 0644;
     }
 
     private function setFilesystemErrorMessage(string $message): void

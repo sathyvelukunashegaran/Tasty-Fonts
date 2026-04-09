@@ -293,8 +293,13 @@ final class BunnyFontsClient
         }
 
         $variants = $this->extractFamilyVariants($html, $slug);
-        $axisTags = $this->extractVariableAxisTags($html);
-        $axes = $this->buildVariableAxesFromVariants($variants, $axisTags);
+        $formats = [
+            'static' => [
+                'label' => 'Static',
+                'available' => true,
+                'source_only' => false,
+            ],
+        ];
 
         return [
             'family' => $familyName,
@@ -303,9 +308,11 @@ final class BunnyFontsClient
             'category_label' => $categoryLabel !== '' ? $categoryLabel : 'Bunny Fonts',
             'variants' => $variants,
             'style_count' => $styleCount > 0 ? $styleCount : count($variants),
-            'is_variable' => $axisTags !== [],
-            'axes' => $axes,
-            'axis_tags' => $axisTags,
+            'is_variable' => false,
+            'axes' => [],
+            'axis_tags' => [],
+            'formats' => $formats,
+            'import_options' => $formats,
         ];
     }
 
@@ -434,6 +441,20 @@ final class BunnyFontsClient
             'is_variable' => false,
             'axes' => [],
             'axis_tags' => [],
+            'formats' => [
+                'static' => [
+                    'label' => 'Static',
+                    'available' => true,
+                    'source_only' => false,
+                ],
+            ],
+            'import_options' => [
+                'static' => [
+                    'label' => 'Static',
+                    'available' => true,
+                    'source_only' => false,
+                ],
+            ],
         ];
     }
 
@@ -508,6 +529,15 @@ final class BunnyFontsClient
             return false;
         }
 
+        $formats = is_array($cached['formats'] ?? null) ? $cached['formats'] : [];
+        $importOptions = is_array($cached['import_options'] ?? null) ? $cached['import_options'] : [];
+        $axisTags = is_array($cached['axis_tags'] ?? null)
+            ? array_filter(
+                $cached['axis_tags'],
+                static fn ($tag): bool => preg_match('/^[A-Z0-9]{4}$/i', (string) $tag) === 1
+            )
+            : [];
+
         return array_key_exists('family', $cached)
             && array_key_exists('slug', $cached)
             && array_key_exists('category', $cached)
@@ -515,7 +545,14 @@ final class BunnyFontsClient
             && array_key_exists('style_count', $cached)
             && array_key_exists('is_variable', $cached)
             && array_key_exists('axes', $cached)
-            && array_key_exists('axis_tags', $cached);
+            && array_key_exists('axis_tags', $cached)
+            && array_key_exists('formats', $cached)
+            && array_key_exists('static', $formats)
+            && !array_key_exists('variable', $formats)
+            && (!array_key_exists('import_options', $cached) || (array_key_exists('static', $importOptions) && !array_key_exists('variable', $importOptions)))
+            && empty($cached['is_variable'])
+            && FontUtils::normalizeAxesMap($cached['axes']) === []
+            && $axisTags === [];
     }
 
     private function familyTransientKey(string $slug): string

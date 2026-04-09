@@ -53,16 +53,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <?php if ($deliveryCount > 1): ?>
-                                <div class="tasty-fonts-inline-note tasty-fonts-inline-note--compact">
-                                    <strong><?php esc_html_e('Available delivery profiles', 'tasty-fonts'); ?></strong>
-                                    <span><?php echo esc_html($availableDeliveryLabels !== [] ? implode(', ', $availableDeliveryLabels) : __('None saved yet.', 'tasty-fonts')); ?></span>
-                                </div>
-                                <div class="tasty-fonts-inline-note tasty-fonts-inline-note--compact">
-                                    <strong><?php esc_html_e('Live delivery', 'tasty-fonts'); ?></strong>
-                                    <span><?php echo esc_html($activeDeliveryLabel . ' · ' . $this->buildProfileRequestSummary($activeDelivery)); ?></span>
-                                </div>
-                            <?php endif; ?>
                             <?php if ($visibleFaceSummaryLabels !== [] || $deliveryCount === 1): ?>
                                 <div class="tasty-fonts-font-loaded <?php echo $deliveryCount === 1 ? 'tasty-fonts-font-loaded--inline' : ''; ?>">
                                     <?php if ($visibleFaceSummaryLabels !== []): ?>

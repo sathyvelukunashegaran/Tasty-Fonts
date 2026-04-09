@@ -61,6 +61,14 @@
             return false;
         }
 
+        const formats = entry.formats && typeof entry.formats === 'object'
+            ? entry.formats
+            : {};
+
+        if (formats.variable && typeof formats.variable === 'object') {
+            return true;
+        }
+
         if (entry.has_variable_faces || entry.is_variable) {
             return true;
         }
@@ -90,14 +98,64 @@
         return faces.some((face) => hasVariableFontMetadata(face));
     }
 
+    function hasStaticFontMetadata(entry) {
+        if (!entry || typeof entry !== 'object') {
+            return false;
+        }
+
+        const formats = entry.formats && typeof entry.formats === 'object'
+            ? entry.formats
+            : {};
+
+        if (formats.static && typeof formats.static === 'object') {
+            return true;
+        }
+
+        if (entry.has_static_faces) {
+            return true;
+        }
+
+        const faces = Array.isArray(entry.faces) ? entry.faces : [];
+
+        if (faces.some((face) => face && typeof face === 'object' && !hasVariableFontMetadata(face))) {
+            return true;
+        }
+
+        return !hasVariableFontMetadata(entry);
+    }
+
     function describeFontType(entry, provider = 'library') {
         const hasVariable = hasVariableFontMetadata(entry);
+        const hasStatic = hasStaticFontMetadata(entry);
         const normalizedProvider = String(provider || '').trim().toLowerCase();
 
+        if (normalizedProvider === 'bunny') {
+            return {
+                type: 'static',
+                hasVariable: false,
+                hasStatic: true,
+                isSourceOnly: false,
+            };
+        }
+
+        const variableFormat = entry && entry.formats && typeof entry.formats === 'object'
+            ? entry.formats.variable
+            : null;
+        const isSourceOnly = !!(
+            hasVariable
+            && (
+                (variableFormat && typeof variableFormat === 'object' && variableFormat.source_only)
+                || (normalizedProvider === 'bunny' && (!variableFormat || variableFormat.available === false))
+            )
+        );
+
         return {
-            type: hasVariable ? 'variable' : 'static',
+            type: hasStatic && hasVariable
+                ? 'static-variable'
+                : (hasVariable ? 'variable' : 'static'),
             hasVariable,
-            isSourceOnly: hasVariable && normalizedProvider === 'bunny',
+            hasStatic,
+            isSourceOnly,
         };
     }
 
@@ -105,6 +163,7 @@
         describeFontType,
         escapeFontFamily,
         getTabNavigationTargetIndex,
+        hasStaticFontMetadata,
         hasVariableFontMetadata,
         sanitizeFallback,
         slugify,

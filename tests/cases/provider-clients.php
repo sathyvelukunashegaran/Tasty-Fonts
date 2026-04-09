@@ -24,6 +24,8 @@ $tests['google_fonts_client_builds_variable_css2_urls_when_axes_are_available'] 
                     'WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'],
                 ],
             ]
+            ,
+            'variable'
         ),
         'Google variable CSS URLs should preserve the style axis and available variation ranges.'
     );
@@ -85,8 +87,14 @@ HTML,
     assertSameValue('sans-serif', (string) ($first['category'] ?? ''), 'Bunny search should normalize public category labels for preview usage.');
     assertSameValue('Sans Serif', (string) ($first['category_label'] ?? ''), 'Bunny search should keep the display category label for the admin cards.');
     assertSameValue(18, (int) ($first['style_count'] ?? 0), 'Bunny search should expose the public style count for the family card.');
-    assertSameValue(true, !empty($first['is_variable']), 'Bunny search should flag variable-source families when the public page exposes variable font filenames.');
-    assertSameValue(['OPSZ', 'WGHT'], $first['axis_tags'] ?? null, 'Bunny search should expose discovered variable axis tags for UI badges and notes.');
+    assertSameValue(false, !empty($first['is_variable']), 'Bunny search should stay static-only even if the public page mentions variable-source files.');
+    assertSameValue([], $first['axis_tags'] ?? null, 'Bunny search should not expose variable axis tags now that Bunny imports are static-only.');
+    assertSameValue([], $first['axes'] ?? null, 'Bunny search should not expose variable axis ranges now that Bunny imports are static-only.');
+    assertSameValue(
+        ['static' => ['label' => 'Static', 'available' => true, 'source_only' => false]],
+        $first['formats'] ?? null,
+        'Bunny search should only expose static delivery since Bunny does not deliver variable fonts via download or CDN.'
+    );
     assertSameValue(
         ['100', 'regular', '700', 'italic', '700italic'],
         $first['variants'] ?? [],
@@ -166,12 +174,81 @@ HTML,
 
     $family = $client->getFamily('Inter');
 
-    assertSameValue(true, !empty($family['is_variable']), 'Legacy Bunny family cache entries should be ignored so variable-source metadata can be refreshed.');
-    assertSameValue(['OPSZ', 'WGHT'], $family['axis_tags'] ?? null, 'Refetched Bunny family records should expose current axis tags.');
+    assertSameValue(false, !empty($family['is_variable']), 'Legacy Bunny family cache entries should be refetched into the new static-only Bunny shape.');
+    assertSameValue([], $family['axis_tags'] ?? null, 'Refetched Bunny family records should clear any legacy Bunny axis tags.');
+    assertSameValue([], $family['axes'] ?? null, 'Refetched Bunny family records should clear any legacy Bunny axis ranges.');
     assertSameValue(
         ['100', 'regular', '700', 'italic', '700italic'],
         $family['variants'] ?? [],
         'Refetched Bunny family records should replace stale cached variants with the current normalized variant list.'
+    );
+    assertSameValue(
+        ['static' => ['label' => 'Static', 'available' => true, 'source_only' => false]],
+        $family['formats'] ?? null,
+        'Refetched Bunny family records should expose only static delivery since Bunny does not deliver variable fonts via download or CDN.'
+    );
+};
+
+$tests['bunny_fonts_client_refetches_cached_family_records_that_still_expose_variable_formats'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $transientStore;
+
+    $client = new BunnyFontsClient();
+    $transientStore[TastyFonts\Bunny\BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . substr(md5('inter'), 0, 12)] = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'category' => 'sans-serif',
+        'category_label' => 'Sans Serif',
+        'variants' => ['regular'],
+        'style_count' => 1,
+        'is_variable' => true,
+        'axes' => ['WGHT' => ['min' => '100', 'default' => '400', 'max' => '900']],
+        'axis_tags' => ['WGHT'],
+        'formats' => [
+            'static' => ['label' => 'Static', 'available' => true, 'source_only' => false],
+            'variable' => ['label' => 'Variable', 'available' => false, 'source_only' => true],
+        ],
+        'import_options' => [
+            'static' => ['label' => 'Static', 'available' => true, 'source_only' => false],
+            'variable' => ['label' => 'Variable', 'available' => false, 'source_only' => true],
+        ],
+    ];
+    $remoteGetResponses['https://fonts.bunny.net/family/inter'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/html'],
+        'body' => <<<'HTML'
+<!doctype html>
+<html>
+<head>
+    <title>Inter | Bunny Fonts</title>
+</head>
+<body>
+    <div class="family"><h3>Sans Serif</h3></div>
+    <div class="styles">18 styles</div>
+    <div class="card-main"><h1>Inter</h1></div>
+    <p class="license-paragraph">Inter-Italic[opsz,wght].ttf</p>
+    <link href="https://fonts.bunny.net/css?family=inter:100,400,700,400i,700i," rel="stylesheet" />
+</body>
+</html>
+HTML,
+    ];
+
+    $family = $client->getFamily('Inter');
+
+    assertSameValue(false, !empty($family['is_variable']), 'Cached Bunny family records with legacy variable flags should be refetched into the static-only shape.');
+    assertSameValue([], $family['axis_tags'] ?? null, 'Refetched Bunny family records should clear stale variable axis tags.');
+    assertSameValue([], $family['axes'] ?? null, 'Refetched Bunny family records should clear stale variable axis ranges.');
+    assertSameValue(
+        ['static' => ['label' => 'Static', 'available' => true, 'source_only' => false]],
+        $family['formats'] ?? null,
+        'Refetched Bunny family records should drop any legacy variable format metadata.'
+    );
+    assertSameValue(
+        ['static' => ['label' => 'Static', 'available' => true, 'source_only' => false]],
+        $family['import_options'] ?? null,
+        'Refetched Bunny family records should drop any legacy variable import options.'
     );
 };
 
@@ -186,7 +263,8 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
     $settings->saveSettings(['google_api_key' => 'api-key']);
     $settings->saveGoogleApiKeyStatus('valid', 'Ready');
     $client = new GoogleFontsClient($settings);
-    $catalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&capability=VF&key=api-key';
+    $catalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
+    $metadataUrl = 'https://fonts.google.com/metadata/fonts';
     $remoteGetResponses[$catalogUrl] = [
         'response' => ['code' => 200],
         'headers' => ['content-type' => 'application/json'],
@@ -200,10 +278,6 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
                         'subsets' => ['latin'],
                         'version' => 'v18',
                         'lastModified' => '2024-01-01',
-                        'axes' => [
-                            ['tag' => 'opsz', 'start' => 14, 'end' => 32],
-                            ['tag' => 'wght', 'start' => 100, 'end' => 900],
-                        ],
                     ],
                     [
                         'family' => 'Lora',
@@ -212,6 +286,27 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
                         'subsets' => ['latin'],
                         'version' => 'v35',
                         'lastModified' => '2024-01-02',
+                    ],
+                ],
+            ]
+        ),
+    ];
+    $remoteGetResponses[$metadataUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'application/json'],
+        'body' => json_encode(
+            [
+                'familyMetadataList' => [
+                    [
+                        'family' => 'Inter',
+                        'axes' => [
+                            ['tag' => 'opsz', 'min' => 14, 'max' => 32, 'defaultValue' => 14],
+                            ['tag' => 'wght', 'min' => 100, 'max' => 900, 'defaultValue' => 400],
+                        ],
+                    ],
+                    [
+                        'family' => 'Lora',
+                        'axes' => [],
                     ],
                 ],
             ]
@@ -235,10 +330,18 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
                     'OPSZ' => ['min' => '14', 'default' => '14', 'max' => '32'],
                     'WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'],
                 ],
+                'formats' => [
+                    'static' => ['label' => 'Static', 'available' => true, 'source_only' => false],
+                    'variable' => ['label' => 'Variable', 'available' => true, 'source_only' => false],
+                ],
+                'import_options' => [
+                    'static' => ['label' => 'Static', 'available' => true, 'source_only' => false],
+                    'variable' => ['label' => 'Variable', 'available' => true, 'source_only' => false],
+                ],
             ],
         ],
         $results,
-        'Google search should return compact search items from the cached catalog index.'
+        'Google search should merge public Google Fonts metadata when the Webfonts API omits variable axes.'
     );
     assertSameValue($results, $resultsAgain, 'Repeated Google searches in the same request should reuse the in-memory compact catalog index.');
     assertSameValue(
@@ -263,12 +366,20 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
                 'axes' => [],
             ],
         ],
-        $transientStore['tasty_fonts_google_catalog_v1'] ?? null,
+        $transientStore[GoogleFontsClient::TRANSIENT_CATALOG] ?? null,
         'The Google catalog transient should only store the compact search index.'
     );
-    assertSameValue(2, count($remoteGetCalls), 'Google family metadata lookups should refetch the full catalog when only the compact search index is cached.');
+    assertSameValue(3, count($remoteGetCalls), 'Google family metadata lookups should refetch the full catalog while reusing the cached Google Fonts metadata fallback.');
     assertSameValue(['regular', 'italic'], $family['variants'] ?? null, 'Google family lookups should still return full variant metadata on demand.');
     assertSameValue('v18', (string) ($family['version'] ?? ''), 'Google family lookups should still return full catalog metadata on demand.');
+    assertSameValue(
+        [
+            'OPSZ' => ['min' => '14', 'default' => '14', 'max' => '32'],
+            'WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'],
+        ],
+        $family['axes'] ?? null,
+        'Google family lookups should recover variable axes from the public metadata catalog when the API response omits them.'
+    );
 };
 
 $tests['google_fonts_client_clears_catalog_cache'] = static function (): void {
@@ -277,13 +388,19 @@ $tests['google_fonts_client_clears_catalog_cache'] = static function (): void {
     global $transientDeleted;
     global $transientStore;
 
-    $transientStore['tasty_fonts_google_catalog_v1'] = ['family' => 'Inter'];
+    $transientStore[GoogleFontsClient::TRANSIENT_CATALOG] = ['family' => 'Inter'];
+    $transientStore[GoogleFontsClient::LEGACY_TRANSIENT_CATALOG] = ['family' => 'Inter (legacy)'];
+    $transientStore[GoogleFontsClient::TRANSIENT_METADATA] = ['inter' => ['family' => 'Inter', 'axes' => []]];
 
     $client = new GoogleFontsClient(new SettingsRepository());
     $client->clearCatalogCache();
 
-    assertSameValue(false, array_key_exists('tasty_fonts_google_catalog_v1', $transientStore), 'Google catalog cache clearing should remove the cached catalog transient.');
-    assertSameValue(true, in_array('tasty_fonts_google_catalog_v1', $transientDeleted, true), 'Google catalog cache clearing should delete the expected transient key.');
+    assertSameValue(false, array_key_exists(GoogleFontsClient::TRANSIENT_CATALOG, $transientStore), 'Google catalog cache clearing should remove the cached catalog transient.');
+    assertSameValue(false, array_key_exists(GoogleFontsClient::LEGACY_TRANSIENT_CATALOG, $transientStore), 'Google catalog cache clearing should also remove the legacy catalog transient.');
+    assertSameValue(false, array_key_exists(GoogleFontsClient::TRANSIENT_METADATA, $transientStore), 'Google catalog cache clearing should remove the cached Google Fonts metadata fallback.');
+    assertSameValue(true, in_array(GoogleFontsClient::TRANSIENT_CATALOG, $transientDeleted, true), 'Google catalog cache clearing should delete the expected catalog transient key.');
+    assertSameValue(true, in_array(GoogleFontsClient::LEGACY_TRANSIENT_CATALOG, $transientDeleted, true), 'Google catalog cache clearing should delete the legacy catalog transient key.');
+    assertSameValue(true, in_array(GoogleFontsClient::TRANSIENT_METADATA, $transientDeleted, true), 'Google catalog cache clearing should delete the metadata fallback transient key.');
 };
 
 $tests['provider_clients_apply_http_request_args_filters'] = static function (): void {
@@ -311,7 +428,7 @@ $tests['provider_clients_apply_http_request_args_filters'] = static function ():
     $google = new GoogleFontsClient($settings);
     $bunny = new BunnyFontsClient();
     $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
-    $googleCatalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&capability=VF&key=api-key';
+    $googleCatalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
     $googleCssUrl = $google->buildCssUrl('Inter', ['regular']);
     $bunnyFamilyUrl = 'https://fonts.bunny.net/family/inter';
     $bunnyCssUrl = $bunny->buildCssUrl('Inter', ['regular']);

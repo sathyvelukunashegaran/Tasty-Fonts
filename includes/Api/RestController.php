@@ -130,7 +130,8 @@ final class RestController
             $this->admin->importGoogleFamily(
                 $this->getTextParam($request, 'family'),
                 $this->getVariantTokens($request),
-                $this->getTextParam($request, 'delivery_mode', 'self_hosted')
+                $this->getTextParam($request, 'delivery_mode', 'self_hosted'),
+                $this->getTextParam($request, 'format_mode', 'static')
             )
         );
     }
@@ -286,6 +287,9 @@ final class RestController
                 'heading_fallback' => 'sans-serif',
                 'body_fallback' => 'sans-serif',
                 'monospace_fallback' => 'monospace',
+                'heading_delivery_id' => '',
+                'body_delivery_id' => '',
+                'monospace_delivery_id' => '',
                 'heading_weight' => '',
                 'body_weight' => '',
                 'monospace_weight' => '',
@@ -373,6 +377,7 @@ final class RestController
             'variants' => $this->buildStringArrayArg(),
             'variant_tokens' => $this->buildTextArg(),
             'delivery_mode' => $this->buildTextArg(false, ['self_hosted', 'cdn']),
+            'format_mode' => $this->buildTextArg(false, ['static', 'variable']),
         ];
     }
 
@@ -388,6 +393,9 @@ final class RestController
                 'heading_fallback',
                 'body_fallback',
                 'monospace_fallback',
+                'heading_delivery_id',
+                'body_delivery_id',
+                'monospace_delivery_id',
                 'heading_weight',
                 'body_weight',
                 'monospace_weight',

@@ -295,6 +295,18 @@
                                                 ?>
                                             </label>
                                         </div>
+                                        <div class="tasty-fonts-role-weight-editor" data-role-delivery-editor="heading" hidden>
+                                            <div class="tasty-fonts-role-axis-head">
+                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Delivery', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-muted" data-role-delivery-summary="heading"><?php esc_html_e('Choose which saved static or variable delivery this role should use.', 'tasty-fonts'); ?></span>
+                                            </div>
+                                            <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
+                                                <span class="screen-reader-text"><?php esc_html_e('Heading delivery', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-select-field">
+                                                    <select name="tasty_fonts_heading_delivery_id" id="tasty_fonts_heading_delivery_id" data-role-delivery-select="heading" form="<?php echo esc_attr($roleFormId); ?>"></select>
+                                                </span>
+                                            </label>
+                                        </div>
                                         <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="heading" hidden>
                                             <div class="tasty-fonts-role-axis-head">
                                                 <span class="tasty-fonts-field-label-text"><?php esc_html_e('Role Weight', 'tasty-fonts'); ?></span>
@@ -383,6 +395,18 @@
                                                     ]
                                                 );
                                                 ?>
+                                            </label>
+                                        </div>
+                                        <div class="tasty-fonts-role-weight-editor" data-role-delivery-editor="body" hidden>
+                                            <div class="tasty-fonts-role-axis-head">
+                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Delivery', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-muted" data-role-delivery-summary="body"><?php esc_html_e('Choose which saved static or variable delivery this role should use.', 'tasty-fonts'); ?></span>
+                                            </div>
+                                            <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
+                                                <span class="screen-reader-text"><?php esc_html_e('Body delivery', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-select-field">
+                                                    <select name="tasty_fonts_body_delivery_id" id="tasty_fonts_body_delivery_id" data-role-delivery-select="body" form="<?php echo esc_attr($roleFormId); ?>"></select>
+                                                </span>
                                             </label>
                                         </div>
                                         <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="body" hidden>
@@ -474,6 +498,18 @@
                                                     ]
                                                 );
                                                 ?>
+                                            </label>
+                                        </div>
+                                        <div class="tasty-fonts-role-weight-editor" data-role-delivery-editor="monospace" hidden>
+                                            <div class="tasty-fonts-role-axis-head">
+                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Delivery', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-muted" data-role-delivery-summary="monospace"><?php esc_html_e('Choose which saved static or variable delivery this role should use.', 'tasty-fonts'); ?></span>
+                                            </div>
+                                            <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
+                                                <span class="screen-reader-text"><?php esc_html_e('Monospace delivery', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-select-field">
+                                                    <select name="tasty_fonts_monospace_delivery_id" id="tasty_fonts_monospace_delivery_id" data-role-delivery-select="monospace" form="<?php echo esc_attr($roleFormId); ?>"></select>
+                                                </span>
                                             </label>
                                         </div>
                                         <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="monospace" hidden>

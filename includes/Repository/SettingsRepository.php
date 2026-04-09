@@ -97,6 +97,7 @@ final class SettingsRepository
         'body_fallback' => 'sans-serif',
         'monospace_fallback' => 'monospace',
     ];
+    private const ROLE_DELIVERY_KEYS = ['heading_delivery_id', 'body_delivery_id', 'monospace_delivery_id'];
     private const ROLE_WEIGHT_KEYS = ['heading_weight', 'body_weight', 'monospace_weight'];
     private const ROLE_AXIS_KEYS = ['heading_axes', 'body_axes', 'monospace_axes'];
     private ?array $settingsCache = null;
@@ -358,6 +359,14 @@ final class SettingsRepository
             }
 
             $roles[$roleKey] = $this->normalizeRoleFallback($input[$roleKey], $defaultFallback);
+        }
+
+        foreach (self::ROLE_DELIVERY_KEYS as $roleKey) {
+            if (!array_key_exists($roleKey, $input)) {
+                continue;
+            }
+
+            $roles[$roleKey] = $this->sanitizeTextValue($input[$roleKey]);
         }
 
         foreach (self::ROLE_WEIGHT_KEYS as $roleKey) {
@@ -677,6 +686,9 @@ final class SettingsRepository
             'heading' => '',
             'body' => '',
             'monospace' => '',
+            'heading_delivery_id' => '',
+            'body_delivery_id' => '',
+            'monospace_delivery_id' => '',
             'heading_weight' => '',
             'body_weight' => '',
             'monospace_weight' => '',
@@ -712,6 +724,9 @@ final class SettingsRepository
         $normalizedRoles['heading'] = $this->sanitizeTextValue($normalizedRoles['heading'] ?? '');
         $normalizedRoles['body'] = $this->sanitizeTextValue($normalizedRoles['body'] ?? '');
         $normalizedRoles['monospace'] = $this->sanitizeTextValue($normalizedRoles['monospace'] ?? '');
+        $normalizedRoles['heading_delivery_id'] = $this->sanitizeTextValue($normalizedRoles['heading_delivery_id'] ?? '');
+        $normalizedRoles['body_delivery_id'] = $this->sanitizeTextValue($normalizedRoles['body_delivery_id'] ?? '');
+        $normalizedRoles['monospace_delivery_id'] = $this->sanitizeTextValue($normalizedRoles['monospace_delivery_id'] ?? '');
         $normalizedRoles['heading_fallback'] = $this->normalizeRoleFallback($normalizedRoles['heading_fallback'] ?? '', 'sans-serif');
         $normalizedRoles['body_fallback'] = $this->normalizeRoleFallback($normalizedRoles['body_fallback'] ?? '', 'sans-serif');
         $normalizedRoles['monospace_fallback'] = $this->normalizeRoleFallback($normalizedRoles['monospace_fallback'] ?? '', 'monospace');

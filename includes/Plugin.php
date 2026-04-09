@@ -47,6 +47,8 @@ final class Plugin
         AssetService::TRANSIENT_HASH,
         AssetService::TRANSIENT_REGENERATE_CSS_QUEUED,
         GoogleFontsClient::TRANSIENT_CATALOG,
+        GoogleFontsClient::LEGACY_TRANSIENT_CATALOG,
+        GoogleFontsClient::TRANSIENT_METADATA,
         BunnyFontsClient::TRANSIENT_CATALOG,
         'tasty_fonts_github_release_v1',
         'tasty_fonts_github_release_manifest_v1',

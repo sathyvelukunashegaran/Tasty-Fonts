@@ -5,6 +5,7 @@ const {
     describeFontType,
     escapeFontFamily,
     getTabNavigationTargetIndex,
+    hasStaticFontMetadata,
     hasVariableFontMetadata,
     sanitizeFallback,
     slugify,
@@ -46,19 +47,21 @@ test('admin contracts detect variable metadata from family and face entries', ()
     assert.equal(hasVariableFontMetadata({ variation_axes: { WGHT: { min: 100, max: 900 } } }), true);
     assert.equal(hasVariableFontMetadata({ faces: [{ is_variable: true }] }), true);
     assert.equal(hasVariableFontMetadata({ faces: [{ weight: '400' }] }), false);
+    assert.equal(hasStaticFontMetadata({ formats: { static: { available: true }, variable: { available: true } } }), true);
+    assert.equal(hasStaticFontMetadata({ faces: [{ is_variable: true, axes: { WGHT: { min: 100, max: 900 } } }] }), false);
 });
 
 test('admin contracts describe font type with provider-aware nuance', () => {
     assert.deepEqual(
-        describeFontType({ has_variable_faces: true }, 'library'),
-        { type: 'variable', hasVariable: true, isSourceOnly: false }
+        describeFontType({ has_variable_faces: true, formats: { static: {}, variable: {} } }, 'library'),
+        { type: 'static-variable', hasVariable: true, hasStatic: true, isSourceOnly: false }
     );
     assert.deepEqual(
-        describeFontType({ variation_axes: { WGHT: { min: 100, max: 900 } } }, 'bunny'),
-        { type: 'variable', hasVariable: true, isSourceOnly: true }
+        describeFontType({ variation_axes: { WGHT: { min: 100, max: 900 } }, formats: { static: {}, variable: { available: false, source_only: true } } }, 'bunny'),
+        { type: 'static', hasVariable: false, hasStatic: true, isSourceOnly: false }
     );
     assert.deepEqual(
         describeFontType({ faces: [{ weight: '400' }] }, 'google'),
-        { type: 'static', hasVariable: false, isSourceOnly: false }
+        { type: 'static', hasVariable: false, hasStatic: true, isSourceOnly: false }
     );
 });
