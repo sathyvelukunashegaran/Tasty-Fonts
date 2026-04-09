@@ -19,7 +19,6 @@
                                                 class="tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-command-status<?php echo $applyEverywhere ? ' is-live' : ''; ?>"
                                                 <?php $this->renderPassiveHelpAttributes($sitewideStatusTooltip); ?>
                                                 aria-label="<?php esc_attr_e('Sitewide delivery status', 'tasty-fonts'); ?>"
-                                                aria-controls="tasty-fonts-help-tooltip-layer"
                                             >
                                                 <?php echo esc_html($applyEverywhere ? __('Sitewide on', 'tasty-fonts') : __('Draft only', 'tasty-fonts')); ?>
                                             </button>
@@ -31,10 +30,8 @@
                                                             type="button"
                                                             class="tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-status-pill <?php echo esc_attr($roleDeploymentBadgeClass); ?>"
                                                             data-role-deployment-pill
-                                                            <?php $this->renderPassiveHelpAttributes($roleDeploymentTooltip); ?>
+                                                            <?php $this->renderPassiveHelpAttributes($roleDeploymentTooltip, $roleDeploymentAnnouncementId . ' tasty-fonts-help-tooltip-layer'); ?>
                                                             aria-label="<?php esc_attr_e('Role deployment status', 'tasty-fonts'); ?>"
-                                                            aria-describedby="<?php echo esc_attr($roleDeploymentAnnouncementId); ?>"
-                                                            aria-controls="tasty-fonts-help-tooltip-layer"
                                                         >
                                                             <span data-role-deployment-badge><?php echo esc_html($roleDeploymentBadge); ?></span>
                                                         </button>
@@ -167,8 +164,8 @@
 
                             <?php if (!empty($embeddedPreviewSection) || !empty($embeddedToolsSection)): ?>
                                 <div class="tasty-fonts-studio-disclosures">
-                                    <?php echo $embeddedPreviewSection ?? ''; ?>
-                                    <?php echo $embeddedToolsSection ?? ''; ?>
+                                    <?php echo $embeddedPreviewSection ?? ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted renderer output ?>
+                                    <?php echo $embeddedToolsSection ?? ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted renderer output ?>
                                 </div>
                             <?php endif; ?>
 

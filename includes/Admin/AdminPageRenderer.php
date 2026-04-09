@@ -136,7 +136,7 @@ final class AdminPageRenderer extends AbstractSectionRenderer
                                         data-tab-group="page"
                                         data-tab-target="<?php echo esc_attr($pageKey); ?>"
                                         aria-selected="<?php echo $isActive ? 'true' : 'false'; ?>"
-                                        tabindex="0"
+                                        tabindex="<?php echo $isActive ? '0' : '-1'; ?>"
                                         aria-controls="tasty-fonts-page-panel-<?php echo esc_attr($pageKey); ?>"
                                         role="tab"
                                     >

@@ -28,7 +28,7 @@
                                         data-tab-group="settings"
                                         data-tab-target="integrations"
                                         aria-selected="false"
-                                        tabindex="0"
+                                        tabindex="-1"
                                         aria-controls="tasty-fonts-settings-panel-integrations"
                                         role="tab"
                                     >
@@ -41,7 +41,7 @@
                                         data-tab-group="settings"
                                         data-tab-target="plugin-behavior"
                                         aria-selected="false"
-                                        tabindex="0"
+                                        tabindex="-1"
                                         aria-controls="tasty-fonts-settings-panel-plugin-behavior"
                                         role="tab"
                                     >
@@ -54,7 +54,7 @@
                                         data-tab-group="settings"
                                         data-tab-target="developer"
                                         aria-selected="false"
-                                        tabindex="0"
+                                        tabindex="-1"
                                         aria-controls="tasty-fonts-settings-panel-developer"
                                         role="tab"
                                     >
@@ -563,7 +563,6 @@
                                                     class="<?php echo esc_attr($etchBadgeClass); ?>"
                                                     <?php $this->renderPassiveHelpAttributes($etchStatusHelp); ?>
                                                     aria-label="<?php esc_attr_e('Etch integration status', 'tasty-fonts'); ?>"
-                                                    aria-controls="tasty-fonts-help-tooltip-layer"
                                                 >
                                                     <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
                                                 </button>
@@ -802,7 +801,6 @@
                                                         value="1"
                                                         aria-label="<?php esc_attr_e('Reinstall selected channel', 'tasty-fonts'); ?>"
                                                         <?php $this->renderPassiveHelpAttributes((string) ($updateChannelStatus['state_copy'] ?? '')); ?>
-                                                        aria-controls="tasty-fonts-help-tooltip-layer"
                                                     ><?php esc_html_e('Reinstall', 'tasty-fonts'); ?></button>
                                                 </div>
                                             </form>
@@ -952,7 +950,7 @@
                                         <form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--developer-danger" data-developer-confirm-message="<?php echo esc_attr__('Reset plugin settings to defaults while keeping the font library and files?', 'tasty-fonts'); ?>">
                                             <?php wp_nonce_field('tasty_fonts_reset_plugin_settings'); ?>
                                             <div class="tasty-fonts-settings-flat-row-support tasty-fonts-settings-flat-row-support--developer tasty-fonts-settings-flat-row-support--developer-danger">
-                                                <p class="tasty-fonts-developer-confirm-copy tasty-fonts-developer-confirm-copy--inline"><?php esc_html_e('Shows a browser confirmation before resetting plugin settings.', 'tasty-fonts'); ?></p>
+                                                <p class="tasty-fonts-developer-confirm-copy tasty-fonts-developer-confirm-copy--inline"><?php esc_html_e('Requires a second click before resetting plugin settings.', 'tasty-fonts'); ?></p>
                                                 <div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
                                                     <button type="submit" class="button button-small tasty-fonts-button-danger tasty-fonts-developer-action-button" name="tasty_fonts_reset_plugin_settings" value="1"><?php esc_html_e('Reset Settings', 'tasty-fonts'); ?></button>
                                                 </div>
@@ -973,7 +971,7 @@
                                         <form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--developer-danger" data-developer-confirm-message="<?php echo esc_attr__('Wipe the managed font library, remove managed files, and rebuild empty storage?', 'tasty-fonts'); ?>">
                                             <?php wp_nonce_field('tasty_fonts_wipe_managed_font_library'); ?>
                                             <div class="tasty-fonts-settings-flat-row-support tasty-fonts-settings-flat-row-support--developer tasty-fonts-settings-flat-row-support--developer-danger">
-                                                <p class="tasty-fonts-developer-confirm-copy tasty-fonts-developer-confirm-copy--inline"><?php esc_html_e('Shows a browser confirmation before wiping the managed library and files.', 'tasty-fonts'); ?></p>
+                                                <p class="tasty-fonts-developer-confirm-copy tasty-fonts-developer-confirm-copy--inline"><?php esc_html_e('Requires a second click before wiping the managed library and files.', 'tasty-fonts'); ?></p>
                                                 <div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
                                                     <button type="submit" class="button button-small tasty-fonts-button-danger tasty-fonts-developer-action-button" name="tasty_fonts_wipe_managed_font_library" value="1"><?php esc_html_e('Wipe Library', 'tasty-fonts'); ?></button>
                                                 </div>
@@ -994,7 +992,7 @@
                                         <form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--developer-danger" data-developer-confirm-message="<?php echo esc_attr__('Reset stored integration detection and ACSS bookkeeping?', 'tasty-fonts'); ?>">
                                             <?php wp_nonce_field('tasty_fonts_reset_integration_detection_state'); ?>
                                             <div class="tasty-fonts-settings-flat-row-support tasty-fonts-settings-flat-row-support--developer tasty-fonts-settings-flat-row-support--developer-danger">
-                                                <p class="tasty-fonts-developer-confirm-copy tasty-fonts-developer-confirm-copy--inline"><?php esc_html_e('Shows a browser confirmation before resetting integration detection state.', 'tasty-fonts'); ?></p>
+                                                <p class="tasty-fonts-developer-confirm-copy tasty-fonts-developer-confirm-copy--inline"><?php esc_html_e('Requires a second click before resetting integration detection state.', 'tasty-fonts'); ?></p>
                                                 <div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
                                                     <button type="submit" class="button button-small tasty-fonts-button-danger tasty-fonts-developer-action-button" name="tasty_fonts_reset_integration_detection_state" value="1"><?php esc_html_e('Reset Integrations', 'tasty-fonts'); ?></button>
                                                 </div>

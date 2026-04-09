@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Added variable-font awareness throughout the library and import workflows, including family type badges/filtering, variable metadata in Google and Bunny search results, upload axis editors, and clearer source-only messaging for Bunny variable families.
 - Added PHP and JavaScript coverage for variable font contracts, provider metadata, library rendering, runtime asset planning, and role/settings persistence.
 - Added a three-rail GitHub release workflow with stable, beta, and nightly channels, including a Behavior-tab update-channel selector and rollback reinstall path for channel downgrades.
+- Added bundled JavaScript translation assets and an RTL admin stylesheet so WordPress can load admin translations and directional overrides through the standard core mechanisms.
 
 ### Changed
 
@@ -17,14 +18,17 @@ All notable changes to this project will be documented in this file.
 - Improved hosted CSS parsing and import merging so Google, Bunny, and Adobe faces share normalized axis metadata and imported profiles retain variable/static face details consistently.
 - Split release automation into shared quality checks plus dedicated stable, beta, and nightly publishing workflows, and replaced the local release helper with channel-aware branch, beta, and stable commands.
 - Streamlined Settings > Behavior so the update channel control, rollback reinstall action, and status messaging now share a flatter inline layout with improved responsive behavior.
-- Simplified Settings > Developer maintenance actions by replacing typed confirmation phrases with browser confirm dialogs and tightening the related action-row presentation.
+- Simplified Settings > Developer maintenance actions by tightening the related action-row presentation and switching destructive actions to a two-step in-place confirmation pattern.
 - Updated the quality workflow to use `actions/setup-node@v5` with Node.js 22.
+- Bumped the plugin minimum supported WordPress version to 6.5 to align the header with the APIs used by the Font Library and editor integrations.
 
 ### Fixed
 
 - Fixed preload and preview weight selection so saved role overrides and variable `WGHT` axis values choose the intended face instead of assuming hard-coded defaults.
 - Fixed local upload duplicate detection and filename handling for variable fonts so self-hosted variable files can coexist cleanly with static faces in the same family.
 - Improved nightly release notes generation so the workflow can fall back to the latest stable or beta tag when a previous nightly tag is unavailable.
+- Fixed admin accessibility and plugin-compliance gaps across the dashboard, including REST route argument schemas, roving-tabindex behavior, real disabled states for blocked destructive actions, tooltip `aria-describedby` wiring, and translation-safe plural handling in both PHP and JavaScript.
+- Fixed generated CSS downloads and Adobe project validation by sending byte-accurate `Content-Length` headers and rejecting invalid Adobe project IDs before remote validation requests run.
 
 ## [1.7.0] - 2026-04-09
 

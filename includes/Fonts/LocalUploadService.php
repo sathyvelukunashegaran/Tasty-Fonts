@@ -541,11 +541,10 @@ final class LocalUploadService
             : '';
 
         return sprintf(
-            __('Local font upload finished: %1$d imported, %2$d skipped, %3$d error%4$s.%5$s', 'tasty-fonts'),
+            __('Local font upload finished: %1$d imported, %2$d skipped, %3$s.%4$s', 'tasty-fonts'),
             $importedCount,
             $skippedCount,
-            $errorCount,
-            $errorCount === 1 ? '' : 's',
+            sprintf(_n('%d error', '%d errors', $errorCount, 'tasty-fonts'), $errorCount),
             $familySummary
         );
     }

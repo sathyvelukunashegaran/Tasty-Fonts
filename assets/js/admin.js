@@ -307,6 +307,8 @@
         deliveryDeleteConfirm: __('Delete the "%1$s" delivery from %2$s?', 'tasty-fonts'),
         deliveryDeleteError: __('The delivery profile could not be deleted.', 'tasty-fonts'),
         deleteConfirm: __('Delete "%s" and remove its files from uploads/fonts?', 'tasty-fonts'),
+        confirmAction: __('Confirm', 'tasty-fonts'),
+        confirmActionLabel: __('Confirm %s', 'tasty-fonts'),
         copied: __('Copied', 'tasty-fonts'),
         activityCountSingle: __('%1$d entry', 'tasty-fonts'),
         activityCountMultiple: __('%1$d entries', 'tasty-fonts'),
@@ -3316,10 +3318,18 @@
                     [variantCount, availableCount]
                 );
             } else if (variantCount > 0) {
-                importSelectionSummary.textContent = formatPluralMessage(
-                    familyHasVariableMetadata(matchedFamily) ? '%1$d Style Selected' : '%1$d Variant Selected',
-                    familyHasVariableMetadata(matchedFamily) ? '%1$d Styles Selected' : '%1$d Variants Selected',
-                    variantCount,
+                importSelectionSummary.textContent = formatMessage(
+                    variantCount === 1
+                        ? (
+                            familyHasVariableMetadata(matchedFamily)
+                                ? getString('styleCountSingle', '%d style')
+                                : getString('variantCountSingle', '%d variant')
+                        )
+                        : (
+                            familyHasVariableMetadata(matchedFamily)
+                                ? getString('styleCountMultiple', '%d styles')
+                                : getString('variantCountMultiple', '%d variants')
+                        ),
                     [variantCount]
                 );
             } else {
@@ -3388,10 +3398,10 @@
                     [variantCount, availableCount]
                 );
             } else if (variantCount > 0) {
-                bunnyImportSelectionSummary.textContent = formatPluralMessage(
-                    '%1$d Variant Selected',
-                    '%1$d Variants Selected',
-                    variantCount,
+                bunnyImportSelectionSummary.textContent = formatMessage(
+                    variantCount === 1
+                        ? getString('variantCountSingle', '%d variant')
+                        : getString('variantCountMultiple', '%d variants'),
                     [variantCount]
                 );
             } else {
@@ -3451,7 +3461,7 @@
             const isActive = tab.getAttribute('data-tab-target') === key;
             tab.classList.toggle('is-active', isActive);
             tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-            tab.setAttribute('tabindex', '0');
+            tab.setAttribute('tabindex', isActive ? '0' : '-1');
         });
 
         tabPanelsForGroup(group).forEach((panel) => {
@@ -3658,6 +3668,108 @@
         stack.appendChild(toast);
 
         scheduleToastDismiss(toast, resolvedTone);
+    }
+
+    function restoreButtonAttribute(button, attribute, value) {
+        if (!button) {
+            return;
+        }
+
+        if (value) {
+            button.setAttribute(attribute, value);
+            return;
+        }
+
+        button.removeAttribute(attribute);
+    }
+
+    function readButtonLabel(button) {
+        if (!button) {
+            return '';
+        }
+
+        const srText = button.querySelector('.screen-reader-text');
+
+        if (button.classList.contains('tasty-fonts-font-action-button--icon') && srText) {
+            return String(srText.textContent || '').trim();
+        }
+
+        return String(button.textContent || '').trim();
+    }
+
+    function writeButtonLabel(button, label) {
+        if (!button || !label) {
+            return;
+        }
+
+        const srText = button.querySelector('.screen-reader-text');
+
+        if (button.classList.contains('tasty-fonts-font-action-button--icon') && srText) {
+            srText.textContent = label;
+        } else {
+            button.textContent = label;
+        }
+
+        button.setAttribute('aria-label', label);
+        button.setAttribute('title', label);
+    }
+
+    function resetDestructiveButton(button) {
+        if (!button) {
+            return;
+        }
+
+        if (button._tastyConfirmTimer) {
+            window.clearTimeout(button._tastyConfirmTimer);
+            button._tastyConfirmTimer = 0;
+        }
+
+        if (button.dataset.confirmOriginalLabel) {
+            writeButtonLabel(button, button.dataset.confirmOriginalLabel);
+        }
+
+        restoreButtonAttribute(button, 'aria-label', button.dataset.confirmOriginalAriaLabel || '');
+        restoreButtonAttribute(button, 'title', button.dataset.confirmOriginalTitle || '');
+
+        delete button.dataset.confirmArmed;
+        delete button.dataset.confirmOriginalLabel;
+        delete button.dataset.confirmOriginalAriaLabel;
+        delete button.dataset.confirmOriginalTitle;
+        button.classList.remove('is-awaiting-confirmation');
+    }
+
+    function armDestructiveButton(button, confirmMessage) {
+        if (!button) {
+            return false;
+        }
+
+        if (button.dataset.confirmArmed === '1') {
+            resetDestructiveButton(button);
+            return true;
+        }
+
+        const originalLabel = readButtonLabel(button) || getString('confirmAction', 'Confirm');
+
+        button.dataset.confirmArmed = '1';
+        button.dataset.confirmOriginalLabel = originalLabel;
+        button.dataset.confirmOriginalAriaLabel = button.getAttribute('aria-label') || '';
+        button.dataset.confirmOriginalTitle = button.getAttribute('title') || '';
+
+        writeButtonLabel(
+            button,
+            formatMessage(getString('confirmActionLabel', 'Confirm %s'), [originalLabel])
+        );
+
+        button.classList.add('is-awaiting-confirmation');
+        button._tastyConfirmTimer = window.setTimeout(() => {
+            resetDestructiveButton(button);
+        }, 6000);
+
+        if (confirmMessage) {
+            showToast(confirmMessage, 'error');
+        }
+
+        return false;
     }
 
     function initToasts() {
@@ -5195,7 +5307,7 @@
             .replace('%1$s', deliveryLabel || 'selected')
             .replace('%2$s', familyName || 'this family');
 
-        if (!window.confirm(confirmMessage)) {
+        if (!armDestructiveButton(button, confirmMessage)) {
             return false;
         }
 
@@ -7337,7 +7449,7 @@
         const familyName = deleteTarget.getAttribute('data-delete-family') || 'this font family';
         const confirmTemplate = getString('deleteConfirm', 'Delete "%s" and remove its files from uploads/fonts?');
 
-        if (!window.confirm(confirmTemplate.replace('%s', familyName))) {
+        if (!armDestructiveButton(deleteTarget, confirmTemplate.replace('%s', familyName))) {
             event.preventDefault();
         }
 
@@ -8367,7 +8479,9 @@
             }
 
             form.addEventListener('submit', (event) => {
-                if (!window.confirm(confirmMessage)) {
+                const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+
+                if (!armDestructiveButton(submitButton, confirmMessage)) {
                     event.preventDefault();
                 }
             });

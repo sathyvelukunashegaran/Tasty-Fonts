@@ -11,7 +11,7 @@
                                                 data-tab-group="output"
                                                 data-tab-target="<?php echo esc_attr((string) $panel['key']); ?>"
                                                 aria-selected="<?php echo !empty($panel['active']) ? 'true' : 'false'; ?>"
-                                                tabindex="0"
+                                                tabindex="<?php echo !empty($panel['active']) ? '0' : '-1'; ?>"
                                                 aria-controls="<?php echo esc_attr($panelId); ?>"
                                                 role="tab"
                                             >

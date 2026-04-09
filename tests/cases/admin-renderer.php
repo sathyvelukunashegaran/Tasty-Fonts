@@ -261,13 +261,13 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
     assertContainsValue('tasty-fonts-page-tab-settings', $output, 'The unified admin page should include a Settings top-level tab.');
     assertContainsValue('<h2 class="tasty-fonts-section-title">Settings</h2>', $output, 'The Settings panel should keep a stable section heading regardless of tab activation order.');
     assertSameValue(4, substr_count($output, 'id="tasty-fonts-page-tab-'), 'The unified admin page should render four top-level page tabs.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-page-tab-library"[\s\S]*?tabindex="0"/', $output), 'All top-level page tabs should remain in the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-integrations"[\s\S]*?tabindex="0"/', $output), 'The Settings sub-tabs should keep the Integrations button in the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-plugin-behavior"[\s\S]*?tabindex="0"/', $output), 'The Settings sub-tabs should keep the Behavior button in the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-developer"[\s\S]*?tabindex="0"/', $output), 'The Settings sub-tabs should keep the Developer button in the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-preview-tab-code"[\s\S]*?tabindex="0"/', $output), 'Inactive preview tabs should remain in the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-add-font-tab-bunny"[\s\S]*?tabindex="0"/', $output), 'Inactive add-font tabs should remain in the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-tab-system"[\s\S]*?tabindex="0"/', $output), 'Inactive diagnostics tabs should remain in the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-page-tab-library"[\s\S]*?tabindex="-1"/', $output), 'Inactive top-level page tabs should be removed from the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-integrations"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-plugin-behavior"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-developer"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-preview-tab-code"[\s\S]*?tabindex="-1"/', $output), 'Inactive preview tabs should be removed from the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-add-font-tab-bunny"[\s\S]*?tabindex="-1"/', $output), 'Inactive add-font tabs should be removed from the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-tab-system"[\s\S]*?tabindex="-1"/', $output), 'Inactive diagnostics tabs should be removed from the normal keyboard tab order.');
     assertSameValue(1, preg_match('/Version [0-9]+\.[0-9]+\.[0-9]+/', $output), 'The page heading should include the current plugin version for assistive technologies.');
     assertContainsValue('data-settings-autosave="output"', $output, 'The Settings tab should render the output settings form with autosave enabled.');
     assertContainsValue('data-settings-autosave="integrations"', $output, 'The Settings tab should render the integrations settings form with autosave enabled.');
@@ -1776,7 +1776,7 @@ $tests['admin_page_renderer_attaches_update_channel_rollback_action_to_the_field
     assertContainsValue('Rollback Available', $output, 'The Behavior tab should render rollback state copy inline with the update channel field.');
     assertContainsValue('Installed: 1.8.0-dev. Latest for Stable: 1.7.0.', $output, 'The Behavior tab should render rollback version context inline.');
     assertContainsValue('data-help-tooltip="The selected channel points to an older package than the one installed now. Use the reinstall action below to switch immediately."', $output, 'The Behavior tab should expose rollback guidance through the shared passive help tooltip system.');
-    assertContainsValue('aria-controls="tasty-fonts-help-tooltip-layer"', $output, 'The Behavior tab should wire rollback help to the shared tooltip layer.');
+    assertNotContainsValue('aria-controls="tasty-fonts-help-tooltip-layer"', $output, 'Passive help triggers should not misuse aria-controls for tooltip relationships.');
     assertNotContainsValue('<p class="tasty-fonts-settings-flat-row-note tasty-fonts-settings-flat-row-note--channel">The selected channel points to an older package than the one installed now. Use the reinstall action below to switch immediately.</p>', $output, 'Rollback guidance should no longer render as an inline sentence when the reinstall action is available.');
     assertContainsValue('Reinstall', $output, 'The Behavior tab should attach the rollback action directly to the update channel field.');
     assertNotContainsValue('Rollback Reinstall', $output, 'Rollback should no longer render as a separate nested section heading.');
@@ -2729,7 +2729,7 @@ $tests['admin_page_renderer_renders_highlighted_snippet_panels_with_icon_copy_bu
     assertContainsValue('<div class="tasty-fonts-code-panel-body" data-snippet-display aria-labelledby=', $output, 'Snippet panels should wrap highlighted output in the shared code panel body.');
     assertContainsValue('<pre class="tasty-fonts-output" data-snippet-view="raw" aria-labelledby=', $output, 'Snippet panels should render highlighted code blocks instead of textareas.');
     assertContainsValue('<code id="tasty-fonts-output-usage" class="tasty-fonts-output-code">', $output, 'Snippet panels should keep stable code block IDs for copy and accessibility hooks.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-output-tab-usage"[\s\S]*?tabindex="0"/', $output), 'Inactive output tabs should remain in the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-output-tab-usage"[\s\S]*?tabindex="-1"/', $output), 'Inactive output tabs should be removed from the normal keyboard tab order.');
     assertContainsValue('tasty-fonts-syntax-property', $output, 'Snippet panels should wrap CSS properties in syntax token markup.');
     assertContainsValue('tasty-fonts-syntax-string', $output, 'Snippet panels should wrap strings in syntax token markup.');
     assertNotContainsValue('<textarea id="tasty-fonts-output-usage"', $output, 'Snippet panels should no longer render plain textareas.');
@@ -3567,4 +3567,5 @@ $tests['admin_page_renderer_family_cards_expose_monospace_assignments_and_varian
     assertContainsValue('>const font = &quot;JetBrains Mono&quot;;', $output, 'Monospace preview markup should not inject template indentation before the code sample text.');
     assertNotContainsValue('font-family: var(--font-monospace);', $output, 'Monospace card previews should now stay on a single code line instead of rendering multiline specimen copy.');
     assertContainsValue('currently assigned to monospace, and this is the last saved variant', $output, 'Last-variant delete guards should mention the monospace role when it protects the family.');
+    assertSameValue(1, preg_match('/data-delete-family="JetBrains Mono"[\s\S]*?aria-disabled="true"[\s\S]*?disabled/', $output), 'Blocked family delete actions should use the real disabled attribute as well as aria-disabled.');
 };

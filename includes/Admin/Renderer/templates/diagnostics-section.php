@@ -33,7 +33,7 @@
                                         data-tab-group="diagnostics"
                                         data-tab-target="system"
                                         aria-selected="false"
-                                        tabindex="0"
+                                        tabindex="-1"
                                         aria-controls="tasty-fonts-diagnostics-panel-system"
                                         role="tab"
                                     >

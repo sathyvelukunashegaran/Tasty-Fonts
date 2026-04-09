@@ -163,6 +163,10 @@ final class AdminController
             $this->assetVersionFor('assets/css/admin.css')
         );
 
+        if (function_exists('wp_style_add_data')) {
+            wp_style_add_data('tasty-fonts-admin', 'rtl', 'replace');
+        }
+
         wp_enqueue_script(
             'tasty-fonts-admin-contracts',
             TASTY_FONTS_URL . 'assets/js/admin-contracts.js',
@@ -1127,7 +1131,7 @@ final class AdminController
 
         header('Content-Type: text/css; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Content-Length: ' . strlen($content));
+        header('Content-Length: ' . $this->byteLength($content));
 
         echo $content;
         exit;
@@ -1774,11 +1778,15 @@ final class AdminController
 
         $projectId = $isResync
             ? $this->settings->getAdobeProjectId()
-            : $this->getPostedText('adobe_project_id');
+            : $this->normalizeAdobeProjectId($this->getPostedText('adobe_project_id'));
         $enabled = $isResync
             ? $this->settings->isAdobeEnabled()
             : !empty($_POST['adobe_enabled']);
         $existingProjectId = $this->settings->getAdobeProjectId();
+
+        if ($projectId !== '' && !$this->isValidAdobeProjectId($projectId)) {
+            $this->redirectWithError(__('Enter a valid Adobe Fonts project ID using 3 to 16 letters and numbers.', 'tasty-fonts'));
+        }
 
         if (!$isResync) {
             $this->settings->saveAdobeProject($projectId, $enabled);
@@ -1898,6 +1906,18 @@ final class AdminController
         return $this->isSupportedFontDisplay($display) ? $display : 'inherit';
     }
 
+    private function normalizeAdobeProjectId(string $projectId): string
+    {
+        $projectId = strtolower(trim($projectId));
+
+        return trim((string) (preg_replace('/[^a-z0-9]+/', '', $projectId) ?? ''));
+    }
+
+    private function isValidAdobeProjectId(string $projectId): bool
+    {
+        return (bool) preg_match('/^[a-z0-9]{3,16}$/', $projectId);
+    }
+
     private function getPostedText(string $key, string $default = ''): string
     {
         if (!isset($_POST[$key])) {
@@ -1905,6 +1925,15 @@ final class AdminController
         }
 
         return sanitize_text_field(wp_unslash((string) $_POST[$key]));
+    }
+
+    private function byteLength(string $value): int
+    {
+        if (function_exists('mb_strlen')) {
+            return mb_strlen($value, '8bit');
+        }
+
+        return strlen($value);
     }
 
     private function getPostedFallback(string $key, string $default = 'sans-serif'): string

@@ -340,7 +340,8 @@
                                         <?php endforeach; ?>
                                         <?php $this->renderPassiveHelpAttributes($deleteBlockedMessage !== '' ? $deleteBlockedMessage : __('Delete this family and remove its managed files from the site library.', 'tasty-fonts')); ?>
                                         aria-label="<?php echo esc_attr__('Delete family', 'tasty-fonts'); ?>"
-                                        aria-disabled="<?php echo esc_attr($isRoleFamily ? 'true' : 'false'); ?>"
+                                        aria-disabled="<?php echo esc_attr($deleteBlockedMessage !== '' ? 'true' : 'false'); ?>"
+                                        <?php disabled($deleteBlockedMessage !== ''); ?>
                                         <?php if ($deleteBlockedMessage !== '') : ?>
                                             data-delete-blocked="<?php echo esc_attr($deleteBlockedMessage); ?>"
                                         <?php endif; ?>
@@ -390,7 +391,7 @@
                                     <div class="tasty-fonts-detail-files tasty-fonts-detail-files--utility">
                                         <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--selection">
                                             <?php foreach ($familyCssVariableSnippets as $label => $snippet) : ?>
-                                                <?php $this->renderFaceVariableCopyPill(__($label, 'tasty-fonts'), (string) $snippet, __('CSS variable copied.', 'tasty-fonts')); ?>
+                                                <?php $this->renderFaceVariableCopyPill((string) $label, (string) $snippet, __('CSS variable copied.', 'tasty-fonts')); ?>
                                             <?php endforeach; ?>
                                         </div>
                                     </div>
@@ -410,7 +411,7 @@
                                     <div class="tasty-fonts-detail-files tasty-fonts-detail-files--utility">
                                         <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--selection">
                                             <?php foreach ($familyCssClassSnippets as $label => $snippet) : ?>
-                                                <?php $this->renderFaceVariableCopyPill(__($label, 'tasty-fonts'), (string) $snippet, __('Font class copied.', 'tasty-fonts')); ?>
+                                                <?php $this->renderFaceVariableCopyPill((string) $label, (string) $snippet, __('Font class copied.', 'tasty-fonts')); ?>
                                             <?php endforeach; ?>
                                         </div>
                                     </div>

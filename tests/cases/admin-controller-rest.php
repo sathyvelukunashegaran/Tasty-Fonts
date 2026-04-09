@@ -932,6 +932,7 @@ $tests['admin_controller_enqueues_wp_i18n_and_script_translations'] = static fun
 
     global $enqueuedScripts;
     global $scriptTranslations;
+    global $styleData;
 
     $services = makeServiceGraph();
     $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
@@ -950,6 +951,11 @@ $tests['admin_controller_enqueues_wp_i18n_and_script_translations'] = static fun
         TASTY_FONTS_DIR . 'languages',
         (string) ($scriptTranslations['tasty-fonts-admin']['path'] ?? ''),
         'Admin scripts should register the plugin languages directory for script translation JSON files.'
+    );
+    assertSameValue(
+        'replace',
+        (string) ($styleData['tasty-fonts-admin']['rtl'] ?? ''),
+        'Admin styles should register an RTL replacement stylesheet.'
     );
 };
 
@@ -1035,7 +1041,35 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
             is_callable($registeredRestRoutes[$route]['args']['permission_callback'] ?? null),
             'Each REST route should register a callable permission callback.'
         );
+        assertSameValue(
+            true,
+            is_array($registeredRestRoutes[$route]['args']['args'] ?? null),
+            'Each REST route should expose a registered args schema.'
+        );
     }
+
+    assertSameValue(
+        true,
+        isset($registeredRestRoutes['tasty-fonts/v1/google/import']['args']['args']['delivery_mode']['sanitize_callback']),
+        'Hosted import routes should sanitize the delivery mode before controller handling.'
+    );
+    assertSameValue(
+        true,
+        isset($registeredRestRoutes['tasty-fonts/v1/roles/draft']['args']['args']['heading_axes']['validate_callback']),
+        'Role draft routes should validate nested axis payloads.'
+    );
+    assertSameValue(
+        true,
+        !empty($registeredRestRoutes['tasty-fonts/v1/families/publish-state']['args']['args']['publish_state']['required']),
+        'Publish-state routes should require the publish_state parameter.'
+    );
+};
+
+$tests['bundled_js_translation_placeholder_exists'] = static function (): void {
+    assertTrueValue(
+        file_exists(TASTY_FONTS_DIR . 'languages/tasty-fonts-en_US-tasty-fonts-admin.json'),
+        'The plugin should ship a bundled JED JSON placeholder for the admin script handle.'
+    );
 };
 
 $tests['rest_controller_returns_native_payloads_for_write_routes'] = static function (): void {

@@ -232,6 +232,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                         data-delivery-id="<?php echo esc_attr($profileId); ?>"
                         data-delivery-label="<?php echo esc_attr($profileLabel); ?>"
                         aria-disabled="<?php echo esc_attr($profileDeleteBlocked !== '' ? 'true' : 'false'); ?>"
+                        <?php disabled($profileDeleteBlocked !== ''); ?>
                         title="<?php echo esc_attr($profileDeleteBlocked !== '' ? $profileDeleteBlocked : __('Delete only this delivery profile and keep the family.', 'tasty-fonts')); ?>"
                         <?php if ($profileDeleteBlocked !== '') : ?>
                             data-delete-blocked="<?php echo esc_attr($profileDeleteBlocked); ?>"

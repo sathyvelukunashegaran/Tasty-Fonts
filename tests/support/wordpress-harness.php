@@ -602,6 +602,7 @@ $remoteRequestResponses = [];
 $remoteRequestCalls = [];
 $enqueuedStyles = [];
 $registeredStyles = [];
+$styleData = [];
 $inlineStyles = [];
 $enqueuedScripts = [];
 $localizedScripts = [];
@@ -1022,6 +1023,21 @@ if (!function_exists('wp_register_style')) {
             'deps' => $deps,
             'ver' => $ver,
         ];
+    }
+}
+
+if (!function_exists('wp_style_add_data')) {
+    function wp_style_add_data(string $handle, string $key, mixed $value): bool
+    {
+        global $styleData;
+
+        if (!isset($styleData[$handle]) || !is_array($styleData[$handle])) {
+            $styleData[$handle] = [];
+        }
+
+        $styleData[$handle][$key] = $value;
+
+        return true;
     }
 }
 
@@ -1461,6 +1477,7 @@ function resetTestState(): void
     global $pluginUpgraderInstallResult;
     global $redirectLocation;
     global $registeredStyles;
+    global $styleData;
     global $registeredRestRoutes;
     global $remoteGetCalls;
     global $remoteGetResponses;
@@ -1507,6 +1524,7 @@ function resetTestState(): void
     $wpFilesystemShouldInit = true;
     $enqueuedStyles = [];
     $registeredStyles = [];
+    $styleData = [];
     $inlineStyles = [];
     $enqueuedScripts = [];
     $localizedScripts = [];

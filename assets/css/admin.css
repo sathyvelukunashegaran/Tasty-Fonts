@@ -6608,6 +6608,12 @@ h3.tasty-fonts-section-title {
     background: var(--tasty-control-surface-muted);
 }
 
+.tasty-fonts-admin .button.is-awaiting-confirmation,
+.tasty-fonts-admin .tasty-fonts-button-danger.is-awaiting-confirmation {
+    border-color: var(--tasty-border-warning-soft);
+    box-shadow: 0 0 0 2px rgba(var(--tasty-warning-rgb), 0.16);
+}
+
 /* ===================================================
    Settings page scoped overrides
    =================================================== */

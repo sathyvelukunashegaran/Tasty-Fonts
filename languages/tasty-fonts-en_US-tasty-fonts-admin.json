@@ -1,0 +1,14 @@
+{
+  "translation-revision-date": "2026-04-09 00:00+0000",
+  "generator": "Tasty Fonts",
+  "domain": "messages",
+  "locale_data": {
+    "messages": {
+      "": {
+        "domain": "messages",
+        "lang": "en_US",
+        "plural-forms": "nplurals=2; plural=(n != 1);"
+      }
+    }
+  }
+}

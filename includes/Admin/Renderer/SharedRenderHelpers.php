@@ -200,9 +200,10 @@ trait SharedRenderHelpers
         return FontTypeHelper::buildSelectorOptionLabel($familyName, $entry, $context);
     }
 
-    public function renderPassiveHelpAttributes(string $copy): void
+    public function renderPassiveHelpAttributes(string $copy, string $describedBy = 'tasty-fonts-help-tooltip-layer'): void
     {
         $copy = trim($copy);
+        $describedBy = trim($describedBy);
 
         if ($this->trainingWheelsOff || $copy === '') {
             return;
@@ -211,6 +212,9 @@ trait SharedRenderHelpers
         echo ' data-help-tooltip="' . esc_attr($copy) . '"';
         echo ' data-help-passive="1"';
         echo ' title="' . esc_attr($copy) . '"';
+        if ($describedBy !== '') {
+            echo ' aria-describedby="' . esc_attr($describedBy) . '"';
+        }
     }
 
     public function renderSectionHeading(string $tag, string $title, string $copy = ''): void
