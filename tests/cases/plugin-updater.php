@@ -11,9 +11,11 @@ use TastyFonts\Support\Storage;
 use TastyFonts\Updates\GitHubUpdater;
 
 $nextPatchVersion = static function (string $version): string {
-    $parts = array_map('intval', explode('.', $version));
-    $parts = array_pad($parts, 3, 0);
-    $parts[2]++;
+    if (preg_match('/^(\d+)\.(\d+)\.(\d+)/', $version, $matches) !== 1) {
+        throw new RuntimeException('Could not derive a base semantic version.');
+    }
+
+    $parts = [(int) $matches[1], (int) $matches[2], (int) $matches[3] + 1];
 
     return implode('.', $parts);
 };
