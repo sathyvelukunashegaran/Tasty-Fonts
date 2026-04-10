@@ -29,12 +29,12 @@ The release helpers assume:
 Branch expectations:
 
 - `bin/release branch ...` runs from `main`
-- `bin/release beta ...` runs from the matching `release/X.Y`
+- `bin/release beta ...` runs from `main` when you are promoting the current dev state for the first beta, or from the matching `release/X.Y` for later beta tags
 - `bin/release stable ...` runs from the matching `release/X.Y`
 
 ### 3. Cut A Release Branch
 
-When a line is ready to stabilize:
+Use this only when you want to prepare a release branch before tagging beta:
 
 ```bash
 bin/release branch 1.8.0
@@ -45,16 +45,21 @@ This helper:
 - creates `release/1.8`
 - updates the new branch to `1.8.0-beta.1`
 - commits that beta-line start on `release/1.8`
-- switches back to `main`
-- bumps `main` to the next minor dev line (for example `1.9.0-dev`)
-- commits the new dev baseline on `main`
-- pushes both branches unless `--no-push` is used
+- leaves `main` on its existing `1.8.0-dev` line
+- pushes only the new release branch unless `--no-push` is used
 
 ### 4. Cut A Beta Or Stable Tag
 
-Beta example:
+First beta from the current dev state on `main`:
 
 ```bash
+bin/release beta 1.8.0-beta.1
+```
+
+Later beta from the existing release branch:
+
+```bash
+git switch release/1.8
 bin/release beta 1.8.0-beta.2
 ```
 
@@ -74,6 +79,14 @@ For beta and stable tags, the helper:
 - creates the release commit
 - creates the annotated tag
 - pushes the current `release/X.Y` branch and the tag unless `--no-push` is used
+
+The intended release lane is:
+
+- keep `main` on the active `X.Y.Z-dev` line
+- let pushes to `main` publish stamped nightly builds
+- when you explicitly bless the latest dev state, run `bin/release beta <X.Y.Z-beta.N>` from `main`
+- continue beta fixes on `release/X.Y`
+- run `bin/release stable <X.Y.Z>` from `release/X.Y` when the beta line is ready
 
 ### 5. Let GitHub Actions Publish The Build
 

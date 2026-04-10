@@ -29,7 +29,10 @@ for script in "${repo_root}/bin/"*; do
     ln -s "${script}" "${test_repo}/bin/$(basename "${script}")"
 done
 
-cleanup() { rm -rf "${test_repo}"; }
+release_repo_from_main="$(mktemp -d)"
+release_repo_branch_flow="$(mktemp -d)"
+
+cleanup() { rm -rf "${test_repo}" "${release_repo_from_main}" "${release_repo_branch_flow}"; }
 trap cleanup EXIT
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -90,6 +93,61 @@ seed_no_unreleased_changelog() {
 
 - Initial release.
 CHANGELOG
+}
+
+seed_release_repo() {
+    local repo="$1"
+    local version="$2"
+
+    mkdir -p "${repo}/bin" "${repo}/tests/bin" "${repo}/tests/js"
+
+    for script in "${repo_root}/bin/"*; do
+        ln -s "${script}" "${repo}/bin/$(basename "${script}")"
+    done
+
+    cat > "${repo}/plugin.php" <<PHP
+<?php
+/*
+Plugin Name: Test Plugin
+Version: ${version}
+*/
+if (!defined('TASTY_FONTS_VERSION')) {
+    define('TASTY_FONTS_VERSION', '${version}');
+}
+PHP
+
+    cat > "${repo}/CHANGELOG.md" <<'CHANGELOG'
+# Changelog
+
+## [Unreleased]
+
+### Fixed
+
+- Test release note.
+CHANGELOG
+
+    cat > "${repo}/tests/run.php" <<'PHP'
+<?php
+exit(0);
+PHP
+
+    cat > "${repo}/tests/bin/release-scripts.test.sh" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+    chmod +x "${repo}/tests/bin/release-scripts.test.sh"
+
+    cat > "${repo}/tests/js/smoke.test.cjs" <<'JS'
+const test = require('node:test');
+
+test('smoke', () => {});
+JS
+
+    git -C "${repo}" init -b main >/dev/null 2>&1
+    git -C "${repo}" config user.name "Test User"
+    git -C "${repo}" config user.email "test@example.com"
+    git -C "${repo}" add .
+    git -C "${repo}" commit -m "Initial dev state" >/dev/null 2>&1
 }
 
 # ── set-version ───────────────────────────────────────────────────────────────
@@ -260,6 +318,63 @@ if ! "${test_repo}/bin/nightly-version" >/dev/null 2>&1; then
     _pass "nightly-version rejects a beta base version"
 else
     _fail "nightly-version rejects a beta base version" "should have failed"
+fi
+
+# ── release ───────────────────────────────────────────────────────────────────
+
+seed_release_repo "${release_repo_from_main}" "1.2.0-dev"
+if (cd "${release_repo_from_main}" && bin/release beta 1.2.0-beta.1 --no-push >/dev/null 2>&1); then
+    _pass "release beta can promote the current main dev state directly"
+else
+    _fail "release beta can promote the current main dev state directly" "command exited non-zero"
+fi
+
+if [[ "$(git -C "${release_repo_from_main}" branch --show-current)" == "release/1.2" ]] \
+    && [[ -n "$(git -C "${release_repo_from_main}" tag --list '1.2.0-beta.1')" ]]; then
+    _pass "release beta from main creates the release branch and tag"
+else
+    _fail "release beta from main creates the release branch and tag" \
+        "branch=$(git -C "${release_repo_from_main}" branch --show-current), tag=$(git -C "${release_repo_from_main}" tag --list '1.2.0-beta.1')"
+fi
+
+release_branch_version="$(git -C "${release_repo_from_main}" show release/1.2:plugin.php | sed -n 's/^Version: //p')"
+main_branch_version="$(git -C "${release_repo_from_main}" show main:plugin.php | sed -n 's/^Version: //p')"
+if [[ "${release_branch_version}" == "1.2.0-beta.1" && "${main_branch_version}" == "1.2.0-dev" ]]; then
+    _pass "release beta from main keeps main on the original dev version"
+else
+    _fail "release beta from main keeps main on the original dev version" \
+        "release=${release_branch_version}, main=${main_branch_version}"
+fi
+
+seed_release_repo "${release_repo_branch_flow}" "1.4.0-dev"
+if (cd "${release_repo_branch_flow}" && bin/release branch 1.4.0 --no-push >/dev/null 2>&1); then
+    _pass "release branch prepares a beta branch without advancing main"
+else
+    _fail "release branch prepares a beta branch without advancing main" "command exited non-zero"
+fi
+
+prepared_release_version="$(git -C "${release_repo_branch_flow}" show release/1.4:plugin.php | sed -n 's/^Version: //p')"
+prepared_main_version="$(git -C "${release_repo_branch_flow}" show main:plugin.php | sed -n 's/^Version: //p')"
+prepared_tag="$(git -C "${release_repo_branch_flow}" tag --list '1.4.0-beta.1')"
+if [[ "${prepared_release_version}" == "1.4.0-beta.1" && "${prepared_main_version}" == "1.4.0-dev" && -z "${prepared_tag}" ]]; then
+    _pass "release branch leaves main untouched and does not tag yet"
+else
+    _fail "release branch leaves main untouched and does not tag yet" \
+        "release=${prepared_release_version}, main=${prepared_main_version}, tag=${prepared_tag}"
+fi
+
+if (cd "${release_repo_branch_flow}" && bin/release beta 1.4.0-beta.1 --no-push >/dev/null 2>&1); then
+    _pass "release beta still works from an existing release branch"
+else
+    _fail "release beta still works from an existing release branch" "command exited non-zero"
+fi
+
+if [[ -n "$(git -C "${release_repo_branch_flow}" tag --list '1.4.0-beta.1')" ]] \
+    && grep -q "## \[1.4.0-beta.1\]" "${release_repo_branch_flow}/CHANGELOG.md"; then
+    _pass "release beta from release branch tags and promotes the changelog"
+else
+    _fail "release beta from release branch tags and promotes the changelog" \
+        "tag=$(git -C "${release_repo_branch_flow}" tag --list '1.4.0-beta.1')"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

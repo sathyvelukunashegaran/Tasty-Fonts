@@ -9,8 +9,8 @@ Usage:
   bin/release stable <X.Y.Z> [--no-push]
 
 Commands:
-  branch  Create release/X.Y from main, set the branch to X.Y.Z-beta.1, and bump main to the next minor dev line.
-  beta    Cut a beta release from release/X.Y, promoting the changelog and tagging the version.
+  branch  Create release/X.Y from main at the current dev state, set the branch to X.Y.Z-beta.1, and leave main unchanged.
+  beta    Cut a beta release by promoting the current dev state on main into release/X.Y, or tag the current release/X.Y branch.
   stable  Cut a stable release from release/X.Y, promoting the changelog and tagging the version.
 EOF
 }
@@ -90,14 +90,36 @@ release_line_from_version() {
   ' "$1"
 }
 
-next_minor_dev_version() {
-  php -r '
-    if (preg_match("/^([0-9]+)\.([0-9]+)\.[0-9]+$/", $argv[1], $matches) !== 1) {
-        fwrite(STDERR, "Could not derive next dev version\n");
-        exit(1);
-    }
-    echo $matches[1] . "." . ((int) $matches[2] + 1) . ".0-dev";
-  ' "$1"
+current_plugin_version() {
+  sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r'
+}
+
+ensure_matching_dev_base_on_main() {
+  local target_version="$1"
+  local current_version
+  local target_line
+  local current_line
+
+  current_version="$(current_plugin_version)"
+  [[ "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev(\.[0-9]+)?$ ]] || \
+    die "main must be on an X.Y.Z-dev version before promoting ${target_version}. Found ${current_version}."
+
+  target_line="$(release_line_from_version "$target_version")"
+  current_line="$(release_line_from_version "$current_version")"
+  [[ "$current_line" == "$target_line" ]] || \
+    die "main is on ${current_version}; expected the ${target_line}.x dev line before promoting ${target_version}."
+}
+
+ensure_release_branch_missing() {
+  local branch_name="$1"
+
+  git show-ref --verify --quiet "refs/heads/${branch_name}" && \
+    die "Branch ${branch_name} already exists locally."
+
+  if $push_release; then
+    git ls-remote --exit-code --heads origin "${branch_name}" >/dev/null 2>&1 && \
+      die "Branch ${branch_name} already exists on origin."
+  fi
 }
 
 tag_exists_anywhere() {
@@ -148,40 +170,43 @@ cut_release_branch() {
   local stable_version="$1"
   local branch_name="release/$(release_line_from_version "$stable_version")"
   local beta_version="${stable_version}-beta.1"
-  local next_dev_version
 
   validate_stable_version "$stable_version"
   [[ "$(current_branch)" == "main" ]] || die "Release branch cuts must start from main."
-
-  local current_version
-  current_version="$(sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r')"
-  [[ "$current_version" =~ -dev$ ]] || die "main must be on an X.Y.Z-dev version before cutting a release branch."
-
-  git show-ref --verify --quiet "refs/heads/${branch_name}" && die "Branch ${branch_name} already exists locally."
-
-  if $push_release; then
-    git ls-remote --exit-code --heads origin "${branch_name}" >/dev/null 2>&1 && die "Branch ${branch_name} already exists on origin."
-  fi
-
-  next_dev_version="$(next_minor_dev_version "$stable_version")"
+  ensure_matching_dev_base_on_main "$stable_version"
+  ensure_release_branch_missing "$branch_name"
 
   git switch -c "${branch_name}"
   "$set_version_script" "$beta_version"
   git add plugin.php
   git commit -m "Start ${branch_name} beta line"
 
-  git switch main
-  "$set_version_script" "$next_dev_version"
-  git add plugin.php
-  git commit -m "Begin ${next_dev_version} development"
-
   if $push_release; then
     git push origin "${branch_name}"
-    git push origin main
-    echo "Created ${branch_name} at ${beta_version} and advanced main to ${next_dev_version}."
+    echo "Created ${branch_name} at ${beta_version} from the current main dev state."
   else
-    echo "Created ${branch_name} at ${beta_version} and advanced main to ${next_dev_version} locally without pushing."
+    echo "Created ${branch_name} at ${beta_version} locally from the current main dev state without pushing."
   fi
+}
+
+cut_beta_release() {
+  local beta_version="$1"
+  local branch_name="release/$(release_line_from_version "$beta_version")"
+  local current_branch_name
+
+  validate_beta_version "$beta_version"
+  current_branch_name="$(current_branch)"
+
+  if [[ "$current_branch_name" == "main" ]]; then
+    ensure_matching_dev_base_on_main "$beta_version"
+    ensure_release_branch_missing "$branch_name"
+    git switch -c "${branch_name}"
+    commit_and_tag_release "$beta_version" "$branch_name"
+    return
+  fi
+
+  [[ "$current_branch_name" == "$branch_name" ]] || die "Beta releases must be cut from main or ${branch_name}."
+  commit_and_tag_release "$beta_version" "$branch_name"
 }
 
 case "$command_name" in
@@ -191,10 +216,7 @@ case "$command_name" in
     ;;
   beta)
     ensure_clean_worktree
-    validate_beta_version "$version"
-    branch_name="release/$(release_line_from_version "$version")"
-    [[ "$(current_branch)" == "$branch_name" ]] || die "Beta releases must be cut from ${branch_name}."
-    commit_and_tag_release "$version" "$branch_name"
+    cut_beta_release "$version"
     ;;
   stable)
     ensure_clean_worktree
