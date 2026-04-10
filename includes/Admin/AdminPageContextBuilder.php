@@ -616,21 +616,42 @@ final class AdminPageContextBuilder
         ];
     }
 
-    public function roleSetsMatch(array $left, array $right, ?array $settings = null): bool
+    public function roleSetsMatch(array $left, array $right, ?array $settings = null, ?array $catalog = null): bool
     {
-        foreach ($this->roleComparisonKeys($settings ?? $this->settings->getSettings()) as $key) {
-            $leftValue = $left[$key] ?? '';
-            $rightValue = $right[$key] ?? '';
+        $settings = $settings ?? $this->settings->getSettings();
+        $catalog = $catalog ?? $this->catalog->getCatalog();
 
-            if (is_array($leftValue) || is_array($rightValue)) {
-                if (FontUtils::normalizeVariationDefaults($leftValue) !== FontUtils::normalizeVariationDefaults($rightValue)) {
-                    return false;
-                }
-
-                continue;
+        foreach ($this->effectiveRoleKeys($settings) as $roleKey) {
+            if (trim((string) ($left[$roleKey] ?? '')) !== trim((string) ($right[$roleKey] ?? ''))) {
+                return false;
             }
 
-            if ((string) $leftValue !== (string) $rightValue) {
+            if (
+                $this->normalizeRoleFallbackForComparison($roleKey, $left)
+                !== $this->normalizeRoleFallbackForComparison($roleKey, $right)
+            ) {
+                return false;
+            }
+
+            if (
+                $this->resolveRoleDeliveryIdForComparison($roleKey, $left, $catalog)
+                !== $this->resolveRoleDeliveryIdForComparison($roleKey, $right, $catalog)
+            ) {
+                return false;
+            }
+
+            if (
+                trim((string) ($left[$roleKey . '_weight'] ?? ''))
+                !== trim((string) ($right[$roleKey . '_weight'] ?? ''))
+            ) {
+                return false;
+            }
+
+            if (
+                !empty($settings['variable_fonts_enabled'])
+                && FontUtils::normalizeVariationDefaults($left[$roleKey . '_axes'] ?? [])
+                    !== FontUtils::normalizeVariationDefaults($right[$roleKey . '_axes'] ?? [])
+            ) {
                 return false;
             }
         }
@@ -1157,6 +1178,75 @@ final class AdminPageContextBuilder
         }
 
         return sprintf(__('%1$s via %2$s', 'tasty-fonts'), $familyName, $label);
+    }
+
+    private function normalizeRoleFallbackForComparison(string $roleKey, array $roles): string
+    {
+        $default = $this->defaultRoleFallback($roleKey);
+        $fallback = trim((string) ($roles[$roleKey . '_fallback'] ?? ''));
+
+        return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
+    }
+
+    private function resolveRoleDeliveryIdForComparison(string $roleKey, array $roles, array $catalog): string
+    {
+        $familyName = trim((string) ($roles[$roleKey] ?? ''));
+        $savedDeliveryId = trim((string) ($roles[$roleKey . '_delivery_id'] ?? ''));
+
+        if ($familyName === '') {
+            return '';
+        }
+
+        $family = $this->findCatalogFamilyByName($familyName, $catalog);
+
+        if (!is_array($family)) {
+            return $savedDeliveryId;
+        }
+
+        $deliveryIds = [];
+
+        foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $deliveryId = trim((string) ($profile['id'] ?? ''));
+
+            if ($deliveryId !== '') {
+                $deliveryIds[] = $deliveryId;
+            }
+        }
+
+        if ($savedDeliveryId !== '' && in_array($savedDeliveryId, $deliveryIds, true)) {
+            return $savedDeliveryId;
+        }
+
+        $activeDeliveryId = trim((string) ($family['active_delivery_id'] ?? ''));
+
+        if ($activeDeliveryId !== '' && in_array($activeDeliveryId, $deliveryIds, true)) {
+            return $activeDeliveryId;
+        }
+
+        return $deliveryIds[0] ?? $savedDeliveryId;
+    }
+
+    private function findCatalogFamilyByName(string $familyName, array $catalog): ?array
+    {
+        if (is_array($catalog[$familyName] ?? null)) {
+            return $catalog[$familyName];
+        }
+
+        foreach ($catalog as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            if (trim((string) ($family['family'] ?? '')) === $familyName) {
+                return $family;
+            }
+        }
+
+        return null;
     }
 
     private function roleComparisonKeys(array $settings): array

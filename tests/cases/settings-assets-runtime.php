@@ -1312,6 +1312,93 @@ $tests['admin_page_context_builder_treats_unavailable_integrations_as_inactive_e
     assertSameValue('unavailable', (string) ($context['oxygen_integration']['status'] ?? ''), 'Oxygen should report an unavailable status when the plugin is inactive.');
 };
 
+$tests['admin_page_context_builder_treats_implicit_active_role_deliveries_as_matching_live_roles'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Lora',
+        'lora',
+        [
+            'id' => 'bunny-cdn-static',
+            'label' => 'Bunny CDN',
+            'provider' => 'bunny',
+            'type' => 'cdn',
+            'format' => 'static',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Lora',
+        'lora',
+        [
+            'id' => 'self-hosted-static',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'static',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        false
+    );
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-static',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'static',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings([
+        'heading_font' => 'Lora',
+        'body_font' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'heading_delivery_id' => 'bunny-cdn-static',
+        'body_delivery_id' => 'inter-static',
+        'applied_roles' => [
+            'heading' => 'Lora',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+            'heading_delivery_id' => '',
+            'body_delivery_id' => '',
+        ],
+    ]);
+    $services['settings']->setAutoApplyRoles(true);
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+
+    $context = $builder->build();
+
+    assertSameValue('Live', (string) ($context['role_deployment']['badge'] ?? ''), 'Role deployment should stay live when applied roles rely on the family active delivery and the draft explicitly selects that same delivery.');
+    assertSameValue('Live Roles Active', (string) ($context['role_deployment']['title'] ?? ''), 'Role deployment should not report pending live changes when only the stored delivery ID representation differs.');
+};
+
 $tests['admin_controller_applies_acss_font_mapping_when_sync_is_enabled'] = static function (): void {
     resetTestState();
 
@@ -1611,8 +1698,35 @@ $tests['runtime_asset_planner_forces_swap_for_admin_preview_stylesheets'] = stat
     $runtimeUrl = (string) ($runtimeStylesheets[0]['url'] ?? '');
     $previewUrl = (string) ($adminPreviewStylesheets[0]['url'] ?? '');
 
-    assertContainsValue('display=optional', $runtimeUrl, 'Frontend runtime stylesheets should continue honoring the saved font-display policy.');
+    assertContainsValue('display=swap', $runtimeUrl, 'Frontend CDN runtime stylesheets should promote optional to swap so the custom font still appears after first paint.');
     assertContainsValue('display=swap', $previewUrl, 'Admin preview stylesheets should force swap so previews remain visible after reload.');
+};
+
+$tests['runtime_asset_planner_preserves_explicit_cdn_font_display_overrides'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['font_display' => 'optional']);
+    $services['settings']->saveFamilyFontDisplay('JetBrains Mono', 'fallback');
+    $services['imports']->saveProfile(
+        'JetBrains Mono',
+        'jetbrains-mono',
+        [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular', '700'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+
+    $runtimeStylesheets = $services['planner']->getExternalStylesheets();
+    $runtimeUrl = (string) ($runtimeStylesheets[0]['url'] ?? '');
+
+    assertContainsValue('display=fallback', $runtimeUrl, 'Explicit per-family CDN font-display overrides should still be honored.');
 };
 
 $tests['runtime_service_enqueues_block_editor_content_styles_for_gutenberg_iframe'] = static function (): void {
@@ -2204,6 +2318,23 @@ $tests['runtime_service_appends_builder_editor_styles_for_managed_bricks_and_oxy
     assertContainsValue('body :is(h1, .editor-post-title){font-family:"Merriweather", sans-serif;}', $css, 'Bricks heading styles should mirror managed H1 selections into Gutenberg.');
     assertContainsValue('body :is(h1, h2, h3, h4, h5, h6, .editor-post-title){font-family:"Merriweather", sans-serif;}', $css, 'Oxygen display families should mirror into Gutenberg heading styles.');
     assertNotContainsValue('Draft Sans', $css, 'Builder editor styles should ignore library-only families that are not part of the runtime catalog.');
+};
+
+$tests['runtime_service_appends_acss_editor_styles_when_font_role_sync_is_active'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'acss_font_role_sync_enabled' => true,
+    ]);
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveAcssFontRoleSyncState(true, true, 'system-ui', 'system-ui');
+
+    $settings = $services['runtime']->filterBlockEditorSettings([], null);
+    $css = (string) ($settings['styles'][0]['css'] ?? '');
+
+    assertContainsValue('body{font-family:var(--font-body);}', $css, 'Automatic.css editor styles should mirror the managed body variable into Gutenberg.');
+    assertContainsValue('body :is(h1, h2, h3, h4, h5, h6, .editor-post-title, .wp-block-post-title){font-family:var(--font-heading);}', $css, 'Automatic.css editor styles should mirror the managed heading variable into Gutenberg, including the post title.');
 };
 
 $tests['oxygen_compatibility_shim_returns_only_runtime_family_names'] = static function (): void {

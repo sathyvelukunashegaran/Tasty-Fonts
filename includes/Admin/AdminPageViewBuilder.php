@@ -158,9 +158,9 @@ final class AdminPageViewBuilder
         $previewRoles = $previewBaselineSource === 'live_sitewide' && $appliedRoles !== []
             ? $appliedRoles
             : $roles;
-        $hasPendingLiveRoleChanges = $applyEverywhere && !$this->roleSetsMatch($roles, $appliedRoles, $monospaceRoleEnabled);
-        $previewHasDraftRoleChanges = !$this->roleSetsMatch($previewRoles, $roles, $monospaceRoleEnabled);
-        $previewHasPendingLiveRoleChanges = $applyEverywhere && !$this->roleSetsMatch($previewRoles, $appliedRoles, $monospaceRoleEnabled);
+        $hasPendingLiveRoleChanges = $applyEverywhere && !$this->roleSetsMatch($roles, $appliedRoles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled);
+        $previewHasDraftRoleChanges = !$this->roleSetsMatch($previewRoles, $roles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled);
+        $previewHasPendingLiveRoleChanges = $applyEverywhere && !$this->roleSetsMatch($previewRoles, $appliedRoles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled);
         $previewHeadingStack = FontUtils::buildFontStack(
             (string) ($previewRoles['heading'] ?? ''),
             (string) ($previewRoles['heading_fallback'] ?? 'sans-serif')

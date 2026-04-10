@@ -306,14 +306,16 @@ final class RuntimeAssetPlanner
             return null;
         }
 
+        $display = $this->runtimeStylesheetDisplay($familyName, $provider, $type, $displayOverride);
+
         $url = match ($provider . ':' . $type) {
             'google:cdn' => $this->google->buildCssUrl(
                 $familyName,
                 (array) ($delivery['variants'] ?? []),
-                $this->effectiveFontDisplay($familyName, $displayOverride),
+                $display,
                 ['faces' => (array) ($delivery['faces'] ?? [])]
             ),
-            'bunny:cdn' => $this->bunny->buildCssUrl($familyName, (array) ($delivery['variants'] ?? []), $this->effectiveFontDisplay($familyName, $displayOverride)),
+            'bunny:cdn' => $this->bunny->buildCssUrl($familyName, (array) ($delivery['variants'] ?? []), $display),
             'adobe:adobe_hosted' => $this->adobeStylesheetUrl($delivery),
             default => '',
         };
@@ -347,6 +349,19 @@ final class RuntimeAssetPlanner
         $saved = $this->settings->getFamilyFontDisplay($familyName);
 
         return $saved !== '' ? $saved : (string) ($settings['font_display'] ?? 'optional');
+    }
+
+    private function runtimeStylesheetDisplay(string $familyName, string $provider, string $type, string $displayOverride = ''): string
+    {
+        $display = $this->effectiveFontDisplay($familyName, $displayOverride);
+
+        if ($displayOverride !== '' || $display !== 'optional') {
+            return $display;
+        }
+
+        return in_array($provider . ':' . $type, ['google:cdn', 'bunny:cdn'], true)
+            ? 'swap'
+            : $display;
     }
 
     private function isSelfHostedDelivery(array $delivery): bool

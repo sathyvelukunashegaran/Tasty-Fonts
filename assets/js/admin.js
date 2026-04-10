@@ -4750,6 +4750,14 @@
     let initialDraftRoleState = roleForm ? currentDraftRoleState() : normalizeRoleState({});
 
     function roleStatesMatch(left = {}, right = {}) {
+        if (typeof adminContracts.roleStatesMatch === 'function') {
+            return adminContracts.roleStatesMatch(left, right, {
+                monospaceRoleEnabled,
+                variableFontsEnabled,
+                roleDeliveryCatalog,
+            });
+        }
+
         const leftState = normalizeRoleState(left);
         const rightState = normalizeRoleState(right);
         const keys = monospaceRoleEnabled

@@ -18,7 +18,7 @@ If you just activated the plugin and are not sure where to begin, start with the
 |---|---|---|
 | CSS Delivery | File (default) | Best performance — browser caches the file independently |
 | Output Preset | Minimal | Outputs only `--font-heading` and `--font-body` — enough for most themes |
-| font-display | optional (default) | Best Core Web Vitals score; swap in body text if brand fidelity matters more |
+| font-display | optional (default for generated `@font-face`) | Good self-hosted default; live Google/Bunny CDN stylesheets promote `optional` to `swap` so the custom face still appears |
 | Minify Generated CSS | On (default) | Smaller file size in production |
 | Preload Primary Fonts | On (if using self-hosted WOFF2 above the fold) | Improves LCP |
 | Block Editor Sync | Off on local, On on staging/production | Avoids loopback TLS failures on local environments |
@@ -92,6 +92,8 @@ Controls the `font-display` descriptor in generated `@font-face` rules.
 - `fallback`: similar to `swap` but with a shorter invisible period. A balanced middle ground.
 - `block`: hides text until the font loads. Avoid for large or slow fonts.
 - `auto`: defers to the browser default.
+
+For live Google and Bunny CDN deliveries, the runtime planner promotes `optional` to `swap`. This keeps remote CDN families from staying on fallback fonts after the first paint while still letting self-hosted `@font-face` output use the saved default.
 
 Per-family overrides from the library take precedence over this global default.
 

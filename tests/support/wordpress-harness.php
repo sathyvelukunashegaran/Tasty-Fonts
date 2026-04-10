@@ -1629,7 +1629,7 @@ function makeServiceGraph(): array
         $updater
     );
     $rest = new RestController($controller);
-    $runtime = new RuntimeService($planner, $assets, $adobe, $settings, $bricksIntegration, $oxygenIntegration);
+    $runtime = new RuntimeService($planner, $assets, $adobe, $settings, $acssIntegration, $bricksIntegration, $oxygenIntegration);
 
     return [
         'storage' => $storage,

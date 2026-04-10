@@ -63,12 +63,19 @@ Go to `Advanced Tools → Generated CSS` and confirm the runtime stylesheet cont
 
 If the CSS looks stale, go to `Settings → Developer` and use `Clear Cache` to force regeneration.
 
+### 7. Check Runtime `font-display` Expectations
+
+For self-hosted deliveries, the generated `@font-face` rules use your saved global or per-family `font-display` value directly.
+
+For live Google and Bunny CDN deliveries, the runtime planner promotes `optional` to `swap`. If a CDN family still does not render as expected, inspect whether the family has a per-family `font-display` override such as `fallback` or `block`.
+
 ---
 
 ## Notes
 
 - Families can stay in the library for later use without becoming live immediately.
 - Remote CDN deliveries and self-hosted deliveries both work within the same delivery profile model, but they produce different runtime asset behavior.
+- Google and Bunny CDN deliveries intentionally avoid live `display=optional` requests because that can leave first-visit renders stuck on fallback fonts.
 - If the library state looks correct but runtime still looks stale, continue with the generated CSS checks.
 
 ## Related Docs

@@ -164,6 +164,7 @@ final class Plugin
             $this->assets,
             $this->adobe,
             $this->settings,
+            $this->acssIntegration,
             $this->bricksIntegration,
             $this->oxygenIntegration
         );

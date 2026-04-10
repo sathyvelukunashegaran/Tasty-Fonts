@@ -28,6 +28,8 @@ All notable changes to this project will be documented in this file.
 - Hid the Upload Files variable column and toggle unless variable font support is enabled, so static-only installs no longer show inactive variable controls in the upload builder.
 - Fixed preload and preview weight selection so saved role overrides and variable `WGHT` axis values choose the intended face instead of assuming hard-coded defaults.
 - Fixed local upload duplicate detection and filename handling for variable fonts so self-hosted variable files can coexist cleanly with static faces in the same family.
+- Fixed Google and Bunny CDN frontend requests so a saved `font-display: optional` no longer leaves live first-visit renders stuck on fallback fonts.
+- Fixed Gutenberg editor typography on Automatic.css sites by mirroring the managed heading/body role variables into the editor canvas when ACSS sync is active.
 - Improved nightly release notes generation so the workflow can fall back to the latest stable or beta tag when a previous nightly tag is unavailable.
 - Fixed admin accessibility and plugin-compliance gaps across the dashboard, including REST route argument schemas, roving-tabindex behavior, real disabled states for blocked destructive actions, tooltip `aria-describedby` wiring, and translation-safe plural handling in both PHP and JavaScript.
 - Fixed generated CSS downloads and Adobe project validation by sending byte-accurate `Content-Length` headers and rejecting invalid Adobe project IDs before remote validation requests run.

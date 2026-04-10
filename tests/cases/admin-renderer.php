@@ -2477,6 +2477,87 @@ $tests['admin_page_renderer_only_highlights_publish_roles_when_changes_are_pendi
     assertContainsValue('No draft changes to save.', $matchedOutput, 'The disabled Save Draft action should explain why it is unavailable.');
 };
 
+$tests['admin_page_renderer_treats_blank_applied_delivery_ids_as_the_active_delivery_when_comparing_role_changes'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    $renderer->renderPage([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [
+            'Lora' => [
+                'family' => 'Lora',
+                'active_delivery_id' => 'bunny-cdn-static',
+                'available_deliveries' => [
+                    [
+                        'id' => 'bunny-cdn-static',
+                        'label' => 'Bunny CDN',
+                    ],
+                    [
+                        'id' => 'self-hosted-static',
+                        'label' => 'Self-hosted',
+                    ],
+                ],
+            ],
+            'Inter' => [
+                'family' => 'Inter',
+                'active_delivery_id' => 'inter-static',
+                'available_deliveries' => [
+                    [
+                        'id' => 'inter-static',
+                        'label' => 'Self-hosted',
+                    ],
+                ],
+            ],
+        ],
+        'available_families' => ['Inter', 'Lora'],
+        'roles' => [
+            'heading' => 'Lora',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+            'heading_delivery_id' => 'bunny-cdn-static',
+            'body_delivery_id' => 'inter-static',
+        ],
+        'applied_roles' => [
+            'heading' => 'Lora',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+            'heading_delivery_id' => '',
+            'body_delivery_id' => '',
+        ],
+        'logs' => [],
+        'activity_actor_options' => [],
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+        'family_font_display_options' => [],
+        'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+        'preview_size' => 32,
+        'font_display' => 'optional',
+        'font_display_options' => [],
+        'minify_css_output' => true,
+        'preload_primary_fonts' => true,
+        'remote_connection_hints' => true,
+        'training_wheels_off' => false,
+        'delete_uploaded_files_on_uninstall' => false,
+        'diagnostic_items' => [],
+        'overview_metrics' => [],
+        'output_panels' => [],
+        'generated_css_panel' => [],
+        'preview_panels' => [],
+        'toasts' => [],
+        'apply_everywhere' => true,
+        'variable_fonts_enabled' => true,
+        'role_deployment' => [],
+    ]);
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('data-role-apply-live aria-disabled="true" disabled', $output, 'Publish Roles should stay disabled when the applied delivery is only implicit through the family active delivery.');
+    assertNotContainsValue('is-pending-live-change', $output, 'Publish Roles should not show a pending-live highlight when the effective delivery has not changed.');
+};
+
 $tests['admin_page_renderer_keeps_deployment_and_role_selection_ahead_of_library_and_activity'] = static function (): void {
     resetTestState();
 

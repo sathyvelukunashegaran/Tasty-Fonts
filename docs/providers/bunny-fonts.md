@@ -45,6 +45,8 @@ When you choose **self-hosted** delivery, the plugin:
 
 When you choose **CDN** delivery, the plugin enqueues the Bunny-hosted stylesheet at runtime. No files are downloaded.
 
+If the effective `font-display` setting resolves to `optional`, the live frontend runtime promotes the Bunny CDN stylesheet request to `swap`. This avoids a first-visit fallback render getting stuck on the fallback face when Bunny responds just after the browser's optional-font window.
+
 Bunny Fonts is a GDPR-friendly alternative to the Google CDN. If you want CDN delivery without routing through Google infrastructure, Bunny CDN is a straightforward substitute for many of the same families.
 
 ## Common Issues
@@ -53,7 +55,7 @@ Bunny Fonts is a GDPR-friendly alternative to the Google CDN. If you want CDN de
 
 **Self-hosted import fails silently** — the plugin validates each download URL before writing files. If a URL fails validation (for example, due to a temporary Bunny outage), the file is not written. Check the activity log for import entries and re-run the import when the provider is reachable.
 
-**CDN delivery shows no output on the frontend** — confirm the family is assigned to a live role and that the draft has been applied sitewide.
+**CDN delivery shows no output on the frontend** — confirm the family is assigned to a live role and that the draft has been applied sitewide. If the role is live but the page still looks wrong, inspect the active delivery profile and per-family `font-display` override next.
 
 **Switching from CDN to self-hosted does not refresh the generated CSS** — use `Advanced Tools -> Generated CSS` to confirm the stylesheet reflects the new delivery mode. If needed, trigger a settings save to force a regeneration.
 

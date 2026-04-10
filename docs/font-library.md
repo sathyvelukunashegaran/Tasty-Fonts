@@ -75,7 +75,7 @@ The plugin will append this fallback sequence to the family name in all generate
 
 Each family can also store a per-family `font-display` override. Use this when a specific family should behave differently from the global default set in `Settings`.
 
-For example, if your global default is `optional` (best for performance) but you have a branding font that absolutely must render correctly, set that family to `swap` — it will always show the custom font rather than falling back silently.
+For example, if your global default is `optional` for self-hosted output but you have a branding font that absolutely must avoid any ambiguity, set that family to `swap` — it will always request the more assertive `font-display` behavior instead of inheriting the global default.
 
 Per-family settings always take precedence over the global default.
 

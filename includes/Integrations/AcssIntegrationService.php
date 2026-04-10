@@ -14,6 +14,7 @@ final class AcssIntegrationService
     public const OPTION_TEXT_FONT_FAMILY = 'text-font-family';
     public const DESIRED_HEADING_VALUE = 'var(--font-heading)';
     public const DESIRED_TEXT_VALUE = 'var(--font-body)';
+    private const EDITOR_HEADING_SELECTOR = 'body :is(h1, h2, h3, h4, h5, h6, .editor-post-title, .wp-block-post-title)';
 
     public function isAvailable(): bool
     {
@@ -100,6 +101,14 @@ final class AcssIntegrationService
         } catch (\Throwable) {
             return $this->emptySettings();
         }
+    }
+
+    public function getManagedEditorStyles(): array
+    {
+        return [
+            'body{font-family:' . self::DESIRED_TEXT_VALUE . ';}',
+            self::EDITOR_HEADING_SELECTOR . '{font-family:' . self::DESIRED_HEADING_VALUE . ';}',
+        ];
     }
 
     private function updateSettings(array $settings): array|WP_Error

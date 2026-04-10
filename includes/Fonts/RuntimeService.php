@@ -7,6 +7,7 @@ namespace TastyFonts\Fonts;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Adobe\AdobeProjectClient;
+use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Repository\SettingsRepository;
@@ -28,6 +29,7 @@ final class RuntimeService
         private readonly AssetService $assets,
         private readonly AdobeProjectClient $adobe,
         private readonly SettingsRepository $settings,
+        private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration
     ) {
@@ -180,6 +182,16 @@ final class RuntimeService
     {
         $styles = [];
         $runtimeFamilies = $this->planner->getRuntimeFamilies();
+        $settings = $this->settings->getSettings();
+
+        if (
+            !empty($settings['auto_apply_roles'])
+            && ($settings['acss_font_role_sync_enabled'] ?? null) === true
+            && !empty($settings['acss_font_role_sync_applied'])
+            && $this->acssIntegration->isAvailable()
+        ) {
+            $styles = array_merge($styles, $this->acssIntegration->getManagedEditorStyles());
+        }
 
         if ($this->builderIntegrationEnabled('bricks') && $this->bricksIntegration->isAvailable()) {
             $styles = array_merge($styles, $this->bricksIntegration->getEditorStyles($runtimeFamilies));

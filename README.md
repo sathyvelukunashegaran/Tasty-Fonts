@@ -133,6 +133,7 @@ Per-family fallback stacks and per-family `font-display` overrides are managed f
 - Oxygen integration can expose published Tasty Fonts families through the compatibility shim and mirror matching Oxygen global font choices into Gutenberg editor styles.
 - Block Editor sync is aware of local-development loopback/TLS issues and provides guidance in the dashboard when sync is likely to fail.
 - Admin previews always force `font-display: swap` for preview safety, even when the live runtime output uses another global setting.
+- Live Google and Bunny CDN stylesheets promote `font-display: optional` to `swap` so first-visit frontend renders do not get stuck on fallback fonts.
 
 ## Installation
 

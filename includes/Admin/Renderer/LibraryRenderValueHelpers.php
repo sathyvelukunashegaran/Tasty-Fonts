@@ -10,22 +10,125 @@ use TastyFonts\Support\FontUtils;
 
 trait LibraryRenderValueHelpers
 {
-    protected function roleSetsMatch(array $left, array $right, bool $includeMonospace): bool
+    protected function roleSetsMatch(
+        array $left,
+        array $right,
+        bool $includeMonospace,
+        array $catalog = [],
+        bool $includeVariableAxes = true
+    ): bool
     {
-        $keys = ['heading', 'body', 'heading_fallback', 'body_fallback'];
+        $roleKeys = ['heading', 'body'];
 
         if ($includeMonospace) {
-            $keys[] = 'monospace';
-            $keys[] = 'monospace_fallback';
+            $roleKeys[] = 'monospace';
         }
 
-        foreach ($keys as $key) {
-            if (trim((string) ($left[$key] ?? '')) !== trim((string) ($right[$key] ?? ''))) {
+        foreach ($roleKeys as $roleKey) {
+            if (trim((string) ($left[$roleKey] ?? '')) !== trim((string) ($right[$roleKey] ?? ''))) {
+                return false;
+            }
+
+            if (
+                $this->normalizeRoleFallbackForComparison($roleKey, $left)
+                !== $this->normalizeRoleFallbackForComparison($roleKey, $right)
+            ) {
+                return false;
+            }
+
+            if (
+                $this->resolveRoleDeliveryIdForComparison($roleKey, $left, $catalog)
+                !== $this->resolveRoleDeliveryIdForComparison($roleKey, $right, $catalog)
+            ) {
+                return false;
+            }
+
+            if (
+                trim((string) ($left[$roleKey . '_weight'] ?? ''))
+                !== trim((string) ($right[$roleKey . '_weight'] ?? ''))
+            ) {
+                return false;
+            }
+
+            if (
+                $includeVariableAxes
+                && FontUtils::normalizeVariationDefaults($left[$roleKey . '_axes'] ?? [])
+                    !== FontUtils::normalizeVariationDefaults($right[$roleKey . '_axes'] ?? [])
+            ) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    protected function normalizeRoleFallbackForComparison(string $roleKey, array $roles): string
+    {
+        $default = $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
+        $fallback = trim((string) ($roles[$roleKey . '_fallback'] ?? ''));
+
+        return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
+    }
+
+    protected function resolveRoleDeliveryIdForComparison(string $roleKey, array $roles, array $catalog): string
+    {
+        $familyName = trim((string) ($roles[$roleKey] ?? ''));
+        $savedDeliveryId = trim((string) ($roles[$roleKey . '_delivery_id'] ?? ''));
+
+        if ($familyName === '') {
+            return '';
+        }
+
+        $family = $this->findCatalogFamilyByName($familyName, $catalog);
+
+        if (!is_array($family)) {
+            return $savedDeliveryId;
+        }
+
+        $deliveryIds = [];
+
+        foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $deliveryId = trim((string) ($profile['id'] ?? ''));
+
+            if ($deliveryId !== '') {
+                $deliveryIds[] = $deliveryId;
+            }
+        }
+
+        if ($savedDeliveryId !== '' && in_array($savedDeliveryId, $deliveryIds, true)) {
+            return $savedDeliveryId;
+        }
+
+        $activeDeliveryId = trim((string) ($family['active_delivery_id'] ?? ''));
+
+        if ($activeDeliveryId !== '' && in_array($activeDeliveryId, $deliveryIds, true)) {
+            return $activeDeliveryId;
+        }
+
+        return $deliveryIds[0] ?? $savedDeliveryId;
+    }
+
+    protected function findCatalogFamilyByName(string $familyName, array $catalog): ?array
+    {
+        if (is_array($catalog[$familyName] ?? null)) {
+            return $catalog[$familyName];
+        }
+
+        foreach ($catalog as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            if (trim((string) ($family['family'] ?? '')) === $familyName) {
+                return $family;
+            }
+        }
+
+        return null;
     }
 
     protected function buildFontVariableReference(string $familyName): string

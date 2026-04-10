@@ -57,6 +57,8 @@ When you choose **self-hosted** delivery, the plugin fetches the remote CSS from
 
 When you choose **CDN** delivery, no files are downloaded. The plugin enqueues the Google-hosted stylesheet at runtime. The family still participates in role assignments and admin previews.
 
+If the effective `font-display` setting resolves to `optional`, the live frontend runtime promotes the Google CDN stylesheet request to `swap`. This avoids a first-visit fallback render getting stuck on the fallback face when the remote stylesheet lands just after the browser's optional-font window.
+
 The **Google Fonts API key** is required only for live catalog search in the add-font workflow. If you already imported a family via CDN or self-hosted delivery, the stored delivery profile remains valid even if the API key is removed later.
 
 ## Common Issues
@@ -65,7 +67,7 @@ The **Google Fonts API key** is required only for live catalog search in the add
 
 **Self-hosted import downloads no files** — the plugin fetches variant URLs from the Google API response. If the API key is missing or invalid at import time, the variant list may be empty. Re-run the import after confirming the key is valid.
 
-**CDN delivery stops working on the frontend** — this usually means the family is published but not assigned to a live role, or the draft was not applied sitewide. Confirm the role assignment and apply sitewide if needed.
+**CDN delivery stops working on the frontend** — this usually means the family is published but not assigned to a live role, or the draft was not applied sitewide. Confirm the role assignment and apply sitewide if needed. If the family is live but still looks wrong, inspect the active delivery profile and per-family `font-display` override next.
 
 **Runtime output looks stale after switching from CDN to self-hosted** — use `Advanced Tools -> Generated CSS` to confirm the stylesheet has been refreshed. If it has not, the plugin may need a delivery-mode or output-settings change to trigger a regeneration.
 

@@ -7,6 +7,7 @@ const {
     getTabNavigationTargetIndex,
     hasStaticFontMetadata,
     hasVariableFontMetadata,
+    roleStatesMatch,
     sanitizeFallback,
     slugify,
 } = require('../../assets/js/admin-contracts.js');
@@ -63,5 +64,79 @@ test('admin contracts describe font type with provider-aware nuance', () => {
     assert.deepEqual(
         describeFontType({ faces: [{ weight: '400' }] }, 'google'),
         { type: 'static', hasVariable: false, hasStatic: true, isSourceOnly: false }
+    );
+});
+
+test('admin contracts treat implicit and explicit active role deliveries as the same live state', () => {
+    assert.equal(
+        roleStatesMatch(
+            {
+                heading: 'Lora',
+                body: 'Inter',
+                heading_fallback: 'sans-serif',
+                body_fallback: 'sans-serif',
+                heading_delivery_id: 'bunny-cdn-static',
+            },
+            {
+                heading: 'Lora',
+                body: 'Inter',
+                heading_fallback: 'sans-serif',
+                body_fallback: 'sans-serif',
+                heading_delivery_id: '',
+            },
+            {
+                roleDeliveryCatalog: {
+                    Lora: {
+                        active_delivery_id: 'bunny-cdn-static',
+                        deliveries: [
+                            { id: 'bunny-cdn-static' },
+                            { id: 'self-hosted-static' },
+                        ],
+                    },
+                    Inter: {
+                        active_delivery_id: 'inter-static',
+                        deliveries: [{ id: 'inter-static' }],
+                    },
+                },
+            }
+        ),
+        true
+    );
+});
+
+test('admin contracts detect pending live changes when a role delivery really differs', () => {
+    assert.equal(
+        roleStatesMatch(
+            {
+                heading: 'Lora',
+                body: 'Inter',
+                heading_fallback: 'sans-serif',
+                body_fallback: 'sans-serif',
+                heading_delivery_id: 'self-hosted-static',
+            },
+            {
+                heading: 'Lora',
+                body: 'Inter',
+                heading_fallback: 'sans-serif',
+                body_fallback: 'sans-serif',
+                heading_delivery_id: 'bunny-cdn-static',
+            },
+            {
+                roleDeliveryCatalog: {
+                    Lora: {
+                        active_delivery_id: 'bunny-cdn-static',
+                        deliveries: [
+                            { id: 'bunny-cdn-static' },
+                            { id: 'self-hosted-static' },
+                        ],
+                    },
+                    Inter: {
+                        active_delivery_id: 'inter-static',
+                        deliveries: [{ id: 'inter-static' }],
+                    },
+                },
+            }
+        ),
+        false
     );
 });
