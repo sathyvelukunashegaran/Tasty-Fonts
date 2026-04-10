@@ -7857,41 +7857,38 @@ h3.tasty-fonts-section-title {
 }
 
 #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--developer-danger {
-    gap: var(--tasty-space-2);
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "copy action";
+    gap: var(--tasty-space-2) var(--tasty-space-3);
+    align-items: start;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--developer-danger > .tasty-fonts-settings-flat-row-copy {
+    grid-area: copy;
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
     gap: var(--tasty-space-2);
+    min-width: 0;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--developer-danger > .tasty-fonts-settings-flat-row-copy .tasty-fonts-developer-tool-title-row {
-    grid-column: 1;
     white-space: normal;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--developer-danger > .tasty-fonts-settings-flat-row-copy > p {
-    grid-column: 1;
     margin: 0;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-settings-flat-row-form--developer-danger {
+    grid-area: action;
+    align-self: center;
     gap: 0;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-settings-flat-row-support--developer-danger {
-    grid-template-columns: minmax(0, 1fr) var(--tasty-developer-action-width);
-    grid-template-areas: "copy action";
-    column-gap: var(--tasty-space-3);
-    row-gap: 0;
-    align-items: center;
+    gap: 0;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-settings-flat-row-support--developer-danger .tasty-fonts-settings-flat-row-actions {
-    grid-area: action;
     padding-top: 0;
     justify-content: flex-end;
 }
@@ -8068,6 +8065,10 @@ h3.tasty-fonts-section-title {
     }
 
     #tasty-fonts-settings-page .tasty-fonts-settings-flat-row-support--developer-danger {
+        justify-items: start;
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--developer-danger {
         grid-template-columns: 1fr;
         grid-template-areas:
             "copy"
@@ -8075,7 +8076,6 @@ h3.tasty-fonts-section-title {
     }
 
     #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--developer-danger > .tasty-fonts-settings-flat-row-copy {
-        grid-template-columns: 1fr;
         gap: 6px;
     }
 
