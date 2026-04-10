@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.8.0-beta.1] - 2026-04-11
+
 ### Added
 
 - Added a global Unicode Range Output control in Settings so emitted `@font-face`, editor font-face payloads, and Block Editor sync can preserve provider subsets, force Latin presets, omit unicode-range entirely, or use a validated custom override without rewriting stored face metadata.
