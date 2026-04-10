@@ -4,9 +4,9 @@ This is the versioned documentation hub for the current plugin codebase.
 
 ## Current Release Track
 
-`1.7.0` is the latest tagged beta milestone for the future `2.0` release, while `main` tracks the next development line as `1.8.0-dev`.
+`1.8.0` is the current stable release. `main` now tracks the next development line as `1.9.0-dev`.
 
-These docs describe the current beta line clearly, including what is already solid, what shipped in `1.7.0`, and what is still expected to receive more release passes before `2.0` is considered stable.
+These docs describe the stable `1.8.0` release in full, covering all shipping features including variable font support, the three-rail update channel, unicode range controls, and the complete settings surface.
 
 ---
 
@@ -78,6 +78,6 @@ These docs describe the current beta line clearly, including what is already sol
 ## Notes
 
 - The docs in `main` always describe the current plugin behavior.
-- The current docs explain the `1.7.x` beta track in plain language so testers understand that more releases are expected before `2.0`.
+- The docs cover the stable `1.8.0` release, including all new features introduced in this line.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](../README.md) stays shorter and links here for full guidance.

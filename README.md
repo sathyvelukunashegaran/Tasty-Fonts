@@ -4,14 +4,14 @@ Typography Management for WordPress Professionals (Deeply integrated with Etch, 
 
 ## Release Rails
 
-The latest tagged beta milestone is `1.7.0`, and `main` now tracks the next development line as `1.8.0-dev`.
+`1.8.0` is the current stable release. `main` now tracks the next development line as `1.9.0-dev`.
 
 Stable, beta, and nightly packages are all published from GitHub. The plugin can follow those rails through `Settings -> Behavior -> Update Channel`, with a rollback reinstall action when switching back to a lower rail before it catches up.
 
 Tasty Custom Fonts lets you upload local font files, import Google Fonts or Bunny Fonts as self-hosted or CDN deliveries, connect an Adobe Fonts web project, and manage the live typography stack from one WordPress dashboard. The plugin generates runtime CSS, editor presets, preview tooling, and delivery controls without any build step.
 
 ![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php&logoColor=white)
-![WordPress 6.1+](https://img.shields.io/badge/WordPress-6.1%2B-21759B?logo=wordpress&logoColor=white)
+![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-21759B?logo=wordpress&logoColor=white)
 ![License: GPLv2+](https://img.shields.io/badge/License-GPLv2%2B-green)
 ![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
 
@@ -33,7 +33,8 @@ Use the repo-native docs for the full knowledge base:
 
 ## What You Can Do
 
-- Upload `WOFF2`, `WOFF`, `TTF`, and `OTF` files from the dashboard.
+- Upload `WOFF2`, `WOFF`, `TTF`, and `OTF` files from the dashboard. Variable fonts in any of these formats are also accepted.
+- Enable variable font support (opt-in in `Settings → Output`) to unlock axis controls, stored axis metadata, and weight overrides per role.
 - Rescan `wp-content/uploads/fonts/` for fonts placed there outside the plugin UI.
 - Import Google Fonts as self-hosted files or keep them on the Google CDN.
 - Import Bunny Fonts as self-hosted files or keep them on the Bunny CDN.
@@ -44,7 +45,7 @@ Use the repo-native docs for the full knowledge base:
 - Generate CSS variables, optional utility classes, editor presets, preloads, and connection hints from the same settings surface.
 - Inspect generated CSS and system details directly from the dashboard.
 
-## Dashboard Layout In 1.7.0 Beta
+## Dashboard Layout
 
 The admin UI is organized into four top-level pages:
 
@@ -66,7 +67,7 @@ The admin UI is organized into four top-level pages:
 
 ### Settings
 
-- `Output`: adjust CSS delivery mode, global `font-display`, unicode-range output, minification, preloads, connection hints, the minimal output preset, variable output, and utility class output.
+- `Output`: adjust CSS delivery mode, global `font-display`, unicode-range output, minification, preloads, connection hints, the minimal output preset, variable output, utility class output, and optional variable font support.
 - `Integrations`: manage Block Editor Font Library sync, Automatic.css font-role sync, and the Bricks/Oxygen builder integrations.
 - `Behavior`: control monospace-role support, onboarding hints, and uninstall cleanup.
 - `Developer`: clear caches, reset notices, restore plugin defaults, wipe the managed library, and reset integration detection with explicit confirmation phrases.
@@ -121,6 +122,7 @@ Tasty Custom Fonts can generate:
 - optional role font-weight usage rules for heading/body selectors
 - optional utility classes for roles, aliases, categories, and families
 - configurable unicode-range output, including preserved provider subsets, Latin-focused presets, or a custom override
+- variable font support (opt-in): `font-variation-settings`, range-based weights, and per-role axis controls when variable fonts are enabled
 - minified or readable CSS output depending on settings
 
 Per-family fallback stacks and per-family `font-display` overrides are managed from the library, while the global output model lives in the Settings page. Unicode-range output is also controlled globally from Settings and does not rewrite stored face metadata.
@@ -193,7 +195,7 @@ When the draft looks right, use `Apply Sitewide` to serve the current role CSS a
 
 | Component | Requirement |
 | --- | --- |
-| WordPress | 6.1+ |
+| WordPress | 6.5+ |
 | PHP | 8.1+ |
 | Etch | Optional |
 
@@ -224,12 +226,6 @@ Pull requests are welcome. For larger changes, open an issue first so the direct
 - Match the WordPress conventions already used in the plugin.
 - Run `php tests/run.php` before submitting changes.
 - Update `README.md` and the relevant pages under `docs/` when user-facing behavior changes.
-
-During the current `1.7.x` beta line, feedback is especially useful when it helps stabilize the path to `2.0`, particularly around:
-
-- builder integrations and editor mirroring
-- the new Settings and Developer workflows
-- the minimal output preset and advanced output controls
 
 ## License
 

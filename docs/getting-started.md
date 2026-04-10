@@ -16,7 +16,9 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 ## Before You Start
 
-Version `1.7.0` is the latest tagged beta step toward `2.0`, while `main` now tracks the next development line as `1.8.0-dev`. The tagged beta builds are intended for real use and real testing, but a few more releases are expected before the final `2.0` experience is considered settled.
+`1.8.0` is the current stable release. The plugin is production-ready.
+
+**Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No Composer install, no npm install, no build step.
 
 **Tip for beginners:** if any term in this guide is unfamiliar, check the [Glossary](glossary.md). The [Concepts](concepts.md) page also explains the three big ideas — delivery profiles, draft/live roles, and the CSS pipeline — before you dive in.
 
@@ -57,7 +59,7 @@ Inside `Settings`, four tabs group related controls:
 
 Pick the source that matches your workflow:
 
-- **Upload local files** — use this if you have font files on your computer (`WOFF2`, `WOFF`, `TTF`, or `OTF`)
+- **Upload local files** — use this if you have font files on your computer (`WOFF2`, `WOFF`, `TTF`, or `OTF`). Variable fonts in those same formats are also accepted.
 - **Rescan `wp-content/uploads/fonts/`** — use this if files were placed on the server directly (via FTP/SSH)
 - **Import Google Fonts** — requires a Google Fonts API key; imports self-hosted files or keeps delivery on Google's CDN
 - **Import Bunny Fonts** — no API key needed; GDPR-friendly; same workflow as Google
@@ -116,6 +118,7 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 - enable only the **integrations** that match the actual stack on the site
 - review **Block Editor sync** behavior on local or staging environments (it often needs to be turned off on local)
 - use the **Developer tab** when you need to reset caches or re-bootstrap integration detection during testing
+- enable **Variable Font Support** (in `Settings → Output`) if any of your families are variable fonts — this unlocks axis controls, per-role weight overrides, and `font-variation-settings` in the generated CSS
 
 ---
 
@@ -124,7 +127,7 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 - Draft role changes do not affect live runtime output until you apply them sitewide.
 - Admin previews force `font-display: swap` for preview safety, even if the live output uses another `font-display` value.
 - GitHub-installed copies can detect future stable, beta, or nightly releases from the normal WordPress plugins screen through the bundled GitHub updater.
-- Because `1.7.0` is part of the beta path toward `2.0`, it is worth rechecking the changelog and docs when upgrading within the `1.7.x` series.
+- WordPress 6.5 or later is required. The minimum was raised from 6.1 to align with the Block Editor Font Library APIs used in this version.
 
 ## Related Docs
 

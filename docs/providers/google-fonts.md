@@ -29,7 +29,7 @@ If search is unavailable, open the Google key settings from the add-font workflo
 
 ### 2. Search For A Family
 
-Use the Google add-font flow to search for the family you want and review available variants.
+Use the Google add-font flow to search for the family you want and review available variants. When Variable Font Support is enabled in `Settings → Output`, families that offer a variable version are marked with a **Variable** badge in the search results.
 
 ### 3. Choose A Delivery Mode
 
@@ -54,6 +54,11 @@ When you choose **self-hosted** delivery, the plugin fetches the remote CSS from
 1. Parses the returned `@font-face` rules to identify individual variant URLs.
 2. Downloads each WOFF2 file into `wp-content/uploads/fonts/google/<family-slug>/`.
 3. Rewrites the `@font-face` rules to point to the local paths.
+
+When Variable Font Support is enabled and the family has a variable version, the import also:
+
+- stores the axis metadata (e.g., `wght` range) from the Google API response
+- marks the delivery profile as variable so the Font Library badge and Deploy Fonts axis controls reflect the correct design space
 
 When you choose **CDN** delivery, no files are downloaded. The plugin enqueues the Google-hosted stylesheet at runtime. The family still participates in role assignments and admin previews.
 

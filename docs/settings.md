@@ -56,6 +56,7 @@ Advanced output controls also cover:
 
 - the `Minimal` output preset
 - `Emit Role Font Weights`
+- `Variable Font Support`
 - utility class generation
 - class sub-controls by role, alias, category, and family
 - variable generation
@@ -125,6 +126,23 @@ Only applies to self-hosted WOFF2 variants. CDN and Adobe deliveries use remote 
 #### Remote Connection Hints
 
 When enabled, the plugin emits `<link rel="preconnect">` tags for active Google, Bunny, and Adobe CDN origins. This tells the browser to open TCP/TLS connections to those origins early, reducing latency for the first CDN stylesheet request. Disable if all your active deliveries are self-hosted.
+
+#### Variable Font Support
+
+When enabled, the plugin activates variable font features across uploads, imports, and runtime delivery.
+
+- **Off** (default): the plugin operates in static-only mode. No variable-font UI, axis controls, or `font-variation-settings` are emitted. Variable font files can still be uploaded and will work, but no axis metadata is stored or used.
+- **On**: unlocks variable font features:
+  - axis metadata (e.g., `wght`, `wdth`, `ital`) is stored on imported faces from Google, Bunny, and local uploads
+  - the Upload Files builder shows a variable column and an axis editor per file
+  - each role (Heading, Body, Monospace) gains per-role axis controls and a static weight override in the Deploy Fonts interface
+  - the generated runtime CSS includes `font-variation-settings` where variable faces are active
+  - editor font presets and Block Editor sync payloads carry variation metadata
+  - the Font Library shows `Variable` family type badges and a variable filter
+
+> **When to enable this:** turn it on only if you are using actual variable font files (fonts with a `wght` or other design axis). For static fonts (separate files per weight/style), leave it off — the static workflow is simpler and the output is identical.
+
+> **Beginner tip:** if you are not sure whether your font is a variable font, check the filename. Variable fonts often include `VariableFont` or `VF` in the filename (e.g., `Inter-VariableFont_wght.woff2`). You can also check the Google Fonts or Bunny Fonts catalog — variable families are marked with a `Variable` badge in search results when variable font support is enabled.
 
 ### 2. Use The Integrations Tab
 
@@ -254,7 +272,8 @@ Developer actions can affect:
 - Per-family `font-display` overrides from the library take precedence over the global default for that family.
 - If the monospace role is off, related output controls are disabled or hidden.
 - Block Editor sync is intentionally cautious on local development environments because loopback TLS trust issues are common there.
-- The current `1.7.x` series is part of the beta path to `2.0`, so the Settings surface is intentionally consolidating more control into one place before that final major release stabilizes.
+- Variable Font Support is off by default. Enable it only when you are actively using variable font files so static-only installs stay clean.
+- WordPress 6.5 or later is required. The minimum was raised from 6.1 to align with the Block Editor Font Library APIs used in this release.
 
 ## Related Docs
 

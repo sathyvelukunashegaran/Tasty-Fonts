@@ -21,6 +21,20 @@ Supported local formats:
 - `TTF`
 - `OTF`
 
+Variable fonts in any of the above formats are accepted. The plugin detects whether a font file contains variable axis data and, when Variable Font Support is enabled in `Settings → Output`, stores the axis metadata alongside the file.
+
+**Using the variable axis editor (when Variable Font Support is enabled):**
+
+When you upload a file that the plugin detects as a variable font, an axis editor row appears in the upload builder. It shows:
+
+- the axes the font exposes (e.g., `wght`, `wdth`, `ital`)
+- the default value for each axis
+- an editable field to override the default before saving
+
+Review and adjust these values before confirming the upload. They become the stored axis defaults for the family and influence generated `font-variation-settings` in the runtime stylesheet.
+
+If you are unsure whether a font file is a variable font, check its filename — variable fonts often include `VariableFont` or `VF` (e.g., `Inter-VariableFont_wght.woff2`). The axis editor will only appear if the file is recognized as variable.
+
 ### 2. Rescan The Uploads Directory
 
 Use rescan when files already exist somewhere under:
@@ -55,6 +69,10 @@ Self-hosted local files are stored at:
 ## Common Issues
 
 **File rejected on upload** — confirm the format is `WOFF2`, `WOFF`, `TTF`, or `OTF`. EOT and SVG are not supported.
+
+**Variable column does not appear in upload builder** — Variable Font Support must be enabled in `Settings → Output` for the axis editor column to show. If it is off, variable font files are still accepted but treated as static.
+
+**Duplicate variable font detection** — the plugin handles duplicate detection correctly for variable fonts. Self-hosted variable files can coexist in the same family alongside static face files without conflict.
 
 **Family does not appear after rescan** — the scanner looks for supported formats anywhere under `wp-content/uploads/fonts/`. If files are nested more than one level inside a subdirectory that is itself not under `fonts/`, they may not be discovered. Move files into `wp-content/uploads/fonts/` directly or into a shallow subdirectory.
 

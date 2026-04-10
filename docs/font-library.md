@@ -22,6 +22,7 @@ Use the library filters to narrow by:
 
 - source (Local, Google, Bunny, Adobe)
 - runtime state (In Use, Published, In Library Only)
+- family type (Static, Variable) — available when Variable Font Support is enabled
 - category (serif, sans-serif, monospace, display, handwriting)
 - search text
 
@@ -79,7 +80,13 @@ For example, if your global default is `optional` for self-hosted output but you
 
 Per-family settings always take precedence over the global default.
 
-### 6. Delete Carefully
+### 6. Variable Font Metadata
+
+When Variable Font Support is enabled in `Settings → Output`, families that have variable delivery profiles display a **Variable** badge in the library. Selecting such a family shows its stored axis metadata — the axes the font exposes (e.g., `wght`, `wdth`) and the default values used in generated output.
+
+Axis defaults and per-role axis overrides are managed from the Deploy Fonts page, not from here. The library shows what is stored; Deploy Fonts is where you tune per-role axis behavior.
+
+### 7. Delete Carefully
 
 The library lets you delete:
 
@@ -96,6 +103,8 @@ The plugin blocks destructive actions when doing so would break a live applied r
 - Google and Bunny self-hosted imports become local files under provider-specific upload directories.
 - Adobe stays hosted remotely, but Adobe families still participate in selectors, previews, and live role assignments.
 - The library is also where you confirm whether a family should stay `Published` or remain `In Library Only`.
+- All newly imported families start as `In Library Only` by default. Promote them to `Published` or assign them to a role when you are ready to serve them.
+- When a family stops being used by live roles and has no remaining role assignments, it automatically returns to `In Library Only` state rather than disappearing from the library.
 
 ## Related Docs
 

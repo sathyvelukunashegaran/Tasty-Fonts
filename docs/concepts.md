@@ -113,14 +113,43 @@ If file delivery is disabled or unavailable, the plugin falls back to injecting 
 
 ---
 
-## Choosing a Provider
+## Variable Fonts (Opt-In)
 
-| Provider | Files downloaded? | API key needed? | Best for |
-|---|---|---|---|
-| Local files | Yes (you upload them) | No | Fonts you already own or licensed separately |
-| Google Fonts | Optional (self-hosted) | Yes, for live search | Large open catalog, self-hosting for privacy |
-| Bunny Fonts | Optional (self-hosted) | No | GDPR-friendly alternative to Google CDN |
-| Adobe Fonts | No (Adobe-hosted) | No (project ID only) | Existing Adobe CC subscriptions with web projects |
+A **variable font** is a single font file that contains a continuous range of design variations (weight, width, slant, etc.) encoded as named **axes**. The most common axis is `wght` (weight), which lets you specify any weight from 100–900 in a single file instead of needing separate files per weight.
+
+**Why this matters:** with a variable font, one WOFF2 file can do the work of eight separate weight files. That means fewer HTTP requests, smaller total download in many cases, and more flexibility to use in-between weights.
+
+### Variable font support in the plugin
+
+Variable font support is **opt-in**. It is disabled by default so static-only installs stay simple and unaffected.
+
+When you enable it in `Settings → Output → Variable Font Support`:
+
+- **Library**: families that have variable delivery profiles display a `Variable` badge and can be filtered by type.
+- **Upload flow**: an axis editor appears per uploaded variable file so you can review detected axes and set axis defaults before saving.
+- **Google and Bunny search**: variable families are marked in search results so you can spot them at a glance.
+- **Deploy Fonts**: each role (Heading, Body, Monospace) gains per-role axis controls. You can pin a specific axis value (e.g., `wght: 650`) or a weight range override for that role.
+- **Generated CSS**: `font-variation-settings` is included in `@font-face` and usage rules where variable faces are active. Weight ranges are expressed as `<number> <number>` in `font-weight` descriptors.
+- **Editor presets and Block Editor sync**: variation metadata travels with the family so the block editor and site editor reflect the correct design space.
+
+### Static fallback
+
+When variable font support is disabled, the plugin treats every font as static. Variable font files that were already uploaded still work — they are just served without any axis metadata or `font-variation-settings`. Re-enabling variable support restores axis metadata and per-role controls.
+
+### Decision guide
+
+- **You have separate weight files (e.g., Inter-Regular.woff2, Inter-Bold.woff2)** → use static mode (default). No change needed.
+- **You have a variable font file (e.g., Inter-VariableFont_wght.woff2)** → enable Variable Font Support in `Settings → Output`.
+- **You imported from Google Fonts and want the variable version** → enable Variable Font Support, then re-import the family. Google Fonts provides variable versions where available.
+
+---
+
+| Provider | Files downloaded? | API key needed? | Variable font support? | Best for |
+|---|---|---|---|---|
+| Local files | Yes (you upload them) | No | Yes | Fonts you already own or licensed separately |
+| Google Fonts | Optional (self-hosted) | Yes, for live search | Yes | Large open catalog, self-hosting for privacy |
+| Bunny Fonts | Optional (self-hosted) | No | Source metadata only (CDN serves variable, self-hosted serves static files) | GDPR-friendly alternative to Google CDN |
+| Adobe Fonts | No (Adobe-hosted) | No (project ID only) | Depends on project | Existing Adobe CC subscriptions with web projects |
 
 Providers are not exclusive. You can mix sources — for example, use a self-hosted local upload for headings and a Bunny CDN delivery for body text.
 

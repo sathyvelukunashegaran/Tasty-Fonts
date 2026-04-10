@@ -2,7 +2,7 @@
 
 Inspect the generated stylesheet, review system details, and use built-in diagnostics.
 
-In the current `1.7.0` beta line, this page works alongside the new `Settings -> Developer` tab. Advanced Tools is primarily for inspection and review. Developer is where you intentionally reset or rebuild state.
+Advanced Tools is primarily for inspection and review. `Settings → Developer` is where you intentionally reset or rebuild state.
 
 > **Beginner context:** you do not need to use Advanced Tools during normal day-to-day font management. Come here when the site is not behaving as expected and you need to understand what the plugin is actually serving.
 
@@ -67,7 +67,7 @@ That tab is now the home for:
 - The generated stylesheet is normally written to `wp-content/uploads/fonts/.generated/tasty-fonts.css` when file delivery is available.
 - The plugin can fall back to inline CSS if file delivery is disabled or unavailable.
 - Diagnostics are especially useful when runtime output looks stale or provider imports appear correct in the library but not on the site.
-- In the `1.7.x` beta cycle, Advanced Tools and Developer are intentionally separated so read-only inspection stays safer than maintenance and reset actions.
+- Advanced Tools is read-only. Use `Settings → Developer` for actions that change state (cache clears, resets, library wipes).
 
 ## Related Docs
 

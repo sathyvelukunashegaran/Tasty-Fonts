@@ -30,6 +30,17 @@ You can also clear a role back to its fallback stack instead of forcing a family
 
 > **Beginner tip:** if you only want to change the heading font and leave the body unchanged, you can update just the Heading role and apply sitewide. Each role is independent.
 
+### 1a. Set Per-Role Variable Font Controls (Variable Fonts Only)
+
+> **This section applies only when Variable Font Support is enabled in `Settings → Output`.**
+
+When a role is assigned to a variable font family, the role controls expand to show:
+
+- **Axis controls**: pin specific axis values for this role. For example, set the heading role to `wght: 600` while the body role stays at `wght: 400`.
+- **Static weight override**: when you want the role to use a fixed weight rather than the full variable range, enter a weight value here. This generates a `font-weight` declaration in the role CSS rules rather than relying on the variable `wght` axis.
+
+If a role is assigned to a static (non-variable) font, these controls are hidden. Axis controls only appear for families that have variable delivery profiles with known axis metadata.
+
 ### 2. Save Draft While Experimenting
 
 `Save Draft` stores the current role pairing without changing live runtime output.
@@ -83,6 +94,7 @@ The Deploy Fonts page exposes code and snippet panels for:
 - The live site reflects the applied roles, not just the latest saved draft.
 - If the monospace role is disabled, the UI removes the third role path and related output.
 - Role variables such as `--font-heading`, `--font-body`, and `--font-monospace` depend on the current output settings and saved role state.
+- Per-role variable font axis controls only appear when Variable Font Support is enabled and the assigned family has a variable delivery profile.
 
 ## Related Docs
 

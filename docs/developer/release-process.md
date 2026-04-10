@@ -12,7 +12,7 @@ Create, verify, tag, and publish stable, beta, and nightly plugin builds.
 
 ### 1. Understand The Rails
 
-- `main` stays on an `X.Y.Z-dev` base version.
+- `main` stays on an `X.Y.Z-dev` base version (currently `1.9.0-dev` after the `1.8.0` stable tag).
 - every push to `main` publishes a fresh nightly prerelease package stamped as `X.Y.Z-dev.YYYYMMDDHHMM`
 - `release/X.Y` branches stabilize one line at a time
 - beta tags use `X.Y.Z-beta.N`

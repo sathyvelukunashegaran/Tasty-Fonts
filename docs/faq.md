@@ -34,6 +34,23 @@ Yes. Assign it to a draft role, click `Save Draft`, and then use the preview wor
 
 Use `WOFF2` whenever possible. It is the most compressed format and is natively supported by every modern browser. If you only have `TTF` or `OTF` files, upload those — the plugin accepts them and they will work, but they will produce slightly larger file sizes. `WOFF` is a valid fallback but less common today.
 
+Variable fonts in any of these formats are also accepted. See the next question for details on variable fonts.
+
+### What is a variable font and should I use one?
+
+A **variable font** is a single font file that contains a continuous range of design variations — most commonly weight (`wght`), but also width, slant, and others — rather than separate files per weight. One variable WOFF2 file can replace eight separate static weight files.
+
+**Use a variable font when:**
+- you want smooth weight interpolation (any weight value from 100–900, not just standard stops)
+- you want to reduce total file count for a multi-weight family
+- the variable version of the family you want is available
+
+**Use static fonts when:**
+- you only need one or two specific weights and want the simplest possible setup
+- your theme or builder already specifies weights through its own variables
+
+To enable variable font features in the plugin, go to `Settings → Output → Variable Font Support` and turn it on. See [Settings](settings.md) for full details.
+
 ---
 
 ## Adding Fonts
@@ -81,7 +98,42 @@ Having multiple profiles on one family means you can switch between them without
 
 ---
 
-## Roles and Output
+## Variable Fonts
+
+### How do I enable variable font support?
+
+Go to `Settings → Output → Variable Font Support` and turn it on. Once enabled:
+
+- the Font Library shows a `Variable` badge on families with variable delivery profiles and a variable filter tab
+- the Upload Files builder shows an axis editor column for variable font files
+- Google and Bunny search results mark variable families
+- the Deploy Fonts role selectors expose per-role axis controls and weight overrides when the assigned family is variable
+
+### What are font axes?
+
+A font axis is a named dimension of variation in a variable font. The most common is `wght` (weight), which lets you specify any weight from 100 to 900. Other axes include `wdth` (width), `ital` (italic), and custom designer axes specific to a particular typeface.
+
+Axis values are stored in the plugin's library and emitted as `font-variation-settings` in the generated CSS when variable font support is enabled.
+
+### Can I mix variable and static fonts on the same site?
+
+Yes. You can assign a variable font to the Heading role and a static font to the Body role (or vice versa). Variable font features only activate for roles assigned to families with variable delivery profiles. Static roles work exactly as before.
+
+### My variable font axis controls do not appear in Deploy Fonts
+
+Check:
+
+1. Variable Font Support is **on** in `Settings → Output`.
+2. The family assigned to the role has a variable delivery profile (confirmed by the `Variable` badge in the Font Library).
+3. The family was imported or uploaded after Variable Font Support was enabled. If the family was already in the library before you enabled the setting, try re-importing it to capture axis metadata.
+
+### Can I use a variable font file for self-hosted Google/Bunny delivery?
+
+Google self-hosted imports will include the variable font WOFF2 files when Variable Font Support is enabled and the family has a variable version on Google Fonts.
+
+For Bunny self-hosted imports, note that Bunny's download API provides static files even for variable families. To get variable font delivery from Bunny, use CDN mode — Bunny's CDN stylesheet serves the variable files directly.
+
+---
 
 ### What is a "font role"?
 

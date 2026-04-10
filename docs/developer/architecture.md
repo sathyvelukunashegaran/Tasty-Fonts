@@ -185,6 +185,7 @@ If you need behavior that is not covered by the existing hooks:
 - The canonical generated stylesheet path is `uploads/fonts/.generated/tasty-fonts.css`.
 - Google and Bunny can be self-hosted or CDN-based; Adobe remains hosted remotely.
 - Block Editor Font Library sync is separate from the plugin's own runtime output path.
+- Variable font support is opt-in. When enabled, `CatalogService`, `CssBuilder`, and `RuntimeAssetPlanner` carry axis metadata and emit `font-variation-settings` where variable faces are active. Disabling it reverts all paths to static-only behavior.
 
 ## Related Docs
 
