@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.8.0-beta.2] - 2026-04-11
+
 ### Changed
 
 - Updated the local release helper and release-process documentation so beta promotion can start from the current `main` dev state without auto-advancing `main` to the next dev line.
