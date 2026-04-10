@@ -275,14 +275,88 @@
         });
     }
 
+    function sanitizeOutputQuickModePreference(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+
+        return ['minimal', 'variables', 'classes', 'custom'].includes(normalized) ? normalized : '';
+    }
+
+    function normalizeToggleFlags(flags) {
+        return Array.isArray(flags)
+            ? flags.filter((value) => typeof value === 'boolean')
+            : [];
+    }
+
+    function allToggleFlagsEnabled(flags) {
+        return normalizeToggleFlags(flags).every((value) => value);
+    }
+
+    function deriveExactOutputQuickMode(state = {}) {
+        const minimalEnabled = !!state.minimalEnabled;
+        const classOutputEnabled = !!state.classOutputEnabled;
+        const variableOutputEnabled = !!state.variableOutputEnabled;
+        const roleUsageFontWeightEnabled = !!state.roleUsageFontWeightEnabled;
+        const classFlags = normalizeToggleFlags(state.classFlags);
+        const variableFlags = normalizeToggleFlags(state.variableFlags);
+
+        if (minimalEnabled) {
+            return 'minimal';
+        }
+
+        if (!roleUsageFontWeightEnabled && !classOutputEnabled && variableOutputEnabled && allToggleFlagsEnabled(variableFlags)) {
+            return 'variables';
+        }
+
+        if (!roleUsageFontWeightEnabled && classOutputEnabled && !variableOutputEnabled && allToggleFlagsEnabled(classFlags)) {
+            return 'classes';
+        }
+
+        return 'custom';
+    }
+
+    function normalizeOutputQuickModePreference(preference, state = {}) {
+        const normalizedPreference = sanitizeOutputQuickModePreference(preference);
+        const exactMode = deriveExactOutputQuickMode(state);
+
+        if (normalizedPreference === 'custom') {
+            return 'custom';
+        }
+
+        if (normalizedPreference === '') {
+            return exactMode;
+        }
+
+        return exactMode === normalizedPreference ? normalizedPreference : 'custom';
+    }
+
+    function canDisableOutputLayer(layerKey, state = {}) {
+        const normalizedLayerKey = String(layerKey || '').trim().toLowerCase();
+        const classOutputEnabled = !!state.classOutputEnabled;
+        const variableOutputEnabled = !!state.variableOutputEnabled;
+
+        if (normalizedLayerKey === 'classes') {
+            return !classOutputEnabled || variableOutputEnabled;
+        }
+
+        if (normalizedLayerKey === 'variables') {
+            return !variableOutputEnabled || classOutputEnabled;
+        }
+
+        return true;
+    }
+
     return {
+        canDisableOutputLayer,
         describeFontType,
+        deriveExactOutputQuickMode,
         escapeFontFamily,
         getTabNavigationTargetIndex,
         hasStaticFontMetadata,
         hasVariableFontMetadata,
+        normalizeOutputQuickModePreference,
         roleStatesMatch,
         sanitizeFallback,
+        sanitizeOutputQuickModePreference,
         slugify,
     };
 });

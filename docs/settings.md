@@ -47,6 +47,7 @@ Core controls include:
 
 - `CSS Delivery`
 - default `font-display`
+- `Unicode Range Output`
 - `Minify Generated CSS`
 - `Preload Primary Heading and Body Fonts`
 - `Remote Connection Hints`
@@ -96,6 +97,20 @@ Controls the `font-display` descriptor in generated `@font-face` rules.
 For live Google and Bunny CDN deliveries, the runtime planner promotes `optional` to `swap`. This keeps remote CDN families from staying on fallback fonts after the first paint while still letting self-hosted `@font-face` output use the saved default.
 
 Per-family overrides from the library take precedence over this global default.
+
+#### Unicode Range Output
+
+Controls how `unicode-range` is emitted for generated `@font-face` output and matching editor font-face payloads.
+
+- `Off` (default): omit `unicode-range` entirely unless you explicitly opt in
+- `Keep Imported Ranges`: preserve the raw range stored on each face
+- `Basic Latin`: force the plugin's compact Latin-focused preset for every emitted face
+- `Latin Extended`: force a broader Latin preset that includes Latin Extended and additional accents
+- `Custom`: emit the same custom comma-separated list for every emitted face
+
+Custom values must be a comma-separated list of `U+XXXX`, `U+XXXX-YYYY`, or `U+XX?` tokens.
+
+This control affects emitted output only. The plugin keeps the original face metadata in the library so advanced users can opt back into `Keep Imported Ranges` or a custom range at any time.
 
 #### Minify Generated CSS
 
@@ -205,6 +220,7 @@ Output settings can affect:
 
 - whether generated CSS is served from a file or inline
 - what `font-display` is emitted for generated `@font-face` rules
+- what `unicode-range` is emitted for generated `@font-face` rules and editor font-face payloads
 - whether minified CSS is written
 - whether the minimal preset suppresses the broader variable and class surface
 - whether heading/body usage rules include explicit font-weight declarations

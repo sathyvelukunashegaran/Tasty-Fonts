@@ -7,6 +7,7 @@ use TastyFonts\Api\RestController;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 
 $tests['admin_controller_merges_adobe_families_into_selectable_role_names'] = static function (): void {
     resetTestState();
@@ -107,6 +108,8 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
             [
                 'css_delivery_mode' => 'file',
                 'font_display' => 'swap',
+                'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_PRESERVE,
+                'unicode_range_custom_value' => 'U+0000-00FF',
                 'class_output_enabled' => false,
                 'class_output_role_heading_enabled' => true,
                 'class_output_role_body_enabled' => true,
@@ -130,6 +133,8 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
             [
                 'css_delivery_mode' => 'inline',
                 'font_display' => 'optional',
+                'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_CUSTOM,
+                'unicode_range_custom_value' => 'U+0000-00FF,U+0100-024F',
                 'class_output_enabled' => true,
                 'class_output_role_heading_enabled' => true,
                 'class_output_role_body_enabled' => true,
@@ -155,6 +160,8 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
 
     assertContainsValue('delivery mode set to inline CSS', $message, 'Settings save messages should explain delivery-mode changes.');
     assertContainsValue('font-display set to optional', $message, 'Settings save messages should explain font-display changes.');
+    assertContainsValue('unicode-range output set to Custom', $message, 'Settings save messages should explain unicode-range mode changes.');
+    assertContainsValue('custom unicode-range updated', $message, 'Settings save messages should explain custom unicode-range changes.');
     assertContainsValue('class output enabled', $message, 'Settings save messages should explain class-output enablement changes.');
     assertContainsValue('class output settings updated', $message, 'Settings save messages should explain granular class-output changes.');
     assertContainsValue('CSS minification disabled', $message, 'Settings save messages should explain CSS minification changes.');
@@ -226,6 +233,32 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
             ]
         ),
         'Changing font-display should trigger a generated asset refresh.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['font_display' => 'swap', 'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_PRESERVE, 'css_delivery_mode' => 'file'],
+                ['font_display' => 'swap', 'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_LATIN_BASIC, 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Changing unicode-range mode should trigger a generated asset refresh.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['font_display' => 'swap', 'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_CUSTOM, 'unicode_range_custom_value' => 'U+0000-00FF', 'css_delivery_mode' => 'file'],
+                ['font_display' => 'swap', 'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_CUSTOM, 'unicode_range_custom_value' => 'U+0000-00FF,U+0100-024F', 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Changing the custom unicode-range value should trigger a generated asset refresh.'
     );
 
     assertSameValue(
@@ -443,15 +476,52 @@ $tests['admin_controller_builds_monospace_role_output_panels_when_enabled'] = st
         [$roles, $settings, $services['catalog']->getCatalog()]
     );
     $panelValues = [];
+    $panelDisplayValues = [];
 
     foreach ($panels as $panel) {
         $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
+        $panelDisplayValues[(string) ($panel['key'] ?? '')] = (string) ($panel['display_value'] ?? '');
     }
 
     assertContainsValue('--font-monospace: monospace;', $panelValues['variables'] ?? '', 'Enabled monospace support should add the monospace variable to the CSS Variables panel.');
     assertContainsValue('code, pre {', $panelValues['usage'] ?? '', 'Enabled monospace support should add the code/pre usage rule to the Site Snippet panel.');
     assertContainsValue('Class output is off', $panelValues['classes'] ?? '', 'The Font Classes panel should explain when the workflow is disabled.');
     assertContainsValue("monospace\n", ($panelValues['stacks'] ?? '') . "\n", 'Enabled monospace support should include the fallback-only monospace stack in the Font Stacks panel.');
+    assertContainsValue('/* Role font stacks */', $panelDisplayValues['variables'] ?? '', 'The CSS Variables panel should expose readable section comments in its display value.');
+    assertContainsValue('/* Body text */', $panelDisplayValues['usage'] ?? '', 'The Site Snippet panel should expose readable rule labels in its display value.');
+};
+
+$tests['admin_controller_keeps_minimal_output_panels_monospace_aware'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'monospace' => '',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $settings = $services['settings']->saveSettings([
+        'monospace_role_enabled' => '1',
+        'minify_css_output' => '0',
+        'minimal_output_preset_enabled' => '1',
+    ]);
+    $panels = invokePrivateMethod(
+        $services['controller'],
+        'buildOutputPanels',
+        [$roles, $settings, $services['catalog']->getCatalog()]
+    );
+    $panelValues = [];
+
+    foreach ($panels as $panel) {
+        $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
+    }
+
+    assertContainsValue('--font-monospace: monospace;', $panelValues['variables'] ?? '', 'Minimal output should still include the monospace role variable in the CSS Variables panel when the monospace role is enabled.');
+    assertContainsValue('--font-monospace: monospace;', $panelValues['usage'] ?? '', 'Minimal output should still include the monospace role variable in the Site Snippet panel when the monospace role is enabled.');
+    assertNotContainsValue('code, pre {', $panelValues['usage'] ?? '', 'Minimal output should keep the Site Snippet panel variable-only.');
 };
 
 $tests['admin_controller_builds_font_class_output_panel_content'] = static function (): void {
@@ -587,13 +657,16 @@ $tests['admin_controller_builds_output_panels_from_applied_roles_when_sitewide_i
         [$draftRoles, $settings, $services['catalog']->getCatalog(), $appliedRoles]
     );
     $panelValues = [];
+    $panelDisplayValues = [];
 
     foreach ($panels as $panel) {
         $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
+        $panelDisplayValues[(string) ($panel['key'] ?? '')] = (string) ($panel['display_value'] ?? '');
     }
 
     assertContainsValue('"Live Heading"', $panelValues['usage'] ?? '', 'Sitewide-on snippet output should use applied roles for the site snippet.');
     assertContainsValue('"Live Heading"', $panelValues['classes'] ?? '', 'Sitewide-on snippet output should use applied roles for the font classes panel.');
+    assertContainsValue('/* Role classes */', $panelDisplayValues['classes'] ?? '', 'Font Classes should expose readable class section comments in the panel display value.');
     assertContainsValue("Live Heading\nLive Body", ($panelValues['names'] ?? ''), 'Sitewide-on snippet output should use applied roles for the font names panel.');
     assertNotContainsValue('"Draft Heading"', $panelValues['classes'] ?? '', 'Sitewide-on font classes should not reflect unsaved draft-only role changes.');
 };
@@ -1132,9 +1205,12 @@ $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): 
     $request->set_body_params([
         'css_delivery_mode' => 'inline',
         'font_display' => 'swap',
+        'unicode_range_mode' => 'custom',
+        'unicode_range_custom_value' => 'u+0000-00ff, u+0100-024f',
         'minify_css_output' => '0',
         'role_usage_font_weight_enabled' => '1',
         'tasty_fonts_output_quick_mode' => 'minimal',
+        'output_quick_mode_preference' => 'minimal',
         'minimal_output_preset_enabled' => '1',
         'class_output_enabled' => '0',
         'per_variant_font_variables_enabled' => '1',
@@ -1148,12 +1224,73 @@ $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): 
     assertSameValue(true, $response instanceof WP_REST_Response, 'The settings autosave route should return a native REST response object.');
     assertSameValue('inline', (string) ($data['settings']['css_delivery_mode'] ?? ''), 'The settings autosave route should return the saved CSS delivery mode.');
     assertSameValue('swap', (string) ($data['settings']['font_display'] ?? ''), 'The settings autosave route should return the saved font-display mode.');
+    assertSameValue('custom', (string) ($data['settings']['unicode_range_mode'] ?? ''), 'The settings autosave route should return the saved unicode-range mode.');
+    assertSameValue('U+0000-00FF,U+0100-024F', (string) ($data['settings']['unicode_range_custom_value'] ?? ''), 'The settings autosave route should normalize and return the saved custom unicode-range value.');
     assertSameValue(false, !empty($data['settings']['role_usage_font_weight_enabled']), 'The minimal preset should suppress role font-weight output.');
     assertSameValue(true, !empty($data['settings']['minimal_output_preset_enabled']), 'The settings autosave route should persist the minimal output preset flag.');
     assertSameValue(false, !empty($data['settings']['class_output_enabled']), 'The minimal preset should suppress class output.');
     assertSameValue(true, !empty($data['settings']['per_variant_font_variables_enabled']), 'The settings autosave route should continue to persist variable output via explicit booleans rather than a removed all preset.');
+    assertSameValue('minimal', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'The settings autosave route should persist the explicit output quick-mode preference.');
     assertSameValue(false, !empty($data['reload_required']), 'Settings that only patch client-synced controls should not ask the autosave client to reload the page.');
+    assertSameValue(true, is_array($data['output_panels'] ?? null), 'The settings autosave route should return refreshed output panels for the live admin snippets.');
+    assertContainsValue('usage', implode(',', array_map(static fn (array $panel): string => (string) ($panel['key'] ?? ''), (array) ($data['output_panels'] ?? []))), 'The refreshed output panels payload should include the site snippet tab.');
     assertContainsValue('Plugin settings saved', (string) ($data['message'] ?? ''), 'The settings autosave route should return the save summary message.');
+};
+
+$tests['rest_controller_settings_keeps_custom_output_preference_sticky'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'custom',
+        'class_output_enabled' => '0',
+        'per_variant_font_variables_enabled' => '1',
+        'role_usage_font_weight_enabled' => '0',
+        'extended_variable_weight_tokens_enabled' => '1',
+        'extended_variable_role_aliases_enabled' => '1',
+        'extended_variable_category_sans_enabled' => '1',
+        'extended_variable_category_serif_enabled' => '1',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response->get_data();
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Sticky custom output saves should return a native REST response.');
+    assertSameValue('custom', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Custom should remain selected when the saved booleans happen to match variables-only.');
+};
+
+$tests['rest_controller_settings_rejects_invalid_custom_unicode_range'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'unicode_range_mode' => 'custom',
+        'unicode_range_custom_value' => 'latin',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+
+    assertWpErrorCode('tasty_fonts_invalid_unicode_range', $response, 'Invalid custom unicode-range values should be rejected through the settings autosave route.');
+};
+
+$tests['rest_controller_settings_rejects_zero_output_states'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'custom',
+        'class_output_enabled' => '0',
+        'per_variant_font_variables_enabled' => '0',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+
+    assertWpErrorCode('tasty_fonts_output_required', $response, 'Saving a zero-output configuration should be rejected through the settings autosave route.');
 };
 
 $tests['rest_controller_settings_reload_toast_mentions_reload_when_needed'] = static function (): void {

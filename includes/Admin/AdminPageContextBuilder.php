@@ -115,6 +115,11 @@ final class AdminPageContextBuilder
             'css_delivery_mode_options' => $this->buildCssDeliveryModeOptions(),
             'font_display' => (string) ($settings['font_display'] ?? 'optional'),
             'font_display_options' => $this->buildFontDisplayOptions(),
+            'unicode_range_mode' => (string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF),
+            'unicode_range_custom_value' => (string) ($settings['unicode_range_custom_value'] ?? ''),
+            'unicode_range_mode_options' => $this->buildUnicodeRangeModeOptions(),
+            'unicode_range_custom_visible' => FontUtils::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? '')) === FontUtils::UNICODE_RANGE_MODE_CUSTOM,
+            'output_quick_mode_preference' => (string) ($settings['output_quick_mode_preference'] ?? 'minimal'),
             'class_output_enabled' => !empty($settings['class_output_enabled']),
             'class_output_role_heading_enabled' => !empty($settings['class_output_role_heading_enabled']),
             'class_output_role_body_enabled' => !empty($settings['class_output_role_body_enabled']),
@@ -356,33 +361,42 @@ final class AdminPageContextBuilder
         $snippetRoles = !empty($settings['auto_apply_roles']) && $appliedRoles !== []
             ? $appliedRoles
             : $roles;
+        $usageValue = $this->cssBuilder->formatOutput(
+            $this->cssBuilder->buildRoleUsageSnippet($snippetRoles, $includeMonospace, $catalog, $settings),
+            $minifyOutput
+        );
+        $usageDisplayValue = $this->cssBuilder->buildRoleUsageSnippet($snippetRoles, $includeMonospace, $catalog, $settings, true);
+        $variablesValue = $this->cssBuilder->formatOutput(
+            $this->cssBuilder->buildRoleVariableDeclarationsSnippet($snippetRoles, $includeMonospace, $catalog, $settings),
+            $minifyOutput
+        );
+        $variablesDisplayValue = $this->cssBuilder->buildRoleVariableDeclarationsSnippet($snippetRoles, $includeMonospace, $catalog, $settings, true);
+        $classesValue = $this->buildClassOutputPanelContent($snippetRoles, $settings, $runtimeFamilies, $includeMonospace);
+        $classesDisplayValue = $this->buildClassOutputPanelContent($snippetRoles, $settings, $runtimeFamilies, $includeMonospace, true);
 
         return [
             [
                 'key' => 'usage',
                 'label' => __('Site Snippet', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-usage',
-                'value' => $this->cssBuilder->formatOutput(
-                    $this->cssBuilder->buildRoleUsageSnippet($snippetRoles, $includeMonospace, $catalog, $settings),
-                    $minifyOutput
-                ),
+                'value' => $usageValue,
+                'display_value' => $usageDisplayValue,
                 'active' => true,
             ],
             [
                 'key' => 'variables',
                 'label' => __('CSS Variables', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-vars',
-                'value' => $this->cssBuilder->formatOutput(
-                    $this->cssBuilder->buildRoleVariableDeclarationsSnippet($snippetRoles, $includeMonospace, $catalog, $settings),
-                    $minifyOutput
-                ),
+                'value' => $variablesValue,
+                'display_value' => $variablesDisplayValue,
                 'active' => false,
             ],
             [
                 'key' => 'classes',
                 'label' => __('Font Classes', 'tasty-fonts'),
                 'target' => 'tasty-fonts-output-classes',
-                'value' => $this->buildClassOutputPanelContent($snippetRoles, $settings, $runtimeFamilies, $includeMonospace),
+                'value' => $classesValue,
+                'display_value' => $classesDisplayValue,
                 'active' => false,
             ],
             [
@@ -542,6 +556,17 @@ final class AdminPageContextBuilder
         ];
     }
 
+    public function buildUnicodeRangeModeOptions(): array
+    {
+        return [
+            ['value' => FontUtils::UNICODE_RANGE_MODE_OFF, 'label' => $this->formatUnicodeRangeModeLabel(FontUtils::UNICODE_RANGE_MODE_OFF)],
+            ['value' => FontUtils::UNICODE_RANGE_MODE_PRESERVE, 'label' => $this->formatUnicodeRangeModeLabel(FontUtils::UNICODE_RANGE_MODE_PRESERVE)],
+            ['value' => FontUtils::UNICODE_RANGE_MODE_LATIN_BASIC, 'label' => $this->formatUnicodeRangeModeLabel(FontUtils::UNICODE_RANGE_MODE_LATIN_BASIC)],
+            ['value' => FontUtils::UNICODE_RANGE_MODE_LATIN_EXTENDED, 'label' => $this->formatUnicodeRangeModeLabel(FontUtils::UNICODE_RANGE_MODE_LATIN_EXTENDED)],
+            ['value' => FontUtils::UNICODE_RANGE_MODE_CUSTOM, 'label' => $this->formatUnicodeRangeModeLabel(FontUtils::UNICODE_RANGE_MODE_CUSTOM)],
+        ];
+    }
+
     public function buildFamilyFontDisplayOptions(string $globalDisplay): array
     {
         return [
@@ -576,6 +601,17 @@ final class AdminPageContextBuilder
         return match ($mode) {
             'inline' => __('inline CSS', 'tasty-fonts'),
             default => __('generated file', 'tasty-fonts'),
+        };
+    }
+
+    public function formatUnicodeRangeModeLabel(string $mode): string
+    {
+        return match (FontUtils::normalizeUnicodeRangeMode($mode)) {
+            FontUtils::UNICODE_RANGE_MODE_LATIN_BASIC => __('Basic Latin', 'tasty-fonts'),
+            FontUtils::UNICODE_RANGE_MODE_LATIN_EXTENDED => __('Latin Extended', 'tasty-fonts'),
+            FontUtils::UNICODE_RANGE_MODE_OFF => __('Off', 'tasty-fonts'),
+            FontUtils::UNICODE_RANGE_MODE_CUSTOM => __('Custom', 'tasty-fonts'),
+            default => __('Keep Imported Ranges', 'tasty-fonts'),
         };
     }
 
@@ -945,16 +981,19 @@ final class AdminPageContextBuilder
         array $roles,
         array $settings,
         array $runtimeFamilies,
-        bool $includeMonospace
+        bool $includeMonospace,
+        bool $includeComments = false
     ): string {
         if (empty($settings['class_output_enabled'])) {
             return __('Class output is off. Turn on Classes in Output Settings to generate utility classes.', 'tasty-fonts');
         }
 
-        $content = $this->cssBuilder->formatOutput(
-            $this->cssBuilder->buildClassOutputSnippet($roles, $includeMonospace, $runtimeFamilies, $settings),
-            !empty($settings['minify_css_output'])
-        );
+        $content = $includeComments
+            ? $this->cssBuilder->buildCommentedClassOutputSnippet($roles, $includeMonospace, $runtimeFamilies, $settings)
+            : $this->cssBuilder->formatOutput(
+                $this->cssBuilder->buildClassOutputSnippet($roles, $includeMonospace, $runtimeFamilies, $settings),
+                !empty($settings['minify_css_output'])
+            );
 
         if ($content !== '') {
             return $content;

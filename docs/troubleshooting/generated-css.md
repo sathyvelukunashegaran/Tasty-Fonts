@@ -77,7 +77,8 @@ If the generated CSS looks stale or missing:
 
 - The plugin can recognize and migrate a current legacy generated stylesheet from `wp-content/uploads/fonts/tasty-fonts.css` into the canonical `.generated` location.
 - Inline delivery is the fallback path when file delivery is disabled or unavailable.
-- Output-affecting settings such as `font-display`, minification, variable generation, and utility class generation all change what appears in the generated runtime CSS.
+- Output-affecting settings such as `font-display`, unicode-range output, minification, variable generation, and utility class generation all change what appears in the generated runtime CSS.
+- If the generated stylesheet shows an unexpected `unicode-range`, check `Settings -> Output -> Unicode Range Output` before assuming the imported face metadata is wrong.
 
 ## Related Docs
 

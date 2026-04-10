@@ -19,9 +19,24 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
         $target = (string) ($panel['target'] ?? '');
         $headingId = $target !== '' ? $this->buildElementId($target . '-label', 'tasty-fonts-code-panel-label') : 'tasty-fonts-code-panel-label';
         $value = (string) ($panel['value'] ?? '');
+        $hasDisplayValue = array_key_exists('display_value', $panel);
+        $displayValue = $hasDisplayValue
+            ? (string) ($panel['display_value'] ?? '')
+            : '';
+        $hasReadableDisplayValue = array_key_exists('readable_display_value', $panel);
+        $readableDisplayValue = $hasReadableDisplayValue
+            ? (string) ($panel['readable_display_value'] ?? '')
+            : '';
         $preserveDisplayFormat = !empty($options['preserve_display_format']);
-        $displayValue = $preserveDisplayFormat ? $value : $this->formatSnippetForDisplay($value);
-        $readableDisplayValue = $this->formatSnippetForDisplay($value);
+
+        if (!$hasDisplayValue) {
+            $displayValue = $preserveDisplayFormat ? $value : $this->formatSnippetForDisplay($value);
+        }
+
+        if (!$hasReadableDisplayValue) {
+            $readableDisplayValue = $this->formatSnippetForDisplay($value);
+        }
+
         $canToggleReadableView = !empty($options['allow_readable_toggle'])
             && $this->looksLikeCssSnippet(trim($value))
             && $readableDisplayValue !== $displayValue;

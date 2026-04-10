@@ -251,9 +251,36 @@ trait SharedRenderHelpers
     public function renderFallbackInput(string $name, string $value, array $attributes = []): void
     {
         $className = 'regular-text';
+        $wrapperClassName = 'tasty-fonts-combobox-field';
+        $clearValue = null;
+        $clearLabel = '';
+        $inputId = '';
 
         if (!empty($attributes['class']) && is_string($attributes['class'])) {
             $className .= ' ' . trim($attributes['class']);
+        }
+
+        if (!empty($attributes['wrapper_class']) && is_string($attributes['wrapper_class'])) {
+            $wrapperClassName .= ' ' . trim($attributes['wrapper_class']);
+            unset($attributes['wrapper_class']);
+        }
+
+        if (array_key_exists('clear_value', $attributes)) {
+            $clearValue = is_scalar($attributes['clear_value']) ? (string) $attributes['clear_value'] : '';
+            unset($attributes['clear_value']);
+        }
+
+        if (!empty($attributes['clear_label']) && is_string($attributes['clear_label'])) {
+            $clearLabel = trim($attributes['clear_label']);
+            unset($attributes['clear_label']);
+        }
+
+        if (!empty($attributes['id']) && is_string($attributes['id'])) {
+            $inputId = trim($attributes['id']);
+        }
+
+        if ($clearLabel !== '') {
+            $wrapperClassName .= ' tasty-fonts-combobox-field--clearable';
         }
 
         $inputAttributes = array_merge(
@@ -273,7 +300,7 @@ trait SharedRenderHelpers
             $inputAttributes['name'] = $name;
         }
 
-        echo '<span class="tasty-fonts-combobox-field">';
+        echo '<span class="' . esc_attr($wrapperClassName) . '">';
         echo '<input';
 
         foreach ($inputAttributes as $key => $attributeValue) {
@@ -290,6 +317,11 @@ trait SharedRenderHelpers
         }
 
         echo '>';
+
+        if ($clearLabel !== '' && $inputId !== '') {
+            echo '<button type="button" class="tasty-fonts-select-clear" data-clear-select-button data-clear-target="' . esc_attr($inputId) . '" data-clear-value="' . esc_attr((string) $clearValue) . '" aria-label="' . esc_attr($clearLabel) . '" hidden><span aria-hidden="true">&times;</span></button>';
+        }
+
         echo '</span>';
     }
 

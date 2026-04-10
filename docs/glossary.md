@@ -65,6 +65,9 @@ A URL-safe identifier derived from the font family name. Used as a directory nam
 **Font display**
 The CSS `font-display` descriptor controls how the browser handles a period when the font has not yet loaded. Options include `swap`, `optional`, `fallback`, `block`, and `auto`. The plugin lets you set a global default and per-family overrides.
 
+**Unicode Range Output**
+A global Output setting that controls whether the plugin preserves imported `unicode-range` descriptors, forces one of the built-in Latin presets, omits the descriptor entirely, or emits a custom range string. This changes emitted CSS and editor payloads only; it does not rewrite stored library face metadata.
+
 **Font Library (plugin page)**
 The admin page that lists every font family the plugin manages. Use it to browse families, switch delivery profiles, set fallback stacks, and control per-family options. Not to be confused with the WordPress Block Editor Font Library.
 

@@ -608,6 +608,17 @@ $tests['admin_page_renderer_renders_unified_output_controls'] = static function 
         ],
         'font_display' => 'optional',
         'font_display_options' => [],
+        'unicode_range_mode' => 'custom',
+        'unicode_range_custom_value' => 'U+0000-00FF,U+0100-024F',
+        'unicode_range_mode_options' => [
+            ['value' => 'off', 'label' => 'Off'],
+            ['value' => 'preserve', 'label' => 'Keep Imported Ranges'],
+            ['value' => 'latin_basic', 'label' => 'Basic Latin'],
+            ['value' => 'latin_extended', 'label' => 'Latin Extended'],
+            ['value' => 'custom', 'label' => 'Custom'],
+        ],
+        'unicode_range_custom_visible' => true,
+        'output_quick_mode_preference' => 'custom',
         'class_output_enabled' => true,
         'class_output_role_heading_enabled' => false,
         'class_output_role_body_enabled' => false,
@@ -638,6 +649,19 @@ $tests['admin_page_renderer_renders_unified_output_controls'] = static function 
     $output = (string) ob_get_clean();
 
     assertContainsValue('CSS Delivery', $output, 'Output Settings should render the CSS delivery control.');
+    assertContainsValue('Unicode Range Output', $output, 'Output Settings should render the unicode-range output control.');
+    assertContainsValue('name="unicode_range_mode"', $output, 'The unicode-range mode control should submit through the shared settings form.');
+    assertContainsValue('name="unicode_range_custom_value"', $output, 'The custom unicode-range textarea should submit through the shared settings form.');
+    assertSameValue(
+        1,
+        preg_match('/id="tasty-fonts-unicode-range-mode-off"[\s\S]*Keep Imported Ranges/', $output),
+        'The Off option should render before the other unicode-range modes.'
+    );
+    assertSameValue(
+        1,
+        preg_match('/data-unicode-range-custom-wrap(?![^>]*hidden)/', $output),
+        'The custom unicode-range textarea should be visible when custom mode is selected.'
+    );
     assertContainsValue('name="css_delivery_mode"', $output, 'The CSS delivery control should submit through the shared settings form.');
     assertContainsValue('type="radio"', $output, 'Output Settings should render segmented radio controls for delivery and font display.');
     assertContainsValue('id="tasty-fonts-css-delivery-mode-inline"', $output, 'The CSS delivery inline option should render as a pill control.');
@@ -655,6 +679,8 @@ $tests['admin_page_renderer_renders_unified_output_controls'] = static function 
     );
     assertContainsValue('value="minimal"', $output, 'The output quick-mode controls should expose the minimal preset.');
     assertContainsValue('value="classes"', $output, 'The output quick-mode controls should expose the classes-only option.');
+    assertContainsValue('name="output_quick_mode_preference"', $output, 'The output quick-mode preference should submit through the shared settings form.');
+    assertContainsValue('data-output-quick-mode-notice', $output, 'The output quick-mode section should render the zero-output guard notice.');
     assertContainsValue('name="class_output_enabled"', $output, 'The class output master toggle should submit through the shared settings form.');
     assertContainsValue('Family Classes', $output, 'Output Settings should group the per-family class toggle under its own submenu heading.');
     assertContainsValue('name="class_output_families_enabled"', $output, 'The granular family class toggle should submit through the shared settings form.');
@@ -668,6 +694,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
         $builder,
         'deriveOutputQuickMode',
         [
+            '',
             [
                 'enabled' => true,
                 'role_heading' => true,
@@ -689,6 +716,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
                 'category_serif' => true,
                 'category_mono' => true,
             ],
+            false,
         ]
     );
     assertSameValue('custom', $customAllEnabledMode, 'Quick mode should resolve to custom when both class and variable output are enabled, even if every subgroup is on.');
@@ -697,6 +725,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
         $builder,
         'deriveOutputQuickMode',
         [
+            '',
             [
                 'enabled' => false,
                 'role_heading' => false,
@@ -715,6 +744,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
                 'category_sans' => false,
                 'category_serif' => false,
             ],
+            false,
         ]
     );
     assertSameValue('minimal', $minimalMode, 'Quick mode should resolve to minimal when the minimal preset is enabled with variables on and classes off.');
@@ -723,6 +753,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
         $builder,
         'deriveOutputQuickMode',
         [
+            '',
             [
                 'enabled' => false,
                 'role_heading' => false,
@@ -736,28 +767,30 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             [
                 'enabled' => true,
                 'minimal' => false,
-                'weight_tokens' => false,
-                'role_aliases' => false,
-                'category_sans' => false,
-                'category_serif' => false,
+                'weight_tokens' => true,
+                'role_aliases' => true,
+                'category_sans' => true,
+                'category_serif' => true,
             ],
+            false,
         ]
     );
-    assertSameValue('variables', $variablesMode, 'Quick mode should resolve to variables when variable output is enabled and class output is disabled.');
+    assertSameValue('variables', $variablesMode, 'Quick mode should resolve to variables only when the full preset baseline remains intact.');
 
     $classesMode = invokePrivateMethod(
         $builder,
         'deriveOutputQuickMode',
         [
+            '',
             [
                 'enabled' => true,
-                'role_heading' => false,
-                'role_body' => false,
-                'role_alias_interface' => false,
-                'role_alias_ui' => false,
-                'category_sans' => false,
-                'category_serif' => false,
-                'families' => false,
+                'role_heading' => true,
+                'role_body' => true,
+                'role_alias_interface' => true,
+                'role_alias_ui' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+                'families' => true,
             ],
             [
                 'enabled' => false,
@@ -767,14 +800,16 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
                 'category_sans' => false,
                 'category_serif' => false,
             ],
+            false,
         ]
     );
-    assertSameValue('classes', $classesMode, 'Quick mode should resolve to classes when class output is enabled and variable output is disabled.');
+    assertSameValue('classes', $classesMode, 'Quick mode should resolve to classes only when the full preset baseline remains intact.');
 
     $customMode = invokePrivateMethod(
         $builder,
         'deriveOutputQuickMode',
         [
+            '',
             [
                 'enabled' => true,
                 'role_heading' => true,
@@ -793,9 +828,66 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
                 'category_sans' => true,
                 'category_serif' => true,
             ],
+            false,
         ]
     );
     assertSameValue('custom', $customMode, 'Quick mode should resolve to custom when both outputs are enabled but one granular subgroup is disabled.');
+
+    $stickyCustomMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            'custom',
+            [
+                'enabled' => false,
+                'role_heading' => true,
+                'role_body' => true,
+                'role_alias_interface' => true,
+                'role_alias_ui' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+                'families' => true,
+            ],
+            [
+                'enabled' => true,
+                'minimal' => false,
+                'weight_tokens' => true,
+                'role_aliases' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+            ],
+            false,
+        ]
+    );
+    assertSameValue('custom', $stickyCustomMode, 'Quick mode should stay custom when an explicit custom preference is saved, even if the output booleans match variables-only.');
+
+    $staleVariablesMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            'variables',
+            [
+                'enabled' => false,
+                'role_heading' => true,
+                'role_body' => true,
+                'role_alias_interface' => true,
+                'role_alias_ui' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+                'families' => true,
+            ],
+            [
+                'enabled' => true,
+                'minimal' => false,
+                'weight_tokens' => true,
+                'role_aliases' => true,
+                'category_sans' => true,
+                'category_serif' => false,
+            ],
+            false,
+        ]
+    );
+    assertSameValue('custom', $staleVariablesMode, 'Saved non-custom preferences should coerce to custom when the detailed output settings no longer match the preset baseline.');
 };
 
 $tests['admin_page_view_builder_builds_typed_family_selector_options'] = static function (): void {
@@ -829,6 +921,36 @@ $tests['admin_page_view_builder_builds_typed_family_selector_options'] = static 
     assertSameValue('Legacy Stack', $view['availableFamilyOptions'][2]['label'] ?? '', 'Families missing from the current catalog should keep their plain selector label.');
     assertSameValue('Inter · Variable', $view['availableFamilyLabels']['Inter'] ?? '', 'The preview label lookup should reuse the typed selector label.');
     assertSameValue('Legacy Stack', $view['availableFamilyLabels']['Legacy Stack'] ?? '', 'Missing catalog families should stay selectable without a type suffix.');
+};
+
+$tests['admin_page_view_builder_prefers_saved_custom_output_quick_mode_on_reload'] = static function (): void {
+    resetTestState();
+
+    $builder = new AdminPageViewBuilder(new Storage());
+    $view = $builder->build([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'output_quick_mode_preference' => 'custom',
+        'class_output_enabled' => false,
+        'class_output_role_heading_enabled' => true,
+        'class_output_role_body_enabled' => true,
+        'class_output_role_alias_interface_enabled' => true,
+        'class_output_role_alias_ui_enabled' => true,
+        'class_output_category_sans_enabled' => true,
+        'class_output_category_serif_enabled' => true,
+        'class_output_families_enabled' => true,
+        'per_variant_font_variables_enabled' => true,
+        'minimal_output_preset_enabled' => false,
+        'extended_variable_weight_tokens_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_sans_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'role_usage_font_weight_enabled' => false,
+    ]);
+
+    assertSameValue('custom', (string) ($view['outputQuickMode'] ?? ''), 'A saved custom quick-mode preference should remain selected on reload even when the current booleans match variables-only.');
+    assertSameValue(true, !empty($view['advancedOutputControlsExpanded']), 'A saved custom quick-mode preference should keep the advanced output controls expanded on reload.');
 };
 
 $tests['admin_page_renderer_balances_div_wrappers'] = static function (): void {
@@ -3018,6 +3140,29 @@ $tests['admin_page_renderer_pretty_prints_minified_variable_declaration_lists_fo
     assertContainsValue("<span class=\"tasty-fonts-syntax-property\">--font-heading</span>", $output, 'Minified variable lists should still highlight the first declaration.');
     assertContainsValue("\n<span class=\"tasty-fonts-syntax-property\">--font-body</span>", $output, 'Minified variable lists should be split into one declaration per line for display.');
     assertContainsValue('data-copy-text="--font-heading:&quot;Inter&quot;,serif;--font-body:&quot;Noto Sans&quot;,sans-serif;"', $output, 'Variable list copy payloads should remain minified.');
+};
+
+$tests['admin_page_renderer_prefers_explicit_display_values_for_snippet_panels'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    invokePrivateMethod(
+        $renderer,
+        'renderCodeEditor',
+        [[
+            'label' => 'CSS Variables',
+            'target' => 'tasty-fonts-output-vars',
+            'value' => '--font-heading:"Inter",serif;--font-body:"Noto Sans",sans-serif;',
+            'display_value' => "/* Role font stacks */\n--font-heading: \"Inter\", serif;\n--font-body: \"Noto Sans\", sans-serif;",
+        ]]
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('tasty-fonts-syntax-comment', $output, 'Snippet panels should render explicit display comments when provided.');
+    assertContainsValue('Role font stacks', $output, 'Snippet panels should show the provided readable section labels.');
+    assertContainsValue('data-copy-text="--font-heading:&quot;Inter&quot;,serif;--font-body:&quot;Noto Sans&quot;,sans-serif;"', $output, 'Explicit display values should not change the copied snippet payload.');
 };
 
 $tests['admin_page_renderer_generated_css_defaults_to_actual_minified_output_with_readable_toggle'] = static function (): void {

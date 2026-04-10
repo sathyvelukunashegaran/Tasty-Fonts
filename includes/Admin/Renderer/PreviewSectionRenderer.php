@@ -343,38 +343,51 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 </span>
             </label>
             <div class="tasty-fonts-role-weight-editor tasty-fonts-preview-role-editor" data-preview-delivery-editor="<?php echo esc_attr($roleKey); ?>" hidden>
-                <div class="tasty-fonts-role-axis-head">
-                    <span class="tasty-fonts-field-label-text"><?php esc_html_e('Delivery', 'tasty-fonts'); ?></span>
-                    <span class="tasty-fonts-muted" data-preview-delivery-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Choose which saved static or variable delivery this preview should use.', 'tasty-fonts'); ?></span>
-                </div>
-                <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
-                    <span class="screen-reader-text"><?php echo esc_html(sprintf(__('%s delivery', 'tasty-fonts'), $label)); ?></span>
-                    <span class="tasty-fonts-select-field">
+                <label class="tasty-fonts-stack-field tasty-fonts-preview-tray-field tasty-fonts-role-weight-field">
+                    <?php $this->renderFieldLabel(__('Delivery', 'tasty-fonts')); ?>
+                    <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
                         <select
                             data-preview-delivery-select="<?php echo esc_attr($roleKey); ?>"
                             data-preview-selected-delivery="<?php echo esc_attr($selectedDeliveryId); ?>"
                         ></select>
+                        <button
+                            type="button"
+                            class="tasty-fonts-select-clear"
+                            data-clear-select-button
+                            data-clear-value=""
+                            data-clear-affordance="always"
+                            aria-label="<?php echo esc_attr(sprintf(__('Clear %s delivery', 'tasty-fonts'), $label)); ?>"
+                            hidden
+                        >
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                     </span>
                 </label>
             </div>
             <div class="tasty-fonts-role-weight-editor tasty-fonts-preview-role-editor" data-preview-weight-editor="<?php echo esc_attr($roleKey); ?>" hidden>
-                <div class="tasty-fonts-role-axis-head">
-                    <span class="tasty-fonts-field-label-text"><?php esc_html_e('Role Weight', 'tasty-fonts'); ?></span>
-                    <span class="tasty-fonts-muted" data-preview-weight-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Choose a saved static weight when the selected family offers more than one.', 'tasty-fonts'); ?></span>
-                </div>
-                <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
-                    <span class="screen-reader-text"><?php echo esc_html(sprintf(__('%s weight', 'tasty-fonts'), $label)); ?></span>
-                    <span class="tasty-fonts-select-field">
+                <label class="tasty-fonts-stack-field tasty-fonts-preview-tray-field tasty-fonts-role-weight-field">
+                    <?php $this->renderFieldLabel(__('Role Weight', 'tasty-fonts')); ?>
+                    <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
                         <select data-preview-weight-select="<?php echo esc_attr($roleKey); ?>"></select>
+                        <button
+                            type="button"
+                            class="tasty-fonts-select-clear"
+                            data-clear-select-button
+                            data-clear-value=""
+                            data-clear-affordance="always"
+                            aria-label="<?php echo esc_attr(sprintf(__('Clear %s weight', 'tasty-fonts'), $label)); ?>"
+                            hidden
+                        >
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                     </span>
                 </label>
             </div>
             <div class="tasty-fonts-role-axis-editor tasty-fonts-preview-role-editor" data-preview-axis-editor="<?php echo esc_attr($roleKey); ?>" hidden>
-                <div class="tasty-fonts-role-axis-head">
-                    <span class="tasty-fonts-field-label-text"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
-                    <span class="tasty-fonts-muted" data-preview-axis-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
+                <div class="tasty-fonts-stack-field tasty-fonts-preview-tray-field">
+                    <?php $this->renderFieldLabel(__('Variable Axes', 'tasty-fonts')); ?>
+                    <div class="tasty-fonts-role-axis-fields" data-preview-axis-fields="<?php echo esc_attr($roleKey); ?>"></div>
                 </div>
-                <div class="tasty-fonts-role-axis-fields" data-preview-axis-fields="<?php echo esc_attr($roleKey); ?>"></div>
             </div>
         </div>
         <?php

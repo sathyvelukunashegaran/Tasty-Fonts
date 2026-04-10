@@ -323,6 +323,9 @@ final class RestController
                 'tasty_fonts_clear_google_api_key' => $this->buildToggleArg(),
                 'css_delivery_mode' => $this->buildTextArg(false, ['file', 'inline']),
                 'font_display' => $this->buildTextArg(false, ['auto', 'block', 'swap', 'fallback', 'optional']),
+                'unicode_range_mode' => $this->buildTextArg(false, ['preserve', 'latin_basic', 'latin_extended', 'off', 'custom']),
+                'unicode_range_custom_value' => $this->buildTextArg(),
+                'output_quick_mode_preference' => $this->buildTextArg(false, ['minimal', 'variables', 'classes', 'custom']),
                 'preview_sentence' => $this->buildTextArg(),
                 'update_channel' => $this->buildTextArg(false, ['stable', 'beta', 'nightly']),
             ] as $key => $schema

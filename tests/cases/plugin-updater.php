@@ -6,6 +6,7 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use TastyFonts\Updates\GitHubUpdater;
 
@@ -887,6 +888,83 @@ $tests['block_editor_font_library_sync_is_enabled_by_default_on_local_hosts'] = 
         'Local installs should now attempt Gutenberg Font Library sync immediately because the default is on.'
     );
     assertSameValue(2, count($remoteRequestCalls), 'With the default on, local installs should create one family and one face in the core Font Library when loopback requests succeed.');
+};
+
+$tests['block_editor_font_library_sync_resolves_unicode_range_output_modes'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $remoteRequestCalls;
+    global $remoteRequestResponses;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'block_editor_font_library_sync_enabled' => '1',
+        'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_CUSTOM,
+        'unicode_range_custom_value' => 'U+0000-00FF,U+0100-024F',
+    ]);
+    $family = $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self-hosted',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'google',
+                'weight' => '400',
+                'style' => 'normal',
+                'unicode_range' => 'U+0370-03FF',
+                'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $remoteGetResponses['https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit'] = [
+        'response' => ['code' => 200],
+        'body' => '[]',
+    ];
+    $remoteRequestResponses['POST https://example.test/wp-json/wp/v2/font-families'] = [
+        'response' => ['code' => 201],
+        'body' => json_encode(['id' => 321]),
+    ];
+    $remoteRequestResponses['POST https://example.test/wp-json/wp/v2/font-families/321/font-faces'] = [
+        'response' => ['code' => 201],
+        'body' => json_encode(['id' => 654]),
+    ];
+
+    $services['block_editor_font_library']->syncImportedFamily(
+        [
+            'status' => 'imported',
+            'family' => 'Inter',
+            'delivery_id' => 'google-self-hosted',
+            'family_record' => $family,
+        ],
+        'google'
+    );
+
+    $customFaceBody = json_decode((string) ($remoteRequestCalls[1]['args']['body']['font_face_settings'] ?? ''), true);
+    assertSameValue('U+0000-00FF,U+0100-024F', (string) ($customFaceBody['unicodeRange'] ?? ''), 'Font Library sync should emit the resolved custom unicode-range instead of the stored provider subset.');
+
+    $remoteRequestCalls = [];
+    $services['settings']->saveSettings(['unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_OFF]);
+    $services['block_editor_font_library']->syncImportedFamily(
+        [
+            'status' => 'imported',
+            'family' => 'Inter',
+            'delivery_id' => 'google-self-hosted',
+            'family_record' => $family,
+        ],
+        'google'
+    );
+
+    $offFaceBody = json_decode((string) ($remoteRequestCalls[1]['args']['body']['font_face_settings'] ?? ''), true);
+    assertSameValue(false, array_key_exists('unicodeRange', $offFaceBody), 'Font Library sync should omit unicodeRange when unicode-range output is disabled.');
 };
 
 $tests['block_editor_font_library_sync_respects_opt_out_filter'] = static function (): void {

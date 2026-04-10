@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a global Unicode Range Output control in Settings so emitted `@font-face`, editor font-face payloads, and Block Editor sync can preserve provider subsets, force Latin presets, omit unicode-range entirely, or use a validated custom override without rewriting stored face metadata.
 - Added opt-in variable font support across local uploads, Google imports, and runtime delivery, including stored axis metadata/defaults, role-specific axis controls, and static weight overrides for heading, body, and monospace roles.
 - Added variable-font awareness throughout the library and import workflows, including family type badges/filtering, variable metadata in Google and Bunny search results, upload axis editors, and clearer source-only messaging for Bunny variable families.
 - Added PHP and JavaScript coverage for variable font contracts, provider metadata, library rendering, runtime asset planning, and role/settings persistence.

@@ -8,6 +8,13 @@ defined('ABSPATH') || exit;
 
 final class FontUtils
 {
+    public const UNICODE_RANGE_MODE_PRESERVE = 'preserve';
+    public const UNICODE_RANGE_MODE_LATIN_BASIC = 'latin_basic';
+    public const UNICODE_RANGE_MODE_LATIN_EXTENDED = 'latin_extended';
+    public const UNICODE_RANGE_MODE_OFF = 'off';
+    public const UNICODE_RANGE_MODE_CUSTOM = 'custom';
+    public const UNICODE_RANGE_PRESET_LATIN_BASIC = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
+    public const UNICODE_RANGE_PRESET_LATIN_EXTENDED = 'U+0000-00FF,U+0100-024F,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+1E00-1EFF,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
     public const FALLBACK_SUGGESTIONS = [
         'sans-serif',
         'serif',
@@ -174,6 +181,72 @@ final class FontUtils
         }
 
         return '400';
+    }
+
+    public static function normalizeUnicodeRangeMode(string $mode): string
+    {
+        $mode = strtolower(trim($mode));
+
+        return in_array(
+            $mode,
+            [
+                self::UNICODE_RANGE_MODE_PRESERVE,
+                self::UNICODE_RANGE_MODE_LATIN_BASIC,
+                self::UNICODE_RANGE_MODE_LATIN_EXTENDED,
+                self::UNICODE_RANGE_MODE_OFF,
+                self::UNICODE_RANGE_MODE_CUSTOM,
+            ],
+            true
+        ) ? $mode : self::UNICODE_RANGE_MODE_OFF;
+    }
+
+    public static function normalizeUnicodeRangeValue(string $value): string
+    {
+        $value = strtoupper(trim($value));
+
+        if ($value === '') {
+            return '';
+        }
+
+        $parts = array_filter(array_map('trim', explode(',', $value)), static fn (string $part): bool => $part !== '');
+
+        return implode(',', $parts);
+    }
+
+    public static function unicodeRangeValueIsValid(string $value): bool
+    {
+        $normalized = self::normalizeUnicodeRangeValue($value);
+
+        if ($normalized === '') {
+            return false;
+        }
+
+        foreach (explode(',', $normalized) as $part) {
+            if (preg_match('/^U\+[0-9A-F?]{1,6}(?:-[0-9A-F]{1,6})?$/', $part) !== 1) {
+                return false;
+            }
+
+            if (str_contains($part, '?') && str_contains($part, '-')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static function resolveFaceUnicodeRange(array $face, array $settings): string
+    {
+        $mode = self::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? self::UNICODE_RANGE_MODE_OFF));
+
+        return match ($mode) {
+            self::UNICODE_RANGE_MODE_LATIN_BASIC => self::UNICODE_RANGE_PRESET_LATIN_BASIC,
+            self::UNICODE_RANGE_MODE_LATIN_EXTENDED => self::UNICODE_RANGE_PRESET_LATIN_EXTENDED,
+            self::UNICODE_RANGE_MODE_OFF => '',
+            self::UNICODE_RANGE_MODE_CUSTOM => self::unicodeRangeValueIsValid((string) ($settings['unicode_range_custom_value'] ?? ''))
+                ? self::normalizeUnicodeRangeValue((string) ($settings['unicode_range_custom_value'] ?? ''))
+                : '',
+            default => trim((string) ($face['unicode_range'] ?? '')),
+        };
     }
 
     public static function normalizeAxisTag(string $tag): string

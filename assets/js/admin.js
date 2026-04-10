@@ -139,6 +139,7 @@
     const outputStacks = document.getElementById('tasty-fonts-output-stacks');
     const outputVars = document.getElementById('tasty-fonts-output-vars');
     const outputUsage = document.getElementById('tasty-fonts-output-usage');
+    const outputClasses = document.getElementById('tasty-fonts-output-classes');
     const disclosureToggles = Array.from(document.querySelectorAll('[data-disclosure-toggle]'));
     const librarySearch = document.getElementById('tasty-fonts-library-search');
     const librarySourceFilter = document.querySelector('[data-library-source-filter]');
@@ -200,6 +201,8 @@
     const outputQuickModeInputs = Array.from(document.querySelectorAll('[data-output-quick-mode]'));
     const outputAdvancedPanel = document.getElementById('tasty-fonts-advanced-output-controls');
     const outputMinimalPresetInput = document.querySelector('[data-output-minimal-preset]');
+    const outputQuickModePreferenceInput = document.querySelector('[data-output-quick-mode-preference]');
+    const outputQuickModeNotice = document.querySelector('[data-output-quick-mode-notice]');
     const developerConfirmForms = Array.from(document.querySelectorAll('[data-developer-confirm-message]'));
     const outputMasterInputs = {
         classes: document.querySelector('[data-output-master="classes"]'),
@@ -211,6 +214,9 @@
     };
     const outputMonoDependentInputs = Array.from(document.querySelectorAll('[data-output-mono-dependent]'));
     const outputRoleWeightInput = document.querySelector('input[name="role_usage_font_weight_enabled"]');
+    const unicodeRangeModeInputs = Array.from(document.querySelectorAll('[data-unicode-range-mode]'));
+    const unicodeRangeCustomWrap = document.querySelector('[data-unicode-range-custom-wrap]');
+    const unicodeRangeCustomInput = document.querySelector('[data-unicode-range-custom]');
     const settingsAutosaveForms = Array.from(document.querySelectorAll('[data-settings-autosave]'));
 
     let selectedSearchFamily = null;
@@ -364,10 +370,10 @@
         bodyFamilyFallbackTitle: __('Body uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'),
         monospaceFamilyVariableTitle: __('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'),
         monospaceFamilyFallbackTitle: __('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'),
+        roleDeliveryDefault: __('Use Family Default', 'tasty-fonts'),
         roleWeightDefault: __('Use Role Default (%1$s)', 'tasty-fonts'),
         roleWeightSummary: __('Available static weights for %1$s. Choose one to override the default role weight when role font-weight output is enabled.', 'tasty-fonts'),
-        previewWeightSummary: __('Available static weights for %1$s. Choose one to preview a specific role weight.', 'tasty-fonts'),
-        previewAxisSummary: __('Available axes for %1$s. Leave a field empty to preview the family default.', 'tasty-fonts'),
+        previewDeliveryDefault: __('Use Family Default (%1$s)', 'tasty-fonts'),
     };
 
     function getHelpTooltipLayer() {
@@ -478,6 +484,70 @@
                     )
                 ),
             };
+        };
+    const sanitizeOutputQuickModePreference = typeof adminContracts.sanitizeOutputQuickModePreference === 'function'
+        ? adminContracts.sanitizeOutputQuickModePreference
+        : (value) => {
+            const normalized = String(value || '').trim().toLowerCase();
+
+            return ['minimal', 'variables', 'classes', 'custom'].includes(normalized) ? normalized : '';
+        };
+    const deriveExactOutputQuickMode = typeof adminContracts.deriveExactOutputQuickMode === 'function'
+        ? adminContracts.deriveExactOutputQuickMode
+        : (state = {}) => {
+            const minimalEnabled = !!state.minimalEnabled;
+            const classOutputEnabled = !!state.classOutputEnabled;
+            const variableOutputEnabled = !!state.variableOutputEnabled;
+            const roleUsageFontWeightEnabled = !!state.roleUsageFontWeightEnabled;
+            const classFlags = Array.isArray(state.classFlags) ? state.classFlags.filter((value) => typeof value === 'boolean') : [];
+            const variableFlags = Array.isArray(state.variableFlags) ? state.variableFlags.filter((value) => typeof value === 'boolean') : [];
+
+            if (minimalEnabled) {
+                return 'minimal';
+            }
+
+            if (!roleUsageFontWeightEnabled && !classOutputEnabled && variableOutputEnabled && variableFlags.every((value) => value)) {
+                return 'variables';
+            }
+
+            if (!roleUsageFontWeightEnabled && classOutputEnabled && !variableOutputEnabled && classFlags.every((value) => value)) {
+                return 'classes';
+            }
+
+            return 'custom';
+        };
+    const normalizeOutputQuickModePreference = typeof adminContracts.normalizeOutputQuickModePreference === 'function'
+        ? adminContracts.normalizeOutputQuickModePreference
+        : (preference, state = {}) => {
+            const normalizedPreference = sanitizeOutputQuickModePreference(preference);
+            const exactMode = deriveExactOutputQuickMode(state);
+
+            if (normalizedPreference === 'custom') {
+                return 'custom';
+            }
+
+            if (!normalizedPreference) {
+                return exactMode;
+            }
+
+            return exactMode === normalizedPreference ? normalizedPreference : 'custom';
+        };
+    const canDisableOutputLayer = typeof adminContracts.canDisableOutputLayer === 'function'
+        ? adminContracts.canDisableOutputLayer
+        : (layerKey, state = {}) => {
+            const normalizedLayerKey = String(layerKey || '').trim().toLowerCase();
+            const classOutputEnabled = !!state.classOutputEnabled;
+            const variableOutputEnabled = !!state.variableOutputEnabled;
+
+            if (normalizedLayerKey === 'classes') {
+                return !classOutputEnabled || variableOutputEnabled;
+            }
+
+            if (normalizedLayerKey === 'variables') {
+                return !variableOutputEnabled || classOutputEnabled;
+            }
+
+            return true;
         };
 
     function buildStack(family, fallback, defaultFallback = 'sans-serif') {
@@ -954,6 +1024,18 @@
             syncRadioFields('font_display', settings.font_display || 'optional');
         }
 
+        if (Object.prototype.hasOwnProperty.call(settings, 'unicode_range_mode')) {
+            syncRadioFields('unicode_range_mode', settings.unicode_range_mode || 'off');
+        }
+
+        if (Object.prototype.hasOwnProperty.call(settings, 'unicode_range_custom_value') && unicodeRangeCustomInput) {
+            unicodeRangeCustomInput.value = settings.unicode_range_custom_value || '';
+        }
+
+        if (Object.prototype.hasOwnProperty.call(settings, 'output_quick_mode_preference') && outputQuickModePreferenceInput) {
+            outputQuickModePreferenceInput.value = sanitizeOutputQuickModePreference(settings.output_quick_mode_preference) || 'custom';
+        }
+
         [
             'minify_css_output',
             'role_usage_font_weight_enabled',
@@ -999,6 +1081,7 @@
         }
 
         syncOutputSettingsUi();
+        syncUnicodeRangeUi();
 
         settingsAutosaveForms.forEach((form) => {
             const state = getSettingsAutosaveState(form);
@@ -1006,6 +1089,147 @@
             if (state) {
                 state.lastSerialized = JSON.stringify(serializeSettingsForm(form));
             }
+        });
+    }
+
+    function escapeSnippetHtml(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function highlightSnippetValue(value) {
+        const parts = String(value || '').split(/(".*?"|'.*?')/);
+
+        return parts.map((part) => {
+            if (!part) {
+                return '';
+            }
+
+            if (
+                (part.startsWith('"') && part.endsWith('"'))
+                || (part.startsWith("'") && part.endsWith("'"))
+            ) {
+                return `<span class="tasty-fonts-syntax-string">${escapeSnippetHtml(part)}</span>`;
+            }
+
+            return escapeSnippetHtml(part);
+        }).join('');
+    }
+
+    function highlightSnippetLine(line) {
+        const value = String(line || '');
+        const trimmed = value.trim();
+
+        if (!trimmed) {
+            return '';
+        }
+
+        let matches = value.match(/^(\s*)(\/\*.*\*\/|\*\/|\*)(.*)$/);
+
+        if (matches) {
+            return `<span class="tasty-fonts-syntax-comment">${escapeSnippetHtml(value)}</span>`;
+        }
+
+        matches = value.match(/^(\s*)(@[\w-]+)(\s+[^{};]+)?(\s*\{?\s*;?\s*)$/);
+
+        if (matches) {
+            return escapeSnippetHtml(matches[1] || '')
+                + `<span class="tasty-fonts-syntax-at-rule">${escapeSnippetHtml(matches[2] || '')}</span>`
+                + highlightSnippetValue(matches[3] || '')
+                + `<span class="tasty-fonts-syntax-punctuation">${escapeSnippetHtml(matches[4] || '')}</span>`;
+        }
+
+        matches = value.match(/^(\s*)([^{}]+)(\s*\{\s*)$/);
+
+        if (matches) {
+            return escapeSnippetHtml(matches[1] || '')
+                + `<span class="tasty-fonts-syntax-selector">${escapeSnippetHtml((matches[2] || '').trim())}</span>`
+                + `<span class="tasty-fonts-syntax-punctuation">${escapeSnippetHtml(matches[3] || '')}</span>`;
+        }
+
+        matches = value.match(/^(\s*)(--[\w-]+|[\w-]+)(\s*:\s*)(.+?)(\s*[;,]?\s*)$/);
+
+        if (matches) {
+            return escapeSnippetHtml(matches[1] || '')
+                + `<span class="tasty-fonts-syntax-property">${escapeSnippetHtml(matches[2] || '')}</span>`
+                + `<span class="tasty-fonts-syntax-punctuation">${escapeSnippetHtml(matches[3] || '')}</span>`
+                + highlightSnippetValue(matches[4] || '')
+                + `<span class="tasty-fonts-syntax-punctuation">${escapeSnippetHtml(matches[5] || '')}</span>`;
+        }
+
+        matches = value.match(/^(\s*)([{}])(\s*)$/);
+
+        if (matches) {
+            return escapeSnippetHtml(matches[1] || '')
+                + `<span class="tasty-fonts-syntax-punctuation">${escapeSnippetHtml(matches[2] || '')}</span>`
+                + escapeSnippetHtml(matches[3] || '');
+        }
+
+        return escapeSnippetHtml(value);
+    }
+
+    function renderHighlightedSnippet(value) {
+        return String(value || '')
+            .split(/\r\n|\n|\r/)
+            .map((line) => highlightSnippetLine(line))
+            .join('\n');
+    }
+
+    function setSnippetTargetContent(target, value) {
+        if (!target) {
+            return;
+        }
+
+        if ('value' in target) {
+            target.value = value;
+            return;
+        }
+
+        target.innerHTML = renderHighlightedSnippet(value);
+    }
+
+    function setSnippetPanelContent(targetId, rawValue, displayValue = '') {
+        if (!targetId) {
+            return;
+        }
+
+        const target = document.getElementById(targetId);
+
+        if (!target) {
+            return;
+        }
+
+        const nextRawValue = String(rawValue || '');
+        const nextDisplayValue = displayValue !== '' ? String(displayValue) : nextRawValue;
+        const codePanel = target.closest('.tasty-fonts-code-panel');
+        const copyButton = codePanel ? codePanel.querySelector('[data-copy-text]') : null;
+
+        setSnippetTargetContent(target, nextDisplayValue);
+
+        if (copyButton) {
+            copyButton.setAttribute('data-copy-text', nextRawValue);
+        }
+    }
+
+    function applyOutputPanelsState(panels) {
+        if (!Array.isArray(panels) || panels.length === 0) {
+            return;
+        }
+
+        panels.forEach((panel) => {
+            if (!panel || typeof panel !== 'object') {
+                return;
+            }
+
+            setSnippetPanelContent(
+                String(panel.target || ''),
+                String(panel.value || ''),
+                typeof panel.display_value === 'string' ? panel.display_value : ''
+            );
         });
     }
 
@@ -1044,6 +1268,7 @@
             });
 
             applySavedSettingsState(payload.settings || {});
+            applyOutputPanelsState(payload.output_panels || []);
             showToast(payload.message || getString('settingsSaved', 'Plugin settings saved.'), 'success');
 
             if (payload && payload.reload_required) {
@@ -2293,6 +2518,7 @@
     function renderRoleDeliveryEditor(roleKey, overrideState = null) {
         const editor = roleDeliveryEditors[roleKey];
         const select = roleDeliverySelects[roleKey];
+        const clearButton = select ? select.closest('.tasty-fonts-select-field')?.querySelector('[data-clear-select-button]') : null;
 
         if (!editor || !select) {
             return;
@@ -2312,11 +2538,21 @@
         if (!familyName || !options.length) {
             editor.hidden = true;
             select.innerHTML = '';
+
+            if (clearButton) {
+                syncClearableSelectButton(clearButton);
+            }
+
             return;
         }
 
         editor.hidden = false;
         select.innerHTML = '';
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = getString('roleDeliveryDefault', 'Use Family Default');
+        select.appendChild(defaultOption);
 
         options.forEach((option) => {
             const element = document.createElement('option');
@@ -2325,7 +2561,7 @@
             select.appendChild(element);
         });
 
-        select.value = selectedValue;
+        select.value = selectedValue || '';
 
         if (summary) {
             summary.textContent = formatMessage(
@@ -2333,11 +2569,16 @@
                 [familyName]
             );
         }
+
+        if (clearButton) {
+            syncClearableSelectButton(clearButton);
+        }
     }
 
     function renderRoleWeightEditor(roleKey, overrideState = null) {
         const editor = roleWeightEditors[roleKey];
         const select = roleWeightSelects[roleKey];
+        const clearButton = select ? select.closest('.tasty-fonts-select-field')?.querySelector('[data-clear-select-button]') : null;
 
         if (!editor || !select) {
             return;
@@ -2360,6 +2601,11 @@
         if (!shouldShow) {
             editor.hidden = true;
             select.innerHTML = '';
+
+            if (clearButton) {
+                syncClearableSelectButton(clearButton);
+            }
+
             return;
         }
 
@@ -2397,6 +2643,10 @@
                 getString('roleWeightSummary', 'Available static weights for %1$s. Choose one to override the default role weight when role font-weight output is enabled.'),
                 [familyName]
             );
+        }
+
+        if (clearButton) {
+            syncClearableSelectButton(clearButton);
         }
     }
 
@@ -2535,13 +2785,13 @@
     function renderPreviewWeightEditor(roleKey, overrideState = null) {
         const editor = previewWeightEditors[roleKey];
         const select = previewWeightSelects[roleKey];
+        const clearButton = select ? select.closest('.tasty-fonts-select-field')?.querySelector('[data-clear-select-button]') : null;
 
         if (!editor || !select) {
             return;
         }
 
         const familySelect = previewRoleSelects[roleKey];
-        const summary = editor.querySelector(`[data-preview-weight-summary="${roleKey}"]`);
         const state = normalizeRoleState(overrideState || currentPreviewRoleState());
         const familyName = String(state[roleKey] || (familySelect ? familySelect.value : '') || '').trim();
         const deliveryId = resolveRoleDeliveryId(roleKey, state);
@@ -2553,6 +2803,11 @@
         if (!shouldShow) {
             editor.hidden = true;
             select.innerHTML = '';
+
+            if (clearButton) {
+                syncClearableSelectButton(clearButton);
+            }
+
             return;
         }
 
@@ -2585,11 +2840,8 @@
 
         select.value = validValues.has(currentValue) ? currentValue : '';
 
-        if (summary) {
-            summary.textContent = formatMessage(
-                getString('previewWeightSummary', 'Available static weights for %1$s. Choose one to preview a specific role weight.'),
-                [familyName]
-            );
+        if (clearButton) {
+            syncClearableSelectButton(clearButton);
         }
     }
 
@@ -2608,26 +2860,42 @@
     function renderPreviewDeliveryEditor(roleKey, overrideState = null) {
         const editor = previewDeliveryEditors[roleKey];
         const select = previewDeliverySelects[roleKey];
+        const clearButton = select ? select.closest('.tasty-fonts-select-field')?.querySelector('[data-clear-select-button]') : null;
 
         if (!editor || !select) {
             return;
         }
 
         const familySelect = previewRoleSelects[roleKey];
-        const summary = editor.querySelector(`[data-preview-delivery-summary="${roleKey}"]`);
         const state = normalizeRoleState(overrideState || currentPreviewRoleState());
         const familyName = String(state[roleKey] || (familySelect ? familySelect.value : '') || '').trim();
         const options = roleDeliveryOptionsForFamily(familyName);
-        const selectedValue = resolveRoleDeliveryId(roleKey, state);
 
         if (!familyName || !options.length) {
             editor.hidden = true;
             select.innerHTML = '';
+
+            if (clearButton) {
+                syncClearableSelectButton(clearButton);
+            }
+
             return;
         }
 
         editor.hidden = false;
         select.innerHTML = '';
+
+        const familyEntry = roleDeliveryEntryForFamily(familyName);
+        const activeDeliveryId = familyEntry ? String(familyEntry.active_delivery_id || '').trim() : '';
+        const activeOption = options.find((option) => String(option.id || '') === activeDeliveryId) || options[0] || null;
+        const explicitValue = String(state[`${roleKey}DeliveryId`] || state[`${roleKey}_delivery_id`] || '').trim();
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = formatMessage(
+            getString('previewDeliveryDefault', 'Use Family Default (%1$s)'),
+            [String(activeOption && (activeOption.label || activeOption.id) ? (activeOption.label || activeOption.id) : '')]
+        );
+        select.appendChild(defaultOption);
 
         options.forEach((option) => {
             const element = document.createElement('option');
@@ -2636,13 +2904,10 @@
             select.appendChild(element);
         });
 
-        select.value = selectedValue;
+        select.value = explicitValue && options.some((option) => String(option.id || '') === explicitValue) ? explicitValue : '';
 
-        if (summary) {
-            summary.textContent = formatMessage(
-                getString('previewDeliverySummary', 'Saved deliveries for %1$s. Choose the static or variable delivery this preview should use.'),
-                [familyName]
-            );
+        if (clearButton) {
+            syncClearableSelectButton(clearButton);
         }
     }
 
@@ -2655,7 +2920,6 @@
 
         const familySelect = previewRoleSelects[roleKey];
         const fields = editor.querySelector(`[data-preview-axis-fields="${roleKey}"]`);
-        const summary = editor.querySelector(`[data-preview-axis-summary="${roleKey}"]`);
         const state = normalizeRoleState(overrideState || currentPreviewRoleState());
         const familyName = String(state[roleKey] || (familySelect ? familySelect.value : '') || '').trim();
         const deliveryId = resolveRoleDeliveryId(roleKey, state);
@@ -2706,12 +2970,6 @@
             fields.appendChild(field);
         });
 
-        if (summary) {
-            summary.textContent = formatMessage(
-                getString('previewAxisSummary', 'Available axes for %1$s. Leave a field empty to preview the family default.'),
-                [familyName]
-            );
-        }
     }
 
     function renderAllPreviewAxisEditors(overrideState = null) {
@@ -5002,6 +5260,10 @@
         return variableLines;
     }
 
+    function minimalOutputModeEnabled() {
+        return !!(outputMinimalPresetInput && outputMinimalPresetInput.value === '1');
+    }
+
     function updatePreviewCopyCssButton(data) {
         if (!previewCopyCssButton) {
             return;
@@ -5349,6 +5611,12 @@
         if (outputUsage) {
             if (!variableSnippet) {
                 outputUsage.value = '';
+            } else if (minimalOutputModeEnabled()) {
+                outputUsage.value = [
+                    ':root {',
+                    ...variableLines.map((line) => `  ${line}`),
+                    '}'
+                ].join('\n');
             } else {
                 const usageLines = [
                     ':root {',
@@ -7857,9 +8125,9 @@
             return document.getElementById(explicitTargetId);
         }
 
-        const field = button.closest('.tasty-fonts-select-field');
+        const field = button.closest('.tasty-fonts-select-field, .tasty-fonts-combobox-field');
 
-        return field ? field.querySelector('select') : null;
+        return field ? field.querySelector('select, input') : null;
     }
 
     function syncClearableSelectButton(button) {
@@ -7875,14 +8143,17 @@
         }
 
         const clearValue = String(button.getAttribute('data-clear-value') || '');
-        const field = button.closest('.tasty-fonts-select-field');
+        const field = button.closest('.tasty-fonts-select-field, .tasty-fonts-combobox-field');
+        const forceAffordance = String(button.getAttribute('data-clear-affordance') || '').trim() === 'always';
+        const hasOptions = select.tagName === 'SELECT' ? Number(select.options ? select.options.length : 0) > 0 : true;
         const hasClearValue = !select.disabled && String(select.value || '') !== clearValue;
+        const shouldShowButton = !select.disabled && hasOptions && (forceAffordance || hasClearValue);
 
-        button.hidden = !hasClearValue;
-        button.disabled = !hasClearValue;
+        button.hidden = !shouldShowButton;
+        button.disabled = !shouldShowButton;
 
         if (field) {
-            field.classList.toggle('has-clear-value', hasClearValue);
+            field.classList.toggle('has-clear-value', shouldShowButton);
         }
     }
 
@@ -7907,19 +8178,30 @@
         }
 
         const clearValue = String(button.getAttribute('data-clear-value') || '');
-        const options = Array.from(select.options || []);
-        const hasClearOption = options.some((option) => String(option.value) === clearValue);
         const previousValue = String(select.value || '');
 
-        if (hasClearOption) {
+        if (select.tagName === 'SELECT') {
+            const options = Array.from(select.options || []);
+            const hasClearOption = options.some((option) => String(option.value) === clearValue);
+
+            if (hasClearOption) {
+                select.value = clearValue;
+            } else if (options.length > 0) {
+                select.selectedIndex = 0;
+            }
+        } else {
             select.value = clearValue;
-        } else if (options.length > 0) {
-            select.selectedIndex = 0;
         }
 
         if (String(select.value || '') !== previousValue) {
+            if (select.tagName !== 'SELECT') {
+                select.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+
             select.dispatchEvent(new Event('change', { bubbles: true }));
-            select.dispatchEvent(new Event('input', { bubbles: true }));
+            if (select.tagName === 'SELECT') {
+                select.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         }
 
         syncClearableSelectButton(button);
@@ -8658,17 +8940,20 @@
     }
 
     function bindClearableSelectControls() {
-        document.querySelectorAll('.tasty-fonts-select-field select').forEach((element) => {
-            const field = element.closest('.tasty-fonts-select-field');
+        document.querySelectorAll('.tasty-fonts-select-field select, .tasty-fonts-combobox-field > input').forEach((element) => {
+            const field = element.closest('.tasty-fonts-select-field, .tasty-fonts-combobox-field');
             const button = field ? field.querySelector('[data-clear-select-button]') : null;
 
             if (!button) {
                 return;
             }
 
-            element.addEventListener('change', () => {
+            const syncButton = () => {
                 syncClearableSelectButton(button);
-            });
+            };
+
+            element.addEventListener('change', syncButton);
+            element.addEventListener('input', syncButton);
 
             syncClearableSelectButton(button);
         });
@@ -9203,24 +9488,87 @@
         ));
     }
 
+    function activeOutputClassFlags() {
+        return outputClassFlagInputs().filter((input) => !input.disabled);
+    }
+
+    function activeOutputVariableFlags() {
+        return outputVariableFlagInputs().filter((input) => !input.disabled);
+    }
+
+    function currentOutputQuickModePreference() {
+        return sanitizeOutputQuickModePreference(outputQuickModePreferenceInput ? outputQuickModePreferenceInput.value : '');
+    }
+
+    function setOutputQuickModePreference(mode) {
+        if (!outputQuickModePreferenceInput) {
+            return;
+        }
+
+        const normalizedMode = sanitizeOutputQuickModePreference(mode);
+        outputQuickModePreferenceInput.value = normalizedMode || 'custom';
+    }
+
+    function currentOutputQuickModeState() {
+        return {
+            minimalEnabled: !!(outputMinimalPresetInput && outputMinimalPresetInput.value === '1'),
+            classOutputEnabled: !!(outputMasterInputs.classes && outputMasterInputs.classes.checked),
+            variableOutputEnabled: !!(outputMasterInputs.variables && outputMasterInputs.variables.checked),
+            roleUsageFontWeightEnabled: !!(outputRoleWeightInput && outputRoleWeightInput.checked),
+            classFlags: activeOutputClassFlags().map((input) => !!input.checked),
+            variableFlags: activeOutputVariableFlags().map((input) => !!input.checked),
+        };
+    }
+
+    function syncOutputQuickModeNotice(visible) {
+        if (!outputQuickModeNotice) {
+            return;
+        }
+
+        outputQuickModeNotice.hidden = !visible;
+    }
+
     function deriveOutputQuickMode() {
-        const classesEnabled = !!(outputMasterInputs.classes && outputMasterInputs.classes.checked);
-        const variablesEnabled = !!(outputMasterInputs.variables && outputMasterInputs.variables.checked);
-        const minimalEnabled = !!(outputMinimalPresetInput && outputMinimalPresetInput.value === '1');
+        return normalizeOutputQuickModePreference(currentOutputQuickModePreference(), currentOutputQuickModeState());
+    }
 
-        if (minimalEnabled && variablesEnabled && !classesEnabled) {
-            return 'minimal';
+    function syncOutputQuickModePreferenceFromState() {
+        const state = currentOutputQuickModeState();
+        const preference = currentOutputQuickModePreference();
+
+        if (preference === 'custom') {
+            setOutputQuickModePreference('custom');
+            return;
         }
 
-        if (variablesEnabled && !classesEnabled) {
-            return 'variables';
+        setOutputQuickModePreference(
+            normalizeOutputQuickModePreference(preference, state)
+        );
+    }
+
+    function ensureOutputLayerCanDisable(layerKey, input) {
+        if (!input || input.checked) {
+            syncOutputQuickModeNotice(false);
+            return true;
         }
 
-        if (classesEnabled && !variablesEnabled) {
-            return 'classes';
+        const state = currentOutputQuickModeState();
+
+        if (layerKey === 'classes') {
+            state.classOutputEnabled = true;
+        } else if (layerKey === 'variables') {
+            state.variableOutputEnabled = true;
         }
 
-        return 'custom';
+        if (canDisableOutputLayer(layerKey, state)) {
+            syncOutputQuickModeNotice(false);
+            return true;
+        }
+
+        input.checked = true;
+        syncOutputQuickModeNotice(true);
+
+        return false;
     }
 
     function syncPillOptionUi() {
@@ -9239,11 +9587,9 @@
     }
 
     function syncOutputQuickModeUi() {
-        const mode = deriveOutputQuickMode();
+        syncOutputQuickModePreferenceFromState();
 
-        if (outputMinimalPresetInput) {
-            outputMinimalPresetInput.value = mode === 'minimal' ? '1' : '0';
-        }
+        const mode = deriveOutputQuickMode();
 
         outputQuickModeInputs.forEach((input) => {
             input.checked = input.value === mode;
@@ -9265,6 +9611,8 @@
             outputMinimalPresetInput.value = minimalMode ? '1' : '0';
         }
 
+        setOutputQuickModePreference(mode);
+
         if (outputMasterInputs.classes) {
             outputMasterInputs.classes.checked = enableClasses;
         }
@@ -9285,7 +9633,7 @@
             }
         });
 
-        if (outputRoleWeightInput && minimalMode) {
+        if (outputRoleWeightInput && mode !== 'custom') {
             outputRoleWeightInput.checked = false;
         }
 
@@ -9303,13 +9651,27 @@
             }
         });
 
+        syncOutputQuickModeNotice(false);
         syncOutputQuickModeUi();
         updateRoleOutputs();
+    }
+
+    function syncUnicodeRangeUi() {
+        if (!unicodeRangeCustomWrap) {
+            return;
+        }
+
+        const customMode = unicodeRangeModeInputs.some((input) => input.checked && input.value === 'custom');
+        unicodeRangeCustomWrap.hidden = !customMode;
     }
 
     function bindOutputSettingsControls() {
         pillOptionInputs.forEach((input) => {
             input.addEventListener('change', syncPillOptionUi);
+        });
+
+        unicodeRangeModeInputs.forEach((input) => {
+            input.addEventListener('change', syncUnicodeRangeUi);
         });
 
         outputQuickModeInputs.forEach((input) => {
@@ -9328,16 +9690,33 @@
             });
         });
 
-        [...outputClassFlagInputs(), ...outputVariableFlagInputs(), ...Object.values(outputMasterInputs).filter(Boolean)].forEach((input) => {
+        [...outputClassFlagInputs(), ...outputVariableFlagInputs()].forEach((input) => {
             input.addEventListener('change', syncOutputSettingsUi);
         });
 
+        if (outputMasterInputs.classes) {
+            outputMasterInputs.classes.addEventListener('change', () => {
+                if (ensureOutputLayerCanDisable('classes', outputMasterInputs.classes)) {
+                    syncOutputSettingsUi();
+                }
+            });
+        }
+
+        if (outputMasterInputs.variables) {
+            outputMasterInputs.variables.addEventListener('change', () => {
+                if (ensureOutputLayerCanDisable('variables', outputMasterInputs.variables)) {
+                    syncOutputSettingsUi();
+                }
+            });
+        }
+
         if (outputRoleWeightInput) {
-            outputRoleWeightInput.addEventListener('change', updateRoleOutputs);
+            outputRoleWeightInput.addEventListener('change', syncOutputSettingsUi);
         }
 
         syncPillOptionUi();
         syncOutputSettingsUi();
+        syncUnicodeRangeUi();
     }
 
     function bindSettingsAutosave() {

@@ -42,7 +42,7 @@ final class CssBuilder
                 : $this->resolveFamilyFontDisplay($familyName, $familyDisplays, $defaultDisplay);
 
             foreach ((array) ($family['faces'] ?? []) as $face) {
-                $rule = $this->buildFaceRule($face, $display);
+                $rule = $this->buildFaceRule($face, $display, $settings);
 
                 if ($rule !== '') {
                     $blocks[] = $rule;
@@ -83,10 +83,11 @@ final class CssBuilder
         array $roles,
         bool $includeMonospace = false,
         array $variableFamilies = [],
-        array $settings = []
+        array $settings = [],
+        bool $includeComments = false
     ): string {
-        $variableSnippet = $this->buildRoleVariableSnippet($roles, $includeMonospace, $variableFamilies, $settings);
-        $usageRules = $this->buildRoleUsageRulesSnippet($roles, $includeMonospace, $settings);
+        $variableSnippet = $this->buildRoleVariableSnippet($roles, $includeMonospace, $variableFamilies, $settings, $includeComments);
+        $usageRules = $this->buildRoleUsageRulesSnippet($roles, $includeMonospace, $settings, $includeComments);
 
         if ($variableSnippet === '' && $usageRules === '') {
             return '';
@@ -107,9 +108,10 @@ final class CssBuilder
         array $roles,
         bool $includeMonospace = false,
         array $variableFamilies = [],
-        array $settings = []
+        array $settings = [],
+        bool $includeComments = false
     ): string {
-        $variableLines = $this->buildRoleVariableLines($roles, $includeMonospace, $variableFamilies, $settings);
+        $variableLines = $this->buildRoleVariableLines($roles, $includeMonospace, $variableFamilies, $settings, $includeComments);
 
         if ($variableLines === []) {
             return '';
@@ -122,9 +124,10 @@ final class CssBuilder
         array $roles,
         bool $includeMonospace = false,
         array $variableFamilies = [],
-        array $settings = []
+        array $settings = [],
+        bool $includeComments = false
     ): string {
-        $variableLines = $this->buildRoleVariableLines($roles, $includeMonospace, $variableFamilies, $settings);
+        $variableLines = $this->buildRoleVariableLines($roles, $includeMonospace, $variableFamilies, $settings, $includeComments);
 
         if ($variableLines === []) {
             return '';
@@ -228,35 +231,53 @@ final class CssBuilder
         array $families = [],
         array $settings = []
     ): string {
-        $blocks = [];
+        $blocks = $this->buildClassOutputBlocks($roles, $includeMonospace, $families, $settings);
 
-        if ($this->classOutputEnabled($settings)) {
-            $roleClasses = $this->buildRoleClassSnippet($roles, $includeMonospace, $settings);
-            $roleAliasClasses = $this->buildRoleAliasClassSnippet($roles, $includeMonospace, $settings);
-            $categoryClasses = $this->buildCategoryAliasClassSnippet($roles, $includeMonospace, $families, $settings);
+        return implode(
+            "\n\n",
+            array_values(
+                array_filter(
+                    array_map(
+                        static fn (array $block): string => (string) ($block['css'] ?? ''),
+                        $blocks
+                    ),
+                    'strlen'
+                )
+            )
+        );
+    }
 
-            if ($roleClasses !== '') {
-                $blocks[] = $roleClasses;
+    public function buildCommentedClassOutputSnippet(
+        array $roles,
+        bool $includeMonospace = false,
+        array $families = [],
+        array $settings = []
+    ): string {
+        $lines = [];
+
+        foreach ($this->buildClassOutputBlocks($roles, $includeMonospace, $families, $settings) as $block) {
+            $css = trim((string) ($block['css'] ?? ''));
+
+            if ($css === '') {
+                continue;
             }
 
-            if ($roleAliasClasses !== '') {
-                $blocks[] = $roleAliasClasses;
+            if ($lines !== []) {
+                $lines[] = '';
             }
 
-            if ($categoryClasses !== '') {
-                $blocks[] = $categoryClasses;
+            $comment = trim((string) ($block['comment'] ?? ''));
+
+            if ($comment !== '') {
+                $lines[] = '/* ' . $comment . ' */';
+            }
+
+            foreach (preg_split("/\r\n|\n|\r/", $css) ?: [$css] as $line) {
+                $lines[] = $line;
             }
         }
 
-        if ($this->classOutputFamiliesEnabled($settings)) {
-            $familyClasses = $this->buildFamilyClassSnippet($families, $settings);
-
-            if ($familyClasses !== '') {
-                $blocks[] = $familyClasses;
-            }
-        }
-
-        return implode("\n\n", $blocks);
+        return implode("\n", $lines);
     }
 
     public function formatOutput(string $css, bool $minify = false): string
@@ -268,12 +289,61 @@ final class CssBuilder
         return $minify ? $this->minify($css) : $css;
     }
 
-    private function buildFaceRule(array $face, string $display): string
+    private function buildClassOutputBlocks(
+        array $roles,
+        bool $includeMonospace = false,
+        array $families = [],
+        array $settings = []
+    ): array {
+        $blocks = [];
+
+        if ($this->classOutputEnabled($settings)) {
+            $roleClasses = $this->buildRoleClassSnippet($roles, $includeMonospace, $settings);
+            $roleAliasClasses = $this->buildRoleAliasClassSnippet($roles, $includeMonospace, $settings);
+            $categoryClasses = $this->buildCategoryAliasClassSnippet($roles, $includeMonospace, $families, $settings);
+
+            if ($roleClasses !== '') {
+                $blocks[] = [
+                    'comment' => 'Role classes',
+                    'css' => $roleClasses,
+                ];
+            }
+
+            if ($roleAliasClasses !== '') {
+                $blocks[] = [
+                    'comment' => 'Role alias classes',
+                    'css' => $roleAliasClasses,
+                ];
+            }
+
+            if ($categoryClasses !== '') {
+                $blocks[] = [
+                    'comment' => 'Category classes',
+                    'css' => $categoryClasses,
+                ];
+            }
+        }
+
+        if ($this->classOutputFamiliesEnabled($settings)) {
+            $familyClasses = $this->buildFamilyClassSnippet($families, $settings);
+
+            if ($familyClasses !== '') {
+                $blocks[] = [
+                    'comment' => 'Family classes',
+                    'css' => $familyClasses,
+                ];
+            }
+        }
+
+        return $blocks;
+    }
+
+    private function buildFaceRule(array $face, string $display, array $settings = []): string
     {
         $family = (string) ($face['family'] ?? '');
         $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
         $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
-        $unicodeRange = trim((string) ($face['unicode_range'] ?? ''));
+        $unicodeRange = FontUtils::resolveFaceUnicodeRange($face, $settings);
         $files = is_array($face['files'] ?? null) ? $face['files'] : [];
         $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
         $variationDefaults = FontUtils::normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes);
@@ -410,7 +480,12 @@ final class CssBuilder
         return in_array($value, $allowed, true) ? $value : $default;
     }
 
-    private function buildRoleUsageRulesSnippet(array $roles, bool $includeMonospace = false, array $settings = []): string
+    private function buildRoleUsageRulesSnippet(
+        array $roles,
+        bool $includeMonospace = false,
+        array $settings = [],
+        bool $includeComments = false
+    ): string
     {
         if ($this->minimalOutputPresetEnabled($settings)) {
             return '';
@@ -430,7 +505,7 @@ final class CssBuilder
         $headingWeightFromAxes = $this->roleUsageWeightComesFromAxis($roles, 'heading');
         $monospaceWeightFromAxes = $this->roleUsageWeightComesFromAxis($roles, 'monospace');
 
-        $lines = [
+        $bodyLines = [
             'body {',
             '  font-family: var(--font-body);',
             '  font-variation-settings: var(--font-body-settings);',
@@ -440,14 +515,13 @@ final class CssBuilder
             $bodyWeightDeclaration = $this->buildRoleWeightDeclaration($bodyWeight, $includeWeightTokens, $includeExtendedVariables, $bodyWeightFromAxes);
 
             if ($bodyWeightDeclaration !== '') {
-                $lines[] = '  font-weight: ' . $bodyWeightDeclaration . ';';
+                $bodyLines[] = '  font-weight: ' . $bodyWeightDeclaration . ';';
             }
         }
 
-        $lines = [
-            ...$lines,
-            '}',
-            '',
+        $bodyLines[] = '}';
+
+        $headingLines = [
             'h1, h2, h3, h4, h5, h6 {',
             '  font-family: var(--font-heading);',
             '  font-variation-settings: var(--font-heading-settings);',
@@ -457,16 +531,24 @@ final class CssBuilder
             $headingWeightDeclaration = $this->buildRoleWeightDeclaration($headingWeight, $includeWeightTokens, $includeExtendedVariables, $headingWeightFromAxes);
 
             if ($headingWeightDeclaration !== '') {
-                $lines[] = '  font-weight: ' . $headingWeightDeclaration . ';';
+                $headingLines[] = '  font-weight: ' . $headingWeightDeclaration . ';';
             }
         }
 
-        $lines[] = '}';
+        $headingLines[] = '}';
+        $blocks = [
+            [
+                'comment' => 'Body text',
+                'lines' => $bodyLines,
+            ],
+            [
+                'comment' => 'Headings',
+                'lines' => $headingLines,
+            ],
+        ];
 
         if ($includeMonospace) {
-            $lines = [
-                ...$lines,
-                '',
+            $monospaceLines = [
                 'code, pre {',
                 '  font-family: var(--font-monospace);',
                 '  font-variation-settings: var(--font-monospace-settings);',
@@ -476,28 +558,50 @@ final class CssBuilder
                 $monospaceWeightDeclaration = $this->buildRoleWeightDeclaration($monospaceWeight, $includeWeightTokens, $includeExtendedVariables, $monospaceWeightFromAxes);
 
                 if ($monospaceWeightDeclaration !== '') {
-                    $lines[] = '  font-weight: ' . $monospaceWeightDeclaration . ';';
+                    $monospaceLines[] = '  font-weight: ' . $monospaceWeightDeclaration . ';';
                 }
             }
 
-            $lines[] = '}';
+            $monospaceLines[] = '}';
+            $blocks[] = [
+                'comment' => 'Code blocks',
+                'lines' => $monospaceLines,
+            ];
         }
 
-        return implode("\n", $lines);
+        if ($includeComments) {
+            return $this->buildCommentedRuleSnippet($blocks);
+        }
+
+        return implode(
+            "\n\n",
+            array_values(
+                array_filter(
+                    array_map(
+                        static fn (array $block): string => implode("\n", (array) ($block['lines'] ?? [])),
+                        $blocks
+                    ),
+                    'strlen'
+                )
+            )
+        );
     }
 
     private function buildRoleVariableLines(
         array $roles,
         bool $includeMonospace = false,
         array $variableFamilies = [],
-        array $settings = []
+        array $settings = [],
+        bool $includeComments = false
     ): array {
         $headingFamily = trim((string) ($roles['heading'] ?? ''));
         $bodyFamily = trim((string) ($roles['body'] ?? ''));
         $monospaceFamily = trim((string) ($roles['monospace'] ?? ''));
+        $roleDeclarations = [];
+        $variationDeclarations = [];
 
         if ($this->minimalOutputPresetEnabled($settings)) {
-            $declarations = [
+            $roleDeclarations = [
                 '--font-heading' => FontUtils::buildFontStack(
                     $headingFamily,
                     (string) ($roles['heading_fallback'] ?? 'sans-serif')
@@ -508,86 +612,105 @@ final class CssBuilder
                 ),
             ];
 
-            $this->appendRoleVariationDeclarations($declarations, $roles, 'heading');
-            $this->appendRoleVariationDeclarations($declarations, $roles, 'body');
-
-            $lines = [':root {'];
-
-            foreach ($declarations as $property => $value) {
-                $lines[] = "  {$property}: {$value};";
+            if ($includeMonospace) {
+                $roleDeclarations['--font-monospace'] = FontUtils::buildFontStack(
+                    $monospaceFamily,
+                    (string) ($roles['monospace_fallback'] ?? 'monospace')
+                );
             }
 
-            $lines[] = '}';
+            $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'heading');
+            $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'body');
 
-            return $lines;
+            if ($includeMonospace) {
+                $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'monospace');
+            }
+
+            if (!$includeComments) {
+                $declarations = [];
+                $this->appendDeclarations($declarations, $roleDeclarations);
+                $this->appendDeclarations($declarations, $variationDeclarations);
+
+                return $this->buildRootDeclarationLines($declarations);
+            }
+
+            return $this->buildCommentedVariableLines([
+                'Role font stacks' => $roleDeclarations,
+                'Role variation settings' => $variationDeclarations,
+            ]);
         }
 
         $includeExtendedVariables = $this->extendedVariableOutputEnabled($settings);
-        $declarations = $this->buildFamilyVariableDeclarations($variableFamilies, $settings);
-
-        if ($includeExtendedVariables) {
-            $this->appendDeclarations(
-                $declarations,
-                $this->buildCategoryAliasDeclarations($roles, $includeMonospace, $variableFamilies, $settings)
-            );
-        }
+        $familyDeclarations = $this->buildFamilyVariableDeclarations($variableFamilies, $settings);
+        $categoryAliasDeclarations = $includeExtendedVariables
+            ? $this->buildCategoryAliasDeclarations($roles, $includeMonospace, $variableFamilies, $settings)
+            : [];
+        $roleAliasDeclarations = [];
+        $weightDeclarations = [];
 
         if ($headingFamily !== '') {
-            $declarations['--font-heading'] = FontUtils::buildFontStack(
+            $roleDeclarations['--font-heading'] = FontUtils::buildFontStack(
                 $headingFamily,
                 (string) ($roles['heading_fallback'] ?? 'sans-serif')
             );
         }
 
         if ($bodyFamily !== '') {
-            $declarations['--font-body'] = FontUtils::buildFontStack(
+            $roleDeclarations['--font-body'] = FontUtils::buildFontStack(
                 $bodyFamily,
                 (string) ($roles['body_fallback'] ?? 'sans-serif')
             );
         }
 
         if ($includeMonospace) {
-            $declarations['--font-monospace'] = FontUtils::buildFontStack(
+            $roleDeclarations['--font-monospace'] = FontUtils::buildFontStack(
                 $monospaceFamily,
                 (string) ($roles['monospace_fallback'] ?? 'monospace')
             );
         }
 
-        $this->appendRoleVariationDeclarations($declarations, $roles, 'heading');
-        $this->appendRoleVariationDeclarations($declarations, $roles, 'body');
+        $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'heading');
+        $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'body');
 
         if ($includeMonospace) {
-            $this->appendRoleVariationDeclarations($declarations, $roles, 'monospace');
+            $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'monospace');
         }
 
         if ($this->extendedVariableRoleAliasesEnabled($settings)) {
             if ($bodyFamily !== '') {
-                $declarations['--font-interface'] = 'var(--font-body)';
-                $declarations['--font-ui'] = 'var(--font-body)';
+                $roleAliasDeclarations['--font-interface'] = 'var(--font-body)';
+                $roleAliasDeclarations['--font-ui'] = 'var(--font-body)';
             }
 
             if ($includeMonospace && trim((string) ($roles['monospace'] ?? '')) !== '') {
-                $declarations['--font-code'] = 'var(--font-monospace)';
+                $roleAliasDeclarations['--font-code'] = 'var(--font-monospace)';
             }
-
         }
 
         if ($this->extendedVariableWeightTokensEnabled($settings)) {
-            $this->appendDeclarations(
-                $declarations,
-                $this->buildWeightVariableDeclarations($variableFamilies)
-            );
+            $weightDeclarations = $this->buildWeightVariableDeclarations($variableFamilies);
         }
 
-        $lines = [':root {'];
+        $declarations = [];
+        $this->appendDeclarations($declarations, $familyDeclarations);
+        $this->appendDeclarations($declarations, $categoryAliasDeclarations);
+        $this->appendDeclarations($declarations, $roleDeclarations);
+        $this->appendDeclarations($declarations, $variationDeclarations);
+        $this->appendDeclarations($declarations, $roleAliasDeclarations);
+        $this->appendDeclarations($declarations, $weightDeclarations);
 
-        foreach ($declarations as $property => $value) {
-            $lines[] = "  {$property}: {$value};";
+        if (!$includeComments) {
+            return $this->buildRootDeclarationLines($declarations);
         }
 
-        $lines[] = '}';
-
-        return $lines;
+        return $this->buildCommentedVariableLines([
+            'Family font stacks' => $familyDeclarations,
+            'Category aliases' => $categoryAliasDeclarations,
+            'Role font stacks' => $roleDeclarations,
+            'Role variation settings' => $variationDeclarations,
+            'Role aliases' => $roleAliasDeclarations,
+            'Weight tokens' => $weightDeclarations,
+        ]);
     }
 
     private function buildFamilyVariableDeclarations(array $families, array $settings): array
@@ -624,6 +747,76 @@ final class CssBuilder
 
             $target[$property] = $value;
         }
+    }
+
+    private function buildRootDeclarationLines(array $declarations): array
+    {
+        $lines = [':root {'];
+
+        foreach ($declarations as $property => $value) {
+            $lines[] = "  {$property}: {$value};";
+        }
+
+        $lines[] = '}';
+
+        return $lines;
+    }
+
+    private function buildCommentedVariableLines(array $groups): array
+    {
+        $lines = [':root {'];
+        $hasContent = false;
+
+        foreach ($groups as $label => $declarations) {
+            if (!is_array($declarations) || $declarations === []) {
+                continue;
+            }
+
+            if ($hasContent) {
+                $lines[] = '';
+            }
+
+            $lines[] = '  /* ' . $label . ' */';
+
+            foreach ($declarations as $property => $value) {
+                $lines[] = "  {$property}: {$value};";
+            }
+
+            $hasContent = true;
+        }
+
+        $lines[] = '}';
+
+        return $lines;
+    }
+
+    private function buildCommentedRuleSnippet(array $blocks): string
+    {
+        $lines = [];
+
+        foreach ($blocks as $block) {
+            $ruleLines = is_array($block['lines'] ?? null) ? $block['lines'] : [];
+
+            if ($ruleLines === []) {
+                continue;
+            }
+
+            if ($lines !== []) {
+                $lines[] = '';
+            }
+
+            $comment = trim((string) ($block['comment'] ?? ''));
+
+            if ($comment !== '') {
+                $lines[] = '/* ' . $comment . ' */';
+            }
+
+            foreach ($ruleLines as $line) {
+                $lines[] = (string) $line;
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     private function buildCategoryAliasDeclarations(array $roles, bool $includeMonospace, array $families, array $settings = []): array

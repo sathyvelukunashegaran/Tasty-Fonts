@@ -18,6 +18,16 @@ final class SettingsRepository
     public const OPTION_GOOGLE_API_KEY_DATA = 'tasty_fonts_google_api_key_data';
     public const LEGACY_OPTION_SETTINGS = 'etch_fonts_settings';
     public const LEGACY_OPTION_ROLES = 'etch_fonts_roles';
+    private const OUTPUT_QUICK_MODE_MINIMAL = 'minimal';
+    private const OUTPUT_QUICK_MODE_VARIABLES = 'variables';
+    private const OUTPUT_QUICK_MODE_CLASSES = 'classes';
+    private const OUTPUT_QUICK_MODE_CUSTOM = 'custom';
+    private const OUTPUT_QUICK_MODE_VALUES = [
+        self::OUTPUT_QUICK_MODE_MINIMAL,
+        self::OUTPUT_QUICK_MODE_VARIABLES,
+        self::OUTPUT_QUICK_MODE_CLASSES,
+        self::OUTPUT_QUICK_MODE_CUSTOM,
+    ];
     private const ROLE_FAMILY_KEYS = ['heading', 'body', 'monospace'];
     private const CLASS_OUTPUT_BOOLEAN_FIELDS = [
         'class_output_enabled',
@@ -38,6 +48,9 @@ final class SettingsRepository
         'delete_uploaded_files_on_uninstall' => false,
         'css_delivery_mode' => 'file',
         'font_display' => 'optional',
+        'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_OFF,
+        'unicode_range_custom_value' => '',
+        'output_quick_mode_preference' => self::OUTPUT_QUICK_MODE_MINIMAL,
         'class_output_enabled' => false,
         'class_output_role_heading_enabled' => true,
         'class_output_role_body_enabled' => true,
@@ -117,6 +130,8 @@ final class SettingsRepository
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($storedSettings, $settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
         $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
+        $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF));
+        $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue((string) ($settings['unicode_range_custom_value'] ?? ''));
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
@@ -159,6 +174,7 @@ final class SettingsRepository
         $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
         $settings['delete_uploaded_files_on_uninstall'] = !empty($settings['delete_uploaded_files_on_uninstall']);
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings['output_quick_mode_preference'] = $this->resolveOutputQuickModePreference($storedSettings, $settings);
 
         return $this->cacheSettings($settings);
     }
@@ -196,6 +212,21 @@ final class SettingsRepository
 
         if (isset($input['font_display'])) {
             $settings['font_display'] = $this->normalizeFontDisplay(sanitize_text_field((string) $input['font_display']));
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('unicode_range_mode', $input)) {
+            $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode((string) $input['unicode_range_mode']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('unicode_range_custom_value', $input)) {
+            $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue((string) $input['unicode_range_custom_value']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('output_quick_mode_preference', $input)) {
+            $settings['output_quick_mode_preference'] = $this->sanitizeOutputQuickModePreference($input['output_quick_mode_preference']);
             $settingsChanged = true;
         }
 
@@ -309,7 +340,18 @@ final class SettingsRepository
             $settingsChanged = true;
         }
 
+        if (
+            !array_key_exists('output_quick_mode_preference', $input)
+            && !empty($input['minimal_output_preset_enabled'])
+        ) {
+            $settings['output_quick_mode_preference'] = self::OUTPUT_QUICK_MODE_MINIMAL;
+        }
+
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
+            (string) ($settings['output_quick_mode_preference'] ?? ''),
+            $settings
+        );
 
         if ($settingsChanged) {
             update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($settings), false);
@@ -867,6 +909,10 @@ final class SettingsRepository
 
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($settings));
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
+            (string) ($settings['output_quick_mode_preference'] ?? ''),
+            $settings
+        );
         $settings = $this->withoutGoogleApiKeyData($settings);
 
         update_option(self::OPTION_SETTINGS, $settings, false);
@@ -886,6 +932,120 @@ final class SettingsRepository
         $settings['per_variant_font_variables_enabled'] = true;
 
         return $settings;
+    }
+
+    private function resolveOutputQuickModePreference(array $storedSettings, array $settings): string
+    {
+        $preference = array_key_exists('output_quick_mode_preference', $storedSettings)
+            ? $this->sanitizeOutputQuickModePreference($storedSettings['output_quick_mode_preference'])
+            : '';
+
+        return $this->normalizeOutputQuickModePreference($preference, $settings);
+    }
+
+    private function normalizeOutputQuickModePreference(string $preference, array $settings): string
+    {
+        $preference = $this->sanitizeOutputQuickModePreference($preference);
+        $exactMode = $this->deriveExactOutputQuickMode($settings);
+
+        if ($preference === self::OUTPUT_QUICK_MODE_CUSTOM) {
+            return self::OUTPUT_QUICK_MODE_CUSTOM;
+        }
+
+        if ($preference === '') {
+            return $exactMode;
+        }
+
+        return $exactMode === $preference
+            ? $preference
+            : self::OUTPUT_QUICK_MODE_CUSTOM;
+    }
+
+    private function deriveExactOutputQuickMode(array $settings): string
+    {
+        if (!empty($settings['minimal_output_preset_enabled'])) {
+            return self::OUTPUT_QUICK_MODE_MINIMAL;
+        }
+
+        if (
+            empty($settings['class_output_enabled'])
+            && !empty($settings['per_variant_font_variables_enabled'])
+            && empty($settings['role_usage_font_weight_enabled'])
+            && $this->allVariableSubgroupsEnabled($settings)
+        ) {
+            return self::OUTPUT_QUICK_MODE_VARIABLES;
+        }
+
+        if (
+            !empty($settings['class_output_enabled'])
+            && empty($settings['per_variant_font_variables_enabled'])
+            && empty($settings['role_usage_font_weight_enabled'])
+            && $this->allClassSubgroupsEnabled($settings)
+        ) {
+            return self::OUTPUT_QUICK_MODE_CLASSES;
+        }
+
+        return self::OUTPUT_QUICK_MODE_CUSTOM;
+    }
+
+    private function allVariableSubgroupsEnabled(array $settings): bool
+    {
+        $fields = [
+            'extended_variable_weight_tokens_enabled',
+            'extended_variable_role_aliases_enabled',
+            'extended_variable_category_sans_enabled',
+            'extended_variable_category_serif_enabled',
+        ];
+
+        if (!empty($settings['monospace_role_enabled'])) {
+            $fields[] = 'extended_variable_category_mono_enabled';
+        }
+
+        foreach ($fields as $field) {
+            if (empty($settings[$field])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function allClassSubgroupsEnabled(array $settings): bool
+    {
+        $fields = [
+            'class_output_role_heading_enabled',
+            'class_output_role_body_enabled',
+            'class_output_role_alias_interface_enabled',
+            'class_output_role_alias_ui_enabled',
+            'class_output_category_sans_enabled',
+            'class_output_category_serif_enabled',
+            'class_output_families_enabled',
+        ];
+
+        if (!empty($settings['monospace_role_enabled'])) {
+            $fields[] = 'class_output_role_monospace_enabled';
+            $fields[] = 'class_output_role_alias_code_enabled';
+            $fields[] = 'class_output_category_mono_enabled';
+        }
+
+        foreach ($fields as $field) {
+            if (empty($settings[$field])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function sanitizeOutputQuickModePreference(mixed $value): string
+    {
+        $value = strtolower(trim((string) $value));
+        $value = preg_replace('/[^a-z0-9_-]+/', '', $value);
+        $value = is_string($value) ? $value : '';
+
+        return in_array($value, self::OUTPUT_QUICK_MODE_VALUES, true)
+            ? $value
+            : '';
     }
 
     private function hasExplicitNonMinimalOutputInput(array $input): bool

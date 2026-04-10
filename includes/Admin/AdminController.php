@@ -531,6 +531,18 @@ final class AdminController
         $clearGoogleKey = !empty($submittedValues['tasty_fonts_clear_google_api_key']);
         $settingsInput = $this->buildSettingsSaveInput($submittedValues);
         $settingsInput = $this->preserveUnavailableIntegrationSettings($settingsInput);
+        $unicodeRangeValidation = $this->validateUnicodeRangeSettingsInput($settingsInput, $previousSettings);
+
+        if (is_wp_error($unicodeRangeValidation)) {
+            return $unicodeRangeValidation;
+        }
+
+        $outputValidation = $this->validateOutputSettingsInput($settingsInput, $previousSettings);
+
+        if (is_wp_error($outputValidation)) {
+            return $outputValidation;
+        }
+
         $savedSettings = $this->settings->saveSettings($settingsInput);
         $variableFontsToggled = !empty($previousSettings['variable_fonts_enabled']) !== !empty($savedSettings['variable_fonts_enabled']);
 
@@ -559,6 +571,11 @@ final class AdminController
 
         $savedSettings = $this->settings->getSettings();
         $reloadRequired = $this->settingsChangeRequiresReload($previousSettings, $savedSettings);
+        $catalog = $this->catalog->getCatalog();
+        $availableFamilies = $this->buildSelectableFamilyNames($catalog);
+        $roles = $this->settings->getRoles($availableFamilies);
+        $appliedRoles = $this->settings->getAppliedRoles($availableFamilies);
+        $outputPanels = $this->buildOutputPanels($roles, $savedSettings, $catalog, $appliedRoles);
 
         if ($clearGoogleKey) {
             $this->settings->saveGoogleApiKeyStatus('empty');
@@ -569,6 +586,7 @@ final class AdminController
                 'message' => $message,
                 'settings' => $this->settings->getSettings(),
                 'reload_required' => $reloadRequired,
+                'output_panels' => $outputPanels,
             ];
         }
 
@@ -588,6 +606,7 @@ final class AdminController
                     'message' => $message,
                     'settings' => $this->settings->getSettings(),
                     'reload_required' => $reloadRequired,
+                    'output_panels' => $outputPanels,
                 ];
             }
 
@@ -614,6 +633,7 @@ final class AdminController
             'message' => $settingsMessage,
             'settings' => $savedSettings,
             'reload_required' => $reloadRequired,
+            'output_panels' => $outputPanels,
         ];
     }
 
@@ -1238,6 +1258,18 @@ final class AdminController
             );
         }
 
+        if (($before['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF) !== ($after['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF)) {
+            /* translators: %s is the selected unicode-range output mode label. */
+            $changes[] = sprintf(
+                __('unicode-range output set to %s', 'tasty-fonts'),
+                $this->formatUnicodeRangeModeLabel((string) ($after['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF))
+            );
+        }
+
+        if (($before['unicode_range_custom_value'] ?? '') !== ($after['unicode_range_custom_value'] ?? '')) {
+            $changes[] = __('custom unicode-range updated', 'tasty-fonts');
+        }
+
         if (!empty($before['class_output_enabled']) !== !empty($after['class_output_enabled'])) {
             $changes[] = !empty($after['class_output_enabled'])
                 ? __('class output enabled', 'tasty-fonts')
@@ -1365,6 +1397,8 @@ final class AdminController
     {
         return ($before['css_delivery_mode'] ?? 'file') !== ($after['css_delivery_mode'] ?? 'file')
             || ($before['font_display'] ?? 'optional') !== ($after['font_display'] ?? 'optional')
+            || ($before['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF) !== ($after['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF)
+            || ($before['unicode_range_custom_value'] ?? '') !== ($after['unicode_range_custom_value'] ?? '')
             || !empty($before['class_output_enabled']) !== !empty($after['class_output_enabled'])
             || $this->classOutputSubsettingsDiffer($before, $after)
             || !empty($before['minify_css_output']) !== !empty($after['minify_css_output'])
@@ -1452,6 +1486,21 @@ final class AdminController
         return $this->pageContextBuilder->buildCssDeliveryModeOptions();
     }
 
+    private function formatUnicodeRangeModeLabel(string $mode): string
+    {
+        if (!isset($this->pageContextBuilder)) {
+            return match (FontUtils::normalizeUnicodeRangeMode($mode)) {
+                FontUtils::UNICODE_RANGE_MODE_LATIN_BASIC => __('Basic Latin', 'tasty-fonts'),
+                FontUtils::UNICODE_RANGE_MODE_LATIN_EXTENDED => __('Latin Extended', 'tasty-fonts'),
+                FontUtils::UNICODE_RANGE_MODE_OFF => __('Off', 'tasty-fonts'),
+                FontUtils::UNICODE_RANGE_MODE_CUSTOM => __('Custom', 'tasty-fonts'),
+                default => __('Keep Imported Ranges', 'tasty-fonts'),
+            };
+        }
+
+        return $this->pageContextBuilder->formatUnicodeRangeModeLabel($mode);
+    }
+
     private function buildFamilyFontDisplayOptions(string $globalDisplay): array
     {
         if (!isset($this->pageContextBuilder)) {
@@ -1512,6 +1561,110 @@ final class AdminController
             SettingsRepository::UPDATE_CHANNEL_NIGHTLY => __('Nightly', 'tasty-fonts'),
             default => __('Stable', 'tasty-fonts'),
         };
+    }
+
+    private function validateUnicodeRangeSettingsInput(array &$settingsInput, array $previousSettings): ?WP_Error
+    {
+        $nextMode = array_key_exists('unicode_range_mode', $settingsInput)
+            ? FontUtils::normalizeUnicodeRangeMode((string) $settingsInput['unicode_range_mode'])
+            : FontUtils::normalizeUnicodeRangeMode((string) ($previousSettings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF));
+        $customValue = array_key_exists('unicode_range_custom_value', $settingsInput)
+            ? (string) $settingsInput['unicode_range_custom_value']
+            : (string) ($previousSettings['unicode_range_custom_value'] ?? '');
+        $customValue = FontUtils::normalizeUnicodeRangeValue($customValue);
+
+        if ($customValue !== '' && !FontUtils::unicodeRangeValueIsValid($customValue)) {
+            return new WP_Error(
+                'tasty_fonts_invalid_unicode_range',
+                __('Custom unicode-range values must be a comma-separated list of U+XXXX, U+XXXX-YYYY, or U+XX? tokens.', 'tasty-fonts')
+            );
+        }
+
+        if ($nextMode === FontUtils::UNICODE_RANGE_MODE_CUSTOM && $customValue === '') {
+            return new WP_Error(
+                'tasty_fonts_unicode_range_required',
+                __('Enter a custom unicode-range before selecting Custom output.', 'tasty-fonts')
+            );
+        }
+
+        if (array_key_exists('unicode_range_mode', $settingsInput)) {
+            $settingsInput['unicode_range_mode'] = $nextMode;
+        }
+
+        if (array_key_exists('unicode_range_custom_value', $settingsInput)) {
+            $settingsInput['unicode_range_custom_value'] = $customValue;
+        }
+
+        return null;
+    }
+
+    private function validateOutputSettingsInput(array $settingsInput, array $previousSettings): ?WP_Error
+    {
+        $nextSettings = $previousSettings;
+
+        foreach (
+            [
+                'minimal_output_preset_enabled',
+                'class_output_enabled',
+                'per_variant_font_variables_enabled',
+            ] as $field
+        ) {
+            if (array_key_exists($field, $settingsInput)) {
+                $nextSettings[$field] = !empty($settingsInput[$field]);
+            }
+        }
+
+        if (
+            !array_key_exists('minimal_output_preset_enabled', $settingsInput)
+            && $this->hasExplicitNonMinimalOutputInput($settingsInput)
+        ) {
+            $nextSettings['minimal_output_preset_enabled'] = false;
+        }
+
+        if (!empty($nextSettings['minimal_output_preset_enabled'])) {
+            return null;
+        }
+
+        if (!empty($nextSettings['class_output_enabled']) || !empty($nextSettings['per_variant_font_variables_enabled'])) {
+            return null;
+        }
+
+        return new WP_Error(
+            'tasty_fonts_output_required',
+            __('Keep either font variables or utility classes enabled before saving output settings.', 'tasty-fonts')
+        );
+    }
+
+    private function hasExplicitNonMinimalOutputInput(array $settingsInput): bool
+    {
+        foreach (
+            [
+                'class_output_enabled',
+                'class_output_role_heading_enabled',
+                'class_output_role_body_enabled',
+                'class_output_role_monospace_enabled',
+                'class_output_role_alias_interface_enabled',
+                'class_output_role_alias_ui_enabled',
+                'class_output_role_alias_code_enabled',
+                'class_output_category_sans_enabled',
+                'class_output_category_serif_enabled',
+                'class_output_category_mono_enabled',
+                'class_output_families_enabled',
+                'role_usage_font_weight_enabled',
+                'per_variant_font_variables_enabled',
+                'extended_variable_weight_tokens_enabled',
+                'extended_variable_role_aliases_enabled',
+                'extended_variable_category_sans_enabled',
+                'extended_variable_category_serif_enabled',
+                'extended_variable_category_mono_enabled',
+            ] as $field
+        ) {
+            if (array_key_exists($field, $settingsInput)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function assetVersionFor(string $relativePath = ''): string
@@ -1996,6 +2149,9 @@ final class AdminController
                 'tasty_fonts_clear_google_api_key',
                 'css_delivery_mode',
                 'font_display',
+                'unicode_range_mode',
+                'unicode_range_custom_value',
+                'output_quick_mode_preference',
                 'preview_sentence',
                 'update_channel',
             ] as $field

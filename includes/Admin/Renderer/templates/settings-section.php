@@ -130,6 +130,46 @@
                                                     <?php endforeach; ?>
                                                 </div>
                                             </div>
+                                            <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice">
+                                                <div class="tasty-fonts-output-settings-submenu-copy">
+                                                    <h4><?php esc_html_e('Unicode Range Output', 'tasty-fonts'); ?></h4>
+                                                    <?php if ($showSettingsDescriptions): ?>
+                                                        <p><?php esc_html_e('Controls how unicode-range is emitted in generated output. This affects emitted CSS and editor payloads only, not the stored library metadata.', 'tasty-fonts'); ?></p>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="tasty-fonts-output-quick-options" role="radiogroup" aria-label="<?php esc_attr_e('Unicode range output', 'tasty-fonts'); ?>">
+                                                    <?php foreach ($unicodeRangeModeOptions as $option): ?>
+                                                        <?php $optionValue = (string) ($option['value'] ?? ''); ?>
+                                                        <label class="tasty-fonts-output-quick-option<?php echo $unicodeRangeMode === $optionValue ? ' is-active' : ''; ?>" data-pill-option>
+                                                            <input
+                                                                type="radio"
+                                                                id="tasty-fonts-unicode-range-mode-<?php echo esc_attr($optionValue); ?>"
+                                                                name="unicode_range_mode"
+                                                                value="<?php echo esc_attr($optionValue); ?>"
+                                                                data-pill-option-input
+                                                                data-unicode-range-mode
+                                                                <?php checked($unicodeRangeMode, $optionValue); ?>
+                                                            >
+                                                            <span><?php echo esc_html((string) ($option['label'] ?? '')); ?></span>
+                                                        </label>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </div>
+                                            <div class="tasty-fonts-output-settings-text-field" data-unicode-range-custom-wrap <?php echo $unicodeRangeCustomVisible ? '' : 'hidden'; ?>>
+                                                <label class="tasty-fonts-output-settings-text-label" for="tasty-fonts-unicode-range-custom-value">
+                                                    <span class="tasty-fonts-output-settings-text-title"><?php esc_html_e('Custom Unicode Range', 'tasty-fonts'); ?></span>
+                                                    <?php if ($showSettingsDescriptions): ?>
+                                                        <span class="tasty-fonts-output-settings-text-description"><?php esc_html_e('Use a comma-separated list of U+XXXX, U+XXXX-YYYY, or U+XX? tokens.', 'tasty-fonts'); ?></span>
+                                                    <?php endif; ?>
+                                                </label>
+                                                <textarea
+                                                    id="tasty-fonts-unicode-range-custom-value"
+                                                    name="unicode_range_custom_value"
+                                                    rows="3"
+                                                    class="tasty-fonts-output-settings-textarea"
+                                                    data-unicode-range-custom
+                                                ><?php echo esc_textarea($unicodeRangeCustomValue); ?></textarea>
+                                            </div>
                                             <input type="hidden" name="minify_css_output" value="0">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                                 <input
@@ -186,10 +226,13 @@
                                                 <div class="tasty-fonts-output-settings-submenu-copy">
                                                     <h4><?php esc_html_e('Output Preset', 'tasty-fonts'); ?></h4>
                                                     <?php if ($showSettingsDescriptions): ?>
-                                                        <p><?php esc_html_e('Use a preset for the common cases. Minimal emits only --font-heading and --font-body. Choose custom to open the detailed controls below with both outputs enabled by default.', 'tasty-fonts'); ?></p>
+                                                        <p><?php echo esc_html($monospaceRoleEnabled
+                                                            ? __('Use a preset for the common cases. Minimal emits the core role variables, including --font-monospace when the monospace role is enabled. Choose custom to open the detailed controls below with both outputs enabled by default.', 'tasty-fonts')
+                                                            : __('Use a preset for the common cases. Minimal emits the core role variables. Choose custom to open the detailed controls below with both outputs enabled by default.', 'tasty-fonts')); ?></p>
                                                     <?php endif; ?>
                                                 </div>
                                                 <input type="hidden" name="minimal_output_preset_enabled" value="<?php echo $minimalOutputPresetEnabled ? '1' : '0'; ?>" data-output-minimal-preset>
+                                                <input type="hidden" name="output_quick_mode_preference" value="<?php echo esc_attr($outputQuickMode); ?>" data-output-quick-mode-preference>
                                                 <div class="tasty-fonts-output-quick-options" role="radiogroup" aria-label="<?php esc_attr_e('Output quick mode', 'tasty-fonts'); ?>">
                                                     <?php foreach ([
                                                         'minimal' => __('Minimal', 'tasty-fonts'),
@@ -209,6 +252,16 @@
                                                             <span><?php echo esc_html($quickModeLabel); ?></span>
                                                         </label>
                                                     <?php endforeach; ?>
+                                                </div>
+                                                <div
+                                                    class="tasty-fonts-page-notice tasty-fonts-inline-note--warning tasty-fonts-output-quick-notice"
+                                                    data-output-quick-mode-notice
+                                                    role="status"
+                                                    aria-live="polite"
+                                                    hidden
+                                                >
+                                                    <strong><?php esc_html_e('At least one output layer must stay enabled.', 'tasty-fonts'); ?></strong>
+                                                    <span><?php esc_html_e('Keep either font variables or utility classes on while customizing output.', 'tasty-fonts'); ?></span>
                                                 </div>
                                             </div>
 

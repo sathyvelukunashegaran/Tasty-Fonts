@@ -2,13 +2,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+    canDisableOutputLayer,
     describeFontType,
+    deriveExactOutputQuickMode,
     escapeFontFamily,
     getTabNavigationTargetIndex,
     hasStaticFontMetadata,
     hasVariableFontMetadata,
+    normalizeOutputQuickModePreference,
     roleStatesMatch,
     sanitizeFallback,
+    sanitizeOutputQuickModePreference,
     slugify,
 } = require('../../assets/js/admin-contracts.js');
 
@@ -139,4 +143,81 @@ test('admin contracts detect pending live changes when a role delivery really di
         ),
         false
     );
+});
+
+test('admin contracts derive exact output quick modes from explicit output shapes', () => {
+    assert.equal(
+        deriveExactOutputQuickMode({
+            minimalEnabled: true,
+            classOutputEnabled: false,
+            variableOutputEnabled: true,
+            roleUsageFontWeightEnabled: false,
+            classFlags: [false, false],
+            variableFlags: [false, false],
+        }),
+        'minimal'
+    );
+    assert.equal(
+        deriveExactOutputQuickMode({
+            minimalEnabled: false,
+            classOutputEnabled: false,
+            variableOutputEnabled: true,
+            roleUsageFontWeightEnabled: false,
+            variableFlags: [true, true, true],
+        }),
+        'variables'
+    );
+    assert.equal(
+        deriveExactOutputQuickMode({
+            minimalEnabled: false,
+            classOutputEnabled: true,
+            variableOutputEnabled: false,
+            roleUsageFontWeightEnabled: false,
+            classFlags: [true, true, true],
+        }),
+        'classes'
+    );
+    assert.equal(
+        deriveExactOutputQuickMode({
+            minimalEnabled: false,
+            classOutputEnabled: false,
+            variableOutputEnabled: true,
+            roleUsageFontWeightEnabled: true,
+            variableFlags: [true, true, true],
+        }),
+        'custom'
+    );
+});
+
+test('admin contracts keep custom sticky and coerce stale non-custom preferences', () => {
+    const variableOnlyState = {
+        minimalEnabled: false,
+        classOutputEnabled: false,
+        variableOutputEnabled: true,
+        roleUsageFontWeightEnabled: false,
+        variableFlags: [true, true, true],
+    };
+
+    assert.equal(normalizeOutputQuickModePreference('', variableOnlyState), 'variables');
+    assert.equal(normalizeOutputQuickModePreference('variables', variableOnlyState), 'variables');
+    assert.equal(normalizeOutputQuickModePreference('custom', variableOnlyState), 'custom');
+    assert.equal(
+        normalizeOutputQuickModePreference('variables', {
+            ...variableOnlyState,
+            variableFlags: [true, false, true],
+        }),
+        'custom'
+    );
+});
+
+test('admin contracts block disabling the last remaining output layer', () => {
+    assert.equal(canDisableOutputLayer('classes', { classOutputEnabled: true, variableOutputEnabled: false }), false);
+    assert.equal(canDisableOutputLayer('variables', { classOutputEnabled: false, variableOutputEnabled: true }), false);
+    assert.equal(canDisableOutputLayer('variables', { classOutputEnabled: true, variableOutputEnabled: true }), true);
+});
+
+test('admin contracts sanitize output quick mode preferences', () => {
+    assert.equal(sanitizeOutputQuickModePreference(' Custom '), 'custom');
+    assert.equal(sanitizeOutputQuickModePreference('variables'), 'variables');
+    assert.equal(sanitizeOutputQuickModePreference('unsupported'), '');
 });

@@ -66,7 +66,7 @@ The admin UI is organized into four top-level pages:
 
 ### Settings
 
-- `Output`: adjust CSS delivery mode, global `font-display`, minification, preloads, connection hints, the minimal output preset, variable output, and utility class output.
+- `Output`: adjust CSS delivery mode, global `font-display`, unicode-range output, minification, preloads, connection hints, the minimal output preset, variable output, and utility class output.
 - `Integrations`: manage Block Editor Font Library sync, Automatic.css font-role sync, and the Bricks/Oxygen builder integrations.
 - `Behavior`: control monospace-role support, onboarding hints, and uninstall cleanup.
 - `Developer`: clear caches, reset notices, restore plugin defaults, wipe the managed library, and reset integration detection with explicit confirmation phrases.
@@ -115,14 +115,15 @@ Each family in the library can store one or more delivery profiles. The active d
 Tasty Custom Fonts can generate:
 
 - role variables such as `--font-heading`, `--font-body`, and `--font-monospace`
-- a minimal output preset that emits only the core heading/body variables
+- a minimal output preset that emits only the core role variables, including monospace when that role is enabled
 - optional family variables and category aliases
 - optional global weight tokens
 - optional role font-weight usage rules for heading/body selectors
 - optional utility classes for roles, aliases, categories, and families
+- configurable unicode-range output, including preserved provider subsets, Latin-focused presets, or a custom override
 - minified or readable CSS output depending on settings
 
-Per-family fallback stacks and per-family `font-display` overrides are managed from the library, while the global output model lives in the Settings page.
+Per-family fallback stacks and per-family `font-display` overrides are managed from the library, while the global output model lives in the Settings page. Unicode-range output is also controlled globally from Settings and does not rewrite stored face metadata.
 
 ## Integrations
 

@@ -261,9 +261,10 @@ final class BlockEditorFontLibraryService
     private function buildFaceSettingsList(array $profile, string $familyName): array
     {
         $payloads = [];
+        $settings = $this->settings->getSettings();
         $fontDisplay = $this->resolveFontDisplay($familyName);
         $quotedFamily = '"' . FontUtils::escapeFontFamily($familyName) . '"';
-        $variableFontsEnabled = !empty($this->settings->getSettings()['variable_fonts_enabled']);
+        $variableFontsEnabled = !empty($settings['variable_fonts_enabled']);
 
         foreach ((array) ($profile['faces'] ?? []) as $face) {
             if (!is_array($face)) {
@@ -288,7 +289,7 @@ final class BlockEditorFontLibraryService
                 'fontDisplay' => $fontDisplay,
             ];
 
-            $unicodeRange = trim((string) ($face['unicode_range'] ?? ''));
+            $unicodeRange = FontUtils::resolveFaceUnicodeRange($face, $settings);
 
             if ($unicodeRange !== '') {
                 $payload['unicodeRange'] = $unicodeRange;

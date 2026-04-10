@@ -16,6 +16,7 @@ use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 
 if (!class_exists('Automatic_CSS\\API')) {
@@ -614,6 +615,7 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
         'Per-variant font variables should default to enabled for new installs.'
     );
     assertSameValue(true, !empty($settings->getSettings()['minimal_output_preset_enabled']), 'Minimal output preset should default to enabled for new installs.');
+    assertSameValue('minimal', (string) ($settings->getSettings()['output_quick_mode_preference'] ?? ''), 'New installs should default the output quick-mode preference to minimal.');
     assertSameValue(false, !empty($settings->getSettings()['role_usage_font_weight_enabled']), 'Role usage font weights should default to disabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_weight_tokens_enabled']), 'Extended weight tokens should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_aliases_enabled']), 'Extended role aliases should default to enabled.');
@@ -662,6 +664,7 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
     assertSameValue(false, $saved['extended_variable_category_sans_enabled'], 'Settings should persist disabled extended sans aliases.');
     assertSameValue(false, $saved['extended_variable_category_serif_enabled'], 'Settings should persist disabled extended serif aliases.');
     assertSameValue(false, $saved['extended_variable_category_mono_enabled'], 'Settings should persist disabled extended mono aliases.');
+    assertSameValue('minimal', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Saving the minimal preset should persist the matching quick-mode preference.');
 };
 
 $tests['settings_repository_preserves_legacy_output_modes_when_minimal_flag_is_missing'] = static function (): void {
@@ -681,6 +684,34 @@ $tests['settings_repository_preserves_legacy_output_modes_when_minimal_flag_is_m
     assertSameValue(false, !empty($normalized['minimal_output_preset_enabled']), 'Legacy saved output settings should not silently opt into the new minimal preset.');
     assertSameValue(true, !empty($normalized['class_output_enabled']), 'Legacy saved class output settings should be preserved when the minimal flag is missing.');
     assertSameValue(true, !empty($normalized['per_variant_font_variables_enabled']), 'Legacy saved variable output settings should be preserved when the minimal flag is missing.');
+    assertSameValue('custom', (string) ($normalized['output_quick_mode_preference'] ?? ''), 'Legacy mixed output settings should derive a custom quick-mode preference when no explicit preference was stored.');
+};
+
+$tests['settings_repository_keeps_custom_output_quick_mode_sticky_and_coerces_stale_presets'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $saved = $settings->saveSettings([
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'custom',
+        'class_output_enabled' => '0',
+        'per_variant_font_variables_enabled' => '1',
+        'role_usage_font_weight_enabled' => '0',
+        'extended_variable_weight_tokens_enabled' => '1',
+        'extended_variable_role_aliases_enabled' => '1',
+        'extended_variable_category_sans_enabled' => '1',
+        'extended_variable_category_serif_enabled' => '1',
+        'extended_variable_category_mono_enabled' => '1',
+    ]);
+
+    assertSameValue('custom', (string) ($saved['output_quick_mode_preference'] ?? ''), 'An explicit custom quick-mode preference should remain sticky even when the saved booleans match variables-only.');
+
+    $saved = $settings->saveSettings([
+        'output_quick_mode_preference' => 'variables',
+        'extended_variable_category_serif_enabled' => '0',
+    ]);
+
+    assertSameValue('custom', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Stale non-custom quick-mode preferences should normalize to custom when the saved booleans no longer match the preset shape.');
 };
 
 $tests['settings_repository_defaults_block_editor_font_library_sync_on_by_default'] = static function (): void {
@@ -751,6 +782,26 @@ $tests['settings_repository_defaults_font_display_to_optional_and_normalizes_inv
 
     $settings->saveSettings(['font_display' => 'unsupported-value']);
     assertSameValue('optional', $settings->getSettings()['font_display'], 'Invalid saved font-display values should normalize back to optional.');
+};
+
+$tests['settings_repository_defaults_unicode_range_mode_and_normalizes_custom_values'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+
+    assertSameValue(FontUtils::UNICODE_RANGE_MODE_OFF, $settings->getSettings()['unicode_range_mode'], 'Unicode-range output should default to off for new installs.');
+    assertSameValue('', $settings->getSettings()['unicode_range_custom_value'], 'New installs should start with an empty custom unicode-range draft.');
+
+    $settings->saveSettings([
+        'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_CUSTOM,
+        'unicode_range_custom_value' => 'u+0000-00ff, u+0100-024f',
+    ]);
+
+    assertSameValue(FontUtils::UNICODE_RANGE_MODE_CUSTOM, $settings->getSettings()['unicode_range_mode'], 'Settings should persist supported unicode-range output modes.');
+    assertSameValue('U+0000-00FF,U+0100-024F', $settings->getSettings()['unicode_range_custom_value'], 'Settings should normalize saved custom unicode-range values.');
+
+    $settings->saveSettings(['unicode_range_mode' => 'unsupported']);
+    assertSameValue(FontUtils::UNICODE_RANGE_MODE_OFF, $settings->getSettings()['unicode_range_mode'], 'Invalid saved unicode-range modes should normalize back to off.');
 };
 
 $tests['settings_repository_persists_family_font_display_overrides_and_unsets_inherit'] = static function (): void {
@@ -2179,6 +2230,52 @@ $tests['runtime_service_skips_font_preloads_when_setting_or_live_roles_are_disab
 
     assertSameValue('', $outputWithSitewideOff, 'Frontend preload output should stay empty while live sitewide role output is disabled.');
     assertSameValue('', $outputWithPreloadsOff, 'Frontend preload output should stay empty when the preload setting is turned off.');
+};
+
+$tests['runtime_asset_planner_resolves_unicode_range_output_modes_for_editor_faces'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'weight' => '400',
+                'style' => 'normal',
+                'unicode_range' => 'U+0370-03FF',
+                'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->setAutoApplyRoles(true);
+
+    $defaultFamilies = $services['planner']->getEditorFontFamilies();
+    $defaultFace = (array) (($defaultFamilies[0]['fontFace'][0] ?? null) ?: []);
+    assertSameValue(false, array_key_exists('unicodeRange', $defaultFace), 'Editor font-face payloads should omit unicodeRange by default now that unicode-range output defaults to off.');
+
+    $services['settings']->saveSettings(['unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_PRESERVE]);
+    $preservedFamilies = $services['planner']->getEditorFontFamilies();
+    $preservedFace = (array) (($preservedFamilies[0]['fontFace'][0] ?? null) ?: []);
+    assertSameValue('U+0370-03FF', (string) ($preservedFace['unicodeRange'] ?? ''), 'Editor font-face payloads should preserve stored unicode ranges when preserve mode is selected.');
+
+    $services['settings']->saveSettings(['unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_LATIN_BASIC]);
+    $latinFamilies = $services['planner']->getEditorFontFamilies();
+    $latinFace = (array) (($latinFamilies[0]['fontFace'][0] ?? null) ?: []);
+    assertSameValue(FontUtils::UNICODE_RANGE_PRESET_LATIN_BASIC, (string) ($latinFace['unicodeRange'] ?? ''), 'Editor font-face payloads should emit the forced Basic Latin unicode-range when selected.');
+
+    $services['settings']->saveSettings(['unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_OFF]);
+    $offFamilies = $services['planner']->getEditorFontFamilies();
+    $offFace = (array) (($offFamilies[0]['fontFace'][0] ?? null) ?: []);
+    assertSameValue(false, array_key_exists('unicodeRange', $offFace), 'Editor font-face payloads should omit unicodeRange when unicode-range output is disabled.');
 };
 
 $tests['settings_repository_tracks_builder_integration_state'] = static function (): void {

@@ -372,6 +372,7 @@ final class RuntimeAssetPlanner
     private function buildEditorFontFaceList(array $family, bool $variableFontsEnabled): array
     {
         $delivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+        $settings = $this->settings->getSettings();
 
         if (!$this->isSelfHostedDelivery($delivery)) {
             return [];
@@ -401,7 +402,7 @@ final class RuntimeAssetPlanner
                 'src' => $src,
             ];
 
-            $unicodeRange = trim((string) ($face['unicode_range'] ?? ''));
+            $unicodeRange = FontUtils::resolveFaceUnicodeRange($face, $settings);
 
             if ($unicodeRange !== '') {
                 $entry['unicodeRange'] = $unicodeRange;

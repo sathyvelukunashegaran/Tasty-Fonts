@@ -93,6 +93,11 @@ final class AdminPageViewBuilder
         $cssDeliveryModeOptions = is_array($context['css_delivery_mode_options'] ?? null) ? $context['css_delivery_mode_options'] : [];
         $fontDisplay = (string) ($context['font_display'] ?? 'optional');
         $fontDisplayOptions = is_array($context['font_display_options'] ?? null) ? $context['font_display_options'] : [];
+        $unicodeRangeMode = (string) ($context['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF);
+        $unicodeRangeCustomValue = (string) ($context['unicode_range_custom_value'] ?? '');
+        $unicodeRangeModeOptions = is_array($context['unicode_range_mode_options'] ?? null) ? $context['unicode_range_mode_options'] : [];
+        $unicodeRangeCustomVisible = !empty($context['unicode_range_custom_visible']);
+        $outputQuickModePreference = (string) ($context['output_quick_mode_preference'] ?? '');
         $classOutputEnabled = !empty($context['class_output_enabled']);
         $classOutputRoleHeadingEnabled = !array_key_exists('class_output_role_heading_enabled', $context)
             || !empty($context['class_output_role_heading_enabled']);
@@ -236,7 +241,12 @@ final class AdminPageViewBuilder
             $classOutputOptions['role_alias_code'] = $classOutputRoleAliasCodeEnabled;
             $classOutputOptions['category_mono'] = $classOutputCategoryMonoEnabled;
         }
-        $outputQuickMode = $this->deriveOutputQuickMode($classOutputOptions, $extendedVariableOptions);
+        $outputQuickMode = $this->deriveOutputQuickMode(
+            $outputQuickModePreference,
+            $classOutputOptions,
+            $extendedVariableOptions,
+            $roleUsageFontWeightEnabled
+        );
         $advancedOutputControlsExpanded = $outputQuickMode === 'custom';
 
         $view = get_defined_vars();
@@ -245,24 +255,82 @@ final class AdminPageViewBuilder
         return $view;
     }
 
-    private function deriveOutputQuickMode(array $classOutputOptions, array $extendedVariableOptions): string
+    private function deriveOutputQuickMode(
+        string $preference,
+        array $classOutputOptions,
+        array $extendedVariableOptions,
+        bool $roleUsageFontWeightEnabled
+    ): string
     {
-        $classEnabled = !empty($classOutputOptions['enabled']);
-        $variableEnabled = !empty($extendedVariableOptions['enabled']);
-        $minimalEnabled = !empty($extendedVariableOptions['minimal']);
+        $preference = $this->sanitizeOutputQuickModePreference($preference);
+        $exactMode = $this->deriveExactOutputQuickMode($classOutputOptions, $extendedVariableOptions, $roleUsageFontWeightEnabled);
 
-        if ($minimalEnabled && $variableEnabled && !$classEnabled) {
+        if ($preference === 'custom') {
+            return 'custom';
+        }
+
+        if ($preference === '') {
+            return $exactMode;
+        }
+
+        return $exactMode === $preference
+            ? $preference
+            : 'custom';
+    }
+
+    private function deriveExactOutputQuickMode(
+        array $classOutputOptions,
+        array $extendedVariableOptions,
+        bool $roleUsageFontWeightEnabled
+    ): string {
+        if (!empty($extendedVariableOptions['minimal'])) {
             return 'minimal';
         }
 
-        if ($variableEnabled && !$classEnabled) {
+        if (
+            empty($classOutputOptions['enabled'])
+            && !empty($extendedVariableOptions['enabled'])
+            && !$roleUsageFontWeightEnabled
+            && $this->allOutputFlagsEnabled($extendedVariableOptions, ['enabled', 'minimal'])
+        ) {
             return 'variables';
         }
 
-        if ($classEnabled && !$variableEnabled) {
+        if (
+            !empty($classOutputOptions['enabled'])
+            && empty($extendedVariableOptions['enabled'])
+            && !$roleUsageFontWeightEnabled
+            && $this->allOutputFlagsEnabled($classOutputOptions, ['enabled'])
+        ) {
             return 'classes';
         }
 
         return 'custom';
+    }
+
+    private function allOutputFlagsEnabled(array $options, array $ignoredKeys = []): bool
+    {
+        foreach ($options as $key => $enabled) {
+            if (in_array((string) $key, $ignoredKeys, true)) {
+                continue;
+            }
+
+            if (!$enabled) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function sanitizeOutputQuickModePreference(string $preference): string
+    {
+        $preference = strtolower(trim($preference));
+        $preference = preg_replace('/[^a-z0-9_-]+/', '', $preference);
+        $preference = is_string($preference) ? $preference : '';
+
+        return in_array($preference, ['minimal', 'variables', 'classes', 'custom'], true)
+            ? $preference
+            : '';
     }
 }
