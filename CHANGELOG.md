@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-04-11
+
 ### Changed
 
 - Promoted the validated `1.8.0` beta line to the stable release rail after the final beta verification pass.
