@@ -4,7 +4,7 @@ Typography Management for WordPress Professionals (Deeply integrated with Etch, 
 
 ## Release Rails
 
-`1.8.0` is the current stable release. `main` now tracks the next development line as `1.9.0-dev`.
+`1.9.0` is the current stable release. `main` now tracks the next development line as `1.10.0-dev`.
 
 Stable, beta, and nightly packages are all published from GitHub. The plugin can follow those rails through `Settings -> Behavior -> Update Channel`, with a rollback reinstall action when switching back to a lower rail before it catches up.
 
