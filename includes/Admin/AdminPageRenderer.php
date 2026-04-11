@@ -97,8 +97,18 @@ final class AdminPageRenderer extends AbstractSectionRenderer
                     <section class="tasty-fonts-card tasty-fonts-page-header">
                         <div class="tasty-fonts-page-header-brand">
                             <div class="tasty-fonts-hero-title-row">
-                                <h1>
-                                    <?php esc_html_e('Tasty Custom Fonts', 'tasty-fonts'); ?>
+                                <h1 class="tasty-fonts-header-title">
+                                    <a
+                                        class="tasty-fonts-header-logo-link"
+                                        href="https://tastywp.com/tastyfonts/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-label="<?php esc_attr_e('Visit Tasty Fonts on TastyWP', 'tasty-fonts'); ?>"
+                                        title="<?php esc_attr_e('Visit Tasty Fonts on TastyWP', 'tasty-fonts'); ?>"
+                                    >
+                                        <span class="tasty-fonts-header-logo" aria-hidden="true"></span>
+                                        <span class="screen-reader-text"><?php esc_html_e('Tasty Custom Fonts', 'tasty-fonts'); ?></span>
+                                    </a>
                                     <?php if ($pluginVersion !== ''): ?>
                                         <span class="screen-reader-text">
                                             <?php echo esc_html(sprintf(__('Version %s', 'tasty-fonts'), $pluginVersion)); ?>

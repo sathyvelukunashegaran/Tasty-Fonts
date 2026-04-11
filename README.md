@@ -78,10 +78,10 @@ Self-hosted Bunny imports are stored under `wp-content/uploads/fonts/bunny/<fami
 
 - Tasty Custom Fonts registers runtime families as editor typography presets.
 - Published families can optionally sync into the core Block Editor Font Library.
-- Automatic.css can map its heading and body font settings to `var(--font-heading)` and `var(--font-body)`.
+- Automatic.css can map its heading/body font-family and font-weight settings to the managed Tasty Fonts role variables.
 - Bricks integration can expose published Tasty Fonts families in builder selectors and mirror matching Bricks typography choices into Gutenberg editor styles.
 - Oxygen integration can expose published Tasty Fonts families through the compatibility shim and mirror matching Oxygen typography choices into Gutenberg editor styles.
-- Etch receives the same runtime stylesheet URLs through the canvas bridge so preview typography stays aligned with the live site.
+- Etch receives the same runtime stylesheet URLs and bridge CSS through the canvas bridge so preview typography stays aligned with the live site.
 
 ## Runtime Output That Stays Practical
 
@@ -131,7 +131,7 @@ The plugin advertises its GitHub repository through `Update URI` and includes a 
 
 ## Release Channels
 
-`1.9.0` is the current stable release. The repository is currently on the `1.10.0-beta.3` line.
+`1.10.0` is the current stable release.
 
 Stable, beta, and nightly packages are published from GitHub. The release flow is intentionally linear so the upcoming line can be tested in public before it becomes the next stable rail.
 

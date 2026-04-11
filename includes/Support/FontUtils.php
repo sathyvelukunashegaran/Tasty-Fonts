@@ -625,7 +625,11 @@ final class FontUtils
 
     public static function googleVariantToAxis(string $variant): ?array
     {
-        $variant = strtolower(trim($variant));
+        $variant = self::canonicalVariantToken($variant);
+
+        if ($variant === '') {
+            return null;
+        }
 
         if ($variant === 'regular') {
             return ['style' => 'normal', 'weight' => '400'];
@@ -652,6 +656,71 @@ final class FontUtils
         }
 
         return null;
+    }
+
+    private static function canonicalVariantToken(string $variant): string
+    {
+        $variant = strtolower(trim($variant));
+
+        if ($variant === '') {
+            return '';
+        }
+
+        $compact = preg_replace('/[\s_-]+/', '', $variant);
+
+        if (!is_string($compact) || $compact === '') {
+            return '';
+        }
+
+        $weightAliases = [
+            'thin' => '100',
+            'hairline' => '100',
+            'extralight' => '200',
+            'ultralight' => '200',
+            'light' => '300',
+            'regular' => 'regular',
+            'normal' => 'regular',
+            'book' => 'regular',
+            'medium' => '500',
+            'semibold' => '600',
+            'demibold' => '600',
+            'bold' => '700',
+            'extrabold' => '800',
+            'ultrabold' => '800',
+            'black' => '900',
+            'heavy' => '900',
+        ];
+
+        if ($compact === 'italic') {
+            return 'italic';
+        }
+
+        if (
+            preg_match('/^([1-9]00)(italic)?$/', $compact) === 1
+            || preg_match('/^([1-9]00)\.\.([1-9]00)(italic)?$/', $compact) === 1
+        ) {
+            return $compact;
+        }
+
+        if (isset($weightAliases[$compact])) {
+            return $weightAliases[$compact];
+        }
+
+        if (str_ends_with($compact, 'italic')) {
+            $weightAlias = substr($compact, 0, -6);
+
+            if ($weightAlias === '') {
+                return 'italic';
+            }
+
+            if (isset($weightAliases[$weightAlias])) {
+                return $weightAliases[$weightAlias] === 'regular'
+                    ? 'italic'
+                    : $weightAliases[$weightAlias] . 'italic';
+            }
+        }
+
+        return '';
     }
 
     public static function normalizeHostedAxisList(array $axes): array
@@ -728,11 +797,13 @@ final class FontUtils
                     continue;
                 }
 
-                if (self::googleVariantToAxis($part) === null) {
+                $canonical = self::canonicalVariantToken($part);
+
+                if ($canonical === '' || self::googleVariantToAxis($canonical) === null) {
                     continue;
                 }
 
-                $normalized[strtolower($part)] = strtolower($part);
+                $normalized[$canonical] = $canonical;
             }
         }
 

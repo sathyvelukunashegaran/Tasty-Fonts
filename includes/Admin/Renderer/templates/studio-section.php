@@ -291,7 +291,7 @@
                                         </div>
                                         <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="heading" hidden>
                                             <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-field-label-text" data-role-axis-heading="heading"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
                                                 <span class="tasty-fonts-muted" data-role-axis-summary="heading"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
                                             </div>
                                             <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="heading"></div>
@@ -358,7 +358,7 @@
                                         </div>
                                         <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="body" hidden>
                                             <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-field-label-text" data-role-axis-heading="body"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
                                                 <span class="tasty-fonts-muted" data-role-axis-summary="body"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
                                             </div>
                                             <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="body"></div>
@@ -426,7 +426,7 @@
                                         </div>
                                         <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="monospace" hidden>
                                             <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-field-label-text" data-role-axis-heading="monospace"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
                                                 <span class="tasty-fonts-muted" data-role-axis-summary="monospace"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
                                             </div>
                                             <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="monospace"></div>

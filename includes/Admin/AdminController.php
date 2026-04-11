@@ -69,6 +69,7 @@ final class AdminController
         'per_variant_font_variables_enabled',
         'minimal_output_preset_enabled',
         'role_usage_font_weight_enabled',
+        'extended_variable_role_weight_vars_enabled',
         'extended_variable_weight_tokens_enabled',
         'extended_variable_role_aliases_enabled',
         'extended_variable_category_sans_enabled',
@@ -146,7 +147,7 @@ final class AdminController
             'manage_options',
             self::MENU_SLUG,
             [$this, 'renderPage'],
-            'dashicons-editor-textcolor',
+            TASTY_FONTS_URL . 'assets/images/tasty-sidebar-icon.svg',
             999
         );
 
@@ -621,6 +622,10 @@ final class AdminController
 
         if (is_wp_error($outputValidation)) {
             return $outputValidation;
+        }
+
+        if (($settingsInput['acss_font_role_sync_enabled'] ?? null) === true) {
+            $settingsInput['extended_variable_role_weight_vars_enabled'] = true;
         }
 
         $savedSettings = $this->settings->saveSettings($settingsInput);
@@ -1583,6 +1588,7 @@ final class AdminController
     {
         foreach (
             [
+                'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
                 'extended_variable_category_sans_enabled',
@@ -1784,6 +1790,7 @@ final class AdminController
                 'class_output_families_enabled',
                 'role_usage_font_weight_enabled',
                 'per_variant_font_variables_enabled',
+                'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
                 'extended_variable_category_sans_enabled',
@@ -2000,6 +2007,7 @@ final class AdminController
     {
         $sanitized = [];
         $catalog = $catalog ?? $this->catalog->getCatalog();
+        $variableFontsEnabled = !empty($this->settings->getSettings()['variable_fonts_enabled']);
 
         foreach (['heading', 'body', 'monospace'] as $roleKey) {
             if (!array_key_exists($roleKey, $roleValues)) {
@@ -2024,36 +2032,48 @@ final class AdminController
         }
 
         foreach (['heading', 'body', 'monospace'] as $roleKey) {
+            $familyName = (string) ($sanitized[$roleKey] ?? $roleValues[$roleKey] ?? '');
+            $profile = $this->roleProfileForFamily($familyName, $catalog);
             $weightKey = $roleKey . '_weight';
+            $axisKey = $roleKey . '_axes';
+            $supportsVariableAxes = $variableFontsEnabled && $this->profileVariationAxes($profile) !== [];
+            $supportsStaticWeightOverride = $profile !== [] && !$this->profileHasWeightAxis($profile);
 
-            if (!array_key_exists($weightKey, $roleValues)) {
-                continue;
-            }
-
-            $sanitized[$weightKey] = $this->sanitizeRoleWeightValue(
-                $roleValues[$weightKey],
-                (string) ($sanitized[$roleKey] ?? $roleValues[$roleKey] ?? ''),
-                $catalog
-            );
-        }
-
-        if (!empty($this->settings->getSettings()['variable_fonts_enabled'])) {
-            foreach (['heading', 'body', 'monospace'] as $roleKey) {
-                $axisKey = $roleKey . '_axes';
-
-                if (!array_key_exists($axisKey, $roleValues)) {
-                    continue;
-                }
-
-                $sanitized[$axisKey] = $this->sanitizeRoleAxisValues(
-                    $roleValues[$axisKey],
-                    (string) ($sanitized[$roleKey] ?? $roleValues[$roleKey] ?? ''),
+            if (array_key_exists($weightKey, $roleValues)) {
+                $sanitized[$weightKey] = $this->sanitizeRoleWeightValue(
+                    $roleValues[$weightKey],
+                    $familyName,
                     $catalog
                 );
+            } elseif (array_key_exists($roleKey, $roleValues) && !$supportsStaticWeightOverride) {
+                $sanitized[$weightKey] = '';
+            }
+
+            if (array_key_exists($axisKey, $roleValues)) {
+                $sanitized[$axisKey] = $this->sanitizeRoleAxisValues(
+                    $roleValues[$axisKey],
+                    $familyName,
+                    $catalog
+                );
+            } elseif (array_key_exists($roleKey, $roleValues) && !$supportsVariableAxes) {
+                $sanitized[$axisKey] = [];
             }
         }
 
         return $sanitized;
+    }
+
+    private function roleProfileForFamily(string $familyName, array $catalog): array
+    {
+        $familyName = trim($familyName);
+
+        if ($familyName === '') {
+            return [];
+        }
+
+        $family = $catalog[$familyName] ?? null;
+
+        return is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
     }
 
     private function normalizeFormatMode(string $formatMode): string
@@ -2634,7 +2654,14 @@ final class AdminController
             return;
         }
 
-        $settings = $this->settings->saveAcssFontRoleSyncState(true, false, $current['heading'], $current['body']);
+        $settings = $this->settings->saveAcssFontRoleSyncState(
+            true,
+            false,
+            $current['heading'],
+            $current['body'],
+            (string) ($current['heading_weight'] ?? ''),
+            (string) ($current['body_weight'] ?? '')
+        );
         $message = __('Automatic.css detected. Automatic.css font sync has been enabled in Integrations.', 'tasty-fonts');
         $syncMessage = $this->syncAcssIntegrationForRuntimeState($settings);
 
@@ -2676,8 +2703,12 @@ final class AdminController
             && empty($settings['acss_font_role_sync_applied'])
             && trim((string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? '')) === ''
             && trim((string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')) === ''
+            && trim((string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? '')) === ''
+            && trim((string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')) === ''
             && trim((string) ($current['heading'] ?? '')) === ''
-            && trim((string) ($current['body'] ?? '')) === '';
+            && trim((string) ($current['body'] ?? '')) === ''
+            && trim((string) ($current['heading_weight'] ?? '')) === ''
+            && trim((string) ($current['body_weight'] ?? '')) === '';
     }
 
     private function reconcileAcssIntegrationDrift(): void
@@ -2703,12 +2734,14 @@ final class AdminController
             false,
             false,
             (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
         );
 
-        $message = __('Automatic.css font sync was turned off because its font-family settings no longer match the managed Tasty Fonts values. Enable it again to reapply the mapping.', 'tasty-fonts');
+        $message = __('Automatic.css font sync was turned off because its managed font settings no longer match the Tasty Fonts values. Enable it again to reapply the mapping.', 'tasty-fonts');
         $this->queueNoticeToast('success', $message, 'status');
-        $this->log->add(__('Automatic.css sync turned off after its font-family settings changed outside Tasty Fonts.', 'tasty-fonts'));
+        $this->log->add(__('Automatic.css sync turned off after its managed font settings changed outside Tasty Fonts.', 'tasty-fonts'));
     }
 
     private function syncAcssIntegrationAfterSettingsSave(array $previousSettings, array $savedSettings, array $settingsInput): string|WP_Error
@@ -2733,6 +2766,10 @@ final class AdminController
         $applied = !empty($settings['acss_font_role_sync_applied']);
         $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
 
+        if ($enabled && empty($settings['extended_variable_role_weight_vars_enabled'])) {
+            $settings = $this->settings->saveSettings(['extended_variable_role_weight_vars_enabled' => '1']);
+        }
+
         if (!$enabled) {
             if ($applied && $this->acssIntegration->isAvailable()) {
                 $restore = $this->restoreAcssIntegration($settings);
@@ -2746,11 +2783,13 @@ final class AdminController
                 false,
                 false,
                 $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
+                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
+                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
             );
 
             return $applied
-                ? __('Previous Automatic.css font-family values were restored.', 'tasty-fonts')
+                ? __('Previous Automatic.css font settings were restored.', 'tasty-fonts')
                 : __('Automatic.css sync is off. Existing Automatic.css settings were left unchanged.', 'tasty-fonts');
         }
 
@@ -2759,7 +2798,9 @@ final class AdminController
                 true,
                 false,
                 (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
+                (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
+                (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
             );
 
             return __('Automatic.css sync is enabled and will apply when Automatic.css is active on this site.', 'tasty-fonts');
@@ -2778,11 +2819,13 @@ final class AdminController
                 true,
                 false,
                 (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
+                (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
+                (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
             );
 
             return $applied
-                ? __('Sitewide role delivery is off, so Automatic.css was restored to its previous font-family values until those role variables are live again.', 'tasty-fonts')
+                ? __('Sitewide role delivery is off, so Automatic.css was restored to its previous font settings until those role variables are live again.', 'tasty-fonts')
                 : __('Automatic.css sync is enabled and will apply after sitewide role delivery is turned on.', 'tasty-fonts');
         }
 
@@ -2803,11 +2846,13 @@ final class AdminController
             true,
             true,
             (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
         );
 
         return $applied
-            ? __('Automatic.css font-family mapping was reapplied.', 'tasty-fonts')
+            ? __('Automatic.css font settings were reapplied.', 'tasty-fonts')
             : __('Automatic.css now uses Tasty Fonts role variables for heading and body typography.', 'tasty-fonts');
     }
 
@@ -2815,8 +2860,10 @@ final class AdminController
     {
         $hasHeadingBackup = trim((string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? '')) !== '';
         $hasTextBackup = trim((string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')) !== '';
+        $hasHeadingWeightBackup = trim((string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? '')) !== '';
+        $hasTextWeightBackup = trim((string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')) !== '';
 
-        if ($hasHeadingBackup || $hasTextBackup) {
+        if ($hasHeadingBackup || $hasTextBackup || $hasHeadingWeightBackup || $hasTextWeightBackup) {
             return $settings;
         }
 
@@ -2826,7 +2873,9 @@ final class AdminController
             true,
             !empty($settings['acss_font_role_sync_applied']),
             $current['heading'],
-            $current['body']
+            $current['body'],
+            (string) ($current['heading_weight'] ?? ''),
+            (string) ($current['body_weight'] ?? '')
         );
     }
 
@@ -2834,7 +2883,9 @@ final class AdminController
     {
         return $this->acssIntegration->restoreFontSettings(
             (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')
+            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
+            (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
         );
     }
 

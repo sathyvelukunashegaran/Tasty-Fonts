@@ -13,6 +13,7 @@ use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Google\GoogleFontsClient;
+use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -259,11 +260,13 @@ $tests['settings_repository_tracks_acss_font_sync_state'] = static function (): 
 
     assertSameValue(true, $saved['acss_font_role_sync_enabled'], 'Saving the Automatic.css sync toggle should persist an explicit enabled state.');
 
-    $saved = $settings->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif');
+    $saved = $settings->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif', '700', '400');
 
     assertSameValue(true, $saved['acss_font_role_sync_applied'], 'Automatic.css sync state should record when the managed ACSS values are currently applied.');
     assertSameValue('Inter, sans-serif', $saved['acss_font_role_sync_previous_heading_font_family'], 'Automatic.css sync state should preserve the previous heading font-family value for later restore.');
     assertSameValue('system-ui, sans-serif', $saved['acss_font_role_sync_previous_text_font_family'], 'Automatic.css sync state should preserve the previous text font-family value for later restore.');
+    assertSameValue('700', $saved['acss_font_role_sync_previous_heading_font_weight'], 'Automatic.css sync state should preserve the previous heading font-weight value for later restore.');
+    assertSameValue('400', $saved['acss_font_role_sync_previous_text_font_weight'], 'Automatic.css sync state should preserve the previous text font-weight value for later restore.');
 };
 
 $tests['settings_repository_reuses_request_scoped_settings_until_a_write_invalidates_the_cache'] = static function (): void {
@@ -685,6 +688,8 @@ $tests['developer_tools_reset_integration_detection_state_and_suppressed_notices
     assertSameValue(false, !empty($settings['acss_font_role_sync_applied']), 'Integration reset should clear the applied Automatic.css sync flag.');
     assertSameValue('', (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'Integration reset should clear Automatic.css heading backups.');
     assertSameValue('', (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''), 'Integration reset should clear Automatic.css body backups.');
+    assertSameValue('', (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''), 'Integration reset should clear Automatic.css heading weight backups.');
+    assertSameValue('', (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? ''), 'Integration reset should clear Automatic.css body weight backups.');
     assertSameValue(1, did_action('tasty_fonts_before_reset_integration_detection'), 'Integration reset should emit a before hook.');
     assertSameValue(1, did_action('tasty_fonts_after_reset_integration_detection'), 'Integration reset should emit an after hook.');
 
@@ -812,6 +817,7 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
     assertSameValue(true, !empty($settings->getSettings()['minimal_output_preset_enabled']), 'Minimal output preset should default to enabled for new installs.');
     assertSameValue('minimal', (string) ($settings->getSettings()['output_quick_mode_preference'] ?? ''), 'New installs should default the output quick-mode preference to minimal.');
     assertSameValue(false, !empty($settings->getSettings()['role_usage_font_weight_enabled']), 'Role usage font weights should default to disabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_weight_vars_enabled']), 'Role weight variables should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_weight_tokens_enabled']), 'Extended weight tokens should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_aliases_enabled']), 'Extended role aliases should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_sans_enabled']), 'Extended sans category alias should default to enabled.');
@@ -839,9 +845,17 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
         'Settings should persist enabled role usage font-weight output.'
     );
 
+    $settings->saveSettings(['extended_variable_role_weight_vars_enabled' => '0']);
+    assertSameValue(
+        false,
+        !empty($settings->getSettings()['extended_variable_role_weight_vars_enabled']),
+        'Settings should persist disabled role weight variable output.'
+    );
+
     $settings->saveSettings([
         'role_usage_font_weight_enabled' => '0',
         'minimal_output_preset_enabled' => '1',
+        'extended_variable_role_weight_vars_enabled' => '0',
         'extended_variable_weight_tokens_enabled' => '0',
         'extended_variable_role_aliases_enabled' => '0',
         'extended_variable_category_sans_enabled' => '0',
@@ -854,6 +868,7 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
     assertSameValue(false, $saved['class_output_enabled'], 'Minimal output preset should suppress class output.');
     assertSameValue(true, $saved['per_variant_font_variables_enabled'], 'Minimal output preset should keep variable output enabled.');
     assertSameValue(false, $saved['role_usage_font_weight_enabled'], 'Settings should persist disabled role usage font-weight output.');
+    assertSameValue(true, $saved['extended_variable_role_weight_vars_enabled'], 'Minimal output preset should keep role weight variables enabled.');
     assertSameValue(false, $saved['extended_variable_weight_tokens_enabled'], 'Settings should persist disabled extended weight tokens.');
     assertSameValue(false, $saved['extended_variable_role_aliases_enabled'], 'Settings should persist disabled extended role aliases.');
     assertSameValue(false, $saved['extended_variable_category_sans_enabled'], 'Settings should persist disabled extended sans aliases.');
@@ -892,6 +907,7 @@ $tests['settings_repository_keeps_custom_output_quick_mode_sticky_and_coerces_st
         'class_output_enabled' => '0',
         'per_variant_font_variables_enabled' => '1',
         'role_usage_font_weight_enabled' => '0',
+        'extended_variable_role_weight_vars_enabled' => '1',
         'extended_variable_weight_tokens_enabled' => '1',
         'extended_variable_role_aliases_enabled' => '1',
         'extended_variable_category_sans_enabled' => '1',
@@ -919,6 +935,7 @@ $tests['settings_repository_persists_variables_and_classes_quick_modes_when_sett
         'class_output_enabled' => '0',
         'per_variant_font_variables_enabled' => '1',
         'role_usage_font_weight_enabled' => '0',
+        'extended_variable_role_weight_vars_enabled' => '1',
         'extended_variable_weight_tokens_enabled' => '1',
         'extended_variable_role_aliases_enabled' => '1',
         'extended_variable_category_sans_enabled' => '1',
@@ -1082,6 +1099,7 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
         'class_output_category_mono_enabled' => '0',
         'class_output_families_enabled' => '1',
         'per_variant_font_variables_enabled' => '0',
+        'extended_variable_role_weight_vars_enabled' => '0',
         'extended_variable_weight_tokens_enabled' => '0',
         'extended_variable_role_aliases_enabled' => '0',
         'extended_variable_category_sans_enabled' => '0',
@@ -1104,6 +1122,7 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     assertSameValue(false, $saved['class_output_role_alias_code_enabled'], 'Saving unrelated settings should not re-enable disabled alias class subsettings.');
     assertSameValue(false, $saved['class_output_category_serif_enabled'], 'Saving unrelated settings should not re-enable disabled category class subsettings.');
     assertSameValue(false, $saved['per_variant_font_variables_enabled'], 'Saving unrelated settings should not re-enable per-variant font variables.');
+    assertSameValue(false, $saved['extended_variable_role_weight_vars_enabled'], 'Saving unrelated settings should not re-enable role weight variables.');
     assertSameValue(false, $saved['extended_variable_weight_tokens_enabled'], 'Saving unrelated settings should not re-enable extended weight tokens.');
     assertSameValue(false, $saved['extended_variable_role_aliases_enabled'], 'Saving unrelated settings should not re-enable extended role aliases.');
     assertSameValue(false, $saved['extended_variable_category_sans_enabled'], 'Saving unrelated settings should not re-enable the sans alias.');
@@ -1799,6 +1818,8 @@ $tests['admin_controller_applies_acss_font_mapping_when_sync_is_enabled'] = stat
     $automaticCssSettings = [
         'heading-font-family' => 'Inter, sans-serif',
         'text-font-family' => 'system-ui, sans-serif',
+        'heading-weight' => '700',
+        'text-font-weight' => '400',
     ];
 
     add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
@@ -1812,8 +1833,12 @@ $tests['admin_controller_applies_acss_font_mapping_when_sync_is_enabled'] = stat
 
     assertSameValue('var(--font-heading)', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Enabling Automatic.css sync should push the heading role variable into Automatic.css.');
     assertSameValue('var(--font-body)', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Enabling Automatic.css sync should push the body role variable into Automatic.css.');
+    assertSameValue('var(--font-heading-weight)', (string) ($automaticCssSettings['heading-weight'] ?? ''), 'Enabling Automatic.css sync should push the heading weight variable into Automatic.css.');
+    assertSameValue('var(--font-body-weight)', (string) ($automaticCssSettings['text-font-weight'] ?? ''), 'Enabling Automatic.css sync should push the body weight variable into Automatic.css.');
     assertSameValue(true, (bool) ($result['settings']['acss_font_role_sync_applied'] ?? false), 'Controller saves should mark Automatic.css sync as applied after the ACSS settings update succeeds.');
+    assertSameValue(true, !empty($result['settings']['extended_variable_role_weight_vars_enabled']), 'Enabling Automatic.css sync should force role weight variables on so the mapped ACSS values always resolve.');
     assertSameValue('Inter, sans-serif', (string) ($result['settings']['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'The previous ACSS heading value should be backed up before Tasty Fonts overwrites it.');
+    assertSameValue('700', (string) ($result['settings']['acss_font_role_sync_previous_heading_font_weight'] ?? ''), 'The previous ACSS heading weight value should be backed up before Tasty Fonts overwrites it.');
     assertContainsValue('Automatic.css now uses Tasty Fonts role variables', (string) ($result['message'] ?? ''), 'The settings response should explain that Automatic.css is now mapped to Tasty Fonts variables.');
 };
 
@@ -1891,20 +1916,24 @@ $tests['admin_controller_restores_previous_acss_font_values_when_sitewide_roles_
     $automaticCssSettings = [
         'heading-font-family' => 'var(--font-heading)',
         'text-font-family' => 'var(--font-body)',
+        'heading-weight' => 'var(--font-heading-weight)',
+        'text-font-weight' => 'var(--font-body-weight)',
     ];
 
     add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
 
     $services = makeServiceGraph();
-    $settings = $services['settings']->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif');
+    $settings = $services['settings']->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif', '700', '400');
     $settings = $services['settings']->setAutoApplyRoles(false);
     $result = invokePrivateMethod($services['controller'], 'syncAcssIntegrationForRuntimeState', [$settings]);
     $saved = $services['settings']->getSettings();
 
     assertSameValue('Inter, sans-serif', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Disabling sitewide roles should restore the previous Automatic.css heading font-family value.');
     assertSameValue('system-ui, sans-serif', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Disabling sitewide roles should restore the previous Automatic.css text font-family value.');
+    assertSameValue('700', (string) ($automaticCssSettings['heading-weight'] ?? ''), 'Disabling sitewide roles should restore the previous Automatic.css heading font-weight value.');
+    assertSameValue('400', (string) ($automaticCssSettings['text-font-weight'] ?? ''), 'Disabling sitewide roles should restore the previous Automatic.css text font-weight value.');
     assertSameValue(false, (bool) ($saved['acss_font_role_sync_applied'] ?? true), 'Automatic.css sync should mark itself unapplied after restoring the previous ACSS values.');
-    assertContainsValue('restored to its previous font-family values', (string) $result, 'The runtime sync helper should explain that ACSS was restored after sitewide roles were turned off.');
+    assertContainsValue('restored to its previous font settings', (string) $result, 'The runtime sync helper should explain that ACSS was restored after sitewide roles were turned off.');
 };
 
 $tests['admin_controller_turns_off_acss_sync_when_acss_drifts_outside_tasty_fonts'] = static function (): void {
@@ -1915,13 +1944,15 @@ $tests['admin_controller_turns_off_acss_sync_when_acss_drifts_outside_tasty_font
     $automaticCssSettings = [
         'heading-font-family' => '',
         'text-font-family' => '',
+        'heading-weight' => '',
+        'text-font-weight' => '',
     ];
 
     add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
 
     $services = makeServiceGraph();
     $services['settings']->setAutoApplyRoles(true);
-    $services['settings']->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif');
+    $services['settings']->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif', '700', '400');
 
     invokePrivateMethod($services['controller'], 'reconcileAcssIntegrationDrift');
 
@@ -1996,6 +2027,65 @@ CSS,
         true,
         in_array('https://use.typekit.net/abc1234.css', $canvasStylesheetUrls, true),
         'Etch canvas runtime data should include the Adobe stylesheet URL.'
+    );
+};
+
+$tests['runtime_service_exposes_acss_inline_weight_styles_to_etch_canvas'] = static function (): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $localizedScripts;
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $currentUserCapabilities['edit_posts'] = true;
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings([
+        'acss_font_role_sync_enabled' => true,
+    ]);
+    $services['settings']->saveAcssFontRoleSyncState(true, true, 'system-ui', 'system-ui', '700', '400');
+    $_GET['etch'] = '1';
+
+    $services['runtime']->enqueueFrontend();
+    $canvasInlineCss = (array) ($localizedScripts['tasty-fonts-canvas']['data']['inlineCss'] ?? []);
+    $combinedInlineCss = implode("\n", $canvasInlineCss);
+
+    assertContainsValue('body{font-family:var(--font-body);font-weight:var(--font-body-weight);}', $combinedInlineCss, 'Etch canvas runtime data should include the ACSS-managed body weight bridge CSS.');
+    assertContainsValue('font-family:var(--font-heading);font-weight:var(--font-heading-weight);', $combinedInlineCss, 'Etch canvas runtime data should include the ACSS-managed heading weight bridge CSS.');
+};
+
+$tests['runtime_service_exposes_acss_runtime_stylesheet_to_etch_canvas_when_sync_is_active'] = static function (): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $localizedScripts;
+    global $registeredStyles;
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $registeredStyles[AcssIntegrationService::RUNTIME_STYLESHEET_HANDLE] = [
+        'src' => 'https://example.test/wp-content/uploads/automatic-css/automatic.css',
+        'deps' => [],
+        'ver' => '1775939707',
+    ];
+
+    $services = makeServiceGraph();
+    $currentUserCapabilities['edit_posts'] = true;
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings([
+        'acss_font_role_sync_enabled' => true,
+    ]);
+    $services['settings']->saveAcssFontRoleSyncState(true, true, 'system-ui', 'system-ui', '700', '400');
+    $_GET['etch'] = '1';
+
+    $services['runtime']->enqueueFrontend();
+    $canvasStylesheetUrls = (array) ($localizedScripts['tasty-fonts-canvas']['data']['stylesheetUrls'] ?? []);
+
+    assertSameValue(
+        true,
+        in_array('https://example.test/wp-content/uploads/automatic-css/automatic.css', $canvasStylesheetUrls, true),
+        'Etch canvas runtime data should include the Automatic.css runtime stylesheet when Tasty manages the ACSS font mapping.'
     );
 };
 
@@ -2182,6 +2272,43 @@ $tests['runtime_service_enqueues_block_editor_content_styles_for_gutenberg_ifram
         true,
         isset($enqueuedStyles['tasty-fonts-google-jetbrains-mono-cdn-editor-content']),
         'Gutenberg iframe styles should enqueue remote font stylesheets with iframe-specific handles so WordPress hoists them into the canvas.'
+    );
+};
+
+$tests['runtime_service_enqueues_acss_runtime_stylesheet_for_gutenberg_iframe_when_sync_is_active'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $isAdminRequest;
+    global $registeredStyles;
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $registeredStyles[AcssIntegrationService::RUNTIME_STYLESHEET_HANDLE] = [
+        'src' => 'https://example.test/wp-content/uploads/automatic-css/automatic.css',
+        'deps' => [],
+        'ver' => '1775939707',
+    ];
+
+    $services = makeServiceGraph();
+    $isAdminRequest = true;
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings([
+        'acss_font_role_sync_enabled' => true,
+    ]);
+    $services['settings']->saveAcssFontRoleSyncState(true, true, 'system-ui', 'system-ui', '700', '400');
+
+    $services['runtime']->enqueueBlockEditorContent();
+
+    assertSameValue(
+        'https://example.test/wp-content/uploads/automatic-css/automatic.css',
+        (string) ($enqueuedStyles['tasty-fonts-acss-runtime-editor-content']['src'] ?? ''),
+        'Gutenberg iframe styles should also enqueue the Automatic.css runtime stylesheet when Tasty manages the ACSS font mapping.'
+    );
+    assertSameValue(
+        '1775939707',
+        (string) ($enqueuedStyles['tasty-fonts-acss-runtime-editor-content']['ver'] ?? ''),
+        'Gutenberg iframe styles should preserve the Automatic.css runtime stylesheet version for cache-busting.'
     );
 };
 
@@ -2986,8 +3113,9 @@ $tests['runtime_service_appends_acss_editor_styles_when_font_role_sync_is_active
     $settings = $services['runtime']->filterBlockEditorSettings([], null);
     $css = (string) ($settings['styles'][0]['css'] ?? '');
 
-    assertContainsValue('body{font-family:var(--font-body);}', $css, 'Automatic.css editor styles should mirror the managed body variable into Gutenberg.');
-    assertContainsValue('body :is(h1, h2, h3, h4, h5, h6, .editor-post-title, .wp-block-post-title){font-family:var(--font-heading);}', $css, 'Automatic.css editor styles should mirror the managed heading variable into Gutenberg, including the post title.');
+    assertContainsValue('body{font-family:var(--font-body);font-weight:var(--font-body-weight);}', $css, 'Automatic.css editor styles should mirror the managed body font-family and weight variables into Gutenberg.');
+    assertContainsValue('body :is(h1, h2, h3, h4, h5, h6, .editor-post-title, .wp-block-post-title){font-family:var(--font-heading);font-weight:var(--font-heading-weight);}', $css, 'Automatic.css editor styles should mirror the managed heading font-family and weight variables into Gutenberg, including the post title.');
+    assertNotContainsValue('font-variation-settings', $css, 'Automatic.css editor styles should stay focused on the same direct font-family mapping used by the main ACSS sync.');
 };
 
 $tests['oxygen_compatibility_shim_returns_only_runtime_family_names'] = static function (): void {

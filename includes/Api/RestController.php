@@ -347,6 +347,7 @@ final class RestController
                 'per_variant_font_variables_enabled',
                 'minimal_output_preset_enabled',
                 'role_usage_font_weight_enabled',
+                'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
                 'extended_variable_category_sans_enabled',

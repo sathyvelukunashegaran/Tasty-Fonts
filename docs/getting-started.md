@@ -16,7 +16,7 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 ## Before You Start
 
-`1.8.0` is the current stable release. The plugin is production-ready.
+`1.10.0` is the current stable release. The plugin is production-ready.
 
 **Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No Composer install, no npm install, no build step.
 

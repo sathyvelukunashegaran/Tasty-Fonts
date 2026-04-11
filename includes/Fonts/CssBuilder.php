@@ -616,7 +616,16 @@ final class CssBuilder
             $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'heading');
             $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'body');
 
+            if ($this->extendedVariableRoleWeightVarsEnabled($settings)) {
+                $roleDeclarations['--font-heading-weight'] = $this->resolveRoleUsageWeightValue($roles, 'heading');
+                $roleDeclarations['--font-body-weight'] = $this->resolveRoleUsageWeightValue($roles, 'body');
+            }
+
             if ($includeMonospace) {
+                if ($this->extendedVariableRoleWeightVarsEnabled($settings)) {
+                    $roleDeclarations['--font-monospace-weight'] = $this->resolveRoleUsageWeightValue($roles, 'monospace');
+                }
+
                 $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'monospace');
             }
 
@@ -657,7 +666,16 @@ final class CssBuilder
         $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'heading');
         $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'body');
 
+        if ($this->extendedVariableRoleWeightVarsEnabled($settings)) {
+            $roleDeclarations['--font-heading-weight'] = $this->resolveRoleUsageWeightValue($roles, 'heading');
+            $roleDeclarations['--font-body-weight'] = $this->resolveRoleUsageWeightValue($roles, 'body');
+        }
+
         if ($includeMonospace) {
+            if ($this->extendedVariableRoleWeightVarsEnabled($settings)) {
+                $roleDeclarations['--font-monospace-weight'] = $this->resolveRoleUsageWeightValue($roles, 'monospace');
+            }
+
             $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'monospace');
         }
 
@@ -1172,6 +1190,12 @@ final class CssBuilder
         return $this->extendedVariableOutputEnabled($settings)
             && (!array_key_exists('extended_variable_weight_tokens_enabled', $settings)
                 || !empty($settings['extended_variable_weight_tokens_enabled']));
+    }
+
+    private function extendedVariableRoleWeightVarsEnabled(array $settings): bool
+    {
+        return !array_key_exists('extended_variable_role_weight_vars_enabled', $settings)
+            || !empty($settings['extended_variable_role_weight_vars_enabled']);
     }
 
     private function roleUsageFontWeightEnabled(array $settings): bool

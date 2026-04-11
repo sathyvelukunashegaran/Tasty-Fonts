@@ -136,6 +136,7 @@ final class AdminPageContextBuilder
             'role_usage_font_weight_enabled' => !empty($settings['role_usage_font_weight_enabled']),
             'per_variant_font_variables_enabled' => !empty($settings['per_variant_font_variables_enabled']),
             'minimal_output_preset_enabled' => !empty($settings['minimal_output_preset_enabled']),
+            'extended_variable_role_weight_vars_enabled' => !empty($settings['extended_variable_role_weight_vars_enabled']),
             'extended_variable_weight_tokens_enabled' => !empty($settings['extended_variable_weight_tokens_enabled']),
             'extended_variable_role_aliases_enabled' => !empty($settings['extended_variable_role_aliases_enabled']),
             'extended_variable_category_sans_enabled' => !empty($settings['extended_variable_category_sans_enabled']),
@@ -772,7 +773,7 @@ final class AdminPageContextBuilder
             $state,
             [
                 'title' => __('Automatic.css', 'tasty-fonts'),
-                'description' => __('Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.', 'tasty-fonts'),
+                'description' => __('Sync ACSS heading and body font-family and font-weight settings to Tasty Fonts role variables for clean interoperability.', 'tasty-fonts'),
                 'status_label' => $this->buildAcssIntegrationStatusLabel((string) ($state['status'] ?? 'disabled')),
                 'status_copy' => $this->buildAcssIntegrationStatusCopy((string) ($state['status'] ?? 'disabled'), $state),
             ]
@@ -1035,10 +1036,10 @@ final class AdminPageContextBuilder
         $current = is_array($state['current'] ?? null) ? $state['current'] : ['heading' => '', 'body' => ''];
 
         return match ($status) {
-            'synced' => __('Automatic.css is using `var(--font-heading)` and `var(--font-body)` now. Tasty Fonts will restore the previous ACSS values if sitewide role delivery is turned off.', 'tasty-fonts'),
+            'synced' => __('Automatic.css is using the managed Tasty Fonts family and weight variables now. Tasty Fonts will restore the previous ACSS values if sitewide role delivery is turned off.', 'tasty-fonts'),
             'ready' => __('Automatic.css is active and the sync is enabled. Save or re-open settings to apply the variable mapping.', 'tasty-fonts'),
-            'out_of_sync' => __('Automatic.css is active, but its current font-family values differ from the managed Tasty Fonts mapping. Re-save the integration to reapply it.', 'tasty-fonts'),
-            'waiting_for_sitewide_roles' => __('Automatic.css sync is enabled, but Tasty Fonts only exposes `--font-heading` and `--font-body` when sitewide role delivery is on. Publish roles sitewide first, then the sync will apply.', 'tasty-fonts'),
+            'out_of_sync' => __('Automatic.css is active, but its current font settings differ from the managed Tasty Fonts mapping. Re-save the integration to reapply it.', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Automatic.css sync is enabled, but Tasty Fonts only exposes its managed family and weight variables when sitewide role delivery is on. Publish roles sitewide first, then the sync will apply.', 'tasty-fonts'),
             'unavailable' => __('Automatic.css is not active on this site, so there is nothing to sync yet.', 'tasty-fonts'),
             default => sprintf(
                 __('Automatic.css currently uses heading `%1$s` and text `%2$s`.', 'tasty-fonts'),

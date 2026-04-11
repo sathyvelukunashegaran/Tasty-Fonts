@@ -235,7 +235,7 @@ test('admin contracts derive exact output quick modes from explicit output shape
             classOutputEnabled: false,
             variableOutputEnabled: true,
             roleUsageFontWeightEnabled: false,
-            variableFlags: [true, true, true],
+            variableFlags: [true, true, true, true],
         }),
         'variables'
     );
@@ -255,7 +255,7 @@ test('admin contracts derive exact output quick modes from explicit output shape
             classOutputEnabled: false,
             variableOutputEnabled: true,
             roleUsageFontWeightEnabled: true,
-            variableFlags: [true, true, true],
+            variableFlags: [true, true, true, true],
         }),
         'custom'
     );
@@ -267,7 +267,7 @@ test('admin contracts keep custom sticky and coerce stale non-custom preferences
         classOutputEnabled: false,
         variableOutputEnabled: true,
         roleUsageFontWeightEnabled: false,
-        variableFlags: [true, true, true],
+        variableFlags: [true, true, true, true],
     };
 
     assert.equal(normalizeOutputQuickModePreference('', variableOnlyState), 'variables');
@@ -276,7 +276,7 @@ test('admin contracts keep custom sticky and coerce stale non-custom preferences
     assert.equal(
         normalizeOutputQuickModePreference('variables', {
             ...variableOnlyState,
-            variableFlags: [true, false, true],
+            variableFlags: [true, false, true, true],
         }),
         'custom'
     );

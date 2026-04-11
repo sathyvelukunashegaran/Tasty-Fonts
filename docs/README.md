@@ -4,9 +4,9 @@ This is the versioned documentation hub for the current plugin codebase.
 
 ## Current Release Track
 
-`1.8.0` is the current stable release. `main` now tracks the next development line as `1.9.0-dev`.
+`1.10.0` is the current stable release.
 
-These docs describe the stable `1.8.0` release in full, covering all shipping features including variable font support, the three-rail update channel, unicode range controls, and the complete settings surface.
+These docs describe the current plugin behavior in full, covering the shipping features, release channels, variable font controls, and integration surface.
 
 ---
 
@@ -78,6 +78,6 @@ These docs describe the stable `1.8.0` release in full, covering all shipping fe
 ## Notes
 
 - The docs in `main` always describe the current plugin behavior.
-- The docs cover the stable `1.8.0` release, including all new features introduced in this line.
+- The docs cover the stable `1.10.0` release, including the current Google, Bunny, Adobe, variable-font, and integration workflows.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](../README.md) stays shorter and links here for full guidance.

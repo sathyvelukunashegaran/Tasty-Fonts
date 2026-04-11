@@ -343,7 +343,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
             </div>
             <div class="tasty-fonts-role-axis-editor tasty-fonts-preview-role-editor" data-preview-axis-editor="<?php echo esc_attr($roleKey); ?>" hidden>
                 <div class="tasty-fonts-stack-field tasty-fonts-preview-tray-field">
-                    <?php $this->renderFieldLabel(__('Variable Axes', 'tasty-fonts')); ?>
+                    <span class="tasty-fonts-field-label" data-preview-axis-heading="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
                     <div class="tasty-fonts-role-axis-fields" data-preview-axis-fields="<?php echo esc_attr($roleKey); ?>"></div>
                 </div>
             </div>

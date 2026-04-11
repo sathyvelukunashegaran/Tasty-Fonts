@@ -3,7 +3,7 @@ Tags: fonts, typography, google fonts, adobe fonts, bunny fonts
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.9.0
+Stable tag: 1.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,7 +43,7 @@ The plugin is designed for single-site activation and per-site activation inside
 
 = Release channels =
 
-The latest stable release is 1.9.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
+The latest stable release is 1.10.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
 
 = What is planned after 2.0.0 stable? =
 
@@ -99,11 +99,11 @@ https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues
 
 == Changelog ==
 
-= 1.10.0-beta.1 =
+= 1.10.0 =
 
-* Added a WordPress-style `readme.txt` for distribution metadata and compatibility messaging.
-* Documented optional integrations and the multisite activation boundary more explicitly.
-* Hardened editor theme JSON font preset injection so invalid or missing schema versions are not forced to a legacy default.
+* Added Automatic.css font-weight sync, dedicated role-weight variables, and matching Gutenberg plus Etch canvas bridge coverage.
+* Improved Google and Bunny variable import flows with style-aware terminology, named weight aliases, and tighter role-axis cleanup when switching back to static families.
+* Refined admin branding, upload-form polish, accessibility feedback, and the final release messaging for the 1.10.0 stable line.
 
 = 1.9.0 =
 

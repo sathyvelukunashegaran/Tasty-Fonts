@@ -41,6 +41,12 @@ $tests['font_utils_normalizes_google_variants'] = static function (): void {
     assertSameValue(['regular', '700italic'], $variants, 'Variant normalization should dedupe and discard unsupported tokens.');
 };
 
+$tests['font_utils_normalizes_google_variant_aliases'] = static function (): void {
+    $variants = FontUtils::normalizeVariantTokens(['bold', 'extra-bold italic', 'book', 'bogus']);
+
+    assertSameValue(['regular', '700', '800italic'], $variants, 'Variant normalization should canonicalize named weight aliases into the supported token set.');
+};
+
 $tests['font_utils_normalizes_and_validates_custom_unicode_ranges'] = static function (): void {
     assertSameValue(FontUtils::UNICODE_RANGE_MODE_OFF, FontUtils::normalizeUnicodeRangeMode('bogus'), 'Unsupported unicode-range modes should normalize back to off.');
     assertSameValue('U+0000-00FF,U+0100-024F,U+4??', FontUtils::normalizeUnicodeRangeValue(' u+0000-00ff, u+0100-024f , u+4?? '), 'Unicode-range normalization should uppercase values and collapse comma spacing.');

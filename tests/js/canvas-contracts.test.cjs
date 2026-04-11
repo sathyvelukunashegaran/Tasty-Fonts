@@ -3,8 +3,10 @@ const assert = require('node:assert/strict');
 
 const {
     getIframeDocument,
+    normalizeInlineCssBlocks,
     normalizeStylesheetUrls,
     requiresCrossOriginStylesheetAccess,
+    syncIframeInlineStyles,
     syncIframeStylesheets,
 } = require('../../assets/js/canvas-contracts.js');
 
@@ -30,11 +32,33 @@ class FakeLink {
     }
 }
 
+class FakeStyle {
+    constructor() {
+        this.attributes = {};
+        this.parentNode = null;
+        this.textContent = '';
+    }
+
+    getAttribute(name) {
+        return this.attributes[name] || null;
+    }
+
+    setAttribute(name, value) {
+        this.attributes[name] = String(value);
+    }
+}
+
 function createFakeDocument(urls = []) {
     const links = [];
+    const styles = [];
     const head = {
         appendChild(node) {
             node.parentNode = head;
+            if (node instanceof FakeStyle) {
+                styles.push(node);
+                return;
+            }
+
             links.push(node);
         },
         removeChild(node) {
@@ -42,6 +66,13 @@ function createFakeDocument(urls = []) {
 
             if (index >= 0) {
                 links.splice(index, 1);
+                return;
+            }
+
+            const styleIndex = styles.indexOf(node);
+
+            if (styleIndex >= 0) {
+                styles.splice(styleIndex, 1);
             }
         },
     };
@@ -52,25 +83,43 @@ function createFakeDocument(urls = []) {
             href: 'https://example.test/?etch=1',
         },
         createElement(tagName) {
+            if (tagName === 'style') {
+                return new FakeStyle();
+            }
+
             assert.equal(tagName, 'link');
 
             return new FakeLink();
         },
         querySelector(selector) {
-            const match = selector.match(/data-tasty-fonts-runtime-index="(\d+)"/);
+            const linkMatch = selector.match(/link\[data-tasty-fonts-runtime="1"\]\[data-tasty-fonts-runtime-index="(\d+)"\]/);
 
-            if (!match) {
-                return null;
+            if (linkMatch) {
+                return links.find((link) => link.getAttribute('data-tasty-fonts-runtime-index') === linkMatch[1]) || null;
             }
 
-            return links.find((link) => link.getAttribute('data-tasty-fonts-runtime-index') === match[1]) || null;
+            const styleMatch = selector.match(/style\[data-tasty-fonts-runtime-inline="1"\]\[data-tasty-fonts-runtime-inline-index="(\d+)"\]/);
+
+            if (styleMatch) {
+                return styles.find((style) => style.getAttribute('data-tasty-fonts-runtime-inline-index') === styleMatch[1]) || null;
+            }
+
+            return null;
         },
         querySelectorAll(selector) {
-            if (selector !== 'link[data-tasty-fonts-runtime="1"]') {
-                return [];
+            if (selector === 'link[data-tasty-fonts-runtime="1"]') {
+                return links.filter((link) => link.getAttribute('data-tasty-fonts-runtime') === '1');
             }
 
-            return [...links];
+            if (selector === 'link[rel="stylesheet"]') {
+                return links.filter((link) => link.rel === 'stylesheet');
+            }
+
+            if (selector === 'style[data-tasty-fonts-runtime-inline="1"]') {
+                return [...styles];
+            }
+
+            return [];
         },
     };
 
@@ -83,7 +132,7 @@ function createFakeDocument(urls = []) {
         head.appendChild(link);
     });
 
-    return { document, links };
+    return { document, links, styles };
 }
 
 test('canvas contracts normalize stylesheet URLs from array or singular config', () => {
@@ -96,6 +145,18 @@ test('canvas contracts normalize stylesheet URLs from array or singular config',
         ['https://example.test/one.css']
     );
     assert.deepEqual(normalizeStylesheetUrls({}), []);
+});
+
+test('canvas contracts normalize inline CSS blocks from array or singular config', () => {
+    assert.deepEqual(
+        normalizeInlineCssBlocks({ inlineCss: ['body{font-weight:var(--font-body-weight);}', '', null] }),
+        ['body{font-weight:var(--font-body-weight);}']
+    );
+    assert.deepEqual(
+        normalizeInlineCssBlocks({ inlineCss: 'body{font-weight:var(--font-body-weight);}' }),
+        ['body{font-weight:var(--font-body-weight);}']
+    );
+    assert.deepEqual(normalizeInlineCssBlocks({}), []);
 });
 
 test('canvas contracts guard iframe documents without a head element', () => {
@@ -157,4 +218,64 @@ test('canvas contracts mark cross-origin runtime stylesheets anonymous for ifram
     );
 
     assert.equal(links[0].crossOrigin, 'anonymous');
+});
+
+test('canvas contracts skip injecting duplicate iframe stylesheets when Etch already loaded an equivalent href', () => {
+    const { document, links } = createFakeDocument();
+    const existing = new FakeLink();
+    existing.rel = 'stylesheet';
+    existing.href = 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?etch_rand=abc123';
+    document.head.appendChild(existing);
+
+    assert.equal(
+        syncIframeStylesheets(document, [
+            'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?ver=hash456',
+        ]),
+        true
+    );
+
+    assert.deepEqual(
+        links.map((link) => ({
+            href: link.href,
+            runtime: link.getAttribute('data-tasty-fonts-runtime'),
+        })),
+        [
+            {
+                href: 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?etch_rand=abc123',
+                runtime: null,
+            },
+        ]
+    );
+});
+
+test('canvas contracts sync iframe inline styles by updating and pruning runtime style tags', () => {
+    const { document, styles } = createFakeDocument();
+
+    assert.equal(
+        syncIframeInlineStyles(document, [
+            'body{font-weight:var(--font-body-weight);}',
+            'h1,h2,h3,h4,h5,h6{font-weight:var(--font-heading-weight);}',
+        ]),
+        true
+    );
+
+    assert.deepEqual(
+        styles.map((style) => style.textContent),
+        [
+            'body{font-weight:var(--font-body-weight);}',
+            'h1,h2,h3,h4,h5,h6{font-weight:var(--font-heading-weight);}',
+        ]
+    );
+
+    assert.equal(
+        syncIframeInlineStyles(document, [
+            'body{font-weight:var(--font-body-weight);}',
+        ]),
+        true
+    );
+
+    assert.deepEqual(
+        styles.map((style) => style.textContent),
+        ['body{font-weight:var(--font-body-weight);}']
+    );
 });

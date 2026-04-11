@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added Automatic.css font-weight sync alongside the managed heading/body font-family mapping, including stored restore points plus Gutenberg and Etch canvas bridges for the active Automatic.css runtime stylesheet and editor-safe inline CSS.
+- Added role weight variable output controls so generated CSS can expose `--font-heading-weight`, `--font-body-weight`, and `--font-monospace-weight` alongside the existing role variables when variable font output is enabled.
+- Added a WordPress-style `readme.txt` with distribution metadata, FAQs, screenshot references, and a clearer multisite stance for installs outside the GitHub README flow.
+- Added scheduled Google Fonts API key revalidation so stale saved key status now queues a lightweight cron recheck instead of remaining indefinitely stale.
+
+### Changed
+
+- Improved Google and Bunny variable import flows so manual entries accept named weight aliases, switch between “variants” and “styles” terminology in variable mode, and keep manual fields plus chip selections synchronized with canonical stored tokens.
+- Improved role-axis and preview-axis editors for single-axis variable fonts, tightened local upload row layout spacing, derived delivery-profile variant counts from actual face data, and updated the admin chrome with a custom sidebar icon plus linked Tasty Fonts masthead logo.
+- Updated the Automatic.css integration panel to show current and desired font-family plus font-weight mappings, and keep the required role-weight variables enabled while sync is active.
+- Hardened editor theme JSON preset injection so the plugin preserves valid incoming schema versions and stops forcing a fallback schema version when the source data omits one.
+- Clarified optional integration messaging for Etch, Automatic.css, Bricks, and Oxygen, and explicitly blocked network-wide activation in favor of per-site activation on multisite installs.
+- Added optional preload `Link` header generation behind a filter for advanced performance setups while keeping HTML preload hints as the default delivery mode.
+- Updated the GitHub updater to support an optional token-backed API request header and to back off temporarily after GitHub rate-limit responses.
+- Documented the shared clear-select button helper so icon-only reset controls keep a consistent accessibility and admin-client contract wherever the renderer reuses them.
+- Rewrote the GitHub README and the WordPress-style `readme.txt` to better highlight the plugin’s typography workflow, integration value, and agency-friendly product benefits.
+- Promoted the validated `1.10.0` beta line to the stable rail after the final Automatic.css, variable-import, and admin polish pass.
+
+### Fixed
+
+- Improved admin accessibility feedback by promoting blocking import and upload errors to assertive announcements while keeping success and progress updates polite.
+- Improved upload-builder accessibility with explicit label associations for cloned family, face, and axis controls, plus clearer grouped row context for assistive technologies.
+- Improved disclosure accessibility across the admin by labeling revealed panels, moving focus into newly opened content, and announcing expansions in a controlled live region.
+- Improved muted control-text contrast in the admin token palette and removed `autocomplete="off"` from the Adobe Fonts Project ID field.
+- Standardized the icon-only clear-button accessibility pattern behind a shared renderer helper so new filter and selector clear controls keep the same `aria-label` plus decorative glyph treatment.
+- Restricted deferred generated CSS regeneration to cron execution contexts so the scheduled action no longer runs when triggered from unintended request paths.
+- Restricted classic settings saves to an explicit allowlist of expected scalar and boolean fields before forwarding values into the settings save pipeline, so unrelated `$_POST` payload keys no longer leak into plugin settings handling.
+- Cleared stale saved role-axis values when switching draft roles from variable families back to static families, and avoided duplicate canvas stylesheet injection when an equivalent runtime stylesheet is already present.
+
 ## [1.10.0-beta.5] - 2026-04-12
 
 ### Changed

@@ -1985,6 +1985,47 @@ $tests['admin_page_renderer_renders_type_badges_for_adobe_delivery_and_face_card
     assertContainsValue('tasty-fonts-detail-card--face', $output, 'Face detail cards should be included in the type badge coverage.');
 };
 
+$tests['family_card_renderer_counts_delivery_variants_from_faces_before_stale_profile_metadata'] = static function (): void {
+    resetTestState();
+
+    $renderer = new FamilyCardRenderer(new Storage());
+
+    ob_start();
+    try {
+        $renderer->renderDeliveryProfileCard(
+            'Lora',
+            'lora',
+            'local-self_hosted',
+            'published',
+            [
+                'id' => 'local-self_hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['100', '200', '300', 'regular', '500', '600', '700'],
+                'faces' => [
+                    [
+                        'weight' => '100..900',
+                        'style' => 'normal',
+                        'source' => 'local',
+                        'is_variable' => true,
+                        'axes' => [
+                            'WGHT' => ['min' => '100', 'max' => '900', 'default' => '400'],
+                        ],
+                    ],
+                ],
+            ]
+        );
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('1 variant', $output, 'Delivery profile cards should count variants from the actual face list when faces are available.');
+    assertNotContainsValue('7 variants', $output, 'Delivery profile cards should not surface stale stored variant counts when a single variable face is present.');
+};
+
 $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static function (): void {
     resetTestState();
 
@@ -2084,7 +2125,9 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertNotContainsValue('Saved automatically:', $output, 'Settings panels should no longer render autosave footnotes.');
     assertContainsValue('tasty-fonts-settings-save-button', $output, 'The shared Settings form should render the pill-style save button in the header.');
     assertNotContainsValue('Unsaved changes', $output, 'The shared Settings header should rely on button state instead of a separate unsaved-changes message.');
-    assertContainsValue('Tasty Custom Fonts', $output, 'The masthead should render the plugin title.');
+    assertContainsValue('tasty-fonts-header-logo', $output, 'The masthead should render the branded logo in place of the plain text title.');
+    assertContainsValue('https://tastywp.com/tastyfonts/', $output, 'The branded masthead logo should link to the Tasty Fonts product page.');
+    assertContainsValue('screen-reader-text', $output, 'The branded masthead should keep an accessible text label for assistive technology.');
     assertContainsValue('is-training-wheels-off', $output, 'Hide Onboarding Hints should add the admin state class used to suppress descriptive copy.');
     assertNotContainsValue('Typography Workspace', $output, 'The masthead should omit the eyebrow label in the streamlined header layout.');
     assertNotContainsValue('Professional Typography Management For WordPress', $output, 'The streamlined masthead should omit the legacy hero tagline.');
@@ -2216,16 +2259,21 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.',
+                'description' => 'Sync ACSS heading and body font-family and font-weight settings to Tasty Fonts role variables for clean interoperability.',
                 'status_label' => 'Synced',
+                'available' => true,
                 'enabled' => true,
                 'current' => [
                     'heading' => 'Inter, sans-serif',
                     'body' => 'System UI, sans-serif',
+                    'heading_weight' => 'var(--font-heading-weight)',
+                    'body_weight' => 'var(--font-body-weight)',
                 ],
                 'desired' => [
                     \TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_FAMILY => 'var(--font-heading)',
                     \TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_FAMILY => 'var(--font-body)',
+                    \TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_WEIGHT => 'var(--font-heading-weight)',
+                    \TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_WEIGHT => 'var(--font-body-weight)',
                 ],
             ],
             'role_deployment' => [
@@ -2245,8 +2293,12 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     assertContainsValue('On', $output, 'The Gutenberg integration row should still surface its current status.');
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Gutenberg integration should no longer render a second row title.');
     assertSameValue(1, substr_count($output, 'Gutenberg Font Library'), 'The Gutenberg integration should render a single main title.');
-    assertContainsValue('Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.', $output, 'The Automatic.css integration summary should still explain the integration.');
+    assertContainsValue('Sync ACSS heading and body font-family and font-weight settings to Tasty Fonts role variables for clean interoperability.', $output, 'The Automatic.css integration summary should still explain the integration.');
     assertContainsValue('Synced', $output, 'The Automatic.css integration row should still surface its current status.');
+    assertContainsValue('Heading Weight', $output, 'The Automatic.css managed mapping should list the heading font-weight field.');
+    assertContainsValue('Body Weight', $output, 'The Automatic.css managed mapping should list the body font-weight field.');
+    assertContainsValue('var(--font-heading-weight)', $output, 'The Automatic.css managed mapping should expose the heading weight variable target.');
+    assertContainsValue('var(--font-body-weight)', $output, 'The Automatic.css managed mapping should expose the body weight variable target.');
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Automatic.css integration should no longer render a second row title.');
     assertNotContainsValue('Sets ACSS `heading-font-family` to `var(--font-heading)` and `text-font-family` to `var(--font-body)` while the integration is enabled.', $output, 'The Automatic.css integration should no longer render a second explanatory line.');
 };

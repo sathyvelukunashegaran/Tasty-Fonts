@@ -124,6 +124,8 @@ final class AdminPageViewBuilder
         $perVariantFontVariablesEnabled = !array_key_exists('per_variant_font_variables_enabled', $context)
             || !empty($context['per_variant_font_variables_enabled']);
         $minimalOutputPresetEnabled = !empty($context['minimal_output_preset_enabled']);
+        $extendedVariableRoleWeightVarsEnabled = !array_key_exists('extended_variable_role_weight_vars_enabled', $context)
+            || !empty($context['extended_variable_role_weight_vars_enabled']);
         $extendedVariableWeightTokensEnabled = !array_key_exists('extended_variable_weight_tokens_enabled', $context)
             || !empty($context['extended_variable_weight_tokens_enabled']);
         $extendedVariableRoleAliasesEnabled = !array_key_exists('extended_variable_role_aliases_enabled', $context)
@@ -221,6 +223,7 @@ final class AdminPageViewBuilder
         $extendedVariableOptions = [
             'enabled' => $perVariantFontVariablesEnabled,
             'minimal' => $minimalOutputPresetEnabled,
+            'role_weight_vars' => $extendedVariableRoleWeightVarsEnabled,
             'weight_tokens' => $extendedVariableWeightTokensEnabled,
             'role_aliases' => $extendedVariableRoleAliasesEnabled,
             'category_sans' => $extendedVariableCategorySansEnabled,

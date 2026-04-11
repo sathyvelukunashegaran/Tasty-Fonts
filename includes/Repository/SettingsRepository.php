@@ -74,6 +74,7 @@ final class SettingsRepository
         'role_usage_font_weight_enabled' => false,
         'per_variant_font_variables_enabled' => true,
         'minimal_output_preset_enabled' => true,
+        'extended_variable_role_weight_vars_enabled' => true,
         'extended_variable_weight_tokens_enabled' => true,
         'extended_variable_role_aliases_enabled' => true,
         'extended_variable_category_sans_enabled' => true,
@@ -92,6 +93,8 @@ final class SettingsRepository
         'acss_font_role_sync_applied' => false,
         'acss_font_role_sync_previous_heading_font_family' => '',
         'acss_font_role_sync_previous_text_font_family' => '',
+        'acss_font_role_sync_previous_heading_font_weight' => '',
+        'acss_font_role_sync_previous_text_font_weight' => '',
         'preview_sentence' => 'The quick brown fox jumps over the lazy dog. 1234567890',
         'adobe_enabled' => false,
         'adobe_project_id' => '',
@@ -143,6 +146,7 @@ final class SettingsRepository
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
         $settings['minimal_output_preset_enabled'] = $this->resolveMinimalOutputPresetEnabled($storedSettings, $settings);
+        $settings['extended_variable_role_weight_vars_enabled'] = !empty($settings['extended_variable_role_weight_vars_enabled']);
         $settings['extended_variable_weight_tokens_enabled'] = !empty($settings['extended_variable_weight_tokens_enabled']);
         $settings['extended_variable_role_aliases_enabled'] = !empty($settings['extended_variable_role_aliases_enabled']);
         $settings['extended_variable_category_sans_enabled'] = !empty($settings['extended_variable_category_sans_enabled']);
@@ -163,6 +167,8 @@ final class SettingsRepository
         $settings['acss_font_role_sync_applied'] = !empty($settings['acss_font_role_sync_applied']);
         $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_family'] ?? '');
         $settings['acss_font_role_sync_previous_text_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_text_font_family'] ?? '');
+        $settings['acss_font_role_sync_previous_heading_font_weight'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_weight'] ?? '');
+        $settings['acss_font_role_sync_previous_text_font_weight'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_text_font_weight'] ?? '');
         $settings['preview_sentence'] = $this->sanitizePreviewSentence($settings['preview_sentence'] ?? '');
         $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
         $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
@@ -271,6 +277,7 @@ final class SettingsRepository
 
         foreach (
             [
+                'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
                 'extended_variable_category_sans_enabled',
@@ -510,13 +517,22 @@ final class SettingsRepository
         return !empty($this->getSettings()['block_editor_font_library_sync_enabled']);
     }
 
-    public function saveAcssFontRoleSyncState(?bool $enabled, bool $applied, string $previousHeading = '', string $previousText = ''): array
+    public function saveAcssFontRoleSyncState(
+        ?bool $enabled,
+        bool $applied,
+        string $previousHeading = '',
+        string $previousText = '',
+        string $previousHeadingWeight = '',
+        string $previousTextWeight = ''
+    ): array
     {
         $settings = $this->getSettings();
         $settings['acss_font_role_sync_enabled'] = $enabled;
         $settings['acss_font_role_sync_applied'] = $applied;
         $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($previousHeading);
         $settings['acss_font_role_sync_previous_text_font_family'] = $this->sanitizeTextValue($previousText);
+        $settings['acss_font_role_sync_previous_heading_font_weight'] = $this->sanitizeTextValue($previousHeadingWeight);
+        $settings['acss_font_role_sync_previous_text_font_weight'] = $this->sanitizeTextValue($previousTextWeight);
 
         return $this->persistSettings($settings);
     }
@@ -562,6 +578,8 @@ final class SettingsRepository
         $settings['acss_font_role_sync_applied'] = false;
         $settings['acss_font_role_sync_previous_heading_font_family'] = '';
         $settings['acss_font_role_sync_previous_text_font_family'] = '';
+        $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
+        $settings['acss_font_role_sync_previous_text_font_weight'] = '';
 
         return $this->persistSettings($settings);
     }
@@ -954,6 +972,7 @@ final class SettingsRepository
         $settings['class_output_enabled'] = false;
         $settings['role_usage_font_weight_enabled'] = false;
         $settings['per_variant_font_variables_enabled'] = true;
+        $settings['extended_variable_role_weight_vars_enabled'] = true;
 
         return $settings;
     }
@@ -1015,6 +1034,7 @@ final class SettingsRepository
     private function allVariableSubgroupsEnabled(array $settings): bool
     {
         $fields = [
+            'extended_variable_role_weight_vars_enabled',
             'extended_variable_weight_tokens_enabled',
             'extended_variable_role_aliases_enabled',
             'extended_variable_category_sans_enabled',
@@ -1082,6 +1102,7 @@ final class SettingsRepository
             [
                 'role_usage_font_weight_enabled',
                 'per_variant_font_variables_enabled',
+                'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
                 'extended_variable_category_sans_enabled',
@@ -1119,6 +1140,7 @@ final class SettingsRepository
                 'class_output_families_enabled',
                 'role_usage_font_weight_enabled',
                 'per_variant_font_variables_enabled',
+                'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
                 'extended_variable_category_sans_enabled',

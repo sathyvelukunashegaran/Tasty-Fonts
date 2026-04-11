@@ -138,6 +138,7 @@ final class RuntimeService
 
         $this->assets->enqueue('tasty-fonts-editor-content');
         $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets(), 'editor-content');
+        $this->enqueueAcssRuntimeStylesheet('editor-content');
     }
 
     /**
@@ -195,14 +196,8 @@ final class RuntimeService
     {
         $styles = [];
         $runtimeFamilies = $this->planner->getRuntimeFamilies();
-        $settings = $this->settings->getSettings();
 
-        if (
-            !empty($settings['auto_apply_roles'])
-            && ($settings['acss_font_role_sync_enabled'] ?? null) === true
-            && !empty($settings['acss_font_role_sync_applied'])
-            && $this->acssIntegration->isAvailable()
-        ) {
+        if ($this->hasManagedAcssRuntimeMapping()) {
             $styles = array_merge($styles, $this->acssIntegration->getManagedEditorStyles());
         }
 
@@ -283,8 +278,9 @@ final class RuntimeService
     private function enqueueEtchCanvasBridge(): void
     {
         $stylesheetUrls = $this->getCanvasStylesheetUrls();
+        $inlineCss = $this->getCanvasInlineCss();
 
-        if ($stylesheetUrls === []) {
+        if ($stylesheetUrls === [] && $inlineCss === []) {
             return;
         }
 
@@ -310,6 +306,7 @@ final class RuntimeService
             [
                 'stylesheetUrl' => $stylesheetUrls[0] ?? '',
                 'stylesheetUrls' => $stylesheetUrls,
+                'inlineCss' => $inlineCss,
             ]
         );
     }
@@ -330,6 +327,24 @@ final class RuntimeService
 
             wp_enqueue_style($handle, $url, [], $this->stylesheetVersion($stylesheet));
         }
+    }
+
+    private function enqueueAcssRuntimeStylesheet(string $handleSuffix): void
+    {
+        $stylesheet = $this->getManagedAcssRuntimeStylesheet();
+
+        if ($stylesheet === []) {
+            return;
+        }
+
+        $handle = $this->stylesheetHandle(
+            [
+                'handle' => 'tasty-fonts-acss-runtime',
+            ],
+            $handleSuffix
+        );
+
+        wp_enqueue_style($handle, $stylesheet['url'], [], $stylesheet['ver'] !== '' ? $stylesheet['ver'] : false);
     }
 
     private function getCanvasStylesheetUrls(): array
@@ -353,7 +368,48 @@ final class RuntimeService
             }
         }
 
+        $acssStylesheet = $this->getManagedAcssRuntimeStylesheet();
+
+        if ($acssStylesheet !== []) {
+            $urls[] = $acssStylesheet['url'];
+        }
+
         return array_values(array_unique(array_filter($urls, 'strlen')));
+    }
+
+    private function getCanvasInlineCss(): array
+    {
+        if (!$this->hasManagedAcssRuntimeMapping()) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter($this->acssIntegration->getManagedEditorStyles(), 'strlen')));
+    }
+
+    /**
+     * Resolve the Automatic.css runtime stylesheet when Tasty manages the ACSS font mapping.
+     *
+     * @since 1.10.0
+     *
+     * @return array{handle:string,url:string,ver:string}|array{}
+     */
+    private function getManagedAcssRuntimeStylesheet(): array
+    {
+        if (!$this->hasManagedAcssRuntimeMapping()) {
+            return [];
+        }
+
+        return $this->acssIntegration->getRuntimeStylesheet();
+    }
+
+    private function hasManagedAcssRuntimeMapping(): bool
+    {
+        $settings = $this->settings->getSettings();
+
+        return !empty($settings['auto_apply_roles'])
+            && ($settings['acss_font_role_sync_enabled'] ?? null) === true
+            && !empty($settings['acss_font_role_sync_applied'])
+            && $this->acssIntegration->isAvailable();
     }
 
     private function stylesheetVersion(array $stylesheet): string

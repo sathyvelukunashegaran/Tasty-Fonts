@@ -190,7 +190,7 @@
                                             <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--google tasty-fonts-workflow-step tasty-fonts-workflow-step--import">
                                                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
                                                     <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 2', 'tasty-fonts'); ?></span>
-                                                    <h4><?php esc_html_e('Choose Variants and Delivery', 'tasty-fonts'); ?></h4>
+                                                    <h4 id="tasty-fonts-google-import-step-title"><?php esc_html_e('Choose Variants and Delivery', 'tasty-fonts'); ?></h4>
                                                 </div>
 
                                                 <div class="tasty-fonts-import-manual-grid">
@@ -199,8 +199,8 @@
                                                         <input type="text" id="tasty-fonts-manual-family" class="regular-text" placeholder="<?php esc_attr_e('e.g. Inter', 'tasty-fonts'); ?>">
                                                     </label>
                                                     <label class="tasty-fonts-stack-field">
-                                                        <?php $this->renderFieldLabel(__('Manual Variants', 'tasty-fonts')); ?>
-                                                        <input type="text" id="tasty-fonts-manual-variants" class="regular-text" placeholder="<?php esc_attr_e('e.g. regular,700', 'tasty-fonts'); ?>">
+                                                        <span id="tasty-fonts-google-manual-variants-label" class="tasty-fonts-field-label"><?php esc_html_e('Manual Variants', 'tasty-fonts'); ?></span>
+                                                        <input type="text" id="tasty-fonts-manual-variants" class="regular-text" placeholder="<?php esc_attr_e('e.g. 400,700', 'tasty-fonts'); ?>">
                                                     </label>
                                                 </div>
 
@@ -248,8 +248,8 @@
                                                     <div class="tasty-fonts-selected-card tasty-fonts-selected-card--import-variants">
                                                         <div class="tasty-fonts-import-card-head">
                                                             <div class="tasty-fonts-import-card-copy">
-                                                                <?php $this->renderFieldLabel(__('Variants to Import', 'tasty-fonts')); ?>
-                                                                <p class="tasty-fonts-import-variant-note tasty-fonts-muted"><?php esc_html_e('Click chips or type a comma-separated list above. Both stay in sync.', 'tasty-fonts'); ?></p>
+                                                                <span id="tasty-fonts-google-selected-variants-label" class="tasty-fonts-field-label"><?php esc_html_e('Variants to Import', 'tasty-fonts'); ?></span>
+                                                                <p id="tasty-fonts-google-selected-variants-note" class="tasty-fonts-import-variant-note tasty-fonts-muted"><?php esc_html_e('Click chips or type a comma-separated list above. Both stay in sync.', 'tasty-fonts'); ?></p>
                                                             </div>
                                                             <div class="tasty-fonts-import-card-meta">
                                                                 <div id="tasty-fonts-import-selection-summary" class="tasty-fonts-import-selection-summary"><?php esc_html_e('0 Variants Selected', 'tasty-fonts'); ?></div>
@@ -337,7 +337,7 @@
                                             <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--google tasty-fonts-import-panel--bunny tasty-fonts-workflow-step tasty-fonts-workflow-step--import">
                                                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
                                                     <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 2', 'tasty-fonts'); ?></span>
-                                                    <h4><?php esc_html_e('Choose Variants and Delivery', 'tasty-fonts'); ?></h4>
+                                                    <h4 id="tasty-fonts-bunny-import-step-title"><?php esc_html_e('Choose Variants and Delivery', 'tasty-fonts'); ?></h4>
                                                 </div>
 
                                                 <div class="tasty-fonts-import-manual-grid">
@@ -346,8 +346,8 @@
                                                         <input type="text" id="tasty-fonts-bunny-family" class="regular-text" placeholder="<?php esc_attr_e('e.g. Inter', 'tasty-fonts'); ?>">
                                                     </label>
                                                     <label class="tasty-fonts-stack-field">
-                                                        <?php $this->renderFieldLabel(__('Manual Variants', 'tasty-fonts')); ?>
-                                                        <input type="text" id="tasty-fonts-bunny-variants" class="regular-text" placeholder="<?php esc_attr_e('Leave blank, or enter regular,700italic', 'tasty-fonts'); ?>">
+                                                        <span id="tasty-fonts-bunny-manual-variants-label" class="tasty-fonts-field-label"><?php esc_html_e('Manual Variants', 'tasty-fonts'); ?></span>
+                                                        <input type="text" id="tasty-fonts-bunny-variants" class="regular-text" placeholder="<?php esc_attr_e('Leave blank, or enter 400,700italic', 'tasty-fonts'); ?>">
                                                     </label>
                                                 </div>
 
@@ -395,8 +395,8 @@
                                                     <div class="tasty-fonts-selected-card tasty-fonts-selected-card--import-variants">
                                                         <div class="tasty-fonts-import-card-head">
                                                             <div class="tasty-fonts-import-card-copy">
-                                                                <?php $this->renderFieldLabel(__('Variants to Import', 'tasty-fonts')); ?>
-                                                                <p class="tasty-fonts-import-variant-note tasty-fonts-muted"><?php esc_html_e('Click chips or type a comma-separated list above. Both stay in sync.', 'tasty-fonts'); ?></p>
+                                                                <span id="tasty-fonts-bunny-selected-variants-label" class="tasty-fonts-field-label"><?php esc_html_e('Variants to Import', 'tasty-fonts'); ?></span>
+                                                                <p id="tasty-fonts-bunny-selected-variants-note" class="tasty-fonts-import-variant-note tasty-fonts-muted"><?php esc_html_e('Click chips or type a comma-separated list above. Both stay in sync.', 'tasty-fonts'); ?></p>
                                                             </div>
                                                             <div class="tasty-fonts-import-card-meta">
                                                                 <div id="tasty-fonts-bunny-import-selection-summary" class="tasty-fonts-import-selection-summary"><?php esc_html_e('0 Variants Selected', 'tasty-fonts'); ?></div>

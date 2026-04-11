@@ -1233,6 +1233,11 @@ $tests['admin_controller_registers_hidden_legacy_admin_routes'] = static functio
 
     assertSameValue(AdminController::MENU_SLUG, (string) ($menuPageCalls[0]['menu_slug'] ?? ''), 'The top-level Tasty Fonts menu should keep the existing menu slug.');
     assertSameValue(
+        TASTY_FONTS_URL . 'assets/images/tasty-sidebar-icon.svg',
+        (string) ($menuPageCalls[0]['icon_url'] ?? ''),
+        'The top-level Tasty Fonts menu should use the custom SVG icon instead of a dashicon.'
+    );
+    assertSameValue(
         [
             AdminController::MENU_SLUG_LIBRARY,
             AdminController::MENU_SLUG_SETTINGS,
@@ -1526,6 +1531,7 @@ $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): 
         'minimal_output_preset_enabled' => '1',
         'class_output_enabled' => '0',
         'per_variant_font_variables_enabled' => '1',
+        'extended_variable_role_weight_vars_enabled' => '0',
         'class_output_families_enabled' => '0',
         'extended_variable_weight_tokens_enabled' => '0',
     ]);
@@ -1542,6 +1548,7 @@ $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): 
     assertSameValue(true, !empty($data['settings']['minimal_output_preset_enabled']), 'The settings autosave route should persist the minimal output preset flag.');
     assertSameValue(false, !empty($data['settings']['class_output_enabled']), 'The minimal preset should suppress class output.');
     assertSameValue(true, !empty($data['settings']['per_variant_font_variables_enabled']), 'The settings autosave route should continue to persist variable output via explicit booleans rather than a removed all preset.');
+    assertSameValue(true, !empty($data['settings']['extended_variable_role_weight_vars_enabled']), 'The minimal preset should keep role weight variables enabled.');
     assertSameValue('minimal', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'The settings autosave route should persist the explicit output quick-mode preference.');
     assertSameValue(false, !empty($data['reload_required']), 'Settings that only patch client-synced controls should not ask the autosave client to reload the page.');
     assertSameValue(true, is_array($data['output_panels'] ?? null), 'The settings autosave route should return refreshed output panels for the live admin snippets.');
@@ -1560,6 +1567,7 @@ $tests['rest_controller_settings_keeps_custom_output_preference_sticky'] = stati
         'class_output_enabled' => '0',
         'per_variant_font_variables_enabled' => '1',
         'role_usage_font_weight_enabled' => '0',
+        'extended_variable_role_weight_vars_enabled' => '1',
         'extended_variable_weight_tokens_enabled' => '1',
         'extended_variable_role_aliases_enabled' => '1',
         'extended_variable_category_sans_enabled' => '1',
@@ -1584,6 +1592,7 @@ $tests['rest_controller_settings_preserves_variables_and_classes_output_presets'
         'class_output_enabled' => '0',
         'per_variant_font_variables_enabled' => '1',
         'role_usage_font_weight_enabled' => '0',
+        'extended_variable_role_weight_vars_enabled' => '1',
         'extended_variable_weight_tokens_enabled' => '1',
         'extended_variable_role_aliases_enabled' => '1',
         'extended_variable_category_sans_enabled' => '1',
@@ -1616,6 +1625,7 @@ $tests['rest_controller_settings_preserves_variables_and_classes_output_presets'
         'class_output_category_mono_enabled' => '1',
         'class_output_families_enabled' => '1',
         'per_variant_font_variables_enabled' => '0',
+        'extended_variable_role_weight_vars_enabled' => '0',
         'role_usage_font_weight_enabled' => '0',
     ]);
 
@@ -1810,6 +1820,84 @@ $tests['rest_controller_roles_draft_accepts_variable_axis_maps_when_the_feature_
     assertSameValue(true, $response instanceof WP_REST_Response, 'The roles/draft route should return a native REST response for variable axis payloads.');
     assertSameValue(['OPSZ' => '18', 'WGHT' => '720'], (array) ($data['roles']['heading_axes'] ?? []), 'The roles/draft route should preserve normalized heading axis values.');
     assertSameValue(['WGHT' => '420'], (array) ($data['roles']['body_axes'] ?? []), 'The roles/draft route should preserve normalized body axis values.');
+};
+
+$tests['admin_controller_role_draft_save_clears_stale_axes_when_switching_to_static_family'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['variable_fonts_enabled' => '1']);
+    $services['imports']->saveProfile(
+        'Noto Sans Variable',
+        'noto-sans-variable',
+        [
+            'id' => 'local-variable',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'label' => 'Self-hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Noto Sans Variable',
+                    'weight' => '100..900',
+                    'style' => 'normal',
+                    'is_variable' => true,
+                    'axes' => [
+                        'WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'],
+                    ],
+                    'files' => ['woff2' => 'noto-sans-variable/NotoSans-Variable.woff2'],
+                ],
+            ],
+            'meta' => [],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Noto Sans',
+        'noto-sans',
+        [
+            'id' => 'local-static',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'label' => 'Self-hosted',
+            'format' => 'static',
+            'variants' => ['regular', '700'],
+            'faces' => [
+                ['family' => 'Noto Sans', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'noto-sans/NotoSans-400.woff2']],
+                ['family' => 'Noto Sans', 'weight' => '700', 'style' => 'normal', 'files' => ['woff2' => 'noto-sans/NotoSans-700.woff2']],
+            ],
+            'meta' => [],
+        ],
+        'published',
+        true
+    );
+
+    $catalog = $services['catalog']->getCatalog();
+    $families = invokePrivateMethod($services['controller'], 'buildSelectableFamilyNames', [$catalog]);
+
+    $services['settings']->saveRoles(
+        [
+            'heading' => 'Noto Sans',
+            'body' => 'Noto Sans Variable',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+            'body_axes' => ['WGHT' => '900'],
+        ],
+        $families
+    );
+
+    $result = $services['controller']->saveRoleDraftValues([
+        'heading' => 'Noto Sans',
+        'body' => 'Noto Sans',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'body_weight' => '700',
+    ]);
+
+    assertSameValue('Noto Sans', (string) ($result['roles']['body'] ?? ''), 'Draft saves should keep the switched static body family.');
+    assertSameValue('700', (string) ($result['roles']['body_weight'] ?? ''), 'Draft saves should preserve the submitted static body weight override.');
+    assertSameValue([], (array) ($result['roles']['body_axes'] ?? []), 'Switching from a variable family to a static family should clear stale role axis values when the removed axis fields are omitted from the request.');
 };
 
 $tests['rest_controller_roles_draft_accepts_saved_static_role_weights'] = static function (): void {

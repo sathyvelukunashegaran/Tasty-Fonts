@@ -6,6 +6,7 @@ namespace TastyFonts\Admin\Renderer;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Support\FontUtils;
 
 final class FamilyCardRenderer extends AbstractSectionRenderer
@@ -191,6 +192,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $profileLabel = $this->translateProfileLabel((string) ($profile['label'] ?? ''));
         $profileProvider = (string) ($profile['provider'] ?? '');
         $profileIsActive = $profileId === $activeDeliveryId;
+        $profileVariantCount = $this->countProfileVariants($profile);
         $profileDeleteBlocked = $profileIsActive && $publishState === 'role_active'
             ? __('Switch the live delivery or remove this family from the active roles before deleting this delivery profile.', 'tasty-fonts')
             : '';
@@ -247,11 +249,22 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                 </div>
                 <div class="tasty-fonts-detail-meta-item">
                     <dt><?php esc_html_e('Variants', 'tasty-fonts'); ?></dt>
-                    <dd><?php echo esc_html(sprintf(_n('%d variant', '%d variants', count((array) ($profile['variants'] ?? [])), 'tasty-fonts'), count((array) ($profile['variants'] ?? [])))); ?></dd>
+                    <dd><?php echo esc_html(sprintf(_n('%d variant', '%d variants', $profileVariantCount, 'tasty-fonts'), $profileVariantCount)); ?></dd>
                 </div>
             </dl>
         </article>
         <?php
+    }
+
+    private function countProfileVariants(array $profile): int
+    {
+        $faces = is_array($profile['faces'] ?? null) ? (array) $profile['faces'] : [];
+
+        if ($faces !== []) {
+            return count(HostedImportSupport::variantsFromFaces($faces));
+        }
+
+        return count((array) ($profile['variants'] ?? []));
     }
 
     public function renderFaceDetailCard(

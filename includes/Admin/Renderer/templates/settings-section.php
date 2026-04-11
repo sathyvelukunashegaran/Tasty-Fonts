@@ -483,6 +483,29 @@
                                                         <?php endif; ?>
                                                     </div>
                                                     <div class="tasty-fonts-output-settings-submenu-list">
+                                                        <input type="hidden" name="extended_variable_role_weight_vars_enabled" value="0">
+                                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
+                                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="extended_variable_role_weight_vars_enabled" value="1" <?php checked($extendedVariableRoleWeightVarsEnabled); ?>>
+                                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                            <span class="tasty-fonts-toggle-copy">
+                                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Role Weight Variables', 'tasty-fonts'); ?></span>
+                                                                <?php if ($showSettingsDescriptions): ?>
+                                                                    <span class="tasty-fonts-toggle-description">
+                                                                        <?php
+                                                                        $roleWeightVariableDescription = $monospaceRoleEnabled
+                                                                            ? __('Controls variables like --font-heading-weight, --font-body-weight, and --font-monospace-weight.', 'tasty-fonts')
+                                                                            : __('Controls variables like --font-heading-weight and --font-body-weight.', 'tasty-fonts');
+
+                                                                        if (!empty($acssIntegration['configured'])) {
+                                                                            $roleWeightVariableDescription .= ' ' . __('Required while Automatic.css sync is on.', 'tasty-fonts');
+                                                                        }
+
+                                                                        echo esc_html($roleWeightVariableDescription);
+                                                                        ?>
+                                                                    </span>
+                                                                <?php endif; ?>
+                                                            </span>
+                                                        </label>
                                                         <input type="hidden" name="extended_variable_weight_tokens_enabled" value="0">
                                                         <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested">
                                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="extended_variable_weight_tokens_enabled" value="1" <?php checked($extendedVariableWeightTokensEnabled); ?>>
@@ -762,7 +785,7 @@
                                                 <div class="tasty-fonts-output-settings-submenu-copy">
                                                     <h4><?php esc_html_e('Managed Mapping', 'tasty-fonts'); ?></h4>
                                                     <?php if ($showSettingsDescriptions): ?>
-                                                        <p><?php esc_html_e('Review the current Automatic.css font-family values alongside the managed heading/body variable mapping.', 'tasty-fonts'); ?></p>
+                                                        <p><?php esc_html_e('Review the current Automatic.css font-family and font-weight values alongside the managed heading/body variable mapping.', 'tasty-fonts'); ?></p>
                                                     <?php endif; ?>
                                                 </div>
                                                 <div class="tasty-fonts-output-settings-submenu-list tasty-fonts-output-settings-submenu-list--integration">
@@ -777,6 +800,14 @@
                                                             <dt><?php esc_html_e('Body Text', 'tasty-fonts'); ?></dt>
                                                             <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) (($acssIntegration['current']['body'] ?? '') !== '' ? $acssIntegration['current']['body'] : __('empty', 'tasty-fonts'))); ?></span></dd>
                                                         </div>
+                                                        <div class="tasty-fonts-integration-kv">
+                                                            <dt><?php esc_html_e('Heading Weight', 'tasty-fonts'); ?></dt>
+                                                            <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) (($acssIntegration['current']['heading_weight'] ?? '') !== '' ? $acssIntegration['current']['heading_weight'] : __('empty', 'tasty-fonts'))); ?></span></dd>
+                                                        </div>
+                                                        <div class="tasty-fonts-integration-kv">
+                                                            <dt><?php esc_html_e('Body Weight', 'tasty-fonts'); ?></dt>
+                                                            <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) (($acssIntegration['current']['body_weight'] ?? '') !== '' ? $acssIntegration['current']['body_weight'] : __('empty', 'tasty-fonts'))); ?></span></dd>
+                                                        </div>
                                                     </dl>
                                                 </section>
 
@@ -790,6 +821,14 @@
                                                         <div class="tasty-fonts-integration-kv">
                                                             <dt><?php esc_html_e('Body Text', 'tasty-fonts'); ?></dt>
                                                             <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_FAMILY] ?? 'var(--font-body)')); ?></span></dd>
+                                                        </div>
+                                                        <div class="tasty-fonts-integration-kv">
+                                                            <dt><?php esc_html_e('Heading Weight', 'tasty-fonts'); ?></dt>
+                                                            <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_WEIGHT] ?? 'var(--font-heading-weight)')); ?></span></dd>
+                                                        </div>
+                                                        <div class="tasty-fonts-integration-kv">
+                                                            <dt><?php esc_html_e('Body Weight', 'tasty-fonts'); ?></dt>
+                                                            <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_WEIGHT] ?? 'var(--font-body-weight)')); ?></span></dd>
                                                         </div>
                                                     </dl>
                                                 </section>

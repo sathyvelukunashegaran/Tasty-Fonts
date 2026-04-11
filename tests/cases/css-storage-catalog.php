@@ -793,6 +793,39 @@ $tests['css_builder_emits_variable_font_ranges_and_role_variation_settings'] = s
     assertContainsValue('font-variation-settings: var(--font-body-settings);', $css, 'Role usage output should reference the body variation-settings variable.');
 };
 
+$tests['css_builder_emits_role_weight_variables_when_enabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Inter Variable',
+        'body' => 'Inter Variable',
+        'monospace' => 'IBM Plex Mono Variable',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+        'heading_weight' => '600',
+        'body_weight' => '400',
+        'monospace_weight' => '500',
+        'heading_axes' => ['WGHT' => '650', 'OPSZ' => '18'],
+        'body_axes' => ['WGHT' => '420'],
+        'monospace_axes' => ['WGHT' => '510'],
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'variable_fonts_enabled' => true,
+        'extended_variable_role_weight_vars_enabled' => true,
+        'monospace_role_enabled' => true,
+    ];
+
+    $css = $builder->build([], $roles, $settings, []);
+
+    assertContainsValue('--font-heading-weight: 650;', $css, 'Role weight variable output should expose the resolved heading weight through a dedicated role variable.');
+    assertContainsValue('--font-body-weight: 420;', $css, 'Role weight variable output should expose the resolved body weight through a dedicated role variable.');
+    assertContainsValue('--font-monospace-weight: 510;', $css, 'Role weight variable output should expose the resolved monospace weight through a dedicated role variable when the role is enabled.');
+    assertNotContainsValue('html:root {', $css, 'Role weight variable output should not emit a dedicated compatibility rule block.');
+    assertNotContainsValue('body :is(p, li, blockquote)', $css, 'Role weight variable output should not inject extra ACSS-specific variation selector rules.');
+};
+
 $tests['css_builder_emits_optional_monospace_role_css_when_enabled'] = static function (): void {
     $builder = new CssBuilder();
     $catalog = [

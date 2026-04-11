@@ -6,6 +6,11 @@
         : (runtimeConfig) => Array.isArray(runtimeConfig.stylesheetUrls)
             ? runtimeConfig.stylesheetUrls.filter(Boolean)
             : (runtimeConfig.stylesheetUrl ? [runtimeConfig.stylesheetUrl] : []);
+    const normalizeInlineCssBlocks = typeof canvasContracts.normalizeInlineCssBlocks === 'function'
+        ? canvasContracts.normalizeInlineCssBlocks
+        : (runtimeConfig) => Array.isArray(runtimeConfig.inlineCss)
+            ? runtimeConfig.inlineCss.filter(Boolean)
+            : (runtimeConfig.inlineCss ? [runtimeConfig.inlineCss] : []);
     const getIframeDocument = typeof canvasContracts.getIframeDocument === 'function'
         ? canvasContracts.getIframeDocument
         : (iframe) => {
@@ -49,9 +54,43 @@
 
             return true;
         };
-    const stylesheetUrls = normalizeStylesheetUrls(config);
+    const syncIframeInlineStyles = typeof canvasContracts.syncIframeInlineStyles === 'function'
+        ? canvasContracts.syncIframeInlineStyles
+        : (doc, runtimeInlineCssBlocks) => {
+            let existingIndex = 0;
 
-    if (!stylesheetUrls.length) {
+            for (const node of doc.querySelectorAll('style[data-tasty-fonts-runtime-inline="1"]')) {
+                if (existingIndex >= runtimeInlineCssBlocks.length && node.parentNode) {
+                    node.parentNode.removeChild(node);
+                }
+
+                existingIndex += 1;
+            }
+
+            for (const [index, inlineCss] of runtimeInlineCssBlocks.entries()) {
+                const current = doc.querySelector(`style[data-tasty-fonts-runtime-inline="1"][data-tasty-fonts-runtime-inline-index="${index}"]`);
+
+                if (current) {
+                    if (current.textContent !== inlineCss) {
+                        current.textContent = inlineCss;
+                    }
+
+                    continue;
+                }
+
+                const style = doc.createElement('style');
+                style.textContent = inlineCss;
+                style.setAttribute('data-tasty-fonts-runtime-inline', '1');
+                style.setAttribute('data-tasty-fonts-runtime-inline-index', String(index));
+                doc.head.appendChild(style);
+            }
+
+            return true;
+        };
+    const stylesheetUrls = normalizeStylesheetUrls(config);
+    const inlineCssBlocks = normalizeInlineCssBlocks(config);
+
+    if (!stylesheetUrls.length && !inlineCssBlocks.length) {
         return;
     }
 
@@ -62,7 +101,15 @@
             return false;
         }
 
-        return syncIframeStylesheets(doc, stylesheetUrls);
+        if (stylesheetUrls.length) {
+            syncIframeStylesheets(doc, stylesheetUrls);
+        }
+
+        if (inlineCssBlocks.length) {
+            syncIframeInlineStyles(doc, inlineCssBlocks);
+        }
+
+        return true;
     };
 
     const bindIframe = (iframe) => {

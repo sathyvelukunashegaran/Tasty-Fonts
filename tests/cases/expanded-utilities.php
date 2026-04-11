@@ -274,8 +274,11 @@ $tests['font_utils_compact_relative_path_normalizes_storage_paths'] = static fun
 
 $tests['font_utils_google_variant_to_axis_converts_all_token_forms'] = static function (): void {
     assertSameValue(['style' => 'normal', 'weight' => '400'], FontUtils::googleVariantToAxis('regular'), 'The regular token should map to 400 normal.');
+    assertSameValue(['style' => 'normal', 'weight' => '400'], FontUtils::googleVariantToAxis('book'), 'The book alias should map to 400 normal.');
     assertSameValue(['style' => 'italic', 'weight' => '400'], FontUtils::googleVariantToAxis('italic'), 'The italic token should map to 400 italic.');
     assertSameValue(['style' => 'normal', 'weight' => '700'], FontUtils::googleVariantToAxis('700'), 'A numeric weight token should map to the given weight and normal style.');
+    assertSameValue(['style' => 'normal', 'weight' => '700'], FontUtils::googleVariantToAxis('bold'), 'The bold alias should map to 700 normal.');
+    assertSameValue(['style' => 'italic', 'weight' => '800'], FontUtils::googleVariantToAxis('extra-bold italic'), 'Named italic aliases should normalize to canonical numeric italic tokens.');
     assertSameValue(['style' => 'italic', 'weight' => '700'], FontUtils::googleVariantToAxis('700italic'), 'A numeric italic token should map to the given weight and italic style.');
     assertSameValue(['style' => 'normal', 'weight' => '100..900'], FontUtils::googleVariantToAxis('100..900'), 'A variable-range token should map to the range weight and normal style.');
     assertSameValue(null, FontUtils::googleVariantToAxis('bogus'), 'Unrecognized tokens should return null.');
