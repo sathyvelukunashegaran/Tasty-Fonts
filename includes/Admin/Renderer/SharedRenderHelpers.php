@@ -319,10 +319,39 @@ trait SharedRenderHelpers
         echo '>';
 
         if ($clearLabel !== '' && $inputId !== '') {
-            echo '<button type="button" class="tasty-fonts-select-clear" data-clear-select-button data-clear-target="' . esc_attr($inputId) . '" data-clear-value="' . esc_attr((string) $clearValue) . '" aria-label="' . esc_attr($clearLabel) . '" hidden><span aria-hidden="true">&times;</span></button>';
+            $this->renderClearSelectButton($clearLabel, $inputId, (string) $clearValue);
         }
 
         echo '</span>';
+    }
+
+    public function renderClearSelectButton(string $label, string $targetId = '', string $clearValue = '', bool $alwaysVisibleAffordance = false): void
+    {
+        $label = trim($label);
+        $targetId = trim($targetId);
+
+        if ($label === '') {
+            return;
+        }
+        ?>
+        <button
+            type="button"
+            class="tasty-fonts-select-clear"
+            data-clear-select-button
+            <?php if ($targetId !== ''): ?>
+                data-clear-target="<?php echo esc_attr($targetId); ?>"
+            <?php endif; ?>
+            data-clear-value="<?php echo esc_attr($clearValue); ?>"
+            <?php if ($alwaysVisibleAffordance): ?>
+                data-clear-affordance="always"
+            <?php endif; ?>
+            aria-label="<?php echo esc_attr($label); ?>"
+            hidden
+        >
+            <?php // Clear buttons stay icon-only visually; the glyph is decorative and the control is named via aria-label. ?>
+            <span aria-hidden="true">&times;</span>
+        </button>
+        <?php
     }
 
     public function renderFallbackSuggestionList(): void

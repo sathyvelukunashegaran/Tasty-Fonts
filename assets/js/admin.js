@@ -210,6 +210,9 @@
     let activeHelpButton = null;
     let nextUploadGroupIndex = uploadGroupsWrap ? uploadGroupsWrap.querySelectorAll('[data-upload-group]').length : 0;
     let nextUploadRowIndex = uploadGroupsWrap ? uploadGroupsWrap.querySelectorAll('[data-upload-row]').length : 0;
+    let nextGeneratedFieldIndex = 0;
+    let disclosureAnnouncementRegion = null;
+    let disclosureAnnouncementToken = 0;
     let activeLibrarySourceFilter = 'all';
     let activeLibraryCategoryFilter = 'all';
     let syncingGoogleVariants = false;
@@ -290,6 +293,10 @@
         uploadRowQueued: __('Queued', 'tasty-fonts'),
         uploadRowUploading: __('Uploading…', 'tasty-fonts'),
         uploadRowError: __('Error', 'tasty-fonts'),
+        uploadFaceRowLabel: __('Font face %d', 'tasty-fonts'),
+        uploadFaceRowLabelFamily: __('Font face %1$d for %2$s', 'tasty-fonts'),
+        uploadRemoveFace: __('Remove font face %d', 'tasty-fonts'),
+        disclosureExpanded: __('%s expanded.', 'tasty-fonts'),
         uploadUseDetected: __('Use Detected Values', 'tasty-fonts'),
         uploadDetectedSummary: __('Detected: %1$s / %2$s / %3$s', 'tasty-fonts'),
         uploadDetectedWeightStyle: __('Detected: %1$s / %2$s', 'tasty-fonts'),
@@ -388,18 +395,24 @@
         : (left, right) => JSON.stringify(left || {}) === JSON.stringify(right || {});
     const getTabNavigationTargetIndex = typeof adminContracts.getTabNavigationTargetIndex === 'function'
         ? adminContracts.getTabNavigationTargetIndex
-        : (key, currentIndex, count) => {
+        : (key, currentIndex, count, orientation = 'horizontal') => {
             if (typeof currentIndex !== 'number' || typeof count !== 'number' || count < 2 || currentIndex < 0 || currentIndex >= count) {
                 return null;
             }
 
+            const normalizedOrientation = String(orientation || 'horizontal').trim().toLowerCase() === 'vertical'
+                ? 'vertical'
+                : 'horizontal';
+
             switch (key) {
                 case 'ArrowRight':
+                    return normalizedOrientation === 'horizontal' ? (currentIndex + 1) % count : null;
                 case 'ArrowDown':
-                    return (currentIndex + 1) % count;
+                    return normalizedOrientation === 'vertical' ? (currentIndex + 1) % count : null;
                 case 'ArrowLeft':
+                    return normalizedOrientation === 'horizontal' ? (currentIndex - 1 + count) % count : null;
                 case 'ArrowUp':
-                    return (currentIndex - 1 + count) % count;
+                    return normalizedOrientation === 'vertical' ? (currentIndex - 1 + count) % count : null;
                 case 'Home':
                     return 0;
                 case 'End':
@@ -408,6 +421,11 @@
                     return null;
             }
         };
+    const resolveStatusAnnouncement = typeof adminContracts.resolveStatusAnnouncement === 'function'
+        ? adminContracts.resolveStatusAnnouncement
+        : (type) => (String(type || '').trim().toLowerCase() === 'error'
+            ? { role: 'alert', live: 'assertive' }
+            : { role: 'status', live: 'polite' });
     const describeFontType = typeof adminContracts.describeFontType === 'function'
         ? adminContracts.describeFontType
         : (entry, provider = 'library') => {
@@ -4107,8 +4125,11 @@
             return;
         }
 
+        const toggleId = ensureElementId(toggle, 'tasty-fonts-disclosure-toggle');
+
         toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
         target.hidden = !expanded;
+        target.setAttribute('aria-labelledby', toggleId);
 
         const expandedLabel = toggle.getAttribute('data-expanded-label');
         const collapsedLabel = toggle.getAttribute('data-collapsed-label');
@@ -4178,6 +4199,100 @@
         if (manualFamily) {
             manualFamily.focus();
         }
+    }
+
+    function ensureDisclosureAnnouncementRegion() {
+        if (disclosureAnnouncementRegion) {
+            return disclosureAnnouncementRegion;
+        }
+
+        const root = document.querySelector('.tasty-fonts-admin') || document.body;
+
+        disclosureAnnouncementRegion = document.createElement('div');
+        disclosureAnnouncementRegion.className = 'screen-reader-text';
+        disclosureAnnouncementRegion.setAttribute('aria-live', 'polite');
+        disclosureAnnouncementRegion.setAttribute('aria-atomic', 'true');
+        disclosureAnnouncementRegion.setAttribute('role', 'status');
+        root.appendChild(disclosureAnnouncementRegion);
+
+        return disclosureAnnouncementRegion;
+    }
+
+    function announceDisclosureExpansion(toggle) {
+        if (!toggle) {
+            return;
+        }
+
+        const region = ensureDisclosureAnnouncementRegion();
+        const label = String(
+            toggle.getAttribute('data-expanded-label')
+            || toggle.getAttribute('aria-label')
+            || toggle.textContent
+            || ''
+        ).trim();
+
+        if (!label) {
+            return;
+        }
+
+        const token = disclosureAnnouncementToken + 1;
+        disclosureAnnouncementToken = token;
+        region.textContent = '';
+
+        window.setTimeout(() => {
+            if (disclosureAnnouncementToken !== token) {
+                return;
+            }
+
+            region.textContent = formatMessage(
+                getString('disclosureExpanded', '%s expanded.'),
+                [label]
+            );
+        }, 20);
+    }
+
+    function firstFocusableIn(container) {
+        if (!container) {
+            return null;
+        }
+
+        return container.querySelector([
+            'input:not([type="hidden"]):not([disabled])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            'button:not([disabled])',
+            '[href]',
+            '[tabindex]:not([tabindex="-1"])'
+        ].join(', '));
+    }
+
+    function focusDisclosureTarget(targetId) {
+        if (!targetId) {
+            return;
+        }
+
+        const panel = document.getElementById(targetId);
+
+        if (!panel || panel.hidden || panel.closest('[hidden]')) {
+            return;
+        }
+
+        window.setTimeout(() => {
+            const focusTarget = firstFocusableIn(panel);
+
+            if (focusTarget && typeof focusTarget.focus === 'function') {
+                focusTarget.focus({ preventScroll: true });
+                return;
+            }
+
+            if (!panel.hasAttribute('tabindex')) {
+                panel.setAttribute('tabindex', '-1');
+            }
+
+            if (typeof panel.focus === 'function') {
+                panel.focus({ preventScroll: true });
+            }
+        }, 0);
     }
 
     // Toasts and tooltips
@@ -4838,8 +4953,13 @@
             return;
         }
 
+        const announcement = resolveStatusAnnouncement(type);
+
         target.innerHTML = '';
         target.classList.remove('is-error', 'is-success', 'is-progress');
+        target.setAttribute('role', announcement.role);
+        target.setAttribute('aria-live', announcement.live);
+        target.setAttribute('aria-atomic', 'true');
 
         if (!message) {
             return;
@@ -7113,6 +7233,204 @@
         }
     }
 
+    function nextGeneratedFieldId(prefix) {
+        const normalizedPrefix = String(prefix || 'tasty-fonts-field').trim() || 'tasty-fonts-field';
+        const id = `${normalizedPrefix}-${nextGeneratedFieldIndex}`;
+
+        nextGeneratedFieldIndex += 1;
+
+        return id;
+    }
+
+    function ensureElementId(element, prefix) {
+        if (!element) {
+            return '';
+        }
+
+        if (!element.id) {
+            element.id = nextGeneratedFieldId(prefix);
+        }
+
+        return element.id;
+    }
+
+    function bindExplicitLabel(label, control, prefix) {
+        if (!label || !control) {
+            return '';
+        }
+
+        const controlId = ensureElementId(control, prefix);
+
+        label.setAttribute('for', controlId);
+
+        return controlId;
+    }
+
+    function uploadHeadingMap(group) {
+        const headings = {};
+
+        if (!group) {
+            return headings;
+        }
+
+        const groupIndex = group.getAttribute('data-upload-group-index') || '0';
+
+        Array.from(group.querySelectorAll('[data-upload-heading]')).forEach((heading) => {
+            const key = String(heading.getAttribute('data-upload-heading') || '').trim();
+
+            if (!key) {
+                return;
+            }
+
+            if (!heading.id) {
+                heading.id = `tasty-fonts-upload-heading-${groupIndex}-${key}`;
+            }
+
+            headings[key] = heading.id;
+        });
+
+        return headings;
+    }
+
+    function setUploadFieldDescriptions(target, ids = []) {
+        if (!target) {
+            return;
+        }
+
+        const describedBy = ids.filter(Boolean).join(' ').trim();
+
+        if (describedBy) {
+            target.setAttribute('aria-describedby', describedBy);
+            return;
+        }
+
+        target.removeAttribute('aria-describedby');
+    }
+
+    function buildUploadRowLabel(group, index) {
+        const familyName = String(familyInputForGroup(group)?.value || '').trim();
+
+        if (familyName !== '') {
+            return formatMessage(
+                getString('uploadFaceRowLabelFamily', 'Font face %1$d for %2$s'),
+                [index + 1, familyName]
+            );
+        }
+
+        return formatMessage(getString('uploadFaceRowLabel', 'Font face %d'), [index + 1]);
+    }
+
+    function ensureUploadRowLabel(row, rowIndex, text) {
+        if (!row) {
+            return '';
+        }
+
+        let label = row.querySelector('[data-upload-row-label]');
+
+        if (!label) {
+            label = document.createElement('span');
+            label.className = 'screen-reader-text';
+            label.setAttribute('data-upload-row-label', '');
+            row.insertBefore(label, row.firstChild);
+        }
+
+        label.id = `tasty-fonts-upload-row-label-${rowIndex}`;
+        label.textContent = text;
+
+        return label.id;
+    }
+
+    function bindUploadGroupLabels(group) {
+        if (!group) {
+            return;
+        }
+
+        const groupIndex = group.getAttribute('data-upload-group-index') || '0';
+
+        bindExplicitLabel(
+            group.querySelector('[data-upload-group-label="family"]'),
+            familyInputForGroup(group),
+            `tasty-fonts-upload-group-family-${groupIndex}`
+        );
+        bindExplicitLabel(
+            group.querySelector('[data-upload-group-label="fallback"]'),
+            fallbackInputForGroup(group),
+            `tasty-fonts-upload-group-fallback-${groupIndex}`
+        );
+    }
+
+    function bindUploadRowFieldLabels(row, rowIndex) {
+        if (!row) {
+            return;
+        }
+
+        bindExplicitLabel(
+            row.querySelector('[data-upload-field-label="file"]'),
+            row.querySelector('[data-upload-field="file"]'),
+            `tasty-fonts-upload-row-file-${rowIndex}`
+        );
+        bindExplicitLabel(
+            row.querySelector('[data-upload-field-label="weight"]'),
+            row.querySelector('[data-upload-field="weight"]'),
+            `tasty-fonts-upload-row-weight-${rowIndex}`
+        );
+        bindExplicitLabel(
+            row.querySelector('[data-upload-field-label="style"]'),
+            row.querySelector('[data-upload-field="style"]'),
+            `tasty-fonts-upload-row-style-${rowIndex}`
+        );
+        bindExplicitLabel(
+            row.querySelector('[data-upload-field-label="variable"]'),
+            row.querySelector('[data-upload-field="is-variable"]'),
+            `tasty-fonts-upload-row-variable-${rowIndex}`
+        );
+    }
+
+    function updateUploadGroupAccessibility(group) {
+        if (!group) {
+            return;
+        }
+
+        assignUploadGroupIndex(group);
+        bindUploadGroupLabels(group);
+
+        const headingIds = uploadHeadingMap(group);
+
+        uploadRows(group).forEach((row, index) => {
+            assignUploadRowIndex(row);
+
+            const rowIndex = row.getAttribute('data-upload-index') || String(index);
+            bindUploadRowFieldLabels(row, rowIndex);
+            const rowLabelId = ensureUploadRowLabel(row, rowIndex, buildUploadRowLabel(group, index));
+            const rowFieldIds = (key) => [rowLabelId, headingIds[key]];
+
+            row.setAttribute('role', 'group');
+            row.setAttribute('aria-labelledby', rowLabelId);
+
+            setUploadFieldDescriptions(row.querySelector('[data-upload-field="file"]'), rowFieldIds('file'));
+            setUploadFieldDescriptions(row.querySelector('[data-upload-field="weight"]'), rowFieldIds('weight'));
+            setUploadFieldDescriptions(row.querySelector('[data-upload-field="style"]'), rowFieldIds('style'));
+            setUploadFieldDescriptions(row.querySelector('[data-upload-field="is-variable"]'), rowFieldIds('variable'));
+
+            const removeButton = row.querySelector('[data-upload-remove]');
+
+            if (removeButton) {
+                removeButton.setAttribute(
+                    'aria-label',
+                    formatMessage(getString('uploadRemoveFace', 'Remove font face %d'), [index + 1])
+                );
+                setUploadFieldDescriptions(removeButton, rowFieldIds('action'));
+            }
+
+            const status = row.querySelector('[data-upload-row-status]');
+
+            if (status) {
+                status.setAttribute('aria-live', 'polite');
+                status.setAttribute('aria-atomic', 'true');
+            }
+        });
+    }
+
     function updateUploadRemoveButtons() {
         const groups = uploadGroups();
 
@@ -7219,6 +7537,7 @@
         const wrapper = document.createElement('div');
         wrapper.className = 'tasty-fonts-upload-axis-row';
         wrapper.setAttribute('data-upload-axis-row', '');
+        const axisRowId = nextGeneratedFieldId('tasty-fonts-upload-axis-row');
 
         const fields = [
             { key: 'tag', placeholder: 'wght', label: getString('uploadAxisTag', 'Axis') },
@@ -7230,12 +7549,14 @@
         fields.forEach(({ key, placeholder, label }) => {
             const field = document.createElement('label');
             field.className = 'tasty-fonts-stack-field tasty-fonts-upload-axis-field';
+            field.setAttribute('data-upload-axis-label', key);
 
             const title = document.createElement('span');
             title.className = 'screen-reader-text';
             title.textContent = label;
 
             const input = document.createElement('input');
+            input.id = `${axisRowId}-${key}`;
             input.type = key === 'tag' ? 'text' : 'number';
             input.step = key === 'tag' ? '' : 'any';
             input.placeholder = placeholder;
@@ -7243,6 +7564,7 @@
                 ? String(axis[key] || '').toUpperCase()
                 : String(axis[key] || '');
             input.setAttribute('data-upload-axis-field', key);
+            field.setAttribute('for', input.id);
 
             field.appendChild(title);
             field.appendChild(input);
@@ -7371,6 +7693,7 @@
         }
 
         rows.forEach((row) => initializeUploadRow(row));
+        updateUploadGroupAccessibility(group);
         updateUploadRemoveButtons();
     }
 
@@ -7416,6 +7739,7 @@
         }
 
         initializeUploadRow(appendedRow);
+        updateUploadGroupAccessibility(group);
         updateUploadRemoveButtons();
 
         return appendedRow;
@@ -7449,6 +7773,7 @@
             fallbackField.value = options.fallback;
         }
 
+        updateUploadGroupAccessibility(appendedGroup);
         uploadRows(appendedGroup).forEach((row) => updateUploadDetectedSuggestion(row));
 
         return appendedGroup;
@@ -8257,6 +8582,8 @@
 
         if (nextExpanded && disclosureToggle.getAttribute('data-disclosure-toggle') === 'tasty-fonts-add-font-panel') {
             window.setTimeout(focusAddFontPanel, 0);
+        } else if (nextExpanded) {
+            focusDisclosureTarget(targetId);
         }
 
         if (nextExpanded && disclosureToggle.getAttribute('data-disclosure-toggle') === 'tasty-fonts-role-preview-panel') {
@@ -8265,6 +8592,10 @@
 
         if (nextExpanded && isRoleToolToggle) {
             revealDisclosurePanel(targetId, disclosureToggle);
+        }
+
+        if (nextExpanded) {
+            announceDisclosureExpansion(disclosureToggle);
         }
 
         return true;
@@ -8319,13 +8650,15 @@
 
         const group = tab.getAttribute('data-tab-group') || '';
         const buttons = tabButtonsForGroup(group);
+        const tablist = tab.closest('[role="tablist"]');
+        const orientation = tablist ? (tablist.getAttribute('aria-orientation') || 'horizontal') : 'horizontal';
 
         if (!group || buttons.length < 2) {
             return false;
         }
 
         const currentIndex = buttons.indexOf(tab);
-        const nextIndex = getTabNavigationTargetIndex(event.key, currentIndex, buttons.length);
+        const nextIndex = getTabNavigationTargetIndex(event.key, currentIndex, buttons.length, orientation);
 
         if (nextIndex === null) {
             return false;
@@ -8633,6 +8966,7 @@
 
             if (row && group && uploadRows(group).length > 1) {
                 row.remove();
+                updateUploadGroupAccessibility(group);
                 updateUploadRemoveButtons();
             }
 
@@ -9354,7 +9688,9 @@
             const familyInput = event.target.closest('[data-upload-group-field="family"]');
 
             if (familyInput) {
-                updateGroupDetectedSuggestions(familyInput.closest('[data-upload-group]'));
+                const group = familyInput.closest('[data-upload-group]');
+                updateUploadGroupAccessibility(group);
+                updateGroupDetectedSuggestions(group);
             }
         });
 
@@ -9371,7 +9707,9 @@
             const familyInput = event.target.closest('[data-upload-group-field="family"]');
 
             if (familyInput) {
-                updateGroupDetectedSuggestions(familyInput.closest('[data-upload-group]'));
+                const group = familyInput.closest('[data-upload-group]');
+                updateUploadGroupAccessibility(group);
+                updateGroupDetectedSuggestions(group);
                 return;
             }
 

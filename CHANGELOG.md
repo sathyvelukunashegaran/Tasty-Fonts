@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Improved admin accessibility feedback by promoting blocking import and upload errors to assertive announcements while keeping success and progress updates polite.
+- Improved upload-builder accessibility with explicit label associations for cloned family, face, and axis controls, plus clearer grouped row context for assistive technologies.
+- Improved disclosure accessibility across the admin by labeling revealed panels, moving focus into newly opened content, and announcing expansions in a controlled live region.
+- Improved muted control-text contrast in the admin token palette and removed `autocomplete="off"` from the Adobe Fonts Project ID field.
+- Standardized the icon-only clear-button accessibility pattern behind a shared renderer helper so new filter and selector clear controls keep the same `aria-label` plus decorative glyph treatment.
+
 ## [1.9.0] - 2026-04-11
 
 ### Added

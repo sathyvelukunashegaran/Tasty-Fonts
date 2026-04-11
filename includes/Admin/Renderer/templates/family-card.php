@@ -222,16 +222,7 @@
                                                             </option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <button
-                                                        type="button"
-                                                        class="tasty-fonts-select-clear"
-                                                        data-clear-select-button
-                                                        data-clear-value="inherit"
-                                                        aria-label="<?php esc_attr_e('Clear font display override', 'tasty-fonts'); ?>"
-                                                        hidden
-                                                    >
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
+                                                    <?php $this->renderClearSelectButton(__('Clear font display override', 'tasty-fonts'), '', 'inherit'); ?>
                                                 </span>
                                             </label>
                                             <button

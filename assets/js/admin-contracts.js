@@ -29,18 +29,24 @@
         return String(family || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     }
 
-    function getTabNavigationTargetIndex(key, currentIndex, count) {
+    function getTabNavigationTargetIndex(key, currentIndex, count, orientation = 'horizontal') {
         if (typeof currentIndex !== 'number' || typeof count !== 'number' || count < 2 || currentIndex < 0 || currentIndex >= count) {
             return null;
         }
 
+        const normalizedOrientation = String(orientation || 'horizontal').trim().toLowerCase() === 'vertical'
+            ? 'vertical'
+            : 'horizontal';
+
         switch (key) {
             case 'ArrowRight':
+                return normalizedOrientation === 'horizontal' ? (currentIndex + 1) % count : null;
             case 'ArrowDown':
-                return (currentIndex + 1) % count;
+                return normalizedOrientation === 'vertical' ? (currentIndex + 1) % count : null;
             case 'ArrowLeft':
+                return normalizedOrientation === 'horizontal' ? (currentIndex - 1 + count) % count : null;
             case 'ArrowUp':
-                return (currentIndex - 1 + count) % count;
+                return normalizedOrientation === 'vertical' ? (currentIndex - 1 + count) % count : null;
             case 'Home':
                 return 0;
             case 'End':
@@ -48,6 +54,12 @@
             default:
                 return null;
         }
+    }
+
+    function resolveStatusAnnouncement(type) {
+        return String(type || '').trim().toLowerCase() === 'error'
+            ? { role: 'alert', live: 'assertive' }
+            : { role: 'status', live: 'polite' };
     }
 
     function normalizeAxisTag(tag) {
@@ -366,6 +378,7 @@
         hasStaticFontMetadata,
         hasVariableFontMetadata,
         normalizeOutputQuickModePreference,
+        resolveStatusAnnouncement,
         resolveAssignedRoleState,
         roleStatesMatch,
         settingsStatesMatch,

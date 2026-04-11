@@ -267,17 +267,7 @@
                                                             <option value="<?php echo esc_attr($familyName); ?>" <?php selected($roles['heading'] ?? '', $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <button
-                                                        type="button"
-                                                        class="tasty-fonts-select-clear"
-                                                        data-clear-select-button
-                                                        data-clear-target="tasty_fonts_heading_font"
-                                                        data-clear-value=""
-                                                        aria-label="<?php esc_attr_e('Clear Heading Family', 'tasty-fonts'); ?>"
-                                                        hidden
-                                                    >
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
+                                                    <?php $this->renderClearSelectButton(__('Clear Heading Family', 'tasty-fonts'), 'tasty_fonts_heading_font'); ?>
                                                 </span>
                                             </label>
                                         </div>
@@ -295,17 +285,7 @@
                                                         data-role-weight-select="heading"
                                                         form="<?php echo esc_attr($roleFormId); ?>"
                                                     ></select>
-                                                    <button
-                                                        type="button"
-                                                        class="tasty-fonts-select-clear"
-                                                        data-clear-select-button
-                                                        data-clear-target="tasty_fonts_heading_weight"
-                                                        data-clear-value=""
-                                                        aria-label="<?php esc_attr_e('Reset Heading Weight', 'tasty-fonts'); ?>"
-                                                        hidden
-                                                    >
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
+                                                    <?php $this->renderClearSelectButton(__('Reset Heading Weight', 'tasty-fonts'), 'tasty_fonts_heading_weight'); ?>
                                                 </span>
                                             </label>
                                         </div>
@@ -354,17 +334,7 @@
                                                             <option value="<?php echo esc_attr($familyName); ?>" <?php selected($roles['body'] ?? '', $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <button
-                                                        type="button"
-                                                        class="tasty-fonts-select-clear"
-                                                        data-clear-select-button
-                                                        data-clear-target="tasty_fonts_body_font"
-                                                        data-clear-value=""
-                                                        aria-label="<?php esc_attr_e('Clear Body Family', 'tasty-fonts'); ?>"
-                                                        hidden
-                                                    >
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
+                                                    <?php $this->renderClearSelectButton(__('Clear Body Family', 'tasty-fonts'), 'tasty_fonts_body_font'); ?>
                                                 </span>
                                             </label>
                                         </div>
@@ -382,17 +352,7 @@
                                                         data-role-weight-select="body"
                                                         form="<?php echo esc_attr($roleFormId); ?>"
                                                     ></select>
-                                                    <button
-                                                        type="button"
-                                                        class="tasty-fonts-select-clear"
-                                                        data-clear-select-button
-                                                        data-clear-target="tasty_fonts_body_weight"
-                                                        data-clear-value=""
-                                                        aria-label="<?php esc_attr_e('Reset Body Weight', 'tasty-fonts'); ?>"
-                                                        hidden
-                                                    >
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
+                                                    <?php $this->renderClearSelectButton(__('Reset Body Weight', 'tasty-fonts'), 'tasty_fonts_body_weight'); ?>
                                                 </span>
                                             </label>
                                         </div>
@@ -442,17 +402,7 @@
                                                             <option value="<?php echo esc_attr($familyName); ?>" <?php selected($roles['monospace'] ?? '', $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <button
-                                                        type="button"
-                                                        class="tasty-fonts-select-clear"
-                                                        data-clear-select-button
-                                                        data-clear-target="tasty_fonts_monospace_font"
-                                                        data-clear-value=""
-                                                        aria-label="<?php esc_attr_e('Clear Monospace Family', 'tasty-fonts'); ?>"
-                                                        hidden
-                                                    >
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
+                                                    <?php $this->renderClearSelectButton(__('Clear Monospace Family', 'tasty-fonts'), 'tasty_fonts_monospace_font'); ?>
                                                 </span>
                                             </label>
                                         </div>
@@ -470,17 +420,7 @@
                                                         data-role-weight-select="monospace"
                                                         form="<?php echo esc_attr($roleFormId); ?>"
                                                     ></select>
-                                                    <button
-                                                        type="button"
-                                                        class="tasty-fonts-select-clear"
-                                                        data-clear-select-button
-                                                        data-clear-target="tasty_fonts_monospace_weight"
-                                                        data-clear-value=""
-                                                        aria-label="<?php esc_attr_e('Reset Monospace Weight', 'tasty-fonts'); ?>"
-                                                        hidden
-                                                    >
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
+                                                    <?php $this->renderClearSelectButton(__('Reset Monospace Weight', 'tasty-fonts'), 'tasty_fonts_monospace_weight'); ?>
                                                 </span>
                                             </label>
                                         </div>

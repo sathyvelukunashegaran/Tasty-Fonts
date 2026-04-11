@@ -36,17 +36,7 @@
                                             <option value="bunny-cdn"><?php esc_html_e('Bunny CDN', 'tasty-fonts'); ?></option>
                                             <option value="adobe-hosted"><?php esc_html_e('Adobe-hosted', 'tasty-fonts'); ?></option>
                                         </select>
-                                        <button
-                                            type="button"
-                                            class="tasty-fonts-select-clear"
-                                            data-clear-select-button
-                                            data-clear-target="tasty-fonts-library-source-filter"
-                                            data-clear-value="all"
-                                            aria-label="<?php esc_attr_e('Clear source filter', 'tasty-fonts'); ?>"
-                                            hidden
-                                        >
-                                            <span aria-hidden="true">&times;</span>
-                                        </button>
+                                        <?php $this->renderClearSelectButton(__('Clear source filter', 'tasty-fonts'), 'tasty-fonts-library-source-filter', 'all'); ?>
                                     </span>
                                     <label class="screen-reader-text" for="tasty-fonts-library-category-filter"><?php esc_html_e('Filter fonts by type', 'tasty-fonts'); ?></label>
                                     <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable tasty-fonts-library-select">
@@ -60,17 +50,7 @@
                                                 <option value="<?php echo esc_attr((string) ($option['value'] ?? '')); ?>"><?php echo esc_html((string) ($option['label'] ?? '')); ?></option>
                                             <?php endforeach; ?>
                                         </select>
-                                        <button
-                                            type="button"
-                                            class="tasty-fonts-select-clear"
-                                            data-clear-select-button
-                                            data-clear-target="tasty-fonts-library-category-filter"
-                                            data-clear-value="all"
-                                            aria-label="<?php esc_attr_e('Clear type filter', 'tasty-fonts'); ?>"
-                                            hidden
-                                        >
-                                            <span aria-hidden="true">&times;</span>
-                                        </button>
+                                        <?php $this->renderClearSelectButton(__('Clear type filter', 'tasty-fonts'), 'tasty-fonts-library-category-filter', 'all'); ?>
                                     </span>
                                 </div>
                                 <div class="tasty-fonts-actions tasty-fonts-actions--library">
@@ -288,7 +268,7 @@
                                                 </div>
 
                                                 <div class="tasty-fonts-import-footer">
-                                                    <div id="tasty-fonts-import-status" class="tasty-fonts-import-status" aria-live="polite"></div>
+                                                    <div id="tasty-fonts-import-status" class="tasty-fonts-import-status" aria-live="polite" aria-atomic="true"></div>
 
                                                     <div class="tasty-fonts-actions tasty-fonts-actions--import">
                                                         <button
@@ -435,7 +415,7 @@
                                                 </div>
 
                                                 <div class="tasty-fonts-import-footer">
-                                                    <div id="tasty-fonts-bunny-import-status" class="tasty-fonts-import-status" aria-live="polite"></div>
+                                                    <div id="tasty-fonts-bunny-import-status" class="tasty-fonts-import-status" aria-live="polite" aria-atomic="true"></div>
 
                                                     <div class="tasty-fonts-actions tasty-fonts-actions--import">
                                                         <button
@@ -496,7 +476,6 @@
                                                                 name="adobe_project_id"
                                                                 value="<?php echo esc_attr($adobeProjectId); ?>"
                                                                 placeholder="<?php esc_attr_e('Example: abc1def', 'tasty-fonts'); ?>"
-                                                                autocomplete="off"
                                                                 spellcheck="false"
                                                             >
                                                         </label>
@@ -576,7 +555,7 @@
                                                     <section class="tasty-fonts-upload-group" data-upload-group>
                                                         <div class="tasty-fonts-upload-group-head">
                                                             <div class="tasty-fonts-upload-group-fields">
-                                                                <label class="tasty-fonts-stack-field">
+                                                                <label class="tasty-fonts-stack-field" data-upload-group-label="family">
                                                                     <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
                                                                     <input
                                                                         type="text"
@@ -586,7 +565,7 @@
                                                                     >
                                                                 </label>
 
-                                                                <label class="tasty-fonts-stack-field">
+                                                                <label class="tasty-fonts-stack-field" data-upload-group-label="fallback">
                                                                     <?php $this->renderFieldLabel(__('Fallback', 'tasty-fonts')); ?>
                                                                     <?php
                                                                     $this->renderFallbackInput(
@@ -611,20 +590,21 @@
                                                         </div>
 
                                                         <div class="tasty-fonts-upload-face-shell<?php echo $showUploadVariableControls ? '' : ' tasty-fonts-upload-face-shell--static-only'; ?>">
-                                                            <div class="tasty-fonts-upload-face-headings" aria-hidden="true">
-                                                                <span><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
-                                                                <span><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
-                                                                <span><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-upload-face-headings">
+                                                                <span data-upload-heading="file"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
+                                                                <span data-upload-heading="weight"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
+                                                                <span data-upload-heading="style"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
                                                                 <?php if ($showUploadVariableControls): ?>
-                                                                    <span><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
+                                                                    <span data-upload-heading="variable"><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
                                                                 <?php endif; ?>
-                                                                <span><?php esc_html_e('Action', 'tasty-fonts'); ?></span>
+                                                                <span data-upload-heading="action"><?php esc_html_e('Action', 'tasty-fonts'); ?></span>
                                                             </div>
 
                                                             <div class="tasty-fonts-upload-face-list" data-upload-face-list>
-                                                                <div class="tasty-fonts-upload-face-row" data-upload-row>
+                                                                <div class="tasty-fonts-upload-face-row" data-upload-row role="group">
+                                                                    <span class="screen-reader-text" data-upload-row-label></span>
                                                                     <div class="tasty-fonts-upload-face-grid">
-                                                                        <label class="tasty-fonts-stack-field tasty-fonts-upload-file-field">
+                                                                        <label class="tasty-fonts-stack-field tasty-fonts-upload-file-field" data-upload-field-label="file">
                                                                             <span class="screen-reader-text"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
                                                                             <span class="tasty-fonts-upload-file-picker">
                                                                                 <input
@@ -638,7 +618,7 @@
                                                                             </span>
                                                                         </label>
 
-                                                                        <label class="tasty-fonts-stack-field">
+                                                                        <label class="tasty-fonts-stack-field" data-upload-field-label="weight">
                                                                             <span class="screen-reader-text"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
                                                                             <span class="tasty-fonts-select-field">
                                                                                 <select data-upload-field="weight">
@@ -649,7 +629,7 @@
                                                                             </span>
                                                                         </label>
 
-                                                                        <label class="tasty-fonts-stack-field">
+                                                                        <label class="tasty-fonts-stack-field" data-upload-field-label="style">
                                                                             <span class="screen-reader-text"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
                                                                             <span class="tasty-fonts-select-field">
                                                                                 <select data-upload-field="style">
@@ -661,7 +641,7 @@
                                                                         </label>
 
                                                                         <?php if ($showUploadVariableControls): ?>
-                                                                            <label class="tasty-fonts-stack-field tasty-fonts-upload-variable-field">
+                                                                            <label class="tasty-fonts-stack-field tasty-fonts-upload-variable-field" data-upload-field-label="variable">
                                                                                 <span class="screen-reader-text"><?php esc_html_e('Variable Font', 'tasty-fonts'); ?></span>
                                                                                 <span class="tasty-fonts-upload-variable-toggle">
                                                                                     <input type="checkbox" data-upload-field="is-variable">
@@ -670,15 +650,14 @@
                                                                             </label>
                                                                         <?php endif; ?>
 
-                                                                        <button
-                                                                            type="button"
-                                                                            class="button tasty-fonts-button-danger tasty-fonts-upload-row-remove"
-                                                                            data-upload-remove
-                                                                            aria-label="<?php esc_attr_e('Remove row', 'tasty-fonts'); ?>"
-                                                                        >
-                                                                            <?php esc_html_e('Remove', 'tasty-fonts'); ?>
-                                                                        </button>
-                                                                    </div>
+                                                                            <button
+                                                                                type="button"
+                                                                                class="button tasty-fonts-button-danger tasty-fonts-upload-row-remove"
+                                                                                data-upload-remove
+                                                                            >
+                                                                                <?php esc_html_e('Remove', 'tasty-fonts'); ?>
+                                                                            </button>
+                                                                        </div>
 
                                                                     <div class="tasty-fonts-upload-row-foot">
                                                                         <button type="button" class="button tasty-fonts-upload-detected" data-upload-detected-apply hidden></button>
@@ -705,7 +684,7 @@
                                                     <section class="tasty-fonts-upload-group" data-upload-group>
                                                         <div class="tasty-fonts-upload-group-head">
                                                             <div class="tasty-fonts-upload-group-fields">
-                                                                <label class="tasty-fonts-stack-field">
+                                                                <label class="tasty-fonts-stack-field" data-upload-group-label="family">
                                                                     <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
                                                                     <input
                                                                         type="text"
@@ -715,7 +694,7 @@
                                                                     >
                                                                 </label>
 
-                                                                <label class="tasty-fonts-stack-field">
+                                                                <label class="tasty-fonts-stack-field" data-upload-group-label="fallback">
                                                                     <?php $this->renderFieldLabel(__('Fallback', 'tasty-fonts')); ?>
                                                                     <?php
                                                                     $this->renderFallbackInput(
@@ -740,20 +719,21 @@
                                                         </div>
 
                                                         <div class="tasty-fonts-upload-face-shell<?php echo $showUploadVariableControls ? '' : ' tasty-fonts-upload-face-shell--static-only'; ?>">
-                                                            <div class="tasty-fonts-upload-face-headings" aria-hidden="true">
-                                                                <span><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
-                                                                <span><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
-                                                                <span><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-upload-face-headings">
+                                                                <span data-upload-heading="file"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
+                                                                <span data-upload-heading="weight"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
+                                                                <span data-upload-heading="style"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
                                                                 <?php if ($showUploadVariableControls): ?>
-                                                                    <span><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
+                                                                    <span data-upload-heading="variable"><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
                                                                 <?php endif; ?>
-                                                                <span><?php esc_html_e('Action', 'tasty-fonts'); ?></span>
+                                                                <span data-upload-heading="action"><?php esc_html_e('Action', 'tasty-fonts'); ?></span>
                                                             </div>
 
                                                             <div class="tasty-fonts-upload-face-list" data-upload-face-list>
-                                                                <div class="tasty-fonts-upload-face-row" data-upload-row>
+                                                                <div class="tasty-fonts-upload-face-row" data-upload-row role="group">
+                                                                    <span class="screen-reader-text" data-upload-row-label></span>
                                                                     <div class="tasty-fonts-upload-face-grid">
-                                                                        <label class="tasty-fonts-stack-field tasty-fonts-upload-file-field">
+                                                                        <label class="tasty-fonts-stack-field tasty-fonts-upload-file-field" data-upload-field-label="file">
                                                                             <span class="screen-reader-text"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
                                                                             <span class="tasty-fonts-upload-file-picker">
                                                                                 <input
@@ -767,7 +747,7 @@
                                                                             </span>
                                                                         </label>
 
-                                                                        <label class="tasty-fonts-stack-field">
+                                                                        <label class="tasty-fonts-stack-field" data-upload-field-label="weight">
                                                                             <span class="screen-reader-text"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
                                                                             <span class="tasty-fonts-select-field">
                                                                                 <select data-upload-field="weight">
@@ -778,7 +758,7 @@
                                                                             </span>
                                                                         </label>
 
-                                                                        <label class="tasty-fonts-stack-field">
+                                                                        <label class="tasty-fonts-stack-field" data-upload-field-label="style">
                                                                             <span class="screen-reader-text"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
                                                                             <span class="tasty-fonts-select-field">
                                                                                 <select data-upload-field="style">
@@ -831,9 +811,10 @@
                                                 </template>
 
                                                 <template id="tasty-fonts-upload-row-template">
-                                                    <div class="tasty-fonts-upload-face-row" data-upload-row>
+                                                    <div class="tasty-fonts-upload-face-row" data-upload-row role="group">
+                                                        <span class="screen-reader-text" data-upload-row-label></span>
                                                         <div class="tasty-fonts-upload-face-grid">
-                                                            <label class="tasty-fonts-stack-field tasty-fonts-upload-file-field">
+                                                            <label class="tasty-fonts-stack-field tasty-fonts-upload-file-field" data-upload-field-label="file">
                                                                 <span class="screen-reader-text"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-upload-file-picker">
                                                                     <input
@@ -847,7 +828,7 @@
                                                                 </span>
                                                             </label>
 
-                                                            <label class="tasty-fonts-stack-field">
+                                                            <label class="tasty-fonts-stack-field" data-upload-field-label="weight">
                                                                 <span class="screen-reader-text"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-select-field">
                                                                     <select data-upload-field="weight">
@@ -858,7 +839,7 @@
                                                                 </span>
                                                             </label>
 
-                                                            <label class="tasty-fonts-stack-field">
+                                                            <label class="tasty-fonts-stack-field" data-upload-field-label="style">
                                                                 <span class="screen-reader-text"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-select-field">
                                                                     <select data-upload-field="style">
@@ -870,7 +851,7 @@
                                                             </label>
 
                                                             <?php if ($showUploadVariableControls): ?>
-                                                                <label class="tasty-fonts-stack-field tasty-fonts-upload-variable-field">
+                                                                <label class="tasty-fonts-stack-field tasty-fonts-upload-variable-field" data-upload-field-label="variable">
                                                                     <span class="screen-reader-text"><?php esc_html_e('Variable Font', 'tasty-fonts'); ?></span>
                                                                     <span class="tasty-fonts-upload-variable-toggle">
                                                                         <input type="checkbox" data-upload-field="is-variable">
@@ -883,7 +864,6 @@
                                                                 type="button"
                                                                 class="button tasty-fonts-button-danger tasty-fonts-upload-row-remove"
                                                                 data-upload-remove
-                                                                aria-label="<?php esc_attr_e('Remove row', 'tasty-fonts'); ?>"
                                                             >
                                                                 <?php esc_html_e('Remove', 'tasty-fonts'); ?>
                                                             </button>
@@ -910,7 +890,7 @@
                                                     <button type="submit" class="button button-primary" id="tasty-fonts-upload-submit"><?php esc_html_e('Upload to Library', 'tasty-fonts'); ?></button>
                                                 </div>
 
-                                                <div id="tasty-fonts-upload-status" class="tasty-fonts-import-status" aria-live="polite"></div>
+                                                <div id="tasty-fonts-upload-status" class="tasty-fonts-import-status" aria-live="polite" aria-atomic="true"></div>
                                             </form>
                                         </section>
                                     </div>

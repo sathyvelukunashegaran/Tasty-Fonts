@@ -328,16 +328,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                         <?php endforeach; ?>
                     </select>
                     <?php if ($allowFallbackOnly): ?>
-                        <button
-                            type="button"
-                            class="tasty-fonts-select-clear"
-                            data-clear-select-button
-                            data-clear-value=""
-                            aria-label="<?php echo esc_attr(sprintf(__('Clear %s', 'tasty-fonts'), $label)); ?>"
-                            hidden
-                        >
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <?php $this->renderClearSelectButton(sprintf(__('Clear %s', 'tasty-fonts'), $label)); ?>
                     <?php endif; ?>
                 </span>
             </label>
@@ -346,17 +337,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                     <?php $this->renderFieldLabel(__('Role Weight', 'tasty-fonts')); ?>
                     <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
                         <select data-preview-weight-select="<?php echo esc_attr($roleKey); ?>"></select>
-                        <button
-                            type="button"
-                            class="tasty-fonts-select-clear"
-                            data-clear-select-button
-                            data-clear-value=""
-                            data-clear-affordance="always"
-                            aria-label="<?php echo esc_attr(sprintf(__('Clear %s weight', 'tasty-fonts'), $label)); ?>"
-                            hidden
-                        >
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <?php $this->renderClearSelectButton(sprintf(__('Clear %s weight', 'tasty-fonts'), $label), '', '', true); ?>
                     </span>
                 </label>
             </div>

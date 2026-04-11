@@ -10,6 +10,7 @@ const {
     hasStaticFontMetadata,
     hasVariableFontMetadata,
     normalizeOutputQuickModePreference,
+    resolveStatusAnnouncement,
     resolveAssignedRoleState,
     roleStatesMatch,
     settingsStatesMatch,
@@ -41,12 +42,21 @@ test('admin contracts escape font family values for CSS usage', () => {
 test('admin contracts resolve keyboard tab navigation targets for tablists', () => {
     assert.equal(getTabNavigationTargetIndex('ArrowRight', 0, 5), 1);
     assert.equal(getTabNavigationTargetIndex('ArrowLeft', 0, 5), 4);
-    assert.equal(getTabNavigationTargetIndex('ArrowDown', 3, 5), 4);
-    assert.equal(getTabNavigationTargetIndex('ArrowUp', 3, 5), 2);
+    assert.equal(getTabNavigationTargetIndex('ArrowDown', 3, 5), null);
+    assert.equal(getTabNavigationTargetIndex('ArrowUp', 3, 5), null);
+    assert.equal(getTabNavigationTargetIndex('ArrowDown', 3, 5, 'vertical'), 4);
+    assert.equal(getTabNavigationTargetIndex('ArrowUp', 3, 5, 'vertical'), 2);
+    assert.equal(getTabNavigationTargetIndex('ArrowRight', 1, 5, 'vertical'), null);
     assert.equal(getTabNavigationTargetIndex('Home', 3, 5), 0);
     assert.equal(getTabNavigationTargetIndex('End', 1, 5), 4);
     assert.equal(getTabNavigationTargetIndex('Enter', 1, 5), null);
     assert.equal(getTabNavigationTargetIndex('ArrowRight', 0, 1), null);
+});
+
+test('admin contracts resolve status announcements by urgency', () => {
+    assert.deepEqual(resolveStatusAnnouncement('error'), { role: 'alert', live: 'assertive' });
+    assert.deepEqual(resolveStatusAnnouncement('success'), { role: 'status', live: 'polite' });
+    assert.deepEqual(resolveStatusAnnouncement('progress'), { role: 'status', live: 'polite' });
 });
 
 test('admin contracts detect variable metadata from family and face entries', () => {

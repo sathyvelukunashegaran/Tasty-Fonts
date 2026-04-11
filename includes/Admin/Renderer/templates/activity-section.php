@@ -27,17 +27,7 @@
                                                     <option value="<?php echo esc_attr((string) $actor); ?>"><?php echo esc_html((string) $actor); ?></option>
                                                 <?php endforeach; ?>
                                             </select>
-                                            <button
-                                                type="button"
-                                                class="tasty-fonts-select-clear"
-                                                data-clear-select-button
-                                                data-clear-target="tasty-fonts-activity-actor-filter"
-                                                data-clear-value=""
-                                                aria-label="<?php esc_attr_e('Clear account filter', 'tasty-fonts'); ?>"
-                                                hidden
-                                            >
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
+                                            <?php $this->renderClearSelectButton(__('Clear account filter', 'tasty-fonts'), 'tasty-fonts-activity-actor-filter'); ?>
                                         </span>
                                         <label class="screen-reader-text" for="tasty-fonts-activity-search"><?php esc_html_e('Search activity', 'tasty-fonts'); ?></label>
                                         <span class="tasty-fonts-search-field--compact tasty-fonts-search-field--activity">
