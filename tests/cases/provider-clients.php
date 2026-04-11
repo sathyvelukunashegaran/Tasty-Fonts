@@ -7,6 +7,7 @@ use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\TransientKey;
 
 $tests['google_fonts_client_builds_variable_css2_urls_when_axes_are_available'] = static function (): void {
     $settings = new SettingsRepository();
@@ -144,7 +145,7 @@ $tests['bunny_fonts_client_refetches_legacy_cached_family_records_without_variab
     global $transientStore;
 
     $client = new BunnyFontsClient();
-    $transientStore[TastyFonts\Bunny\BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . substr(md5('inter'), 0, 12)] = [
+    $transientStore[TransientKey::forSite(TastyFonts\Bunny\BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . substr(md5('inter'), 0, 12))] = [
         'family' => 'Inter',
         'slug' => 'inter',
         'category' => 'sans-serif',
@@ -196,7 +197,7 @@ $tests['bunny_fonts_client_refetches_cached_family_records_that_still_expose_var
     global $transientStore;
 
     $client = new BunnyFontsClient();
-    $transientStore[TastyFonts\Bunny\BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . substr(md5('inter'), 0, 12)] = [
+    $transientStore[TransientKey::forSite(TastyFonts\Bunny\BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . substr(md5('inter'), 0, 12))] = [
         'family' => 'Inter',
         'slug' => 'inter',
         'category' => 'sans-serif',
@@ -366,7 +367,7 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
                 'axes' => [],
             ],
         ],
-        $transientStore[GoogleFontsClient::TRANSIENT_CATALOG] ?? null,
+        $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG)] ?? null,
         'The Google catalog transient should only store the compact search index.'
     );
     assertSameValue(3, count($remoteGetCalls), 'Google family metadata lookups should refetch the full catalog while reusing the cached Google Fonts metadata fallback.');
@@ -388,19 +389,19 @@ $tests['google_fonts_client_clears_catalog_cache'] = static function (): void {
     global $transientDeleted;
     global $transientStore;
 
-    $transientStore[GoogleFontsClient::TRANSIENT_CATALOG] = ['family' => 'Inter'];
-    $transientStore[GoogleFontsClient::LEGACY_TRANSIENT_CATALOG] = ['family' => 'Inter (legacy)'];
-    $transientStore[GoogleFontsClient::TRANSIENT_METADATA] = ['inter' => ['family' => 'Inter', 'axes' => []]];
+    $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG)] = ['family' => 'Inter'];
+    $transientStore[TransientKey::forSite(GoogleFontsClient::LEGACY_TRANSIENT_CATALOG)] = ['family' => 'Inter (legacy)'];
+    $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA)] = ['inter' => ['family' => 'Inter', 'axes' => []]];
 
     $client = new GoogleFontsClient(new SettingsRepository());
     $client->clearCatalogCache();
 
-    assertSameValue(false, array_key_exists(GoogleFontsClient::TRANSIENT_CATALOG, $transientStore), 'Google catalog cache clearing should remove the cached catalog transient.');
-    assertSameValue(false, array_key_exists(GoogleFontsClient::LEGACY_TRANSIENT_CATALOG, $transientStore), 'Google catalog cache clearing should also remove the legacy catalog transient.');
-    assertSameValue(false, array_key_exists(GoogleFontsClient::TRANSIENT_METADATA, $transientStore), 'Google catalog cache clearing should remove the cached Google Fonts metadata fallback.');
-    assertSameValue(true, in_array(GoogleFontsClient::TRANSIENT_CATALOG, $transientDeleted, true), 'Google catalog cache clearing should delete the expected catalog transient key.');
-    assertSameValue(true, in_array(GoogleFontsClient::LEGACY_TRANSIENT_CATALOG, $transientDeleted, true), 'Google catalog cache clearing should delete the legacy catalog transient key.');
-    assertSameValue(true, in_array(GoogleFontsClient::TRANSIENT_METADATA, $transientDeleted, true), 'Google catalog cache clearing should delete the metadata fallback transient key.');
+    assertSameValue(false, array_key_exists(TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG), $transientStore), 'Google catalog cache clearing should remove the cached catalog transient.');
+    assertSameValue(false, array_key_exists(TransientKey::forSite(GoogleFontsClient::LEGACY_TRANSIENT_CATALOG), $transientStore), 'Google catalog cache clearing should also remove the legacy catalog transient.');
+    assertSameValue(false, array_key_exists(TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA), $transientStore), 'Google catalog cache clearing should remove the cached Google Fonts metadata fallback.');
+    assertSameValue(true, in_array(TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG), $transientDeleted, true), 'Google catalog cache clearing should delete the expected catalog transient key.');
+    assertSameValue(true, in_array(TransientKey::forSite(GoogleFontsClient::LEGACY_TRANSIENT_CATALOG), $transientDeleted, true), 'Google catalog cache clearing should delete the legacy catalog transient key.');
+    assertSameValue(true, in_array(TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA), $transientDeleted, true), 'Google catalog cache clearing should delete the metadata fallback transient key.');
 };
 
 $tests['provider_clients_apply_http_request_args_filters'] = static function (): void {

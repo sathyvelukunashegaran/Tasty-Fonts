@@ -16,6 +16,7 @@ use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\TransientKey;
 use WP_Error;
 
 final class DeveloperToolsService
@@ -243,7 +244,7 @@ HTACCESS;
                 self::UPDATER_INSTALLED_VERSION_TRANSIENT,
             ] as $transientKey
         ) {
-            delete_transient($transientKey);
+            delete_transient(TransientKey::forSite($transientKey));
         }
     }
 
@@ -267,8 +268,9 @@ HTACCESS;
                 continue;
             }
 
-            $transientPattern = $wpdb->esc_like('_transient_' . $prefix) . '%';
-            $timeoutPattern = $wpdb->esc_like('_transient_timeout_' . $prefix) . '%';
+            $scopedPrefix = TransientKey::prefixForSite($prefix);
+            $transientPattern = $wpdb->esc_like('_transient_' . $scopedPrefix) . '%';
+            $timeoutPattern = $wpdb->esc_like('_transient_timeout_' . $scopedPrefix) . '%';
 
             $wpdb->query(
                 $wpdb->prepare(
@@ -289,7 +291,7 @@ HTACCESS;
             return;
         }
 
-        delete_transient(AdobeProjectClient::TRANSIENT_PREFIX . md5($projectId));
+        delete_transient(TransientKey::forSite(AdobeProjectClient::TRANSIENT_PREFIX . md5($projectId)));
     }
 
     private function scaffoldStorageFiles(string $root): array

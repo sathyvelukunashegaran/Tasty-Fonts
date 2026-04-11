@@ -9,6 +9,7 @@ use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\TransientKey;
 
 $tests['admin_controller_merges_adobe_families_into_selectable_role_names'] = static function (): void {
     resetTestState();
@@ -989,7 +990,7 @@ $tests['admin_controller_reuses_cached_search_results_during_search_cooldown'] =
     assertSameValue('Lora', (string) ($third['items'][0]['family'] ?? ''), 'Search cooldown should not block a different query for the same user.');
     assertSameValue(
         true,
-        is_array(get_transient('tasty_fonts_search_cooldown_42')),
+        is_array(get_transient(TransientKey::forSite('tasty_fonts_search_cooldown_42'))),
         'Search cooldown should be stored in a per-user transient.'
     );
 };
@@ -1049,7 +1050,7 @@ $tests['admin_controller_rate_limits_expensive_rest_actions_per_user'] = static 
     assertSameValue('ok', (string) ($third['status'] ?? ''), 'Rate limiting should be scoped per user, not globally.');
     assertSameValue(
         true,
-        is_array(get_transient(AdminController::ACTION_COOLDOWN_TRANSIENT_PREFIX . 'google_import_42')),
+        is_array(get_transient(TransientKey::forSite(AdminController::ACTION_COOLDOWN_TRANSIENT_PREFIX . 'google_import_42'))),
         'Expensive REST action throttles should be stored in per-user transients.'
     );
 };
@@ -2056,7 +2057,7 @@ $tests['google_search_cooldown_cache_is_shared_between_repeated_rest_requests'] 
     $services['settings']->saveSettings(['google_api_key' => 'live-key']);
     $services['settings']->saveGoogleApiKeyStatus('valid');
     set_transient(
-        GoogleFontsClient::TRANSIENT_CATALOG,
+        TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG),
         [
             'inter' => [
                 'family' => 'Inter',
@@ -2076,7 +2077,7 @@ $tests['google_search_cooldown_cache_is_shared_between_repeated_rest_requests'] 
     $firstData = $firstResponse instanceof WP_REST_Response ? $firstResponse->get_data() : [];
 
     set_transient(
-        GoogleFontsClient::TRANSIENT_CATALOG,
+        TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG),
         [
             'inter' => [
                 'family' => 'Inter',
@@ -2145,7 +2146,7 @@ $tests['admin_controller_family_font_display_changes_refresh_generated_assets'] 
 
     invokePrivateMethod($services['controller'], 'saveFamilyFontDisplaySelection', ['Inter', 'swap']);
 
-    assertSameValue(true, in_array('tasty_fonts_css_v2', $transientDeleted, true), 'Saving a family font-display override should invalidate the cached CSS payload.');
+    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_v2'), $transientDeleted, true), 'Saving a family font-display override should invalidate the cached CSS payload.');
     assertContainsValue('font-display:swap', $services['assets']->getCss(), 'Saving a family font-display override should rebuild the generated CSS with the new value.');
 };
 
@@ -2189,7 +2190,7 @@ $tests['admin_controller_family_fallback_changes_refresh_generated_assets'] = st
 
     $result = $services['controller']->saveFamilyFallbackValue('Inter', 'serif');
 
-    assertSameValue(true, in_array('tasty_fonts_css_v2', $transientDeleted, true), 'Saving a family fallback should invalidate the cached CSS payload.');
+    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_v2'), $transientDeleted, true), 'Saving a family fallback should invalidate the cached CSS payload.');
     assertSameValue('"Inter", serif', (string) ($result['stack'] ?? ''), 'Saving a family fallback should return the rebuilt family stack.');
 };
 
@@ -2560,16 +2561,16 @@ $tests['admin_controller_clears_plugin_caches_and_logs_the_reset'] = static func
 
     $services = makeServiceGraph();
     $transientStore = [
-        'tasty_fonts_catalog_v2' => ['cached'],
-        'tasty_fonts_css_v2' => 'cached',
-        'tasty_fonts_css_hash_v2' => 'hash',
-        GoogleFontsClient::TRANSIENT_CATALOG => ['google'],
-        GoogleFontsClient::TRANSIENT_METADATA => ['google' => ['family' => 'Google', 'axes' => []]],
-        'tasty_fonts_bunny_catalog_v1' => ['bunny'],
+        TransientKey::forSite('tasty_fonts_catalog_v2') => ['cached'],
+        TransientKey::forSite('tasty_fonts_css_v2') => 'cached',
+        TransientKey::forSite('tasty_fonts_css_hash_v2') => 'hash',
+        TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG) => ['google'],
+        TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA) => ['google' => ['family' => 'Google', 'axes' => []]],
+        TransientKey::forSite('tasty_fonts_bunny_catalog_v1') => ['bunny'],
     ];
 
-    set_transient(AdminController::SEARCH_CACHE_TRANSIENT_PREFIX . 'google_inter', ['Inter'], 300);
-    set_transient(AdminController::SEARCH_COOLDOWN_TRANSIENT_PREFIX . 'google_inter', 1, 1);
+    set_transient(TransientKey::forSite(AdminController::SEARCH_CACHE_TRANSIENT_PREFIX . 'google_inter'), ['Inter'], 300);
+    set_transient(TransientKey::forSite(AdminController::SEARCH_COOLDOWN_TRANSIENT_PREFIX . 'google_inter'), 1, 1);
 
     $result = $services['controller']->clearPluginCachesAndRegenerateAssets();
 

@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\TransientKey;
 use WP_Error;
 
 final class GoogleFontsClient
@@ -50,9 +51,9 @@ final class GoogleFontsClient
         $this->catalogIndex = null;
         $this->catalogItems = null;
         $this->metadataIndex = null;
-        delete_transient(self::TRANSIENT_CATALOG);
-        delete_transient(self::LEGACY_TRANSIENT_CATALOG);
-        delete_transient(self::TRANSIENT_METADATA);
+        delete_transient(TransientKey::forSite(self::TRANSIENT_CATALOG));
+        delete_transient(TransientKey::forSite(self::LEGACY_TRANSIENT_CATALOG));
+        delete_transient(TransientKey::forSite(self::TRANSIENT_METADATA));
     }
 
     public function validateApiKey(string $apiKey): array
@@ -238,7 +239,7 @@ final class GoogleFontsClient
             return $this->catalogIndex;
         }
 
-        $cached = get_transient(self::TRANSIENT_CATALOG);
+        $cached = get_transient(TransientKey::forSite(self::TRANSIENT_CATALOG));
 
         if ($this->isCatalogIndex($cached)) {
             $this->catalogIndex = $cached;
@@ -249,7 +250,7 @@ final class GoogleFontsClient
         if ($this->isLegacyCatalogItemsCache($cached)) {
             $this->catalogItems = $cached;
             $this->catalogIndex = $this->buildCatalogIndex($cached);
-            set_transient(self::TRANSIENT_CATALOG, $this->catalogIndex, self::CATALOG_TTL);
+            set_transient(TransientKey::forSite(self::TRANSIENT_CATALOG), $this->catalogIndex, self::CATALOG_TTL);
 
             return $this->catalogIndex;
         }
@@ -262,7 +263,7 @@ final class GoogleFontsClient
 
         $this->catalogItems = $items;
         $this->catalogIndex = $this->buildCatalogIndex($items);
-        set_transient(self::TRANSIENT_CATALOG, $this->catalogIndex, self::CATALOG_TTL);
+        set_transient(TransientKey::forSite(self::TRANSIENT_CATALOG), $this->catalogIndex, self::CATALOG_TTL);
 
         return $this->catalogIndex;
     }
@@ -283,7 +284,7 @@ final class GoogleFontsClient
 
         if (!is_array($this->catalogIndex)) {
             $this->catalogIndex = $this->buildCatalogIndex($items);
-            set_transient(self::TRANSIENT_CATALOG, $this->catalogIndex, self::CATALOG_TTL);
+            set_transient(TransientKey::forSite(self::TRANSIENT_CATALOG), $this->catalogIndex, self::CATALOG_TTL);
         }
 
         return $this->catalogItems;
@@ -490,7 +491,7 @@ final class GoogleFontsClient
             return $this->metadataIndex;
         }
 
-        $cached = get_transient(self::TRANSIENT_METADATA);
+        $cached = get_transient(TransientKey::forSite(self::TRANSIENT_METADATA));
 
         if ($this->isMetadataIndex($cached)) {
             $this->metadataIndex = $cached;
@@ -544,7 +545,7 @@ final class GoogleFontsClient
 
         if ($index !== []) {
             $this->metadataIndex = $index;
-            set_transient(self::TRANSIENT_METADATA, $this->metadataIndex, self::METADATA_TTL);
+            set_transient(TransientKey::forSite(self::TRANSIENT_METADATA), $this->metadataIndex, self::METADATA_TTL);
         }
 
         return $this->metadataIndex ?? [];

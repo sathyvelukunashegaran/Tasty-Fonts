@@ -12,6 +12,7 @@ use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\TransientKey;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -66,7 +67,7 @@ final class CatalogService
             return $this->catalog;
         }
 
-        if ($this->hydrateFromCache(get_transient(self::TRANSIENT_CATALOG))) {
+        if ($this->hydrateFromCache(get_transient(TransientKey::forSite(self::TRANSIENT_CATALOG)))) {
             return $this->applyCatalogFilter();
         }
 
@@ -108,7 +109,7 @@ final class CatalogService
      */
     public function invalidate(): void
     {
-        delete_transient(self::TRANSIENT_CATALOG);
+        delete_transient(TransientKey::forSite(self::TRANSIENT_CATALOG));
         $this->catalog = null;
         $this->counts = self::DEFAULT_COUNTS;
     }
@@ -1021,7 +1022,7 @@ final class CatalogService
     private function cacheCatalogState(): void
     {
         set_transient(
-            self::TRANSIENT_CATALOG,
+            TransientKey::forSite(self::TRANSIENT_CATALOG),
             [
                 'families' => $this->catalog,
                 'counts' => $this->counts,

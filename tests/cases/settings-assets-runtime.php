@@ -18,6 +18,7 @@ use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\TransientKey;
 
 if (!class_exists('Automatic_CSS\\API')) {
     eval(<<<'PHP'
@@ -290,6 +291,41 @@ $tests['settings_repository_reuses_request_scoped_settings_until_a_write_invalid
     assertSameValue('Saved preview', $afterSave['preview_sentence'], 'Settings writes should refresh the request-scoped cache.');
 };
 
+$tests['settings_repository_normalizes_preview_sentence_before_saving'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $saved = $settings->saveSettings([
+        'preview_sentence' => "<b>Hello</b>\n\tworld\x07 " . str_repeat('A', 400),
+    ]);
+    $previewSentence = (string) ($saved['preview_sentence'] ?? '');
+
+    assertNotContainsValue('<b>', $previewSentence, 'Preview sentence saving should strip HTML tags before storage.');
+    assertNotContainsValue("\n", $previewSentence, 'Preview sentence saving should normalize multiline content to a single line.');
+    assertNotContainsValue("\x07", $previewSentence, 'Preview sentence saving should remove non-printable control characters.');
+    assertSameValue(280, strlen($previewSentence), 'Preview sentence saving should cap the stored value length.');
+    assertContainsValue('Hello world ', $previewSentence, 'Preview sentence saving should preserve readable text with normalized spacing.');
+};
+
+$tests['settings_repository_normalizes_legacy_preview_sentence_values_on_read'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'preview_sentence' => "<script>alert(1)</script>\r\nPreview\x00 text",
+    ];
+
+    $settings = new SettingsRepository();
+    $loaded = $settings->getSettings();
+
+    assertSameValue(
+        'alert(1) Preview text',
+        (string) ($loaded['preview_sentence'] ?? ''),
+        'Reading stored preview text should normalize legacy values into printable single-line content.'
+    );
+};
+
 $tests['settings_repository_persists_delete_files_on_uninstall_preference'] = static function (): void {
     resetTestState();
 
@@ -515,31 +551,31 @@ $tests['developer_tools_clear_plugin_caches_and_regenerate_assets'] = static fun
     $services['developer_tools']->ensureStorageScaffolding();
     $services['settings']->saveAdobeProject('abc123', true);
     $transientStore = [
-        CatalogService::TRANSIENT_CATALOG => ['cached'],
-        AssetService::TRANSIENT_CSS => 'body{}',
-        AssetService::TRANSIENT_HASH => 'hash',
-        AssetService::TRANSIENT_REGENERATE_CSS_QUEUED => true,
-        GoogleFontsClient::TRANSIENT_CATALOG => ['Inter'],
-        GoogleFontsClient::TRANSIENT_METADATA => ['inter' => ['family' => 'Inter', 'axes' => []]],
-        BunnyFontsClient::TRANSIENT_CATALOG => ['Inter'],
-        'tasty_fonts_github_release_manifest_v1' => ['latest_for_channel' => ['stable' => ['version' => '1.0.0']]],
-        'tasty_fonts_github_release_version_v1' => '1.0.0',
-        BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . 'abc' => ['family' => 'Inter'],
-        AdminController::SEARCH_CACHE_TRANSIENT_PREFIX . 'google_inter' => ['Inter'],
-        AdminController::SEARCH_COOLDOWN_TRANSIENT_PREFIX . 'google_inter' => 1,
-        AdobeProjectClient::TRANSIENT_PREFIX . md5('abc123') => ['families' => ['Inter']],
+        TransientKey::forSite(CatalogService::TRANSIENT_CATALOG) => ['cached'],
+        TransientKey::forSite(AssetService::TRANSIENT_CSS) => 'body{}',
+        TransientKey::forSite(AssetService::TRANSIENT_HASH) => 'hash',
+        TransientKey::forSite(AssetService::TRANSIENT_REGENERATE_CSS_QUEUED) => true,
+        TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG) => ['Inter'],
+        TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA) => ['inter' => ['family' => 'Inter', 'axes' => []]],
+        TransientKey::forSite(BunnyFontsClient::TRANSIENT_CATALOG) => ['Inter'],
+        TransientKey::forSite('tasty_fonts_github_release_manifest_v1') => ['latest_for_channel' => ['stable' => ['version' => '1.0.0']]],
+        TransientKey::forSite('tasty_fonts_github_release_version_v1') => '1.0.0',
+        TransientKey::forSite(BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . 'abc') => ['family' => 'Inter'],
+        TransientKey::forSite(AdminController::SEARCH_CACHE_TRANSIENT_PREFIX . 'google_inter') => ['Inter'],
+        TransientKey::forSite(AdminController::SEARCH_COOLDOWN_TRANSIENT_PREFIX . 'google_inter') => 1,
+        TransientKey::forSite(AdobeProjectClient::TRANSIENT_PREFIX . md5('abc123')) => ['families' => ['Inter']],
     ];
 
     $result = $services['developer_tools']->clearPluginCachesAndRegenerateAssets();
 
     assertTrueValue($result, 'Clearing plugin caches should report success.');
-    assertSameValue(true, in_array(CatalogService::TRANSIENT_CATALOG, $transientDeleted, true), 'Clearing plugin caches should invalidate the catalog transient.');
-    assertSameValue(true, in_array(AssetService::TRANSIENT_CSS, $transientDeleted, true), 'Clearing plugin caches should invalidate the CSS transient.');
-    assertSameValue(true, in_array(AssetService::TRANSIENT_HASH, $transientDeleted, true), 'Clearing plugin caches should invalidate the CSS hash transient.');
-    assertSameValue(true, in_array(GoogleFontsClient::TRANSIENT_CATALOG, $transientDeleted, true), 'Clearing plugin caches should invalidate the Google catalog transient.');
-    assertSameValue(true, in_array(GoogleFontsClient::TRANSIENT_METADATA, $transientDeleted, true), 'Clearing plugin caches should invalidate the Google metadata transient.');
-    assertSameValue(true, in_array(BunnyFontsClient::TRANSIENT_CATALOG, $transientDeleted, true), 'Clearing plugin caches should invalidate the Bunny catalog transient.');
-    assertSameValue(true, in_array(AdobeProjectClient::TRANSIENT_PREFIX . md5('abc123'), $transientDeleted, true), 'Clearing plugin caches should invalidate the saved Adobe project transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true), 'Clearing plugin caches should invalidate the catalog transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(AssetService::TRANSIENT_CSS), $transientDeleted, true), 'Clearing plugin caches should invalidate the CSS transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(AssetService::TRANSIENT_HASH), $transientDeleted, true), 'Clearing plugin caches should invalidate the CSS hash transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG), $transientDeleted, true), 'Clearing plugin caches should invalidate the Google catalog transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA), $transientDeleted, true), 'Clearing plugin caches should invalidate the Google metadata transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(BunnyFontsClient::TRANSIENT_CATALOG), $transientDeleted, true), 'Clearing plugin caches should invalidate the Bunny catalog transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(AdobeProjectClient::TRANSIENT_PREFIX . md5('abc123')), $transientDeleted, true), 'Clearing plugin caches should invalidate the saved Adobe project transient.');
     assertSameValue(true, in_array(AssetService::ACTION_REGENERATE_CSS, $clearedScheduledHooks, true), 'Clearing plugin caches should clear queued CSS regeneration hooks.');
     assertSameValue(1, did_action('tasty_fonts_before_clear_plugin_caches'), 'Clearing plugin caches should emit a before hook.');
     assertSameValue(1, did_action('tasty_fonts_after_clear_plugin_caches'), 'Clearing plugin caches should emit an after hook.');
@@ -598,16 +634,16 @@ $tests['developer_tools_regenerate_css_rebuilds_the_stylesheet_without_clearing_
     $beforeCss = is_readable($generatedPath) ? (string) file_get_contents($generatedPath) : '';
 
     $services['settings']->saveSettings(['font_display' => 'swap']);
-    $transientStore[GoogleFontsClient::TRANSIENT_CATALOG] = ['Inter'];
-    $transientStore[BunnyFontsClient::TRANSIENT_CATALOG] = ['Inter'];
+    $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG)] = ['Inter'];
+    $transientStore[TransientKey::forSite(BunnyFontsClient::TRANSIENT_CATALOG)] = ['Inter'];
 
     $result = $services['developer_tools']->regenerateCss();
     $afterCss = is_readable($generatedPath) ? (string) file_get_contents($generatedPath) : '';
 
     assertTrueValue($result, 'Regenerating CSS should report success.');
     assertSameValue(true, in_array(AssetService::ACTION_REGENERATE_CSS, $clearedScheduledHooks, true), 'Regenerating CSS should clear queued CSS regeneration hooks before rebuilding.');
-    assertSameValue(false, in_array(GoogleFontsClient::TRANSIENT_CATALOG, $transientDeleted, true), 'Regenerating CSS should not clear the Google catalog cache.');
-    assertSameValue(false, in_array(BunnyFontsClient::TRANSIENT_CATALOG, $transientDeleted, true), 'Regenerating CSS should not clear the Bunny catalog cache.');
+    assertSameValue(false, in_array(TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG), $transientDeleted, true), 'Regenerating CSS should not clear the Google catalog cache.');
+    assertSameValue(false, in_array(TransientKey::forSite(BunnyFontsClient::TRANSIENT_CATALOG), $transientDeleted, true), 'Regenerating CSS should not clear the Bunny catalog cache.');
     assertContainsValue('font-display:swap', $afterCss, 'Regenerating CSS should rebuild the generated stylesheet using the current settings.');
     assertTrueValue($beforeCss !== $afterCss, 'Regenerating CSS should rewrite the generated stylesheet when the CSS payload changes.');
     assertSameValue(1, did_action('tasty_fonts_before_regenerate_css'), 'Regenerating CSS should emit a before hook.');
@@ -1270,9 +1306,9 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
         'family_fallbacks' => [],
     ];
     $optionStore[SettingsRepository::OPTION_ROLES] = [];
-    $transientStore['tasty_fonts_catalog_v2'] = ['stale' => true];
-    $transientStore['tasty_fonts_css_v2'] = 'stale-css';
-    $transientStore['tasty_fonts_css_hash_v2'] = 'stale-hash';
+    $transientStore[TransientKey::forSite('tasty_fonts_catalog_v2')] = ['stale' => true];
+    $transientStore[TransientKey::forSite('tasty_fonts_css_v2')] = 'stale-css';
+    $transientStore[TransientKey::forSite('tasty_fonts_css_hash_v2')] = 'stale-hash';
 
     $storage = new Storage();
     $settings = new SettingsRepository();
@@ -1290,11 +1326,11 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     $generatedPath = $storage->getGeneratedCssPath();
 
     assertSameValue(false, is_string($generatedPath) && file_exists($generatedPath), 'Refreshing generated assets should defer writing the generated CSS file.');
-    assertSameValue(true, in_array('tasty_fonts_catalog_v2', $transientDeleted, true), 'Refreshing generated assets should invalidate the catalog cache first.');
-    assertSameValue(true, in_array('tasty_fonts_css_v2', $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS payload.');
-    assertSameValue(true, in_array('tasty_fonts_css_hash_v2', $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS hash.');
-    assertSameValue(false, array_key_exists('tasty_fonts_css_v2', $transientStore), 'Refreshing generated assets should leave CSS transient regeneration to the next request.');
-    assertSameValue(false, array_key_exists('tasty_fonts_css_hash_v2', $transientStore), 'Refreshing generated assets should leave CSS hash regeneration to the next request.');
+    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the catalog cache first.');
+    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS payload.');
+    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_hash_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS hash.');
+    assertSameValue(false, array_key_exists(TransientKey::forSite('tasty_fonts_css_v2'), $transientStore), 'Refreshing generated assets should leave CSS transient regeneration to the next request.');
+    assertSameValue(false, array_key_exists(TransientKey::forSite('tasty_fonts_css_hash_v2'), $transientStore), 'Refreshing generated assets should leave CSS hash regeneration to the next request.');
     assertSameValue(
         [
             [
@@ -1315,7 +1351,7 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     );
     assertSameValue(
         ['log_write_result' => 1],
-        $transientStore['tasty_fonts_regenerate_css_queued'] ?? null,
+        $transientStore[TransientKey::forSite('tasty_fonts_regenerate_css_queued')] ?? null,
         'Refreshing generated assets should set a short-lived cron guard transient.'
     );
 };
@@ -1488,7 +1524,7 @@ $tests['asset_service_applies_generated_css_filter_before_caching'] = static fun
 
     assertSameValue(true, $filterReceivedContext, 'Generated CSS filters should receive the runtime catalog, roles, and settings context.');
     assertContainsValue('body{letter-spacing:.02em;}', $css, 'Generated CSS filters should be able to append CSS before the payload is returned.');
-    assertContainsValue('body{letter-spacing:.02em;}', (string) ($transientStore['tasty_fonts_css_v2'] ?? ''), 'Generated CSS filters should run before the CSS transient is written.');
+    assertContainsValue('body{letter-spacing:.02em;}', (string) ($transientStore[TransientKey::forSite('tasty_fonts_css_v2')] ?? ''), 'Generated CSS filters should run before the CSS transient is written.');
 };
 
 $tests['asset_service_can_refresh_generated_assets_without_logging_file_writes'] = static function (): void {
@@ -1909,7 +1945,7 @@ $tests['asset_service_debounces_background_css_regeneration_events'] = static fu
     assertSameValue(1, count($scheduledEvents), 'Repeated asset invalidations in a short window should only queue one background CSS regeneration event.');
     assertSameValue(
         ['log_write_result' => 1],
-        $transientStore['tasty_fonts_regenerate_css_queued'] ?? null,
+        $transientStore[TransientKey::forSite('tasty_fonts_regenerate_css_queued')] ?? null,
         'Queued CSS regeneration should keep the short-lived guard transient until the write runs.'
     );
 };

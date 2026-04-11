@@ -27,6 +27,7 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\SiteEnvironment;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\TransientKey;
 use TastyFonts\Updates\GitHubUpdater;
 use WP_Error;
 
@@ -2860,30 +2861,34 @@ final class AdminController
 
     private function getPendingNoticeTransientKey(): string
     {
-        return self::NOTICE_TRANSIENT_PREFIX . max(0, (int) get_current_user_id());
+        return TransientKey::forSite(self::NOTICE_TRANSIENT_PREFIX . max(0, (int) get_current_user_id()));
     }
 
     private function getActionCooldownTransientKey(string $action): string
     {
-        return self::ACTION_COOLDOWN_TRANSIENT_PREFIX
+        return TransientKey::forSite(
+            self::ACTION_COOLDOWN_TRANSIENT_PREFIX
             . strtolower(trim(preg_replace('/[^a-z0-9_-]+/i', '_', $action) ?? 'action'))
             . '_'
-            . max(0, (int) get_current_user_id());
+            . max(0, (int) get_current_user_id())
+        );
     }
 
     private function getSearchCooldownTransientKey(): string
     {
-        return self::SEARCH_COOLDOWN_TRANSIENT_PREFIX . max(0, (int) get_current_user_id());
+        return TransientKey::forSite(self::SEARCH_COOLDOWN_TRANSIENT_PREFIX . max(0, (int) get_current_user_id()));
     }
 
     private function getSearchCacheTransientKey(string $provider, string $query): string
     {
-        return self::SEARCH_CACHE_TRANSIENT_PREFIX
+        return TransientKey::forSite(
+            self::SEARCH_CACHE_TRANSIENT_PREFIX
             . strtolower(trim($provider))
             . '_'
             . max(0, (int) get_current_user_id())
             . '_'
-            . md5(strtolower(trim($query)));
+            . md5(strtolower(trim($query)))
+        );
     }
 
     private function isSearchCooldownActive(string $cooldownKey, string $provider, string $query): bool
@@ -2905,7 +2910,7 @@ final class AdminController
             && strtolower(trim((string) ($cooldown['query'] ?? ''))) === strtolower(trim($query));
     }
 
-    private function startRateLimitedActionCooldown(string $action): true|WP_Error
+    private function startRateLimitedActionCooldown(string $action): bool|WP_Error
     {
         $window = (float) apply_filters(
             'tasty_fonts_rest_action_cooldown_window',

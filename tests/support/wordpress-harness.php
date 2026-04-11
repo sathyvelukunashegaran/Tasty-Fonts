@@ -1377,6 +1377,15 @@ if (!function_exists('get_current_user_id')) {
     }
 }
 
+if (!function_exists('get_current_blog_id')) {
+    function get_current_blog_id(): int
+    {
+        global $currentBlogId;
+
+        return $currentBlogId;
+    }
+}
+
 if (!function_exists('wp_get_current_user')) {
     function wp_get_current_user(): object
     {
@@ -1598,6 +1607,7 @@ function resetTestState(): void
     global $loadedTextdomains;
     global $menuPageCalls;
     global $currentPostId;
+    global $currentBlogId;
     global $currentUserId;
     global $currentUserCapabilities;
     global $oxygenGlobalSettings;
@@ -1677,6 +1687,7 @@ function resetTestState(): void
     $uploadBaseDir = uniqueTestDirectory('uploads');
     $uploadedFilePaths = [];
     $currentPostId = 0;
+    $currentBlogId = 1;
     $currentUserId = 1;
     $currentUserCapabilities = ['manage_options' => true];
     $oxygenGlobalSettings = [];

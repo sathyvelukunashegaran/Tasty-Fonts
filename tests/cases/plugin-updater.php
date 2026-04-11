@@ -8,6 +8,7 @@ use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\TransientKey;
 use TastyFonts\Updates\GitHubUpdater;
 
 $nextPatchVersion = static function (string $version): string {
@@ -118,7 +119,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_github_release_manifest_v1',
         'tasty_fonts_github_release_version_v1',
     ] as $transientKey) {
-        set_transient($transientKey, 'cached', DAY_IN_SECONDS);
+        set_transient(TransientKey::forSite($transientKey), 'cached', DAY_IN_SECONDS);
     }
 
     Plugin::deactivate();
@@ -135,7 +136,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_github_release_manifest_v1',
         'tasty_fonts_github_release_version_v1',
     ] as $transientKey) {
-        assertSameValue(false, get_transient($transientKey), 'Deactivation should clear known plugin transients.');
+        assertSameValue(false, get_transient(TransientKey::forSite($transientKey)), 'Deactivation should clear known plugin transients.');
     }
 
     assertSameValue(
@@ -712,7 +713,7 @@ $tests['github_updater_reuses_cached_release_metadata_and_clears_cache_after_upg
         ]
     );
 
-    assertSameValue(false, get_transient('tasty_fonts_github_release_manifest_v1'), 'Updater should clear cached release metadata after a successful plugin upgrade.');
+    assertSameValue(false, get_transient(TransientKey::forSite('tasty_fonts_github_release_manifest_v1')), 'Updater should clear cached release metadata after a successful plugin upgrade.');
 
     apply_filters('pre_set_site_transient_update_plugins', $transient);
 
@@ -751,7 +752,7 @@ $tests['github_updater_ignores_unrelated_upgrader_events'] = static function () 
 
     apply_filters('pre_set_site_transient_update_plugins', $transient);
 
-    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_manifest_v1')), 'Updater should populate the release cache before exercising upgrader hook boundaries.');
+    assertSameValue(true, is_array(get_transient(TransientKey::forSite('tasty_fonts_github_release_manifest_v1'))), 'Updater should populate the release cache before exercising upgrader hook boundaries.');
 
     do_action(
         'upgrader_process_complete',
@@ -763,7 +764,7 @@ $tests['github_updater_ignores_unrelated_upgrader_events'] = static function () 
         ]
     );
 
-    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_manifest_v1')), 'Updater should ignore non-plugin upgrader events.');
+    assertSameValue(true, is_array(get_transient(TransientKey::forSite('tasty_fonts_github_release_manifest_v1'))), 'Updater should ignore non-plugin upgrader events.');
 
     do_action(
         'upgrader_process_complete',
@@ -775,7 +776,7 @@ $tests['github_updater_ignores_unrelated_upgrader_events'] = static function () 
         ]
     );
 
-    assertSameValue(true, is_array(get_transient('tasty_fonts_github_release_manifest_v1')), 'Updater should ignore plugin upgrades for other plugins.');
+    assertSameValue(true, is_array(get_transient(TransientKey::forSite('tasty_fonts_github_release_manifest_v1'))), 'Updater should ignore plugin upgrades for other plugins.');
 };
 
 $tests['github_updater_handles_network_and_response_failures_quietly'] = static function (): void {
@@ -814,14 +815,14 @@ $tests['github_updater_handles_network_and_response_failures_quietly'] = static 
 $tests['github_updater_clears_cached_release_data_when_the_installed_version_changes'] = static function () use ($nextPatchVersion): void {
     resetTestState();
 
-    set_transient('tasty_fonts_github_release_manifest_v1', ['latest_for_channel' => ['stable' => ['version' => $nextPatchVersion(TASTY_FONTS_VERSION)]]], HOUR_IN_SECONDS);
-    set_transient('tasty_fonts_github_release_version_v1', '1.4.0', DAY_IN_SECONDS);
+    set_transient(TransientKey::forSite('tasty_fonts_github_release_manifest_v1'), ['latest_for_channel' => ['stable' => ['version' => $nextPatchVersion(TASTY_FONTS_VERSION)]]], HOUR_IN_SECONDS);
+    set_transient(TransientKey::forSite('tasty_fonts_github_release_version_v1'), '1.4.0', DAY_IN_SECONDS);
 
     $updater = new GitHubUpdater();
     $updater->registerHooks();
 
-    assertSameValue(false, get_transient('tasty_fonts_github_release_manifest_v1'), 'Updater should clear cached release metadata when the installed plugin version changes.');
-    assertSameValue(TASTY_FONTS_VERSION, get_transient('tasty_fonts_github_release_version_v1'), 'Updater should persist the current installed version after clearing stale updater caches.');
+    assertSameValue(false, get_transient(TransientKey::forSite('tasty_fonts_github_release_manifest_v1')), 'Updater should clear cached release metadata when the installed plugin version changes.');
+    assertSameValue(TASTY_FONTS_VERSION, get_transient(TransientKey::forSite('tasty_fonts_github_release_version_v1')), 'Updater should persist the current installed version after clearing stale updater caches.');
 };
 
 $tests['block_editor_font_library_sync_registers_managed_font_families_after_import'] = static function (): void {
@@ -1277,7 +1278,7 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
         'tasty_fonts_local_environment_notice_preferences' => [1 => ['hidden_until' => 123456, 'dismissed_forever' => true]],
     ];
     $transientStore = [
-        'tasty_fonts_bunny_catalog_v1' => ['Inter'],
+        TransientKey::forSite('tasty_fonts_bunny_catalog_v1') => ['Inter'],
     ];
 
     require dirname(__DIR__, 2) . '/uninstall.php';
@@ -1286,13 +1287,13 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
     assertSameValue(true, in_array('tasty_fonts_google_api_key_data', $optionDeleted, true), 'Uninstall should delete the dedicated Google API key option.');
     assertSameValue(true, in_array('tasty_fonts_imports', $optionDeleted, true), 'Uninstall should continue deleting the legacy imports option key.');
     assertSameValue(true, in_array('tasty_fonts_local_environment_notice_preferences', $optionDeleted, true), 'Uninstall should delete persisted local-environment reminder preferences.');
-    assertSameValue(true, in_array('tasty_fonts_bunny_catalog_v1', $transientDeleted, true), 'Uninstall should delete the Bunny catalog transient.');
+    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_bunny_catalog_v1'), $transientDeleted, true), 'Uninstall should delete the Bunny catalog transient.');
     assertSameValue(2, count($wpdbQueries), 'Uninstall should issue wildcard cleanup queries for Bunny family and admin notice transients.');
     assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[0] ?? '', 'Uninstall should target the options table when cleaning Bunny family transients.');
-    assertContainsValue('tasty\\_fonts\\_bunny\\_family\\_', $wpdbQueries[0] ?? '', 'Uninstall should wildcard-match Bunny family transients.');
+    assertContainsValue('blog\\_1\\_tasty\\_fonts\\_bunny\\_family\\_', $wpdbQueries[0] ?? '', 'Uninstall should wildcard-match blog-scoped Bunny family transients.');
     assertContainsValue('timeout', $wpdbQueries[0] ?? '', 'Uninstall should also remove Bunny family transient timeout rows.');
     assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[1] ?? '', 'Uninstall should target the options table when cleaning admin notice transients.');
-    assertContainsValue('tasty\\_fonts\\_admin\\_notices\\_', $wpdbQueries[1] ?? '', 'Uninstall should wildcard-match per-user admin notice transients.');
+    assertContainsValue('blog\\_1\\_tasty\\_fonts\\_admin\\_notices\\_', $wpdbQueries[1] ?? '', 'Uninstall should wildcard-match blog-scoped per-user admin notice transients.');
     assertContainsValue('timeout', $wpdbQueries[1] ?? '', 'Uninstall should also remove admin notice transient timeout rows.');
 };
 

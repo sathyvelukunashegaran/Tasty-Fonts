@@ -20,6 +20,7 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\SiteEnvironment;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\TransientKey;
 use TastyFonts\Updates\GitHubUpdater;
 
 final class AdminPageContextBuilder
@@ -1313,7 +1314,7 @@ final class AdminPageContextBuilder
 
     private function getPendingNoticeTransientKey(): string
     {
-        return AdminController::NOTICE_TRANSIENT_PREFIX . max(0, (int) get_current_user_id());
+        return TransientKey::forSite(AdminController::NOTICE_TRANSIENT_PREFIX . max(0, (int) get_current_user_id()));
     }
 
     private function buildGeneratedCssDownloadUrl(): string

@@ -9,6 +9,7 @@ defined('ABSPATH') || exit;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\TransientKey;
 
 final class AssetService
 {
@@ -59,8 +60,8 @@ final class AssetService
      */
     public function invalidate(): void
     {
-        delete_transient(self::TRANSIENT_CSS);
-        delete_transient(self::TRANSIENT_HASH);
+        delete_transient(TransientKey::forSite(self::TRANSIENT_CSS));
+        delete_transient(TransientKey::forSite(self::TRANSIENT_HASH));
         $this->css = null;
         $this->hash = null;
     }
@@ -78,8 +79,8 @@ final class AssetService
             return $this->css;
         }
 
-        $cachedCss = get_transient(self::TRANSIENT_CSS);
-        $cachedHash = get_transient(self::TRANSIENT_HASH);
+        $cachedCss = get_transient(TransientKey::forSite(self::TRANSIENT_CSS));
+        $cachedHash = get_transient(TransientKey::forSite(self::TRANSIENT_HASH));
 
         if (is_string($cachedCss) && is_string($cachedHash)) {
             $this->css = $cachedCss;
@@ -100,8 +101,8 @@ final class AssetService
         $this->css = (string) apply_filters('tasty_fonts_generated_css', $this->css, $localCatalog, $roles, $settings);
         $this->hash = $this->hashContents($this->css);
 
-        set_transient(self::TRANSIENT_CSS, $this->css, DAY_IN_SECONDS);
-        set_transient(self::TRANSIENT_HASH, $this->hash, DAY_IN_SECONDS);
+        set_transient(TransientKey::forSite(self::TRANSIENT_CSS), $this->css, DAY_IN_SECONDS);
+        set_transient(TransientKey::forSite(self::TRANSIENT_HASH), $this->hash, DAY_IN_SECONDS);
 
         return $this->css;
     }
@@ -146,13 +147,13 @@ final class AssetService
      */
     public function ensureGeneratedCssFile(bool $logWriteResult = true): bool
     {
-        $queuedState = get_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
+        $queuedState = get_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED));
 
         if (func_num_args() === 0 && is_array($queuedState) && array_key_exists('log_write_result', $queuedState)) {
             $logWriteResult = !empty($queuedState['log_write_result']);
         }
 
-        delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
+        delete_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED));
 
         $state = $this->getGeneratedStylesheetState();
         $path = (string) $state['path'];
@@ -447,12 +448,12 @@ final class AssetService
 
     private function queueGeneratedCssRegeneration(bool $logWriteResult = true): void
     {
-        if (get_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED) !== false) {
+        if (get_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED)) !== false) {
             return;
         }
 
         set_transient(
-            self::TRANSIENT_REGENERATE_CSS_QUEUED,
+            TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED),
             ['log_write_result' => $logWriteResult ? 1 : 0],
             self::REGENERATE_CSS_QUEUE_TTL
         );
@@ -460,7 +461,7 @@ final class AssetService
         $scheduled = wp_schedule_single_event(time(), self::ACTION_REGENERATE_CSS);
 
         if ($scheduled === false || is_wp_error($scheduled)) {
-            delete_transient(self::TRANSIENT_REGENERATE_CSS_QUEUED);
+            delete_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED));
         }
     }
 

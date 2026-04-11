@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\TransientKey;
 use WP_Error;
 
 final class AdobeProjectClient
@@ -237,7 +238,7 @@ final class AdobeProjectClient
 
     private function transientKey(string $projectId): string
     {
-        return self::TRANSIENT_PREFIX . md5($projectId);
+        return TransientKey::forSite(self::TRANSIENT_PREFIX . md5($projectId));
     }
 
     private function errorState(WP_Error $error): string

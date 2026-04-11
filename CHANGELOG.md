@@ -7,28 +7,23 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Added per-user REST action cooldowns around Google/Bunny family lookups, provider imports, and local uploads so repeated admin actions now return a proper `429` instead of hammering remote services or duplicate upload flows.
+- Added blog-scoped transient key handling for site-specific runtime, provider, updater, and admin caches so multisite and shared object-cache installs do not bleed plugin cache state across sites.
 - Added Apache `.htaccess` hardening alongside the managed `uploads/fonts` scaffold and published SHA-256 checksum assets in the stable, beta, and nightly release workflows.
 - Added transparent at-rest encryption for the stored Google Fonts API key using WordPress salt material and Sodium when the runtime supports it.
+- Added CSP-friendly inline-style nonce hooks for generated runtime and admin preview CSS so stricter content-security-policy deployments can attach a nonce without forking core output.
 
 ### Changed
 
 - Moved plugin boot from `plugins_loaded` priority `0` to the default priority so peer plugins and host integrations can initialize before Tasty Fonts wires itself up.
-- Switched generated CSS file versioning from CRC32b to SHA-256-derived hashes and added inline-style nonce handling hooks for CSP-friendly runtime and admin preview output.
+- Switched generated CSS file versioning from CRC32b to SHA-256-derived hashes, while keeping short version tokens for cache-busting URLs.
 - Tightened Etch canvas query handling so the `etch` query parameter is only honored for logged-in users who can edit posts, and updated admin redirects to exit directly after a dedicated pre-exit action for test coverage.
 - Updated the GitHub updater to require a published checksum asset for each release and verify the downloaded ZIP before WordPress installs it.
 
-### Added
+### Fixed
 
-- Added per-user REST action cooldowns around Google/Bunny family lookups, provider imports, and local uploads so repeated admin actions now return a proper `429` instead of hammering remote services or duplicate upload flows.
-- Added Apache `.htaccess` hardening alongside the managed `uploads/fonts` scaffold and published SHA-256 checksum assets in the stable, beta, and nightly release workflows.
-- Added transparent at-rest encryption for the stored Google Fonts API key using WordPress salt material and Sodium when the runtime supports it.
-
-### Changed
-
-- Moved plugin boot from `plugins_loaded` priority `0` to the default priority so peer plugins and host integrations can initialize before Tasty Fonts wires itself up.
-- Switched generated CSS file versioning from CRC32b to SHA-256-derived hashes and added inline-style nonce handling hooks for CSP-friendly runtime and admin preview output.
-- Tightened Etch canvas query handling so the `etch` query parameter is only honored for logged-in users who can edit posts, and updated admin redirects to exit directly after a dedicated pre-exit action for test coverage.
-- Updated the GitHub updater to require a published checksum asset for each release and verify the downloaded ZIP before WordPress installs it.
+- Fixed the public Etch canvas bridge path so anonymous requests can no longer trigger the extra runtime canvas assets by sending an arbitrary `etch` query parameter.
+- Fixed preview sentence persistence by stripping tags, removing control characters, collapsing whitespace, and capping stored text length before the value is reused in admin and bootstrap payloads.
+- Fixed admin and runtime compatibility on older supported PHP environments by avoiding literal `true|WP_Error` return types in shared controller code.
 
 ## [1.8.0] - 2026-04-11
 

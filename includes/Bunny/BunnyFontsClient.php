@@ -7,6 +7,7 @@ namespace TastyFonts\Bunny;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\TransientKey;
 use WP_Error;
 
 final class BunnyFontsClient
@@ -158,7 +159,7 @@ final class BunnyFontsClient
 
     private function fetchCatalogEntries(): array
     {
-        $cached = get_transient(self::TRANSIENT_CATALOG);
+        $cached = get_transient(TransientKey::forSite(self::TRANSIENT_CATALOG));
 
         if (is_array($cached)) {
             return $cached;
@@ -173,7 +174,7 @@ final class BunnyFontsClient
         $items = $this->parseCatalogEntries((string) wp_remote_retrieve_body($response));
 
         if ($items !== []) {
-            set_transient(self::TRANSIENT_CATALOG, $items, self::CATALOG_TTL);
+            set_transient(TransientKey::forSite(self::TRANSIENT_CATALOG), $items, self::CATALOG_TTL);
         }
 
         return $items;
@@ -557,7 +558,7 @@ final class BunnyFontsClient
 
     private function familyTransientKey(string $slug): string
     {
-        return self::TRANSIENT_FAMILY_PREFIX . substr(md5($slug), 0, 12);
+        return TransientKey::forSite(self::TRANSIENT_FAMILY_PREFIX . substr(md5($slug), 0, 12));
     }
 
     private function humanizeSlug(string $slug): string

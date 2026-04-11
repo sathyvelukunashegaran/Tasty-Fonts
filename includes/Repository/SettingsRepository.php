@@ -20,6 +20,7 @@ final class SettingsRepository
     public const LEGACY_OPTION_ROLES = 'etch_fonts_roles';
     private const GOOGLE_API_KEY_ENCRYPTED_FIELD = 'google_api_key_encrypted';
     private const GOOGLE_API_KEY_CIPHER_PREFIX = 'secretbox:';
+    private const PREVIEW_SENTENCE_MAX_LENGTH = 280;
     private const OUTPUT_QUICK_MODE_MINIMAL = 'minimal';
     private const OUTPUT_QUICK_MODE_VARIABLES = 'variables';
     private const OUTPUT_QUICK_MODE_CLASSES = 'classes';
@@ -162,6 +163,7 @@ final class SettingsRepository
         $settings['acss_font_role_sync_applied'] = !empty($settings['acss_font_role_sync_applied']);
         $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_family'] ?? '');
         $settings['acss_font_role_sync_previous_text_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_text_font_family'] ?? '');
+        $settings['preview_sentence'] = $this->sanitizePreviewSentence($settings['preview_sentence'] ?? '');
         $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
         $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
         $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
@@ -337,7 +339,7 @@ final class SettingsRepository
         }
 
         if (isset($input['preview_sentence'])) {
-            $settings['preview_sentence'] = sanitize_text_field((string) $input['preview_sentence']);
+            $settings['preview_sentence'] = $this->sanitizePreviewSentence($input['preview_sentence']);
             $settingsChanged = true;
         }
 
@@ -841,6 +843,27 @@ final class SettingsRepository
     private function sanitizeTextValue(mixed $value): string
     {
         return sanitize_text_field(wp_unslash((string) $value));
+    }
+
+    private function sanitizePreviewSentence(mixed $value): string
+    {
+        $text = wp_unslash((string) $value);
+        $text = wp_strip_all_tags($text);
+        $text = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+        $text = trim($text);
+
+        if ($text === '') {
+            return '';
+        }
+
+        if (function_exists('mb_substr')) {
+            $text = mb_substr($text, 0, self::PREVIEW_SENTENCE_MAX_LENGTH);
+        } else {
+            $text = substr($text, 0, self::PREVIEW_SENTENCE_MAX_LENGTH);
+        }
+
+        return sanitize_text_field($text);
     }
 
     private function normalizeOptionalBoolean(mixed $value): ?bool

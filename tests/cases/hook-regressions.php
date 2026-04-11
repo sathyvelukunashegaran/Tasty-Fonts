@@ -91,20 +91,20 @@ $tests['plugin_attachment_hooks_only_invalidate_catalog_for_files_within_font_st
     Plugin::instance()->boot();
 
     $attachedFilePaths[100] = uniqueTestDirectory('outside-root') . '/inter.woff2';
-    $transientStore['tasty_fonts_catalog_v2'] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2')] = ['cached' => true];
     do_action('add_attachment', 100);
 
     assertFalseValue(
-        in_array('tasty_fonts_catalog_v2', $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true),
         'Attachment hooks should ignore media changes outside uploads/fonts.'
     );
 
     $attachedFilePaths[101] = $root . '/google/inter/inter-400-normal.woff2';
-    $transientStore['tasty_fonts_catalog_v2'] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2')] = ['cached' => true];
     do_action('delete_attachment', 101);
 
     assertTrueValue(
-        in_array('tasty_fonts_catalog_v2', $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true),
         'Attachment hooks should invalidate the cached catalog when a font attachment changes inside uploads/fonts.'
     );
     assertContainsValue(
@@ -155,7 +155,7 @@ $tests['local_upload_service_successfully_imported_rows_queue_generated_asset_re
     );
     assertSameValue(
         ['log_write_result' => 1],
-        $transientStore['tasty_fonts_regenerate_css_queued'] ?? null,
+        $transientStore[TastyFonts\Support\TransientKey::forSite('tasty_fonts_regenerate_css_queued')] ?? null,
         'Successful local uploads should persist the deferred generated CSS write state.'
     );
 };

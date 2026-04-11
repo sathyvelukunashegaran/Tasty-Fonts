@@ -7,6 +7,7 @@ namespace TastyFonts\Updates;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\TransientKey;
 use WP_Error;
 use stdClass;
 
@@ -30,6 +31,8 @@ final class GitHubUpdater
     private const PACKAGE_CHECKSUM_NAME_PATTERN = 'tasty-fonts-%s.zip.sha256';
 
     private ?array $pluginMetadata = null;
+    private ?string $pluginBasename = null;
+    private ?string $installedVersion = null;
 
     public function __construct(private readonly ?SettingsRepository $settings = null)
     {
@@ -223,7 +226,7 @@ final class GitHubUpdater
         }
 
         $this->clearReleaseCache();
-        set_transient(self::TRANSIENT_INSTALLED_VERSION, $this->installedVersion(), self::INSTALLED_VERSION_TTL);
+        set_transient($this->installedVersionTransientKey(), $this->installedVersion(), self::INSTALLED_VERSION_TTL);
 
         return [
             'channel' => (string) ($overview['selected_channel'] ?? self::CHANNEL_STABLE),
@@ -249,7 +252,7 @@ final class GitHubUpdater
         }
 
         $this->clearReleaseCache();
-        set_transient(self::TRANSIENT_INSTALLED_VERSION, $this->installedVersion(), self::INSTALLED_VERSION_TTL);
+        set_transient($this->installedVersionTransientKey(), $this->installedVersion(), self::INSTALLED_VERSION_TTL);
     }
 
     public function filterUpgraderPreDownload(mixed $reply, string $package, mixed $upgrader, array $hookExtra = []): mixed
@@ -308,19 +311,19 @@ final class GitHubUpdater
 
     private function maybeRefreshInstalledVersion(): void
     {
-        $cachedVersion = get_transient(self::TRANSIENT_INSTALLED_VERSION);
+        $cachedVersion = get_transient($this->installedVersionTransientKey());
         $installedVersion = $this->installedVersion();
 
         if (!is_string($cachedVersion) || $cachedVersion !== $installedVersion) {
             $this->clearReleaseCache();
-            set_transient(self::TRANSIENT_INSTALLED_VERSION, $installedVersion, self::INSTALLED_VERSION_TTL);
+            set_transient($this->installedVersionTransientKey(), $installedVersion, self::INSTALLED_VERSION_TTL);
         }
     }
 
     private function clearReleaseCache(): void
     {
-        delete_transient(self::TRANSIENT_LEGACY_RELEASE);
-        delete_transient(self::TRANSIENT_RELEASE_MANIFEST);
+        delete_transient($this->legacyReleaseTransientKey());
+        delete_transient($this->releaseManifestTransientKey());
     }
 
     private function getLatestReleaseForChannel(string $channel): ?array
@@ -342,7 +345,7 @@ final class GitHubUpdater
 
     private function getReleaseManifest(): ?array
     {
-        $cached = get_transient(self::TRANSIENT_RELEASE_MANIFEST);
+        $cached = get_transient($this->releaseManifestTransientKey());
 
         if (is_array($cached)) {
             return $cached;
@@ -410,7 +413,7 @@ final class GitHubUpdater
         $manifest['latest_for_channel'][self::CHANNEL_BETA] = $this->pickNewerRelease($stable, $beta);
         $manifest['latest_for_channel'][self::CHANNEL_NIGHTLY] = $this->pickNewestRelease([$stable, $beta, $nightly]);
 
-        set_transient(self::TRANSIENT_RELEASE_MANIFEST, $manifest, self::CACHE_TTL);
+        set_transient($this->releaseManifestTransientKey(), $manifest, self::CACHE_TTL);
 
         return $manifest;
     }
@@ -635,7 +638,13 @@ final class GitHubUpdater
 
     private function pluginBasename(): string
     {
-        return plugin_basename(TASTY_FONTS_FILE);
+        if (is_string($this->pluginBasename)) {
+            return $this->pluginBasename;
+        }
+
+        $this->pluginBasename = plugin_basename(TASTY_FONTS_FILE);
+
+        return $this->pluginBasename;
     }
 
     private function resolveChannel(?string $channel): string
@@ -728,8 +737,28 @@ final class GitHubUpdater
 
     private function installedVersion(): string
     {
-        $metadata = $this->getPluginMetadata();
+        if (is_string($this->installedVersion)) {
+            return $this->installedVersion;
+        }
 
-        return (string) ($metadata['version'] ?? TASTY_FONTS_VERSION);
+        $metadata = $this->getPluginMetadata();
+        $this->installedVersion = (string) ($metadata['version'] ?? TASTY_FONTS_VERSION);
+
+        return $this->installedVersion;
+    }
+
+    private function legacyReleaseTransientKey(): string
+    {
+        return TransientKey::forSite(self::TRANSIENT_LEGACY_RELEASE);
+    }
+
+    private function releaseManifestTransientKey(): string
+    {
+        return TransientKey::forSite(self::TRANSIENT_RELEASE_MANIFEST);
+    }
+
+    private function installedVersionTransientKey(): string
+    {
+        return TransientKey::forSite(self::TRANSIENT_INSTALLED_VERSION);
     }
 }
