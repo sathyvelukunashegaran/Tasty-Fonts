@@ -42,6 +42,49 @@ final class AdminController
     public const PAGE_SETTINGS = 'settings';
     public const PAGE_DIAGNOSTICS = 'diagnostics';
     private const ACTION_DOWNLOAD_GENERATED_CSS = 'tasty_fonts_download_generated_css';
+    private const SETTINGS_SAVE_SCALAR_FIELDS = [
+        'google_api_key',
+        'tasty_fonts_clear_google_api_key',
+        'css_delivery_mode',
+        'font_display',
+        'unicode_range_mode',
+        'unicode_range_custom_value',
+        'output_quick_mode_preference',
+        'preview_sentence',
+        'update_channel',
+    ];
+    private const SETTINGS_SAVE_BOOLEAN_FIELDS = [
+        'minify_css_output',
+        'class_output_enabled',
+        'class_output_role_heading_enabled',
+        'class_output_role_body_enabled',
+        'class_output_role_monospace_enabled',
+        'class_output_role_alias_interface_enabled',
+        'class_output_role_alias_ui_enabled',
+        'class_output_role_alias_code_enabled',
+        'class_output_category_sans_enabled',
+        'class_output_category_serif_enabled',
+        'class_output_category_mono_enabled',
+        'class_output_families_enabled',
+        'per_variant_font_variables_enabled',
+        'minimal_output_preset_enabled',
+        'role_usage_font_weight_enabled',
+        'extended_variable_weight_tokens_enabled',
+        'extended_variable_role_aliases_enabled',
+        'extended_variable_category_sans_enabled',
+        'extended_variable_category_serif_enabled',
+        'extended_variable_category_mono_enabled',
+        'preload_primary_fonts',
+        'remote_connection_hints',
+        'block_editor_font_library_sync_enabled',
+        'bricks_integration_enabled',
+        'oxygen_integration_enabled',
+        'acss_font_role_sync_enabled',
+        'delete_uploaded_files_on_uninstall',
+        'training_wheels_off',
+        'variable_fonts_enabled',
+        'monospace_role_enabled',
+    ];
     public const LOCAL_ENV_NOTICE_OPTION = 'tasty_fonts_local_environment_notice_preferences';
     private const LOCAL_ENV_NOTICE_FORM_FIELD = 'tasty_fonts_local_environment_notice';
     private const LOCAL_ENV_NOTICE_ACTION_FIELD = 'tasty_fonts_local_environment_notice_action';
@@ -999,7 +1042,7 @@ final class AdminController
 
         check_admin_referer('tasty_fonts_save_settings');
 
-        $result = $this->saveSettingsValues($_POST);
+        $result = $this->saveSettingsValues($this->collectPostedSettingsSubmission());
 
         if (is_wp_error($result)) {
             $this->redirectWithError($result->get_error_message());
@@ -2230,19 +2273,7 @@ final class AdminController
     {
         $settingsInput = [];
 
-        foreach (
-            [
-                'google_api_key',
-                'tasty_fonts_clear_google_api_key',
-                'css_delivery_mode',
-                'font_display',
-                'unicode_range_mode',
-                'unicode_range_custom_value',
-                'output_quick_mode_preference',
-                'preview_sentence',
-                'update_channel',
-            ] as $field
-        ) {
+        foreach (self::SETTINGS_SAVE_SCALAR_FIELDS as $field) {
             if (!array_key_exists($field, $submittedValues)) {
                 continue;
             }
@@ -2256,49 +2287,34 @@ final class AdminController
             $settingsInput[$field] = is_string($value) ? wp_unslash($value) : $value;
         }
 
-        foreach (
-            [
-                'minify_css_output',
-                'class_output_enabled',
-                'class_output_role_heading_enabled',
-                'class_output_role_body_enabled',
-                'class_output_role_monospace_enabled',
-                'class_output_role_alias_interface_enabled',
-                'class_output_role_alias_ui_enabled',
-                'class_output_role_alias_code_enabled',
-                'class_output_category_sans_enabled',
-                'class_output_category_serif_enabled',
-                'class_output_category_mono_enabled',
-                'class_output_families_enabled',
-                'per_variant_font_variables_enabled',
-                'minimal_output_preset_enabled',
-                'role_usage_font_weight_enabled',
-                'extended_variable_weight_tokens_enabled',
-                'extended_variable_role_aliases_enabled',
-                'extended_variable_category_sans_enabled',
-                'extended_variable_category_serif_enabled',
-                'extended_variable_category_mono_enabled',
-                'preload_primary_fonts',
-                'remote_connection_hints',
-                'block_editor_font_library_sync_enabled',
-                'bricks_integration_enabled',
-                'oxygen_integration_enabled',
-                'acss_font_role_sync_enabled',
-                'delete_uploaded_files_on_uninstall',
-                'training_wheels_off',
-                'variable_fonts_enabled',
-            ] as $field
-        ) {
+        foreach (self::SETTINGS_SAVE_BOOLEAN_FIELDS as $field) {
             if (array_key_exists($field, $submittedValues)) {
                 $settingsInput[$field] = $submittedValues[$field];
             }
         }
 
-        if (array_key_exists('monospace_role_enabled', $submittedValues)) {
-            $settingsInput['monospace_role_enabled'] = $submittedValues['monospace_role_enabled'];
+        return $settingsInput;
+    }
+
+    private function collectPostedSettingsSubmission(): array
+    {
+        $submittedValues = [];
+
+        foreach (array_merge(self::SETTINGS_SAVE_SCALAR_FIELDS, self::SETTINGS_SAVE_BOOLEAN_FIELDS) as $field) {
+            if (!array_key_exists($field, $_POST)) {
+                continue;
+            }
+
+            $value = $_POST[$field];
+
+            if (!is_scalar($value) && $value !== null) {
+                continue;
+            }
+
+            $submittedValues[$field] = $value;
         }
 
-        return $settingsInput;
+        return $submittedValues;
     }
 
     private function preserveUnavailableIntegrationSettings(array $settingsInput): array

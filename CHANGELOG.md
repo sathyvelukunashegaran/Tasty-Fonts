@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Documented the shared clear-select button helper so icon-only reset controls keep a consistent accessibility and admin-client contract wherever the renderer reuses them.
+
+### Fixed
+
+- Restricted classic settings saves to an explicit allowlist of expected scalar and boolean fields before forwarding values into the settings save pipeline, so unrelated `$_POST` payload keys no longer leak into plugin settings handling.
+
 ## [1.10.0-beta.2] - 2026-04-11
 
 ### Added

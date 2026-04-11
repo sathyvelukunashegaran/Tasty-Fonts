@@ -99,6 +99,31 @@ $tests['admin_controller_sanitizes_posted_fallback_values'] = static function ()
     );
 };
 
+$tests['admin_controller_collects_only_allowlisted_posted_settings_fields'] = static function (): void {
+    resetTestState();
+
+    $_POST = [
+        'google_api_key' => " api-key\\with-slash ",
+        'preload_primary_fonts' => '1',
+        'monospace_role_enabled' => '0',
+        'unexpected_setting' => 'should-not-pass',
+        'nested_payload' => ['nope'],
+    ];
+
+    $controller = makeAdminControllerTestInstance();
+    $submitted = invokePrivateMethod($controller, 'collectPostedSettingsSubmission');
+
+    assertSameValue(
+        [
+            'google_api_key' => ' api-key\\with-slash ',
+            'preload_primary_fonts' => '1',
+            'monospace_role_enabled' => '0',
+        ],
+        $submitted,
+        'Classic settings saves should only forward explicitly allowlisted scalar setting fields from $_POST.'
+    );
+};
+
 $tests['admin_controller_builds_specific_settings_saved_message'] = static function (): void {
     resetTestState();
 

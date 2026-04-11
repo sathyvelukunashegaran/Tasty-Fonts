@@ -325,6 +325,20 @@ trait SharedRenderHelpers
         echo '</span>';
     }
 
+    /**
+     * Render the shared icon-only clear button used by select and filter controls.
+     *
+     * The visible glyph stays decorative while the control name and reset behavior
+     * are carried by aria-label and data attributes for the admin client.
+     *
+     * @since 1.10.0
+     *
+     * @param string $label Accessible button label announced by assistive technology.
+     * @param string $targetId Optional input/select id to reset when the button is activated.
+     * @param string $clearValue Optional value that should be restored when clearing the control.
+     * @param bool   $alwaysVisibleAffordance Whether the client should keep the affordance visible even when the control is empty.
+     * @return void
+     */
     public function renderClearSelectButton(string $label, string $targetId = '', string $clearValue = '', bool $alwaysVisibleAffordance = false): void
     {
         $label = trim($label);
