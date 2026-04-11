@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Promoted the validated `1.9.0` security hardening line to the stable rail for general release availability, keeping the same runtime, updater, CSP, preview-sanitization, and admin-throttling protections published in `1.9.0-beta.1`.
+
 ## [1.9.0-beta.1] - 2026-04-11
 
 ### Added
