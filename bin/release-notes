@@ -35,18 +35,60 @@ php -r '
       exit(1);
   }
 
-  $pattern = "/^## \\[" . preg_quote($version, "/") . "\\](?: - [^\r\n]*)?\\R(.*?)(?=^## \\[|\\z)/ms";
+  $extractSection = static function (string $targetVersion) use ($contents): ?string {
+      $pattern = "/^## \\[" . preg_quote($targetVersion, "/") . "\\](?: - [^\r\n]*)?\\R(.*?)(?=^## \\[|\\z)/ms";
 
-  if (!preg_match($pattern, $contents, $matches)) {
+      if (!preg_match($pattern, $contents, $matches)) {
+          return null;
+      }
+
+      $notes = trim($matches[1]);
+
+      return $notes === "" ? "" : $notes;
+  };
+
+  $notes = $extractSection($version);
+
+  if ($notes === null) {
       fwrite(STDERR, "Could not find CHANGELOG.md section for " . $version . "\n");
       exit(1);
   }
 
-  $notes = trim($matches[1]);
-
   if ($notes === "") {
       fwrite(STDERR, "CHANGELOG.md section for " . $version . " is empty\n");
       exit(1);
+  }
+
+  if (preg_match("/^[0-9]+\\.[0-9]+\\.[0-9]+$/", $version) === 1) {
+      $nonEmptyLines = array_values(array_filter(
+          preg_split("/\\R/", $notes) ?: [],
+          static fn (string $line): bool => trim($line) !== ""
+      ));
+      $bodyLines = array_values(array_filter(
+          $nonEmptyLines,
+          static fn (string $line): bool => preg_match("/^###\\s+/", $line) !== 1
+      ));
+      $isPromotionOnly = count($bodyLines) === 1 && preg_match("/^-\\s+Promoted\\b/i", $bodyLines[0]) === 1;
+
+      if ($isPromotionOnly) {
+          $betaPattern = "/^## \\[" . preg_quote($version, "/") . "-beta\\.([0-9]+)\\](?: - [^\r\n]*)?\\R(.*?)(?=^## \\[|\\z)/ms";
+          $betaMatches = [];
+
+          if (preg_match_all($betaPattern, $contents, $betaMatches, PREG_SET_ORDER) > 0) {
+              usort(
+                  $betaMatches,
+                  static fn (array $left, array $right): int => (int) $left[1] <=> (int) $right[1]
+              );
+
+              foreach ($betaMatches as $betaMatch) {
+                  $betaNotes = trim($betaMatch[2]);
+
+                  if ($betaNotes !== "") {
+                      $notes .= "\n\n" . $betaNotes;
+                  }
+              }
+          }
+      }
   }
 
   echo $notes . PHP_EOL;

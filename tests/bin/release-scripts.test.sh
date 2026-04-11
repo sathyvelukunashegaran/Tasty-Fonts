@@ -270,6 +270,63 @@ else
     _fail "release-notes handles Windows CRLF line endings" "output: ${crlf_notes}"
 fi
 
+cat > "${test_repo}/CHANGELOG.md" <<'CHANGELOG'
+# Changelog
+
+## [4.0.0] - 2026-04-11
+
+### Changed
+
+- Promoted the validated `4.0.0` line to stable.
+
+## [4.0.0-beta.2] - 2026-04-10
+
+### Fixed
+
+- Beta follow-up fix.
+
+## [4.0.0-beta.1] - 2026-04-09
+
+### Added
+
+- Beta launch feature.
+CHANGELOG
+
+stable_notes="$("${test_repo}/bin/release-notes" "4.0.0" 2>/dev/null)"
+if [[ "$stable_notes" == *"Promoted the validated \`4.0.0\` line to stable."* ]] \
+    && [[ "$stable_notes" == *"Beta launch feature."* ]] \
+    && [[ "$stable_notes" == *"Beta follow-up fix."* ]]; then
+    _pass "release-notes expands promotion-only stable entries with matching beta sections"
+else
+    _fail "release-notes expands promotion-only stable entries with matching beta sections" \
+        "output: ${stable_notes}"
+fi
+
+cat > "${test_repo}/CHANGELOG.md" <<'CHANGELOG'
+# Changelog
+
+## [5.0.0] - 2026-04-11
+
+### Added
+
+- Stable-only feature.
+
+## [5.0.0-beta.1] - 2026-04-10
+
+### Fixed
+
+- Beta-only fix.
+CHANGELOG
+
+detailed_stable_notes="$("${test_repo}/bin/release-notes" "5.0.0" 2>/dev/null)"
+if [[ "$detailed_stable_notes" == *"Stable-only feature."* ]] \
+    && [[ "$detailed_stable_notes" != *"Beta-only fix."* ]]; then
+    _pass "release-notes keeps detailed stable sections unchanged"
+else
+    _fail "release-notes keeps detailed stable sections unchanged" \
+        "output: ${detailed_stable_notes}"
+fi
+
 # ── promote-changelog ─────────────────────────────────────────────────────────
 
 seed_changelog
