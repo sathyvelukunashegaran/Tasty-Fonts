@@ -30,9 +30,9 @@ for script in "${repo_root}/bin/"*; do
 done
 
 release_repo_from_main="$(mktemp -d)"
-release_repo_branch_flow="$(mktemp -d)"
+release_repo_from_beta="$(mktemp -d)"
 
-cleanup() { rm -rf "${test_repo}" "${release_repo_from_main}" "${release_repo_branch_flow}"; }
+cleanup() { rm -rf "${test_repo}" "${release_repo_from_main}" "${release_repo_from_beta}"; }
 trap cleanup EXIT
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -423,52 +423,57 @@ else
     _fail "release beta can promote the current main dev state directly" "command exited non-zero"
 fi
 
-if [[ "$(git -C "${release_repo_from_main}" branch --show-current)" == "release/1.2" ]] \
-    && [[ -n "$(git -C "${release_repo_from_main}" tag --list '1.2.0-beta.1')" ]]; then
-    _pass "release beta from main creates the release branch and tag"
+beta_branch_name="$(git -C "${release_repo_from_main}" branch --show-current)"
+beta_tag="$(git -C "${release_repo_from_main}" tag --list '1.2.0-beta.1')"
+beta_main_version="$(git -C "${release_repo_from_main}" show main:plugin.php | sed -n 's/^Version: //p')"
+if [[ "${beta_branch_name}" == "main" && -n "${beta_tag}" && "${beta_main_version}" == "1.2.0-beta.1" ]]; then
+    _pass "release beta from main keeps the tagged beta state on main"
 else
-    _fail "release beta from main creates the release branch and tag" \
-        "branch=$(git -C "${release_repo_from_main}" branch --show-current), tag=$(git -C "${release_repo_from_main}" tag --list '1.2.0-beta.1')"
+    _fail "release beta from main keeps the tagged beta state on main" \
+        "branch=${beta_branch_name}, tag=${beta_tag}, main=${beta_main_version}"
 fi
 
-release_branch_version="$(git -C "${release_repo_from_main}" show release/1.2:plugin.php | sed -n 's/^Version: //p')"
-main_branch_version="$(git -C "${release_repo_from_main}" show main:plugin.php | sed -n 's/^Version: //p')"
-if [[ "${release_branch_version}" == "1.2.0-beta.1" && "${main_branch_version}" == "1.2.0-dev" ]]; then
-    _pass "release beta from main keeps main on the original dev version"
+if grep -q "## \[1.2.0-beta.1\]" "${release_repo_from_main}/CHANGELOG.md"; then
+    _pass "release beta from main promotes the changelog on main"
 else
-    _fail "release beta from main keeps main on the original dev version" \
-        "release=${release_branch_version}, main=${main_branch_version}"
+    _fail "release beta from main promotes the changelog on main" \
+        "changelog=$(<"${release_repo_from_main}/CHANGELOG.md")"
 fi
 
-seed_release_repo "${release_repo_branch_flow}" "1.4.0-dev"
-if (cd "${release_repo_branch_flow}" && bin/release branch 1.4.0 --no-push >/dev/null 2>&1); then
-    _pass "release branch prepares a beta branch without advancing main"
+if ! (cd "${release_repo_from_main}" && bin/release stable 1.3.0 --no-push >/dev/null 2>&1); then
+    _pass "release stable rejects a mismatched release line on main"
 else
-    _fail "release branch prepares a beta branch without advancing main" "command exited non-zero"
+    _fail "release stable rejects a mismatched release line on main" "should have failed"
 fi
 
-prepared_release_version="$(git -C "${release_repo_branch_flow}" show release/1.4:plugin.php | sed -n 's/^Version: //p')"
-prepared_main_version="$(git -C "${release_repo_branch_flow}" show main:plugin.php | sed -n 's/^Version: //p')"
-prepared_tag="$(git -C "${release_repo_branch_flow}" tag --list '1.4.0-beta.1')"
-if [[ "${prepared_release_version}" == "1.4.0-beta.1" && "${prepared_main_version}" == "1.4.0-dev" && -z "${prepared_tag}" ]]; then
-    _pass "release branch leaves main untouched and does not tag yet"
+seed_release_repo "${release_repo_from_beta}" "1.4.0-beta.2"
+if (cd "${release_repo_from_beta}" && bin/release stable 1.4.0 --no-push >/dev/null 2>&1); then
+    _pass "release stable can promote the current beta line on main"
 else
-    _fail "release branch leaves main untouched and does not tag yet" \
-        "release=${prepared_release_version}, main=${prepared_main_version}, tag=${prepared_tag}"
+    _fail "release stable can promote the current beta line on main" "command exited non-zero"
 fi
 
-if (cd "${release_repo_branch_flow}" && bin/release beta 1.4.0-beta.1 --no-push >/dev/null 2>&1); then
-    _pass "release beta still works from an existing release branch"
+stable_tag="$(git -C "${release_repo_from_beta}" tag --list '1.4.0')"
+release_commit_version="$(git -C "${release_repo_from_beta}" show 1.4.0:plugin.php | sed -n 's/^Version: //p')"
+advanced_main_version="$(git -C "${release_repo_from_beta}" show main:plugin.php | sed -n 's/^Version: //p')"
+latest_subject="$(git -C "${release_repo_from_beta}" log -1 --pretty=%s)"
+previous_subject="$(git -C "${release_repo_from_beta}" log -2 --pretty=%s | tail -n 1)"
+if [[ -n "${stable_tag}" \
+    && "${release_commit_version}" == "1.4.0" \
+    && "${advanced_main_version}" == "1.5.0-dev" \
+    && "${latest_subject}" == "Start 1.5.0-dev" \
+    && "${previous_subject}" == "Release 1.4.0" ]]; then
+    _pass "release stable tags the stable commit and reopens main on the next dev line"
 else
-    _fail "release beta still works from an existing release branch" "command exited non-zero"
+    _fail "release stable tags the stable commit and reopens main on the next dev line" \
+        "tag=${stable_tag}, release=${release_commit_version}, main=${advanced_main_version}, latest=${latest_subject}, previous=${previous_subject}"
 fi
 
-if [[ -n "$(git -C "${release_repo_branch_flow}" tag --list '1.4.0-beta.1')" ]] \
-    && grep -q "## \[1.4.0-beta.1\]" "${release_repo_branch_flow}/CHANGELOG.md"; then
-    _pass "release beta from release branch tags and promotes the changelog"
+if grep -q "## \[1.4.0\]" "${release_repo_from_beta}/CHANGELOG.md"; then
+    _pass "release stable promotes the changelog before advancing main"
 else
-    _fail "release beta from release branch tags and promotes the changelog" \
-        "tag=$(git -C "${release_repo_branch_flow}" tag --list '1.4.0-beta.1')"
+    _fail "release stable promotes the changelog before advancing main" \
+        "changelog=$(<"${release_repo_from_beta}/CHANGELOG.md")"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

@@ -22,7 +22,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Detect nightly-eligible base version
+        id: eligibility
+        shell: bash
+        run: |
+          base_version="$(sed -n 's/^Version: //p' plugin.php | head -n 1 | tr -d '\r')"
+          echo "base_version=${base_version}" >> "${GITHUB_OUTPUT}"
+
+          if [[ "${base_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev$ ]]; then
+            echo "publish=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "publish=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Derive nightly version
+        if: steps.eligibility.outputs.publish == 'true'
         id: nightly
         shell: bash
         run: |
@@ -30,10 +44,12 @@ jobs:
           echo "version=${nightly_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Stamp nightly version into plugin metadata
+        if: steps.eligibility.outputs.publish == 'true'
         shell: bash
         run: ./bin/set-version "${{ steps.nightly.outputs.version }}"
 
       - name: Build plugin zip from stamped worktree
+        if: steps.eligibility.outputs.publish == 'true'
         id: build
         shell: bash
         run: |
@@ -53,6 +69,7 @@ jobs:
           echo "checksum_name=${checksum_name}" >> "${GITHUB_OUTPUT}"
 
       - name: Generate nightly release notes
+        if: steps.eligibility.outputs.publish == 'true'
         shell: bash
         run: |
           previous_reference="$(
@@ -80,6 +97,7 @@ jobs:
           } > release-notes.md
 
       - name: Publish nightly prerelease
+        if: steps.eligibility.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -95,6 +113,7 @@ jobs:
             --prerelease
 
       - name: Prune older nightly prereleases
+        if: steps.eligibility.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -109,3 +128,9 @@ jobs:
           for tag_name in "${old_tags[@]}"; do
             gh release delete "${tag_name}" --cleanup-tag -y
           done
+
+      - name: Skip nightly publish on non-dev main
+        if: steps.eligibility.outputs.publish != 'true'
+        shell: bash
+        run: |
+          echo "Skipping nightly publish because main is on ${{ steps.eligibility.outputs.base_version }}, not an X.Y.Z-dev base."

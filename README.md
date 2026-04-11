@@ -4,9 +4,17 @@ Typography Management for WordPress Professionals (Deeply integrated with Etch, 
 
 ## Release Rails
 
-`1.9.0` is the current stable release. `main` now tracks the next development line as `1.10.0-dev`.
+`1.9.0` is the current stable release. `main` is currently back on the next development line as `1.10.0-dev`.
 
 Stable, beta, and nightly packages are all published from GitHub. The plugin can follow those rails through `Settings -> Behavior -> Update Channel`, with a rollback reinstall action when switching back to a lower rail before it catches up.
+
+The release flow is intentionally linear:
+
+- cut beta tags from `main`
+- continue beta fixes on `main`
+- cut the stable tag from `main`
+- let the stable helper immediately advance `main` to the next `X.Y.0-dev` line
+- create a `release/X.Y` branch later only if you actually need a hotfix line such as `X.Y.1`
 
 Tasty Custom Fonts lets you upload local font files, import Google Fonts or Bunny Fonts as self-hosted or CDN deliveries, connect an Adobe Fonts web project, and manage the live typography stack from one WordPress dashboard. The plugin generates runtime CSS, editor presets, preview tooling, and delivery controls without any build step.
 

@@ -12,11 +12,12 @@ Create, verify, tag, and publish stable, beta, and nightly plugin builds.
 
 ### 1. Understand The Rails
 
-- `main` stays on an `X.Y.Z-dev` base version (currently `1.9.0-dev` after the `1.8.0` stable tag).
-- every push to `main` publishes a fresh nightly prerelease package stamped as `X.Y.Z-dev.YYYYMMDDHHMM`
-- `release/X.Y` branches stabilize one line at a time
+- `main` is the only branch used for normal beta and stable releases.
+- `main` usually sits on an `X.Y.Z-dev` base version between release windows.
+- every push to `main` publishes a fresh nightly prerelease package stamped as `X.Y.Z-dev.YYYYMMDDHHMM` when `plugin.php` is on a dev base.
 - beta tags use `X.Y.Z-beta.N`
 - stable tags use `X.Y.Z`
+- `release/X.Y` branches are optional hotfix lanes created only if a shipped stable line needs an `X.Y.1+` patch later.
 
 ### 2. Start From A Clean Branch
 
@@ -28,27 +29,10 @@ The release helpers assume:
 
 Branch expectations:
 
-- `bin/release branch ...` runs from `main`
-- `bin/release beta ...` runs from `main` when you are promoting the current dev state for the first beta, or from the matching `release/X.Y` for later beta tags
-- `bin/release stable ...` runs from the matching `release/X.Y`
+- `bin/release beta ...` runs from `main`
+- `bin/release stable ...` runs from `main`
 
-### 3. Cut A Release Branch
-
-Use this only when you want to prepare a release branch before tagging beta:
-
-```bash
-bin/release branch 1.8.0
-```
-
-This helper:
-
-- creates `release/1.8`
-- updates the new branch to `1.8.0-beta.1`
-- commits that beta-line start on `release/1.8`
-- leaves `main` on its existing `1.8.0-dev` line
-- pushes only the new release branch unless `--no-push` is used
-
-### 4. Cut A Beta Or Stable Tag
+### 3. Cut A Beta Or Stable Tag
 
 First beta from the current dev state on `main`:
 
@@ -56,10 +40,9 @@ First beta from the current dev state on `main`:
 bin/release beta 1.8.0-beta.1
 ```
 
-Later beta from the existing release branch:
+Later beta from the same line on `main`:
 
 ```bash
-git switch release/1.8
 bin/release beta 1.8.0-beta.2
 ```
 
@@ -78,17 +61,25 @@ For beta and stable tags, the helper:
 - runs `node --test tests/js/*.test.cjs`
 - creates the release commit
 - creates the annotated tag
-- pushes the current `release/X.Y` branch and the tag unless `--no-push` is used
+- pushes `main` and the tag unless `--no-push` is used
+
+For stable tags, the helper also:
+
+- computes the next minor dev base, such as `1.9.0 -> 1.10.0-dev`
+- rewrites `plugin.php` to that next dev version
+- creates a follow-up `Start X.Y.0-dev` commit on `main`
 
 The intended release lane is:
 
-- keep `main` on the active `X.Y.Z-dev` line
-- let pushes to `main` publish stamped nightly builds
+- keep `main` on the active release line while preparing beta and stable tags
+- let pushes to `main` publish stamped nightly builds whenever `plugin.php` is on an `X.Y.Z-dev` base
 - when you explicitly bless the latest dev state, run `bin/release beta <X.Y.Z-beta.N>` from `main`
-- continue beta fixes on `release/X.Y`
-- run `bin/release stable <X.Y.Z>` from `release/X.Y` when the beta line is ready
+- continue beta fixes on `main`
+- run `bin/release stable <X.Y.Z>` from `main` when the beta line is ready
+- after the stable tag is cut, let the helper reopen `main` on the next minor dev line
+- if you later need `X.Y.1`, create `release/X.Y` from the stable tag and patch there
 
-### 5. Let GitHub Actions Publish The Build
+### 4. Let GitHub Actions Publish The Build
 
 GitHub Actions now uses four workflows:
 
@@ -102,7 +93,7 @@ Release-note sources:
 - stable and beta releases use `CHANGELOG.md` through `bin/release-notes`
 - nightly releases use commit messages since the previous nightly tag
 
-Nightly publishing also prunes older nightly prereleases so the rail keeps only the most recent builds.
+Nightly publishing also prunes older nightly prereleases so the rail keeps only the most recent builds, and it skips cleanly when `main` is intentionally on a beta or stable version during a release window.
 
 ## GitHub Updater Implications
 
@@ -120,7 +111,7 @@ Nightly publishing also prunes older nightly prereleases so the rail keeps only 
 - Stable releases should be published as GitHub releases, not prereleases.
 - Beta and nightly builds should be published as GitHub prereleases.
 - The release workflows are the source of the installable GitHub ZIP assets used by the updater.
-- Nightly builds require `plugin.php` on `main` to remain on an `X.Y.Z-dev` base version.
+- Nightly builds publish only when `plugin.php` on `main` is on an `X.Y.Z-dev` base version.
 
 ## Related Docs
 
