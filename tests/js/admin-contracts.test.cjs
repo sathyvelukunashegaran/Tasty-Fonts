@@ -343,12 +343,12 @@ test('admin contracts resolveRoleFallback uses catalog-driven fallback when avai
     assert.equal(mismatch, true);
 });
 
-test('admin contracts canDisableOutputLayer returns true for classes-only state (variables enabled, classes disabled)', () => {
-    // When variables are disabled but classes are enabled, 'variables' layer cannot be disabled.
+test('admin contracts canDisableOutputLayer returns true when another output layer remains enabled', () => {
+    // When classes are enabled and variables are disabled, the variables layer can be disabled.
     assert.equal(canDisableOutputLayer('variables', { classOutputEnabled: true, variableOutputEnabled: false }), true);
-    // When classes are disabled but variables are enabled, 'classes' layer cannot be disabled.
+    // When variables are enabled and classes are disabled, the classes layer can be disabled.
     assert.equal(canDisableOutputLayer('classes', { classOutputEnabled: false, variableOutputEnabled: true }), true);
-    // When both are enabled, both can be disabled individually.
+    // When both are enabled, either layer can be disabled individually.
     assert.equal(canDisableOutputLayer('classes', { classOutputEnabled: true, variableOutputEnabled: true }), true);
 });
 
