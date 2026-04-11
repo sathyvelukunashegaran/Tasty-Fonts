@@ -282,7 +282,9 @@ final class AssetService
             return null;
         }
 
-        return add_query_arg('ver', (string) $state['expected_hash'], $url);
+        $version = !empty($state['exists']) ? (string) $state['expected_hash'] : TASTY_FONTS_VERSION;
+
+        return add_query_arg('ver', $version, $url);
     }
 
     /**

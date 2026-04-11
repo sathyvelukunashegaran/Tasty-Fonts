@@ -950,3 +950,68 @@ $tests['library_service_blocks_deleting_live_monospace_family_when_enabled'] = s
     assertSameValue('tasty_fonts_family_in_use', $result->get_error_code(), 'Deleting a live monospace family should return the family-in-use error.');
     assertContainsValue('currently assigned as the monospace font', $result->get_error_message(), 'The delete-family guard should explain that the family is still used for the monospace role.');
 };
+
+// ---------------------------------------------------------------------------
+// LibraryService::saveFamilyDelivery – error path
+// ---------------------------------------------------------------------------
+
+$tests['library_service_save_family_delivery_returns_error_for_unknown_slug'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+
+    $result = $services['library']->saveFamilyDelivery('no-such-font', 'google-cdn');
+
+    assertTrueValue(is_wp_error($result), 'saveFamilyDelivery() should return a WP_Error when the given family slug is not in the library.');
+    assertSameValue('tasty_fonts_family_not_found', $result->get_error_code(), 'saveFamilyDelivery() should use the family_not_found error code for an unknown slug.');
+};
+
+// ---------------------------------------------------------------------------
+// LibraryService::saveFamilyPublishState – error path
+// ---------------------------------------------------------------------------
+
+$tests['library_service_save_family_publish_state_returns_error_for_unknown_slug'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+
+    $result = $services['library']->saveFamilyPublishState('no-such-font', 'published');
+
+    assertTrueValue(is_wp_error($result), 'saveFamilyPublishState() should return a WP_Error when the given family slug is not in the library.');
+    assertSameValue('tasty_fonts_family_not_found', $result->get_error_code(), 'saveFamilyPublishState() should use the family_not_found error code for an unknown slug.');
+};
+
+// ---------------------------------------------------------------------------
+// BunnyImportService – WP_Error during font file download
+// ---------------------------------------------------------------------------
+
+$tests['bunny_import_service_aborts_with_wp_error_when_font_download_fails'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $cssUrl = $services['bunny']->buildCssUrl('Inter', ['regular']);
+    $fontUrl = 'https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2';
+
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+CSS,
+    ];
+    $remoteGetResponses[$fontUrl] = new WP_Error('http_request_failed', 'cURL error 28: Connection timed out.');
+
+    $result = $services['bunny_import']->importFamily('Inter', ['regular']);
+
+    assertTrueValue(is_wp_error($result), 'BunnyImportService should return a WP_Error when wp_remote_get fails during font file download.');
+    assertSameValue('http_request_failed', $result->get_error_code(), 'BunnyImportService should propagate the error code from the failed download response.');
+};

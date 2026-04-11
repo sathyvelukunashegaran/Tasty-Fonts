@@ -132,6 +132,10 @@ if (!class_exists('WP_Error')) {
     }
 }
 
+if (!class_exists('WpDieException')) {
+    class WpDieException extends RuntimeException {}
+}
+
 if (!class_exists('WP_REST_Response')) {
     class WP_REST_Response
     {
@@ -1214,6 +1218,13 @@ if (!function_exists('wp_safe_redirect')) {
         $redirectLocation = $location;
 
         return true;
+    }
+}
+
+if (!function_exists('wp_die')) {
+    function wp_die(mixed $message = '', mixed $title = '', mixed $args = []): never
+    {
+        throw new WpDieException((string) $message);
     }
 }
 

@@ -3058,7 +3058,7 @@ final class AdminController
     private function redirect(): never
     {
         wp_safe_redirect($this->buildAdminPageUrl());
-        exit;
+        wp_die();
     }
 
     public static function isPluginAdminHook(string $hookSuffix): bool

@@ -2741,23 +2741,27 @@ $tests['asset_service_get_versioned_stylesheet_url_includes_hash_version_when_fi
     resetTestState();
 
     $services = makeServiceGraph();
-    Plugin::activate();
+    $services['storage']->ensureRootDirectory();
+    $services['assets']->ensureGeneratedCssFile();
 
     $url = $services['assets']->getVersionedStylesheetUrl();
 
     assertSameValue(false, $url === null, 'getVersionedStylesheetUrl() should return a non-null URL after the file is created.');
     assertContainsValue('ver=', (string) $url, 'getVersionedStylesheetUrl() should append a ver= query string.');
     assertNotContainsValue('ver=', str_replace('ver=', '', (string) $url), 'getVersionedStylesheetUrl() should append exactly one ver= parameter.');
+    assertNotContainsValue(TASTY_FONTS_VERSION, (string) $url, 'getVersionedStylesheetUrl() should use the file hash, not the plugin version string, when the file exists.');
 };
 
-$tests['asset_service_get_versioned_stylesheet_url_returns_null_when_generated_file_is_missing'] = static function (): void {
+$tests['asset_service_get_versioned_stylesheet_url_falls_back_to_plugin_version_when_file_is_missing'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
 
     $url = $services['assets']->getVersionedStylesheetUrl();
 
-    assertSameValue(null, $url, 'getVersionedStylesheetUrl() should return null when the generated CSS file does not yet exist.');
+    assertSameValue(false, $url === null, 'getVersionedStylesheetUrl() should return a versioned URL even before the generated CSS file is written.');
+    assertContainsValue(TASTY_FONTS_VERSION, (string) $url, 'getVersionedStylesheetUrl() should fall back to the plugin version string when no generated file exists.');
 };
 
 // ---------------------------------------------------------------------------
@@ -2916,8 +2920,6 @@ $tests['runtime_service_enqueue_admin_screen_fonts_enqueues_when_hook_suffix_mat
     resetTestState();
 
     global $registeredStyles;
-
-    Plugin::activate();
 
     $services = makeServiceGraph();
     $services['runtime']->enqueueAdminScreenFonts('toplevel_page_' . AdminController::MENU_SLUG);

@@ -156,7 +156,7 @@ final class RuntimeAssetPlanner
             $provider = strtolower(trim((string) ($activeDelivery['provider'] ?? '')));
             $type = strtolower(trim((string) ($activeDelivery['type'] ?? '')));
 
-            if ($type === 'self_hosted' || in_array($provider, ['google', 'bunny'], true)) {
+            if ($type === 'self_hosted') {
                 continue;
             }
 

@@ -6,6 +6,7 @@ use TastyFonts\Admin\AdminController;
 use TastyFonts\Api\RestController;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
+use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 
@@ -2586,7 +2587,6 @@ $tests['handle_admin_actions_dispatches_clear_log_and_redirects'] = static funct
     resetTestState();
 
     global $isAdminRequest;
-    global $optionStore;
     global $redirectLocation;
 
     $isAdminRequest = true;
@@ -2594,9 +2594,16 @@ $tests['handle_admin_actions_dispatches_clear_log_and_redirects'] = static funct
 
     $services = makeServiceGraph();
     $services['log']->add('Entry before clear');
-    $services['controller']->handleAdminActions();
 
-    assertSameValue([], $optionStore[LogRepository::OPTION_LOG] ?? [], 'handleAdminActions() should clear the log when the clear-log field is posted.');
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected: the redirect handler terminates via wp_die() after wp_safe_redirect().
+    }
+
+    $logMessages = implode(' ', array_column($services['log']->all(), 'message'));
+    assertNotContainsValue('Entry before clear', $logMessages, 'handleAdminActions() should have cleared the old log entries when the clear-log field is posted.');
+    assertContainsValue('cleared', $logMessages, 'handleAdminActions() should add a "cleared" confirmation log entry after clearing.');
     assertSameValue(false, empty($redirectLocation), 'handleAdminActions() should redirect after clearing the log.');
 };
 
@@ -2612,9 +2619,15 @@ $tests['handle_admin_actions_returns_early_after_first_matching_handler'] = stat
     $_POST['tasty_fonts_rescan_fonts'] = '1';
 
     $services = makeServiceGraph();
-    $services['controller']->handleAdminActions();
 
-    // The rescan handler would schedule a cron event; the clear-log handler would not.
-    // If the dispatch stops after clear-log, no cron event will be queued.
-    assertSameValue([], $services['log']->all(), 'Only the clear-log handler should have fired; the rescan log message should be absent.');
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected: the redirect handler terminates via wp_die() after wp_safe_redirect().
+    }
+
+    // The rescan handler would add a "Fonts rescanned." log entry; the clear-log handler would not.
+    // If the dispatch stops after clear-log, only the "Activity log cleared." entry should be present.
+    $logMessages = implode(' ', array_column($services['log']->all(), 'message'));
+    assertNotContainsValue('rescanned', $logMessages, 'Only the clear-log handler should have fired; the rescan log message should be absent.');
 };

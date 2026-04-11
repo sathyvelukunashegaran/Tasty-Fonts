@@ -935,3 +935,101 @@ $tests['google_import_service_returns_wp_error_when_css_yields_no_usable_faces']
     assertTrueValue(is_wp_error($result), 'importFamily should return a WP_Error when the CSS response contains no usable @font-face rules.');
     assertSameValue('tasty_fonts_google_no_faces', $result->get_error_code(), 'importFamily should use the google_no_faces error code when no faces are parsed.');
 };
+
+// ---------------------------------------------------------------------------
+// ImportRepository::getAll – insertion order
+// ---------------------------------------------------------------------------
+
+$tests['import_repository_get_all_returns_families_in_insertion_order'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+
+    $services['imports']->saveProfile(
+        'Alfa',
+        'alfa',
+        ['id' => 'local-self_hosted', 'provider' => 'local', 'type' => 'self_hosted', 'variants' => [], 'faces' => []],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Beta',
+        'beta',
+        ['id' => 'local-self_hosted', 'provider' => 'local', 'type' => 'self_hosted', 'variants' => [], 'faces' => []],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Gamma',
+        'gamma',
+        ['id' => 'local-self_hosted', 'provider' => 'local', 'type' => 'self_hosted', 'variants' => [], 'faces' => []],
+        'published',
+        true
+    );
+
+    $all = $services['imports']->all();
+    $slugs = array_keys($all);
+
+    assertSameValue(['alfa', 'beta', 'gamma'], $slugs, 'ImportRepository::all() should return families in insertion order.');
+};
+
+// ---------------------------------------------------------------------------
+// GoogleImportService – non-200 HTTP status
+// ---------------------------------------------------------------------------
+
+$tests['google_import_service_fails_when_remote_css_returns_non_200_status'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $cssUrl = $services['google']->buildCssUrl('Inter', ['regular']);
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 403],
+        'headers'  => ['content-type' => 'text/html'],
+        'body'     => 'Forbidden',
+    ];
+
+    $result = $services['google_import']->importFamily('Inter', ['regular']);
+
+    assertTrueValue(is_wp_error($result), 'importFamily should return a WP_Error when the Google Fonts CSS endpoint returns a non-200 status code.');
+    assertSameValue('tasty_fonts_google_css_fetch_failed', $result->get_error_code(), 'importFamily should propagate the css_fetch_failed error code for non-200 responses.');
+};
+
+// ---------------------------------------------------------------------------
+// LogRepository – entry timestamp format
+// ---------------------------------------------------------------------------
+
+$tests['log_repository_entry_timestamp_is_a_mysql_datetime_string'] = static function (): void {
+    resetTestState();
+
+    $log = new LogRepository();
+    $log->add('Timestamp check action');
+
+    $entry = $log->all()[0] ?? [];
+    $time = (string) ($entry['time'] ?? '');
+
+    assertSameValue(
+        1,
+        preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $time),
+        'LogRepository entries should record a MySQL-formatted UTC datetime string in the "time" field.'
+    );
+};
+
+// ---------------------------------------------------------------------------
+// LogRepository – two entries added in succession are newest-first
+// ---------------------------------------------------------------------------
+
+$tests['log_repository_two_entries_in_succession_are_ordered_newest_first'] = static function (): void {
+    resetTestState();
+
+    $log = new LogRepository();
+    $log->add('First action');
+    $log->add('Second action');
+
+    $entries = $log->all();
+
+    assertSameValue(2, count($entries), 'LogRepository should keep both entries when two are added.');
+    assertSameValue('Second action', (string) ($entries[0]['message'] ?? ''), 'The most recently added entry should appear first (newest-first order).');
+    assertSameValue('First action', (string) ($entries[1]['message'] ?? ''), 'The earlier entry should appear at index 1.');
+};
