@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.10.0-beta.3] - 2026-04-12
+
 ### Changed
 
 - Documented the shared clear-select button helper so icon-only reset controls keep a consistent accessibility and admin-client contract wherever the renderer reuses them.
