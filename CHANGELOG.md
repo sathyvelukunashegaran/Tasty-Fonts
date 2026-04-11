@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Reworked the WordPress-style `readme.txt` copy to better highlight the plugin's typography workflow, agency-friendly value, and product benefits while keeping the standard distribution format intact.
+
 ## [1.10.0-beta.4] - 2026-04-12
 
 ### Changed
