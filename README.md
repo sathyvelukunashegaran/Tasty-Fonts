@@ -137,18 +137,18 @@ Stable, beta, and nightly packages are published from GitHub. The release flow i
 
 ## What We’re Preparing After 2.0.0 Stable
 
-The 2.0.0 stable release is about locking in the foundation. The work immediately after that release is focused on making Tasty Custom Fonts even stronger for agencies, product teams, and advanced WordPress operators.
+The 2.0.0 stable release is focused on locking in the current foundation. The work immediately after that release is aimed at making Tasty Custom Fonts even more capable for agencies, product teams, and high-volume WordPress operators.
 
-Planned post-2.0 work includes:
+Planned post-2.0 improvements include:
 
 - richer operator tooling, including WP-CLI commands for maintenance, cache management, CSS regeneration, rescans, and diagnostics
-- portable export and import flows for settings and library metadata
-- better high-volume workflows with bulk actions and broader search-result handling
-- more flexible ingestion paths, including remote CSS and URL-based import flows
-- smarter background upkeep such as scheduled Adobe project refreshes and deeper runtime diagnostics
+- portable site-to-site workflows with secure export and import for settings and library metadata
+- faster large-library management with bulk actions, broader search result flows, and better high-volume browsing
+- more flexible ingestion paths, including remote CSS or URL-based import flows for custom hosted font sources
+- smarter background upkeep such as scheduled Adobe project refreshes and deeper runtime diagnostics, including font-loading performance visibility and downloadable activity logs
 - stronger platform alignment through Composer-based autoloading, evaluation of targeted Interactivity API adoption, and polished plugin screenshots for distribution surfaces
 
-If there is a workflow you want to see prioritized after 2.0.0, open an issue or feature request on [GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues). Real agency, client, and editorial use cases are especially helpful when shaping the next release line.
+If there is a workflow you want to see prioritized after 2.0.0, open an issue or feature request on [GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues). Feedback on real-world agency, client, and editorial use cases is especially useful when shaping the next release line.
 
 ## Requirements
 
