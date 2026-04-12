@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.11.0-beta.3] - 2026-04-13
+
 ### Changed
 
 - Added explicit least-privilege `GITHUB_TOKEN` permissions to the shared quality and CI GitHub Actions workflows.
