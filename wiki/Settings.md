@@ -254,7 +254,7 @@ To import on the destination site:
 1. Open the `Transfer` tab on the **destination site**.
 2. In the **Import Site Transfer Bundle** card, click the file picker and choose the ZIP you exported.
 3. (Optional) Paste a **Google Fonts API key** into the key field if this destination site needs Google catalog search. This key is stored encrypted and applies only to the destination.
-4. Click **Import** and confirm the destructive confirmation prompt.
+4. Click **Import Bundle** and confirm the destructive confirmation prompt.
 5. The plugin validates the bundle, restores font files, applies library data, settings, and role assignments, then rebuilds the generated CSS automatically.
 
 #### Why Google API Keys Are Excluded
