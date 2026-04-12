@@ -102,7 +102,7 @@ Having multiple profiles on one family means you can switch between them without
 
 ### Can I move my font setup from one WordPress site to another?
 
-Yes. Use `Settings → Transfer`. Export a bundle on the source site (click **Export Site Transfer Bundle** in the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.12.0-beta.2 or later, and PHP's ZipArchive extension must be available on both servers.
+Yes. Use `Settings → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.12.0-beta.2 or later, and PHP's ZipArchive extension must be available on both servers.
 
 See [Site Transfer](Site-Transfer) for the full step-by-step walkthrough.
 
