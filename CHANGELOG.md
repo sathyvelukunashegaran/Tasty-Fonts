@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.11.0-beta.1] - 2026-04-12
+
 ### Added
 
 - Added deep Bricks Builder typography integration with managed Theme Style sync, Theme Style target modes for a Tasty-managed style, one selected style, or all Theme Styles, plus create, delete, and reset actions for the Tasty-managed Bricks Theme Style.
