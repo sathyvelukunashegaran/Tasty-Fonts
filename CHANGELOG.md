@@ -6,10 +6,27 @@ All notable changes to this project will be documented in this file.
 
 ## [1.11.0] - 2026-04-13
 
+### Added
+
+- Added deep Bricks Builder typography integration with managed Theme Style sync, Theme Style target modes for a Tasty-managed style, one selected style, or all Theme Styles, plus create, delete, and reset actions for the Tasty-managed Bricks Theme Style.
+- Added direct Bricks control over the native `disableGoogleFonts` setting so Tasty Fonts can switch Bricks pickers into a Tasty-only font list.
+
 ### Changed
 
+- Simplified the Bricks integration UI by folding selector exposure and builder preview loading into the main Bricks toggle, flattening the settings layout, and clarifying current Theme Style targeting and state reporting.
+- Updated Bricks Theme Style sync to use the existing Tasty role variables directly for family and weight output instead of maintaining a separate Bricks alias-variable layer.
+- Grouped Tasty runtime families into a dedicated top-level Bricks builder picker group so published Tasty fonts are easier to find than when mixed into Bricks standard fonts.
+- Added contributor-facing repo scaffolding, including a standalone contributing guide, local setup documentation, GitHub issue and pull request templates, a security policy, a code of conduct, and an `.editorconfig`, while correcting the developer testing guide to match the current zero-dependency harness.
+- Added explicit least-privilege `GITHUB_TOKEN` permissions to the shared quality and CI GitHub Actions workflows.
 - Trimmed GitHub release archives down to runtime plugin files by excluding repo docs, screenshots, contributor metadata, test/build tooling, and translation source templates from `git archive` exports.
 - Updated nightly release packaging to honor the same export rules as beta and stable release archives.
+
+### Fixed
+
+- Fixed Bricks frontend and builder canvas typography when Bricks quoted `var(...)` font-family values, including live canvas CSSOM repairs so Tasty-managed family and weight variables resolve correctly in preview and runtime output.
+- Fixed Bricks Theme Style targeting, reset, and managed-style lifecycle behavior so switching between managed, selected, and all-style modes stays in sync and reset restores user Theme Styles without deleting them.
+- Hardened admin hosted-font preview stylesheets by allowing only trusted Google Fonts and Bunny Fonts `https://.../css2` URLs before assigning preview `link` elements.
+- Replaced admin Google and Bunny search empty-state, loading, and error rendering with DOM text nodes instead of HTML interpolation for error messages.
 
 ## [1.11.0-beta.3] - 2026-04-13
 

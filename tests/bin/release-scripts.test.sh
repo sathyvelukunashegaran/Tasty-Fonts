@@ -446,6 +446,51 @@ else
         "changelog: ${promoted}"
 fi
 
+cat > "${test_repo}/CHANGELOG.md" <<'CHANGELOG'
+# Changelog
+
+## [Unreleased]
+
+### Changed
+
+- Stable-only follow-up.
+
+## [2.0.0-beta.2] - 2026-04-10
+
+### Fixed
+
+- Beta fix two.
+
+## [2.0.0-beta.1] - 2026-04-09
+
+### Added
+
+- Beta launch feature.
+
+### Fixed
+
+- Beta fix one.
+CHANGELOG
+
+if "${test_repo}/bin/promote-changelog" "2.0.0" "2026-04-11" >/dev/null 2>&1; then
+    merged_stable="$(<"${test_repo}/CHANGELOG.md")"
+    if [[ "$merged_stable" == *"## [2.0.0] - 2026-04-11"* \
+        && "$merged_stable" == *"### Added"* \
+        && "$merged_stable" == *"- Beta launch feature."* \
+        && "$merged_stable" == *"### Changed"* \
+        && "$merged_stable" == *"- Stable-only follow-up."* \
+        && "$merged_stable" == *"### Fixed"* \
+        && "$merged_stable" == *"- Beta fix one."* \
+        && "$merged_stable" == *"- Beta fix two."* ]]; then
+        _pass "promote-changelog merges same-line beta sections into stable releases"
+    else
+        _fail "promote-changelog merges same-line beta sections into stable releases" \
+            "changelog: ${merged_stable}"
+    fi
+else
+    _fail "promote-changelog merges same-line beta sections into stable releases" "command exited non-zero"
+fi
+
 seed_empty_unreleased_changelog
 if ! "${test_repo}/bin/promote-changelog" "1.1.0" "2026-04-08" >/dev/null 2>&1; then
     _pass "promote-changelog fails when Unreleased section is empty"
@@ -591,6 +636,14 @@ if grep -q "## \[1.4.0\]" "${release_repo_from_beta}/CHANGELOG.md"; then
 else
     _fail "release stable promotes the changelog before advancing main" \
         "changelog=$(<"${release_repo_from_beta}/CHANGELOG.md")"
+fi
+
+if [[ "$(git -C "${release_repo_from_beta}" show 1.4.0:CHANGELOG.md)" == *"### Fixed"* \
+    && "$(git -C "${release_repo_from_beta}" show 1.4.0:CHANGELOG.md)" == *"- Test release note."* ]]; then
+    _pass "release stable changelog carries the release-line notes into the stable section"
+else
+    _fail "release stable changelog carries the release-line notes into the stable section" \
+        "changelog=$(git -C "${release_repo_from_beta}" show 1.4.0:CHANGELOG.md)"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

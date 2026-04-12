@@ -61,6 +61,104 @@ php -r '
       exit(1);
   }
 
+  $extractSection = static function (string $targetVersion) use ($contents): ?string {
+      $pattern = "/^## \\[" . preg_quote($targetVersion, "/") . "\\](?: - [^\r\n]*)?\\R(.*?)(?=^## \\[|\\z)/ms";
+
+      if (!preg_match($pattern, $contents, $matches)) {
+          return null;
+      }
+
+      return trim($matches[1]);
+  };
+
+  $mergeSectionBodies = static function (array $bodies): string {
+      $intro = [];
+      $sections = [];
+      $order = [];
+
+      foreach ($bodies as $sectionBody) {
+          $lines = preg_split("/\\R/", trim($sectionBody)) ?: [];
+          $currentHeading = null;
+
+          foreach ($lines as $line) {
+              $trimmedLine = rtrim($line);
+
+              if ($trimmedLine === "") {
+                  continue;
+              }
+
+              if (preg_match("/^###\\s+(.+)$/", $trimmedLine, $matches) === 1) {
+                  $currentHeading = trim($matches[1]);
+
+                  if (!array_key_exists($currentHeading, $sections)) {
+                      $sections[$currentHeading] = [];
+                      $order[] = $currentHeading;
+                  }
+
+                  continue;
+              }
+
+              if ($currentHeading === null) {
+                  $intro[] = $trimmedLine;
+                  continue;
+              }
+
+              $sections[$currentHeading][] = $trimmedLine;
+          }
+      }
+
+      if ($order === []) {
+          return implode("\n\n", array_values(array_filter(
+              array_map(static fn (string $entry): string => trim($entry), $bodies),
+              static fn (string $entry): bool => $entry !== ""
+          )));
+      }
+
+      $chunks = [];
+
+      if ($intro !== []) {
+          $chunks[] = implode("\n", $intro);
+      }
+
+      foreach ($order as $heading) {
+          $sectionLines = $sections[$heading];
+
+          if ($sectionLines === []) {
+              continue;
+          }
+
+          $chunks[] = "### " . $heading . "\n\n" . implode("\n", $sectionLines);
+      }
+
+      return implode("\n\n", $chunks);
+  };
+
+  if (preg_match("/^[0-9]+\\.[0-9]+\\.[0-9]+$/", $version) === 1) {
+      $betaPattern = "/^## \\[" . preg_quote($version, "/") . "-beta\\.([0-9]+)\\](?: - [^\r\n]*)?\\R/ms";
+      preg_match_all($betaPattern, $contents, $betaMatches, PREG_SET_ORDER);
+
+      if ($betaMatches !== []) {
+          usort(
+              $betaMatches,
+              static fn (array $left, array $right): int => (int) $left[1] <=> (int) $right[1]
+          );
+
+          $mergedBodies = [];
+
+          foreach ($betaMatches as $betaMatch) {
+              $betaVersion = $version . "-beta." . $betaMatch[1];
+              $betaBody = $extractSection($betaVersion);
+
+              if ($betaBody !== null && $betaBody !== "") {
+                  $mergedBodies[] = $betaBody;
+              }
+          }
+
+          $mergedBodies[] = $body;
+          $body = $mergeSectionBodies($mergedBodies);
+      }
+  }
+
   $prefix = substr($contents, 0, $start);
   $suffix = $nextHeading === false ? "" : substr($contents, $nextHeading + 1);
 
