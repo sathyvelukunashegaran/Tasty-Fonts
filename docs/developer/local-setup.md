@@ -13,7 +13,7 @@ Set up Tasty Custom Fonts in a local WordPress environment and run the repositor
 
 ## Recommended Local WordPress Setups
 
-Any local WordPress stack is fine as long as you can place the plugin in `wp-content/plugins/etch-fonts/`.
+Any local WordPress stack is fine as long as you can place the plugin in `wp-content/plugins/tasty-fonts/`.
 
 ### `wp-env`
 
@@ -23,12 +23,12 @@ npx @wordpress/env start
 
 ### LocalWP
 
-Create a local site, then symlink or copy this repository into that site's `app/public/wp-content/plugins/etch-fonts/` directory.
+Create a local site, then symlink or copy this repository into that site's `app/public/wp-content/plugins/tasty-fonts/` directory.
 
 ### DDEV
 
 ```bash
-ddev wp plugin activate etch-fonts
+ddev wp plugin activate tasty-fonts
 ```
 
 If you use a different stack, follow the same manual install path and activate the plugin from the local admin.
@@ -38,7 +38,7 @@ If you use a different stack, follow the same manual install path and activate t
 ## Manual Install Path
 
 1. Clone this repository.
-2. Copy the checkout to `wp-content/plugins/etch-fonts/`.
+2. Copy the checkout to `wp-content/plugins/tasty-fonts/`.
 3. Activate `Tasty Custom Fonts` in the WordPress admin.
 4. Open `Tasty Fonts` from the admin menu.
 

@@ -31,7 +31,7 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 Use one of these paths:
 
 - **Via GitHub release** (recommended): download the latest ZIP from [GitHub Releases](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/releases), then go to WordPress `Plugins → Add New Plugin → Upload Plugin`, upload the ZIP, and activate.
-- **Manual install**: copy the `etch-fonts/` directory into `wp-content/plugins/` and activate from the WordPress `Plugins` screen.
+- **Manual install**: copy the `tasty-fonts/` directory into `wp-content/plugins/` and activate from the WordPress `Plugins` screen.
 
 After activation, a new `Tasty Fonts` item will appear in the WordPress admin sidebar.
 

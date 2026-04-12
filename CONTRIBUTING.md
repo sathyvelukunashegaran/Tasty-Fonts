@@ -13,7 +13,7 @@ This project keeps its contributor workflow intentionally lightweight: there is 
 ## Local Setup
 
 1. Clone the repository.
-2. Copy the repository folder to `wp-content/plugins/etch-fonts/` inside your local WordPress install.
+2. Copy the repository folder to `wp-content/plugins/tasty-fonts/` inside your local WordPress install.
 3. Activate `Tasty Custom Fonts` from the WordPress admin.
 
 Any local WordPress stack is fine. Common choices:

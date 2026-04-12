@@ -57,7 +57,7 @@ https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues
 
 == Installation ==
 
-1. Upload the `etch-fonts` folder to `/wp-content/plugins/`, or install a packaged ZIP from GitHub releases.
+1. Upload the `tasty-fonts` folder to `/wp-content/plugins/`, or install a packaged ZIP from GitHub releases.
 2. Activate `Tasty Custom Fonts` from the Plugins screen on the site where you want to manage typography.
 3. Open `Tasty Fonts` in the WordPress admin menu.
 4. Add local, Google, Bunny, or Adobe families to your library and publish your live roles when ready.

@@ -1338,7 +1338,7 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
     global $wpdbQueries;
 
     if (!defined('WP_UNINSTALL_PLUGIN')) {
-        define('WP_UNINSTALL_PLUGIN', 'etch-fonts/plugin.php');
+        define('WP_UNINSTALL_PLUGIN', 'tasty-fonts/plugin.php');
     }
 
     $optionStore = [
@@ -1386,7 +1386,7 @@ $tests['uninstall_always_deletes_generated_css_and_removes_synced_block_editor_f
     global $optionStore;
 
     if (!defined('WP_UNINSTALL_PLUGIN')) {
-        define('WP_UNINSTALL_PLUGIN', 'etch-fonts/plugin.php');
+        define('WP_UNINSTALL_PLUGIN', 'tasty-fonts/plugin.php');
     }
 
     $storage = new Storage();

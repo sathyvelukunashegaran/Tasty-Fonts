@@ -60,7 +60,7 @@ jobs:
           git archive \
             --format=zip \
             --worktree-attributes \
-            --prefix=etch-fonts/ \
+            --prefix=tasty-fonts/ \
             -o "${zip_name}" \
             "$(git write-tree)"
           git restore --staged plugin.php

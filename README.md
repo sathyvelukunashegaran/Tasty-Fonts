@@ -116,7 +116,7 @@ Use the repo-native docs when you want the deeper product and technical walkthro
 3. Upload the ZIP and activate `Tasty Custom Fonts`.
 4. Open `Tasty Fonts` in the WordPress admin menu.
 
-The packaged plugin directory remains `etch-fonts/` so existing installs can update cleanly.
+The packaged plugin directory is `tasty-fonts/`.
 
 ### Updates For GitHub Installs
 
@@ -125,7 +125,7 @@ The plugin advertises its GitHub repository through `Update URI` and includes a 
 ### Manual Install
 
 1. Clone or download this repository.
-2. Copy the `etch-fonts` folder into `wp-content/plugins/`.
+2. Copy the `tasty-fonts` folder into `wp-content/plugins/`.
 3. Activate the plugin from the WordPress `Plugins` screen.
 4. Open `Tasty Fonts` in the WordPress admin menu.
 

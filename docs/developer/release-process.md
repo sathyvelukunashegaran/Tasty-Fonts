@@ -103,7 +103,7 @@ Nightly publishing also prunes older nightly prereleases so the rail keeps only 
 - normal WordPress update checks continue to handle upgrades
 - when a selected channel points to an older version than the one installed now, the Behavior tab exposes a rollback reinstall action
 - release asset naming still matters because the updater expects `tasty-fonts-<version>.zip`
-- the packaged plugin directory remains `etch-fonts/` for update continuity
+- the packaged plugin directory is `tasty-fonts/` to match the current product branding
 
 ## Notes
 

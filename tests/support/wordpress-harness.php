@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('TASTY_FONTS_URL')) {
-    define('TASTY_FONTS_URL', 'https://example.test/wp-content/plugins/etch-fonts/');
+    define('TASTY_FONTS_URL', 'https://example.test/wp-content/plugins/tasty-fonts/');
 }
 
 if (!defined('TASTY_FONTS_DIR')) {

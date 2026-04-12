@@ -49,7 +49,7 @@ jobs:
           git archive \
             --format=zip \
             --worktree-attributes \
-            --prefix=etch-fonts/ \
+            --prefix=tasty-fonts/ \
             -o "${zip_name}" \
             "${GITHUB_SHA}"
           sha256sum "${zip_name}" > "${checksum_name}"
