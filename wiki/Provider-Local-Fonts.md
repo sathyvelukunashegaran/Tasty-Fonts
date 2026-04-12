@@ -99,8 +99,8 @@ Self-hosted local files are stored at:
 
 ## Related Docs
 
-- [Getting Started](../getting-started.md)
-- [Font Library](../font-library.md)
-- [Generated CSS](../troubleshooting/generated-css.md)
-- [Concepts](../concepts.md)
-- [FAQ](../faq.md)
+- [Getting Started](Getting-Started)
+- [Font Library](Font-Library)
+- [Generated CSS](Troubleshooting-Generated-CSS)
+- [Concepts](Concepts)
+- [FAQ](FAQ)

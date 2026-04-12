@@ -159,7 +159,7 @@ Key controls include:
 
 When enabled, the plugin mirrors managed families into the core WordPress Block Editor Font Library so they appear in the site editor's typography controls. The sync depends on background loopback requests from the server back to itself.
 
-On local development environments, TLS certificate trust issues commonly block these loopback requests. The plugin defaults this off on likely local environments. See [Local Development](troubleshooting/local-development.md) for guidance.
+On local development environments, TLS certificate trust issues commonly block these loopback requests. The plugin defaults this off on likely local environments. See [Local Development](Troubleshooting-Local-Development) for guidance.
 
 #### Automatic.css Font Role Sync
 
@@ -277,8 +277,8 @@ Developer actions can affect:
 
 ## Related Docs
 
-- [Deploy Fonts](deploy-fonts.md)
-- [Font Library](font-library.md)
-- [Local Development](troubleshooting/local-development.md)
-- [Generated CSS](troubleshooting/generated-css.md)
-- [FAQ](faq.md)
+- [Deploy Fonts](Deploy-Fonts)
+- [Font Library](Font-Library)
+- [Local Development](Troubleshooting-Local-Development)
+- [Generated CSS](Troubleshooting-Generated-CSS)
+- [FAQ](FAQ)

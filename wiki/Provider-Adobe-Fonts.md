@@ -69,8 +69,8 @@ To change which variants are available, update your Adobe Fonts web project in t
 
 ## Related Docs
 
-- [Getting Started](../getting-started.md)
-- [Font Library](../font-library.md)
-- [Imports And Deliveries](../troubleshooting/imports-and-deliveries.md)
-- [Concepts](../concepts.md)
-- [FAQ](../faq.md)
+- [Getting Started](Getting-Started)
+- [Font Library](Font-Library)
+- [Imports And Deliveries](Troubleshooting-Imports-and-Deliveries)
+- [Concepts](Concepts)
+- [FAQ](FAQ)

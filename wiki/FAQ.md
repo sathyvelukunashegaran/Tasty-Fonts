@@ -49,7 +49,7 @@ A **variable font** is a single font file that contains a continuous range of de
 - you only need one or two specific weights and want the simplest possible setup
 - your theme or builder already specifies weights through its own variables
 
-To enable variable font features in the plugin, go to `Settings → Output → Variable Font Support` and turn it on. See [Settings](settings.md) for full details.
+To enable variable font features in the plugin, go to `Settings → Output → Variable Font Support` and turn it on. See [Settings](Settings) for full details.
 
 ---
 
@@ -216,7 +216,7 @@ This is a known and expected behavior. The sync sends loopback requests from the
 
 The fix: disable `Block Editor Font Library Sync` in `Settings -> Integrations` on your local environment. The plugin's runtime CSS, admin previews, and Etch canvas all continue to work correctly without it.
 
-See [Local Development](troubleshooting/local-development.md) for full guidance.
+See [Local Development](Troubleshooting-Local-Development) for full guidance.
 
 ### The generated CSS file path doesn't exist — where is it?
 
@@ -317,7 +317,7 @@ node --test tests/js/*.test.cjs
 find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
 ```
 
-See [Testing](developer/testing.md) for details on adding new tests.
+See [Testing](Testing) for details on adding new tests.
 
 ### Where do I find the service container and how do I get a service instance?
 
@@ -335,9 +335,9 @@ Yes. The plugin exposes REST endpoints used by its own admin UI. These endpoints
 
 ## Related Docs
 
-- [Getting Started](getting-started.md)
-- [Concepts](concepts.md)
-- [Glossary](glossary.md)
-- [Troubleshooting: Imports and Deliveries](troubleshooting/imports-and-deliveries.md)
-- [Troubleshooting: Local Development](troubleshooting/local-development.md)
-- [Developer: Architecture](developer/architecture.md)
+- [Getting Started](Getting-Started)
+- [Concepts](Concepts)
+- [Glossary](Glossary)
+- [Troubleshooting: Imports and Deliveries](Troubleshooting-Imports-and-Deliveries)
+- [Troubleshooting: Local Development](Troubleshooting-Local-Development)
+- [Developer: Architecture](Architecture)

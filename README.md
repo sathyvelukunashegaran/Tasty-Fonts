@@ -95,17 +95,17 @@ Self-hosted Bunny imports are stored under `wp-content/uploads/fonts/bunny/<fami
 
 ## Documentation
 
-Use the repo-native docs when you want the deeper product and technical walkthroughs:
+Full documentation lives on the [GitHub Wiki](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki):
 
-- [Documentation Hub](docs/README.md)
-- [Getting Started](docs/getting-started.md)
-- [Deploy Fonts](docs/deploy-fonts.md)
-- [Font Library](docs/font-library.md)
-- [Settings](docs/settings.md)
-- [Advanced Tools](docs/advanced-tools.md)
-- [Developer Docs](docs/developer/architecture.md)
-- [FAQ](docs/faq.md)
-- [Glossary](docs/glossary.md)
+- [Documentation Hub](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki)
+- [Getting Started](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Getting-Started)
+- [Deploy Fonts](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Deploy-Fonts)
+- [Font Library](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Font-Library)
+- [Settings](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Settings)
+- [Advanced Tools](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Advanced-Tools)
+- [Developer Docs](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Architecture)
+- [FAQ](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/FAQ)
+- [Glossary](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Glossary)
 
 ## Install
 

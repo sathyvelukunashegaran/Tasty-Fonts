@@ -157,5 +157,5 @@ The test runner discovers all `*.test.cjs` files automatically via the glob patt
 
 ## Related Docs
 
-- [Architecture](architecture.md)
-- [Release Process](release-process.md)
+- [Architecture](Architecture)
+- [Release Process](Release-Process)

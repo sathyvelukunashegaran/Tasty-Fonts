@@ -71,7 +71,7 @@ That tab is now the home for:
 
 ## Related Docs
 
-- [Settings](settings.md)
-- [Generated CSS](troubleshooting/generated-css.md)
-- [Imports And Deliveries](troubleshooting/imports-and-deliveries.md)
-- [FAQ](faq.md)
+- [Settings](Settings)
+- [Generated CSS](Troubleshooting-Generated-CSS)
+- [Imports And Deliveries](Troubleshooting-Imports-and-Deliveries)
+- [FAQ](FAQ)

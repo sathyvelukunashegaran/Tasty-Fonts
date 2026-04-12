@@ -37,9 +37,9 @@ When you adjust labels, button text, notices, diagnostics copy, or settings lang
 ## Notes
 
 - The plugin now loads its text domain early in boot so translated strings are available before the rest of the runtime and admin hooks register.
-- Translation changes often go together with README or `docs/` updates because terminology consistency matters for user guidance.
+- Translation changes often go together with README or wiki updates because terminology consistency matters for user guidance.
 
 ## Related Docs
 
-- [Architecture](architecture.md)
-- [Release Process](release-process.md)
+- [Architecture](Architecture)
+- [Release Process](Release-Process)

@@ -108,11 +108,11 @@ The plugin blocks destructive actions when doing so would break a live applied r
 
 ## Related Docs
 
-- [Getting Started](getting-started.md)
-- [Deploy Fonts](deploy-fonts.md)
-- [Local Fonts](providers/local-fonts.md)
-- [Google Fonts](providers/google-fonts.md)
-- [Bunny Fonts](providers/bunny-fonts.md)
-- [Adobe Fonts](providers/adobe-fonts.md)
-- [Imports And Deliveries](troubleshooting/imports-and-deliveries.md)
-- [FAQ](faq.md)
+- [Getting Started](Getting-Started)
+- [Deploy Fonts](Deploy-Fonts)
+- [Local Fonts](Provider-Local-Fonts)
+- [Google Fonts](Provider-Google-Fonts)
+- [Bunny Fonts](Provider-Bunny-Fonts)
+- [Adobe Fonts](Provider-Adobe-Fonts)
+- [Imports And Deliveries](Troubleshooting-Imports-and-Deliveries)
+- [FAQ](FAQ)

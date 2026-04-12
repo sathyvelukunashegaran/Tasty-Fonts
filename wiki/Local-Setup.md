@@ -70,7 +70,7 @@ Self-hosted imports and generated CSS write under `wp-content/uploads/fonts/`. I
 
 Most plugin features work normally on local HTTPS sites, but Block Editor Font Library sync depends on loopback REST requests. Local TLS trust problems can break those requests even when the rest of the plugin works.
 
-See [Local Development Troubleshooting](../troubleshooting/local-development.md) for the detailed certificate and loopback guidance.
+See [Local Development Troubleshooting](Troubleshooting-Local-Development) for the detailed certificate and loopback guidance.
 
 ### Preload Hints On Local Sites
 
@@ -80,7 +80,7 @@ If you are testing preload or preconnect behavior locally, keep in mind that loc
 
 ## Related Docs
 
-- [Contributing](../../CONTRIBUTING.md)
-- [Testing](testing.md)
-- [Architecture](architecture.md)
-- [Local Development Troubleshooting](../troubleshooting/local-development.md)
+- [Contributing](Contributing)
+- [Testing](Testing)
+- [Architecture](Architecture)
+- [Local Development Troubleshooting](Troubleshooting-Local-Development)

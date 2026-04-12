@@ -120,7 +120,7 @@ How it works:
 
 **Why it defaults off on local environments**: loopback requests from the server to itself require a valid TLS certificate when the site is on HTTPS. Local development environments commonly use self-signed certificates that the server's own HTTP client does not trust. The plugin detects likely local environments and defaults the sync off to avoid repeated certificate verification failures. The plugin's own runtime output, admin previews, and Etch canvas delivery still work correctly when this sync is off.
 
-See [Local Development](../troubleshooting/local-development.md) for troubleshooting guidance.
+See [Local Development](Troubleshooting-Local-Development) for troubleshooting guidance.
 
 ---
 
@@ -189,8 +189,8 @@ If you need behavior that is not covered by the existing hooks:
 
 ## Related Docs
 
-- [Testing](testing.md)
-- [Release Process](release-process.md)
-- [Translations](translations.md)
-- [Local Development](../troubleshooting/local-development.md)
-- [FAQ — Developer Questions](../faq.md#developer-questions)
+- [Testing](Testing)
+- [Release Process](Release-Process)
+- [Translations](Translations)
+- [Local Development](Troubleshooting-Local-Development)
+- [FAQ — Developer Questions](FAQ#developer-questions)

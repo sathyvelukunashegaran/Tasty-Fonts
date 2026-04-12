@@ -82,7 +82,7 @@ If the generated CSS looks stale or missing:
 
 ## Related Docs
 
-- [Advanced Tools](../advanced-tools.md)
-- [Settings](../settings.md)
-- [Imports And Deliveries](imports-and-deliveries.md)
-- [FAQ](../faq.md)
+- [Advanced Tools](Advanced-Tools)
+- [Settings](Settings)
+- [Imports And Deliveries](Troubleshooting-Imports-and-Deliveries)
+- [FAQ](FAQ)

@@ -165,10 +165,10 @@ Providers are not exclusive. You can mix sources — for example, use a self-hos
 
 ## Related Docs
 
-- [Getting Started](getting-started.md)
-- [Deploy Fonts](deploy-fonts.md)
-- [Font Library](font-library.md)
-- [Settings](settings.md)
-- [Architecture](developer/architecture.md)
-- [Glossary](glossary.md)
-- [FAQ](faq.md)
+- [Getting Started](Getting-Started)
+- [Deploy Fonts](Deploy-Fonts)
+- [Font Library](Font-Library)
+- [Settings](Settings)
+- [Architecture](Architecture)
+- [Glossary](Glossary)
+- [FAQ](FAQ)

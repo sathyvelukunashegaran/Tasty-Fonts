@@ -80,9 +80,9 @@ For live Google and Bunny CDN deliveries, the runtime planner promotes `optional
 
 ## Related Docs
 
-- [Font Library](../font-library.md)
-- [Generated CSS](generated-css.md)
-- [Google Fonts](../providers/google-fonts.md)
-- [Bunny Fonts](../providers/bunny-fonts.md)
-- [Adobe Fonts](../providers/adobe-fonts.md)
-- [FAQ](../faq.md)
+- [Font Library](Font-Library)
+- [Generated CSS](Troubleshooting-Generated-CSS)
+- [Google Fonts](Provider-Google-Fonts)
+- [Bunny Fonts](Provider-Bunny-Fonts)
+- [Adobe Fonts](Provider-Adobe-Fonts)
+- [FAQ](FAQ)

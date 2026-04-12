@@ -156,7 +156,7 @@ seed_archive_repo() {
 
     mkdir -p \
         "${repo}/assets/js" \
-        "${repo}/docs" \
+        "${repo}/wiki" \
         "${repo}/languages" \
         "${repo}/screenshots" \
         "${repo}/tests" \
@@ -208,7 +208,7 @@ TXT
 console.log('runtime');
 JS
 
-    cat > "${repo}/docs/guide.md" <<'MD'
+    cat > "${repo}/wiki/guide.md" <<'MD'
 # Guide
 MD
 
@@ -565,7 +565,7 @@ if [[ "${archive_entries}" != *"README.md"* \
     && "${archive_entries}" != *"CONTRIBUTING.md"* \
     && "${archive_entries}" != *"CODE_OF_CONDUCT.md"* \
     && "${archive_entries}" != *"readme.txt"* \
-    && "${archive_entries}" != *"docs/guide.md"* \
+    && "${archive_entries}" != *"wiki/guide.md"* \
     && "${archive_entries}" != *"screenshots/.gitkeep"* \
     && "${archive_entries}" != *"languages/tasty-fonts.pot"* \
     && "${archive_entries}" != *".github/workflows/ci.yml"* \

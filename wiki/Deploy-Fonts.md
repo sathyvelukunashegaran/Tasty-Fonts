@@ -98,8 +98,8 @@ The Deploy Fonts page exposes code and snippet panels for:
 
 ## Related Docs
 
-- [Getting Started](getting-started.md)
-- [Settings](settings.md)
-- [Font Library](font-library.md)
-- [Generated CSS](troubleshooting/generated-css.md)
-- [FAQ](faq.md)
+- [Getting Started](Getting-Started)
+- [Settings](Settings)
+- [Font Library](Font-Library)
+- [Generated CSS](Troubleshooting-Generated-CSS)
+- [FAQ](FAQ)

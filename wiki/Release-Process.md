@@ -115,6 +115,6 @@ Nightly publishing also prunes older nightly prereleases so the rail keeps only 
 
 ## Related Docs
 
-- [Testing](testing.md)
-- [Translations](translations.md)
-- [Changelog](../../CHANGELOG.md)
+- [Testing](Testing)
+- [Translations](Translations)
+- [Changelog](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/blob/main/CHANGELOG.md)

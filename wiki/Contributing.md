@@ -22,7 +22,7 @@ Any local WordPress stack is fine. Common choices:
 - LocalWP
 - DDEV
 
-See [Local Setup](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Local-Setup) for examples, manual install notes, and common local-environment pitfalls.
+See [Local Setup](Local-Setup) for examples, manual install notes, and common local-environment pitfalls.
 
 ## Verification Commands
 
@@ -75,13 +75,13 @@ Browse issues labeled [good first issue](https://github.com/sathyvelukunashegara
 
 ## Key Developer Docs
 
-- [Documentation Hub](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki)
-- [Architecture](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Architecture)
-- [Testing](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Testing)
-- [Local Setup](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Local-Setup)
-- [Release Process](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Release-Process)
-- [Translations](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Translations)
+- [Documentation Hub](Home)
+- [Architecture](Architecture)
+- [Testing](Testing)
+- [Local Setup](Local-Setup)
+- [Release Process](Release-Process)
+- [Translations](Translations)
 
 ## Security
 
-Please do not report security issues in public issues or pull requests. Follow the process in [SECURITY.md](SECURITY.md).
+Please do not report security issues in public issues or pull requests. Follow the process in [Security Policy](Security).

@@ -81,8 +81,8 @@ If it cannot, disable it locally and continue using the plugin's own runtime and
 
 ## Related Docs
 
-- [Settings](../settings.md)
-- [Advanced Tools](../advanced-tools.md)
-- [Architecture](../developer/architecture.md)
-- [Local Setup](../developer/local-setup.md)
-- [FAQ](../faq.md)
+- [Settings](Settings)
+- [Advanced Tools](Advanced-Tools)
+- [Architecture](Architecture)
+- [Local Setup](Local-Setup)
+- [FAQ](FAQ)

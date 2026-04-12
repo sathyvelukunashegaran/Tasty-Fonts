@@ -84,8 +84,8 @@ The **Google Fonts API key** is required only for live catalog search in the add
 
 ## Related Docs
 
-- [Font Library](../font-library.md)
-- [Settings](../settings.md)
-- [Imports And Deliveries](../troubleshooting/imports-and-deliveries.md)
-- [Concepts](../concepts.md)
-- [FAQ](../faq.md)
+- [Font Library](Font-Library)
+- [Settings](Settings)
+- [Imports And Deliveries](Troubleshooting-Imports-and-Deliveries)
+- [Concepts](Concepts)
+- [FAQ](FAQ)

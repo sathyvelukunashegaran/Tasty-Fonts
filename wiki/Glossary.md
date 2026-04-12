@@ -207,6 +207,6 @@ An Adobe Fonts project configuration that specifies which families and variants 
 
 ## Related Docs
 
-- [Concepts](concepts.md)
-- [Getting Started](getting-started.md)
-- [FAQ](faq.md)
+- [Concepts](Concepts)
+- [Getting Started](Getting-Started)
+- [FAQ](FAQ)

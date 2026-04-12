@@ -69,8 +69,8 @@ Bunny Fonts is a GDPR-friendly alternative to the Google CDN. If you want CDN de
 
 ## Related Docs
 
-- [Font Library](../font-library.md)
-- [Generated CSS](../troubleshooting/generated-css.md)
-- [Imports And Deliveries](../troubleshooting/imports-and-deliveries.md)
-- [Concepts](../concepts.md)
-- [FAQ](../faq.md)
+- [Font Library](Font-Library)
+- [Generated CSS](Troubleshooting-Generated-CSS)
+- [Imports And Deliveries](Troubleshooting-Imports-and-Deliveries)
+- [Concepts](Concepts)
+- [FAQ](FAQ)

@@ -5,8 +5,8 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 ## Who This Is For
 
 - **Complete beginners**: if this is your first time managing fonts in WordPress, read every step below and follow the links when you need more context.
-- **Experienced WordPress users**: skim the steps — each one is short. If you get stuck, jump to the [FAQ](faq.md) or the relevant provider guide.
-- **Developers**: this page covers the admin workflow. For the internal architecture, go straight to [Architecture](developer/architecture.md).
+- **Experienced WordPress users**: skim the steps — each one is short. If you get stuck, jump to the [FAQ](FAQ) or the relevant provider guide.
+- **Developers**: this page covers the admin workflow. For the internal architecture, go straight to [Architecture](Architecture).
 
 ## Use This Page When
 
@@ -20,7 +20,7 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 **Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No Composer install, no npm install, no build step.
 
-**Tip for beginners:** if any term in this guide is unfamiliar, check the [Glossary](glossary.md). The [Concepts](concepts.md) page also explains the three big ideas — delivery profiles, draft/live roles, and the CSS pipeline — before you dive in.
+**Tip for beginners:** if any term in this guide is unfamiliar, check the [Glossary](Glossary). The [Concepts](Concepts) page also explains the three big ideas — delivery profiles, draft/live roles, and the CSS pipeline — before you dive in.
 
 ---
 
@@ -65,7 +65,7 @@ Pick the source that matches your workflow:
 - **Import Bunny Fonts** — no API key needed; GDPR-friendly; same workflow as Google
 - **Connect an Adobe Fonts web project** — requires an active Adobe Creative Cloud subscription and a web project ID
 
-> **Not sure which to pick?** Start with Bunny Fonts if you want a free catalog without API credentials, or upload your own files if you already have them. See [Concepts → Choosing a Provider](concepts.md#choosing-a-provider) for a comparison table.
+> **Not sure which to pick?** Start with Bunny Fonts if you want a free catalog without API credentials, or upload your own files if you already have them. See [Concepts → Choosing a Provider](Concepts#choosing-a-provider) for a comparison table.
 
 Google self-hosted files are stored under `wp-content/uploads/fonts/google/<family-slug>/`.
 Bunny self-hosted files are stored under `wp-content/uploads/fonts/bunny/<family-slug>/`.
@@ -131,9 +131,9 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 
 ## Related Docs
 
-- [Concepts](concepts.md) — the mental model behind delivery profiles, roles, and the CSS pipeline
-- [Deploy Fonts](deploy-fonts.md) — detailed guide to the draft/apply workflow
-- [Font Library](font-library.md) — managing families, profiles, and publish state
-- [Settings](settings.md) — full output and integration controls
-- [Local Fonts](providers/local-fonts.md) — uploading your own font files
-- [FAQ](faq.md) — answers to common beginner and developer questions
+- [Concepts](Concepts) — the mental model behind delivery profiles, roles, and the CSS pipeline
+- [Deploy Fonts](Deploy-Fonts) — detailed guide to the draft/apply workflow
+- [Font Library](Font-Library) — managing families, profiles, and publish state
+- [Settings](Settings) — full output and integration controls
+- [Local Fonts](Provider-Local-Fonts) — uploading your own font files
+- [FAQ](FAQ) — answers to common beginner and developer questions
