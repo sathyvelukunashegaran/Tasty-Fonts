@@ -4,9 +4,18 @@ This is the versioned documentation hub for the current plugin codebase.
 
 ## Current Release Track
 
-`1.10.0` is the current stable release.
+`1.12.0-beta.2` is the current release. This is a pre-release beta — if you need a fully stable install for production, set `Settings → Behavior → Update Channel` to `Stable` and reinstall from that channel.
 
-These docs describe the current plugin behavior in full, covering the shipping features, release channels, variable font controls, and integration surface.
+These docs describe the current plugin behavior in full, covering the shipping features, release channels, variable font controls, Site Transfer, and the full integration surface.
+
+---
+
+## What's New In 1.12.0 Beta
+
+- **[Site Transfer](Site-Transfer)** — export your entire Tasty Fonts setup (library, settings, role assignments, and font files) as a portable ZIP bundle and import it on any other site running 1.12.0-beta.2 or later.
+- **Google Fonts API key encryption** — the API key is now stored in a dedicated encrypted WordPress option (`tasty_fonts_google_api_key_data`) that is isolated from the main settings record and never exported in transfer bundles.
+- **Variable font axis-default cleanup** — `font-variation-settings` is now omitted from generated CSS and Block Editor sync payloads when a role axis value matches the font's registered default, keeping output clean and non-redundant.
+- **CSS minification fix** — significant whitespace in generated output is now preserved correctly so minification no longer collapses rules in ways that could change browser behavior.
 
 ---
 
@@ -46,6 +55,7 @@ These docs describe the current plugin behavior in full, covering the shipping f
 - [Deploy Fonts](Deploy-Fonts) — draft roles, preview workspace, and applying changes sitewide
 - [Font Library](Font-Library) — browse families, switch delivery profiles, and manage publish state
 - [Settings](Settings) — output model, integrations, behavior, and developer maintenance
+- [Site Transfer](Site-Transfer) — move your full Tasty Fonts setup between sites with one portable bundle
 - [Advanced Tools](Advanced-Tools) — inspect generated CSS, system details, and activity history
 
 ## Font Sources
@@ -88,6 +98,6 @@ These docs describe the current plugin behavior in full, covering the shipping f
 ## Notes
 
 - The docs in `main` always describe the current plugin behavior.
-- The docs cover the stable `1.10.0` release, including the current Google, Bunny, Adobe, variable-font, and integration workflows.
+- The docs cover the `1.12.0-beta.2` release, including Site Transfer, Google Fonts API key encryption, variable-font axis-default cleanup, and all existing Google, Bunny, Adobe, and integration workflows.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/blob/main/README.md) stays shorter and links here for full guidance.
