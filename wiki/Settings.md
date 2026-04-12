@@ -243,7 +243,7 @@ To export:
 
 1. Open the `Transfer` tab.
 2. Confirm the export action is available (not disabled).
-3. Click **Export Site Transfer Bundle**. Your browser downloads the ZIP.
+3. Click **Export Bundle**. Your browser downloads the ZIP.
 
 #### Import Card
 
