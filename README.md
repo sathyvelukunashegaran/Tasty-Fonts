@@ -188,13 +188,9 @@ The translation template is included at `languages/tasty-fonts.pot`.
 
 ## Contributing
 
-Pull requests are welcome. For larger changes, open an issue first so the direction is clear before implementation starts.
+Contribution setup, verification commands, branch expectations, and good-first entry points live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Feature ideas, workflow requests, and usability feedback are also welcome through [GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues).
-
-- Match the WordPress conventions already used in the plugin.
-- Run `php tests/run.php` before submitting changes.
-- Update `README.md` and the relevant pages under `docs/` when user-facing behavior changes.
+For larger changes, open an issue first so the direction is clear before implementation starts. Feature ideas, workflow requests, and usability feedback are welcome through [GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues).
 
 ## License
 

@@ -1,0 +1,87 @@
+name: Bug report
+description: Report a reproducible problem in Tasty Custom Fonts.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: input
+    id: plugin_version
+    attributes:
+      label: Plugin version
+      description: What version of Tasty Custom Fonts are you running?
+      placeholder: "Example: 1.10.0"
+    validations:
+      required: true
+
+  - type: input
+    id: wordpress_version
+    attributes:
+      label: WordPress version
+      placeholder: "Example: 6.5.5"
+    validations:
+      required: true
+
+  - type: input
+    id: php_version
+    attributes:
+      label: PHP version
+      placeholder: "Example: 8.2.18"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: font_source
+    attributes:
+      label: Font source
+      description: Which source is involved in the bug?
+      options:
+        - Local
+        - Google
+        - Bunny
+        - Adobe
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps needed to trigger the problem.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      placeholder: Describe what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual behavior
+      placeholder: Describe what actually happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Relevant diagnostics
+      description: Paste relevant output from `Advanced Tools -> Diagnostics`.
+      render: text
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        For product and developer context, start with the [docs hub](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/blob/main/docs/README.md).
+
+        <!-- Context footer: docs hub -->

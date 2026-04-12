@@ -24,7 +24,9 @@ These docs describe the current plugin behavior in full, covering the shipping f
 - See [Settings](settings.md) for the full output and integration controls.
 
 ### I'm a developer who wants to understand or extend the plugin
+- Start with [Contributing](../CONTRIBUTING.md) for setup, verification, and PR expectations.
 - Read [Architecture](developer/architecture.md) for a service-layer overview.
+- Read [Local Setup](developer/local-setup.md) for local WordPress environment notes and common pitfalls.
 - Read [Testing](developer/testing.md) to run and add tests.
 - Check the [FAQ — Developer Questions](faq.md#developer-questions) section for code-level answers.
 - See [Release Process](developer/release-process.md) and [Translations](developer/translations.md) for contribution workflows.
@@ -68,8 +70,16 @@ These docs describe the current plugin behavior in full, covering the shipping f
 
 - [Architecture](developer/architecture.md) — service layers, runtime flow, and extension points
 - [Testing](developer/testing.md) — run and write PHP and JavaScript tests
+- [Local Setup](developer/local-setup.md) — local WordPress options, manual installs, and development pitfalls
 - [Release Process](developer/release-process.md) — tag, build, and publish a release
 - [Translations](developer/translations.md) — maintain the POT template and text domain
+
+## Contributing
+
+- [Contributing](../CONTRIBUTING.md) — contributor workflow, verification commands, and good-first entry points
+- [Security Policy](../SECURITY.md) — private vulnerability reporting and scope
+- [Code Of Conduct](../CODE_OF_CONDUCT.md) — community expectations for contributors
+- [Local Setup](developer/local-setup.md) — local development environments and troubleshooting
 
 ## What's New
 

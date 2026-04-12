@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose a product, workflow, or developer-experience improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What gap, pain point, or workflow problem are you trying to solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_behavior
+    attributes:
+      label: Proposed behavior
+      description: Describe the behavior you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or other approaches have you already considered?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: personas
+    attributes:
+      label: Which user personas does this affect?
+      description: Select every audience this request applies to.
+      multiple: true
+      options:
+        - Agency
+        - Individual
+        - Editorial
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        For product and developer context, start with the [docs hub](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/blob/main/docs/README.md).
+
+        <!-- Context footer: docs hub -->

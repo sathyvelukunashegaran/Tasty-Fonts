@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Added contributor-facing repo scaffolding, including a standalone contributing guide, local setup documentation, GitHub issue and pull request templates, a security policy, a code of conduct, and an `.editorconfig`, while correcting the developer testing guide to match the current zero-dependency harness.
+
 ## [1.11.0-beta.1] - 2026-04-12
 
 ### Added

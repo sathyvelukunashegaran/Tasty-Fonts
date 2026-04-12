@@ -52,49 +52,64 @@ This is the same verification sequence the release helper runs before tagging.
 
 ### PHP Tests
 
-PHP test cases live in `tests/cases/*.php`. Each file contains one or more test closures.
+PHP test cases live in `tests/cases/*.php`. Each case file registers one or more closures on the shared `$tests` array, then `tests/run.php` loads every case file and passes that array into `runTestSuite( $tests )`.
 
 **Basic structure:**
 
 ```php
 <?php
-// tests/cases/my-feature.php
 
-use function TastyFonts\Tests\run_test;
-use function TastyFonts\Tests\assert_equals;
+declare(strict_types=1);
 
-run_test( 'my feature returns expected value', function () {
-    $result = some_function_under_test();
-    assert_equals( 'expected', $result );
-} );
+namespace {
+    use TastyFonts\Support\FontUtils;
+
+    $tests['font_utils_normalizes_font_weight_tokens'] = static function (): void {
+        assertSameValue(
+            '700',
+            FontUtils::normalizeWeight('bold'),
+            'FontUtils should normalize named weight aliases to their stored numeric token.'
+        );
+    };
+}
 ```
 
 **Available harness helpers:**
 
 | Helper | What it does |
 |---|---|
-| `run_test( $name, $fn )` | Registers and runs a named test closure |
-| `assert_equals( $expected, $actual )` | Fails if values are not equal |
-| `assert_true( $value )` | Fails if value is not truthy |
-| `assert_false( $value )` | Fails if value is not falsy |
-| `assert_contains( $needle, $haystack )` | Fails if needle is not in haystack |
-| `resetTestState()` | Clears global and option-like state between tests; call this when your test touches stored state |
+| `assertSameValue( $expected, $actual, $message )` | Fails if values are not strictly identical |
+| `assertTrueValue( $actual, $message )` | Fails if the value is not `true` |
+| `assertFalseValue( $actual, $message )` | Fails if the value is not `false` |
+| `assertContainsValue( $needle, $haystack, $message )` | Fails if a string does not contain the expected substring |
+| `assertNotContainsValue( $needle, $haystack, $message )` | Fails if a string contains an unexpected substring |
+| `assertArrayHasKeys( $expectedKeys, $actual, $message )` | Fails if an array is missing required keys |
+| `assertWpErrorCode( $expectedCode, $actual, $message )` | Fails unless the value is a `WP_Error` with the expected error code |
+| `assertMatchesPattern( $pattern, $subject, $message )` | Fails unless the subject matches the regex pattern |
+| `resetTestState()` | Clears global and option-like state between tests; call this before a test that touches stored state |
 
 Helpers are defined in `tests/bootstrap.php` and `tests/support/wordpress-harness.php`.
 
 **Example with state reset:**
 
 ```php
-run_test( 'settings save persists correctly', function () {
-    resetTestState();
+<?php
 
-    update_tasty_option( 'css_delivery', 'inline' );
-    $settings = get_tasty_settings();
+declare(strict_types=1);
 
-    assert_equals( 'inline', $settings['css_delivery'] );
+namespace {
+    $tests['settings_repository_persists_css_delivery_updates'] = static function (): void {
+        resetTestState();
 
-    resetTestState();
-} );
+        update_option('tasty_fonts_settings', ['css_delivery' => 'inline']);
+
+        assertSameValue(
+            'inline',
+            get_option('tasty_fonts_settings')['css_delivery'] ?? '',
+            'Settings updates should persist the selected CSS delivery mode.'
+        );
+    };
+}
 ```
 
 **Adding the file to the runner:**
@@ -104,6 +119,13 @@ If you add a new `tests/cases/` file, include it at the bottom of `tests/run.php
 ```php
 require_once __DIR__ . '/cases/my-feature.php';
 ```
+
+**Useful harness utilities from the support layer:**
+
+- `makeServiceGraph()` builds a wired service container for integration-style tests.
+- `makeAdminControllerTestInstance()` instantiates `AdminController` without running its constructor.
+- `invokePrivateMethod()` helps target private methods in focused unit tests.
+- `resetPluginSingleton()` is available when you need to test the `Plugin` boot lifecycle cleanly.
 
 ### JavaScript Tests
 
