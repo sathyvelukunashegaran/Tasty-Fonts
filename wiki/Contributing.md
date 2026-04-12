@@ -84,4 +84,4 @@ Browse issues labeled [good first issue](https://github.com/sathyvelukunashegara
 
 ## Security
 
-Please do not report security issues in public issues or pull requests. Follow the process in [SECURITY.md](Security).
+Please do not report security issues in public issues or pull requests. Follow the process in [Security Policy](Security).
