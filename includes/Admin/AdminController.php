@@ -22,6 +22,7 @@ use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Maintenance\DeveloperToolsService;
+use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -42,6 +43,10 @@ final class AdminController
     public const PAGE_SETTINGS = 'settings';
     public const PAGE_DIAGNOSTICS = 'diagnostics';
     private const ACTION_DOWNLOAD_GENERATED_CSS = 'tasty_fonts_download_generated_css';
+    private const ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE = 'tasty_fonts_download_site_transfer_bundle';
+    private const ACTION_IMPORT_SITE_TRANSFER_BUNDLE = 'tasty_fonts_import_site_transfer_bundle';
+    private const IMPORT_SITE_TRANSFER_FILE_FIELD = 'tasty_fonts_site_transfer_bundle';
+    private const IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD = 'tasty_fonts_import_google_api_key';
     private const SETTINGS_SAVE_SCALAR_FIELDS = [
         'google_api_key',
         'tasty_fonts_clear_google_api_key',
@@ -127,6 +132,7 @@ final class AdminController
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration,
         private readonly DeveloperToolsService $developerTools,
+        private readonly SiteTransferService $siteTransfer,
         private readonly ?GitHubUpdater $updater = null
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
@@ -285,6 +291,10 @@ final class AdminController
             return;
         }
 
+        if ($this->handleDownloadSiteTransferBundleAction()) {
+            return;
+        }
+
         if ($this->handleClearLogAction()) {
             return;
         }
@@ -318,6 +328,10 @@ final class AdminController
         }
 
         if ($this->handleResetSuppressedNoticesAction()) {
+            return;
+        }
+
+        if ($this->handleImportSiteTransferBundleAction()) {
             return;
         }
 
@@ -863,6 +877,68 @@ final class AdminController
         ];
     }
 
+    public function exportSiteTransferBundle(): array|WP_Error
+    {
+        return $this->siteTransfer->buildExportBundle();
+    }
+
+    public function importSiteTransferBundle(array $uploadedFile, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        $result = $this->siteTransfer->importBundleReplacingCurrentState($uploadedFile, $freshGoogleApiKey);
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $settings = is_array($result['settings'] ?? null) ? $result['settings'] : $this->settings->getSettings();
+        $messages = [];
+
+        $acssMessage = $this->syncAcssIntegrationForRuntimeState($settings, true);
+
+        if (is_wp_error($acssMessage)) {
+            $messages[] = $acssMessage->get_error_message();
+        } elseif (trim($acssMessage) !== '') {
+            $messages[] = trim($acssMessage);
+        }
+
+        $bricksMessage = $this->syncBricksIntegrationForRuntimeState($settings, true);
+
+        if (is_wp_error($bricksMessage)) {
+            $messages[] = $bricksMessage->get_error_message();
+        } elseif (trim($bricksMessage) !== '') {
+            $messages[] = trim($bricksMessage);
+        }
+
+        $familyCount = (int) ($result['families'] ?? 0);
+        $fileCount = (int) ($result['files'] ?? 0);
+        $message = sprintf(
+            __('Imported the site transfer bundle (%1$d famil%2$s, %3$d file%4$s).', 'tasty-fonts'),
+            $familyCount,
+            $familyCount === 1 ? 'y' : 'ies',
+            $fileCount,
+            $fileCount === 1 ? '' : 's'
+        );
+
+        if (!empty($result['used_fresh_google_api_key'])) {
+            $message .= ' ' . __('A fresh Google Fonts API key was saved for this site.', 'tasty-fonts');
+        } else {
+            $message .= ' ' . __('Secrets were not imported. Add a fresh Google Fonts API key if this site needs one.', 'tasty-fonts');
+        }
+
+        if ($messages !== []) {
+            $message .= ' ' . implode(' ', $messages);
+        }
+
+        $this->log->add($message);
+
+        return [
+            'message' => $message,
+            'settings' => $settings,
+            'roles' => $result['roles'] ?? [],
+            'library' => $result['library'] ?? [],
+        ];
+    }
+
     public function saveFamilyDeliveryValue(string $familySlug, string $deliveryId): array|WP_Error
     {
         return $this->library->saveFamilyDelivery($familySlug, $deliveryId);
@@ -1046,6 +1122,27 @@ final class AdminController
         $result = $this->resetSuppressedNotices();
 
         $this->redirectWithSuccess((string) ($result['message'] ?? __('Suppressed notices reset.', 'tasty-fonts')));
+    }
+
+    private function handleImportSiteTransferBundleAction(): bool
+    {
+        if (!isset($_POST[self::ACTION_IMPORT_SITE_TRANSFER_BUNDLE])) {
+            return false;
+        }
+
+        check_admin_referer(self::ACTION_IMPORT_SITE_TRANSFER_BUNDLE);
+
+        $uploadedFile = is_array($_FILES[self::IMPORT_SITE_TRANSFER_FILE_FIELD] ?? null)
+            ? $_FILES[self::IMPORT_SITE_TRANSFER_FILE_FIELD]
+            : [];
+        $freshGoogleApiKey = $this->getPostedText(self::IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD);
+        $result = $this->importSiteTransferBundle($uploadedFile, $freshGoogleApiKey);
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
+
+        $this->redirectWithSuccess((string) ($result['message'] ?? __('Site transfer bundle imported.', 'tasty-fonts')));
     }
 
     private function handleReinstallUpdateChannelAction(): bool
@@ -1329,6 +1426,43 @@ final class AdminController
         exit;
     }
 
+    private function handleDownloadSiteTransferBundleAction(): bool
+    {
+        if (!self::isPluginPageSlug($this->getQueryText('page', self::MENU_SLUG)) || !isset($_GET[self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE])) {
+            return false;
+        }
+
+        check_admin_referer(self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE);
+
+        $bundle = $this->exportSiteTransferBundle();
+
+        if (is_wp_error($bundle)) {
+            $this->redirectWithError($bundle->get_error_message());
+        }
+
+        $path = wp_normalize_path((string) ($bundle['path'] ?? ''));
+
+        if ($path === '' || !is_readable($path)) {
+            $this->redirectWithError(__('The site transfer bundle could not be prepared for download.', 'tasty-fonts'));
+        }
+
+        $filename = sanitize_file_name((string) ($bundle['filename'] ?? 'tasty-fonts-transfer.zip'));
+        $contentType = trim((string) ($bundle['content_type'] ?? 'application/zip'));
+        $size = is_file($path) ? (int) filesize($path) : 0;
+        $this->log->add(__('Exported a site transfer bundle.', 'tasty-fonts'));
+
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        if ($size > 0) {
+            header('Content-Length: ' . $size);
+        }
+
+        readfile($path);
+        @unlink($path);
+        exit;
+    }
+
     private function buildPageContext(): array
     {
         $pageType = $this->resolveRequestedPageType();
@@ -1357,6 +1491,7 @@ final class AdminController
                     ]),
                     self::PAGE_DIAGNOSTICS => $this->buildPageUrl(self::PAGE_DIAGNOSTICS),
                 ],
+                'site_transfer' => $this->buildSiteTransferContext(),
             ]
         );
     }
@@ -1411,6 +1546,20 @@ final class AdminController
     private function buildNoticeToasts(): array
     {
         return $this->pageContextBuilder->buildNoticeToasts();
+    }
+
+    private function buildSiteTransferContext(): array
+    {
+        $capability = $this->siteTransfer->getCapabilityStatus();
+
+        return [
+            'available' => !empty($capability['available']),
+            'message' => (string) ($capability['message'] ?? ''),
+            'export_url' => $this->buildSiteTransferDownloadUrl(),
+            'import_file_field' => self::IMPORT_SITE_TRANSFER_FILE_FIELD,
+            'import_google_api_key_field' => self::IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD,
+            'import_action_field' => self::ACTION_IMPORT_SITE_TRANSFER_BUNDLE,
+        ];
     }
 
     private function buildSettingsSavedMessage(array $before, array $after): string
@@ -3444,6 +3593,20 @@ final class AdminController
                 ['page' => self::MENU_SLUG],
                 $this->buildTrackedUiQueryArgs($resolvedPageType)
             ),
+            admin_url('admin.php')
+        );
+    }
+
+    private function buildSiteTransferDownloadUrl(): string
+    {
+        return add_query_arg(
+            [
+                'page' => self::MENU_SLUG,
+                'tf_page' => self::PAGE_SETTINGS,
+                'tf_studio' => 'developer',
+                self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE => '1',
+                '_wpnonce' => wp_create_nonce(self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE),
+            ],
             admin_url('admin.php')
         );
     }

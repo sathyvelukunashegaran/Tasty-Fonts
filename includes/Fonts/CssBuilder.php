@@ -346,7 +346,7 @@ final class CssBuilder
         $unicodeRange = FontUtils::resolveFaceUnicodeRange($face, $settings);
         $files = is_array($face['files'] ?? null) ? $face['files'] : [];
         $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
-        $variationDefaults = FontUtils::normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes);
+        $variationDefaults = FontUtils::faceLevelVariationDefaults($face['variation_defaults'] ?? [], $axes);
 
         if ($family === '' || $files === []) {
             return '';
@@ -460,6 +460,27 @@ final class CssBuilder
             }
 
             if (preg_match('/\s/', $character) === 1) {
+                if ($result === '') {
+                    continue;
+                }
+
+                $nextIndex = $index + 1;
+
+                while ($nextIndex < $length && preg_match('/\s/', $css[$nextIndex]) === 1) {
+                    $nextIndex++;
+                }
+
+                if ($nextIndex >= $length) {
+                    continue;
+                }
+
+                $previousCharacter = $result[strlen($result) - 1] ?? '';
+                $nextCharacter = $css[$nextIndex] ?? '';
+
+                if ($this->minifyWhitespaceIsSignificant($previousCharacter, $nextCharacter)) {
+                    $result .= ' ';
+                }
+
                 continue;
             }
 
@@ -473,6 +494,23 @@ final class CssBuilder
         $result = str_replace(';}', '}', $result);
 
         return trim($result);
+    }
+
+    private function minifyWhitespaceIsSignificant(string $previousCharacter, string $nextCharacter): bool
+    {
+        if ($previousCharacter === '' || $nextCharacter === '') {
+            return false;
+        }
+
+        if (str_contains('{}[:;,>+~(/', $previousCharacter)) {
+            return false;
+        }
+
+        if (str_contains('{}:;,>+~)]/', $nextCharacter)) {
+            return false;
+        }
+
+        return true;
     }
 
     private function sanitizeKeyword(string $value, array $allowed, string $default): string

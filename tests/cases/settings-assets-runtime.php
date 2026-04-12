@@ -15,6 +15,7 @@ use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
+use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -699,6 +700,295 @@ $tests['developer_tools_reset_integration_detection_state_and_suppressed_notices
     assertSameValue(false, array_key_exists(AdminController::LOCAL_ENV_NOTICE_OPTION, $optionStore), 'Reset suppressed notices should clear saved notice preferences.');
     assertSameValue(1, did_action('tasty_fonts_before_reset_suppressed_notices'), 'Reset suppressed notices should emit a before hook.');
     assertSameValue(1, did_action('tasty_fonts_after_reset_suppressed_notices'), 'Reset suppressed notices should emit an after hook.');
+};
+
+$tests['site_transfer_service_exports_a_portable_bundle_without_secrets_or_generated_css'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2'), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->getGeneratedCssPath(), 'body{font-family:Inter;}');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings([
+        'google_api_key' => 'live-key',
+        'acss_font_role_sync_enabled' => '1',
+    ]);
+    $services['settings']->saveAppliedRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+    $services['settings']->saveRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+    $services['settings']->saveAdobeProject('abc123', true);
+
+    $bundle = $services['site_transfer']->buildExportBundle();
+
+    assertFalseValue(is_wp_error($bundle), 'Building a site transfer bundle should succeed.');
+    assertSameValue(true, is_readable((string) ($bundle['path'] ?? '')), 'Building a site transfer bundle should create a readable zip file.');
+
+    $zip = new ZipArchive();
+    assertSameValue(true, $zip->open((string) $bundle['path']) === true, 'The exported bundle should be a readable zip archive.');
+
+    $manifestJson = (string) $zip->getFromName('tasty-fonts-export.json');
+    $fontPayload = (string) $zip->getFromName('fonts/upload/inter/inter-400-normal.woff2');
+    $generatedCssPayload = $zip->getFromName('fonts/.generated/tasty-fonts.css');
+    $zip->close();
+
+    $manifest = json_decode($manifestJson, true);
+
+    assertSameValue(true, is_array($manifest), 'The exported bundle should contain a JSON manifest.');
+    assertSameValue(SiteTransferService::SCHEMA_VERSION, (int) ($manifest['schema_version'] ?? 0), 'The exported bundle should stamp the current schema version.');
+    assertSameValue(false, isset($manifest['settings']['google_api_key']), 'The exported bundle should omit Google API secrets from the settings snapshot.');
+    assertSameValue(false, isset($manifest['settings']['applied_roles']), 'The exported bundle should store applied roles outside the main settings snapshot.');
+    assertSameValue(false, !empty($manifest['settings']['acss_font_role_sync_applied']), 'The exported bundle should clear non-portable ACSS applied state.');
+    assertSameValue('', (string) ($manifest['settings']['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'The exported bundle should clear non-portable ACSS restore state.');
+    assertSameValue('unknown', (string) ($manifest['settings']['adobe_project_status'] ?? ''), 'The exported bundle should reset Adobe project status for destination revalidation.');
+    assertSameValue('Inter', (string) ($manifest['roles']['heading'] ?? ''), 'The exported bundle should include saved role drafts.');
+    assertSameValue('Inter', (string) ($manifest['applied_roles']['heading'] ?? ''), 'The exported bundle should include applied live roles.');
+    assertSameValue('font-data', $fontPayload, 'The exported bundle should include managed font files under the fonts payload directory.');
+    assertSameValue(false, is_string($generatedCssPayload), 'The exported bundle should exclude generated CSS from the fonts payload.');
+    assertSameValue('google_api_key', (string) ($manifest['secret_requirements'][0]['key'] ?? ''), 'The exported bundle should describe fresh secret inputs required at import time.');
+    assertSameValue(true, in_array('upload/inter/inter-400-normal.woff2', array_column((array) ($manifest['files'] ?? []), 'relative_path'), true), 'The exported bundle manifest should list the managed font files that were included.');
+
+    @unlink((string) ($bundle['path'] ?? ''));
+};
+
+$tests['site_transfer_service_rejects_checksum_mismatches_during_bundle_validation'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $bundle = $services['site_transfer']->buildExportBundle();
+    $zip = new ZipArchive();
+    $zip->open((string) $bundle['path']);
+    $zip->addFromString('fonts/upload/inter/inter-400-normal.woff2', 'tampered-font-data');
+    $zip->close();
+
+    $validation = $services['site_transfer']->validateImportBundle((string) $bundle['path']);
+
+    assertTrueValue(is_wp_error($validation), 'Bundle validation should fail when a managed file checksum no longer matches the manifest.');
+    assertSameValue('tasty_fonts_transfer_checksum_mismatch', $validation->get_error_code(), 'Checksum validation failures should use the dedicated transfer error code.');
+
+    @unlink((string) ($bundle['path'] ?? ''));
+};
+
+$tests['site_transfer_service_import_replaces_existing_state_and_accepts_a_fresh_google_api_key'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $remoteRequestResponses;
+    global $remoteGetCalls;
+    global $remoteRequestCalls;
+    global $uploadedFilePaths;
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $sourceFile = (string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($sourceFile, 'source-font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings([
+        'block_editor_font_library_sync_enabled' => '1',
+        'google_api_key' => 'source-secret',
+        'acss_font_role_sync_enabled' => '1',
+    ]);
+    $services['settings']->saveRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+    $services['settings']->saveAppliedRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+
+    $bundle = $services['site_transfer']->buildExportBundle();
+    assertFalseValue(is_wp_error($bundle), 'Building the source bundle for import testing should succeed.');
+
+    $existingFile = (string) $services['storage']->pathForRelativePath('upload/existing/existing-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($existingFile, 'existing-font-data');
+    $services['imports']->saveProfile(
+        'Existing Sans',
+        'existing-sans',
+        [
+            'id' => 'existing-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Existing Sans',
+                    'slug' => 'existing-sans',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/existing/existing-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/existing/existing-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings(['google_api_key' => 'old-secret']);
+    $services['log']->add('Old log entry.');
+
+    $baseUrl = 'https://example.test/wp-json/wp/v2/font-families';
+    $findUrl = $baseUrl . '?slug=tasty-fonts-inter&context=edit';
+    $remoteGetResponses[$findUrl] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode([]),
+    ];
+    $remoteRequestResponses['POST ' . $baseUrl] = [
+        'response' => ['code' => 201],
+        'body' => wp_json_encode(['id' => 321]),
+    ];
+    $remoteRequestResponses['POST ' . $baseUrl . '/321/font-faces'] = [
+        'response' => ['code' => 201],
+        'body' => wp_json_encode(['id' => 654]),
+    ];
+
+    $uploadedFilePaths[] = (string) $bundle['path'];
+    $result = $services['site_transfer']->importBundleReplacingCurrentState(
+        [
+            'name' => 'tasty-fonts-transfer.zip',
+            'tmp_name' => (string) $bundle['path'],
+            'error' => UPLOAD_ERR_OK,
+            'size' => (int) filesize((string) $bundle['path']),
+        ],
+        'fresh-destination-key'
+    );
+
+    assertFalseValue(is_wp_error($result), 'Importing a valid site transfer bundle should succeed.');
+    assertSameValue(false, file_exists($existingFile), 'Importing a site transfer bundle should remove previously managed font files that are not in the bundle.');
+    assertSameValue('source-font-data', (string) file_get_contents($sourceFile), 'Importing a site transfer bundle should restore bundled managed font files.');
+    assertSameValue(null, $services['imports']->getFamily('existing-sans'), 'Importing a site transfer bundle should replace the existing library instead of merging.');
+    assertSameValue('Inter', (string) ($services['settings']->getRoles([])['heading'] ?? ''), 'Importing a site transfer bundle should restore saved role drafts.');
+    assertSameValue('Inter', (string) ($services['settings']->getAppliedRoles([])['heading'] ?? ''), 'Importing a site transfer bundle should restore applied live roles.');
+    assertSameValue('fresh-destination-key', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Importing a site transfer bundle should accept a fresh Google API key for the destination site.');
+    assertSameValue([], $services['log']->all(), 'Importing a site transfer bundle directly should clear the previous activity log before the controller adds any new import summary entry.');
+    assertSameValue(true, is_readable((string) $services['storage']->getGeneratedCssPath()), 'Importing a site transfer bundle should rebuild generated CSS from the restored library.');
+    $remoteGetUrls = array_map(
+        static fn (array $call): string => (string) ($call['url'] ?? ''),
+        $remoteGetCalls
+    );
+    assertTrueValue(in_array($findUrl, $remoteGetUrls, true), 'Importing a site transfer bundle should re-sync the restored library to the Block Editor Font Library when that feature is enabled.');
+    assertSameValue(2, count($remoteRequestCalls), 'Importing a site transfer bundle should create one managed family and one managed font face for the restored library.');
+};
+
+$tests['site_transfer_service_import_leaves_google_api_key_empty_when_no_fresh_secret_is_provided'] = static function (): void {
+    resetTestState();
+
+    global $uploadedFilePaths;
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings([
+        'google_api_key' => 'source-secret',
+        'block_editor_font_library_sync_enabled' => '0',
+    ]);
+
+    $bundle = $services['site_transfer']->buildExportBundle();
+    $uploadedFilePaths[] = (string) $bundle['path'];
+    $result = $services['site_transfer']->importBundleReplacingCurrentState(
+        [
+            'name' => 'tasty-fonts-transfer.zip',
+            'tmp_name' => (string) $bundle['path'],
+            'error' => UPLOAD_ERR_OK,
+            'size' => (int) filesize((string) $bundle['path']),
+        ],
+        ''
+    );
+
+    assertFalseValue(is_wp_error($result), 'Importing a valid site transfer bundle without a fresh Google API key should still succeed.');
+    assertSameValue('', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Importing without a fresh Google API key should leave the destination site with no saved Google secret.');
 };
 
 $tests['settings_repository_defaults_and_persists_class_output_settings'] = static function (): void {
@@ -2960,6 +3250,127 @@ $tests['runtime_asset_planner_resolves_unicode_range_output_modes_for_editor_fac
     $offFamilies = $services['planner']->getEditorFontFamilies();
     $offFace = (array) (($offFamilies[0]['fontFace'][0] ?? null) ?: []);
     assertSameValue(false, array_key_exists('unicodeRange', $offFace), 'Editor font-face payloads should omit unicodeRange when unicode-range output is disabled.');
+};
+
+$tests['runtime_asset_planner_omits_registered_axis_defaults_from_editor_font_faces'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter Variable',
+        'inter-variable',
+        [
+            'id' => 'local-self_hosted-variable',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'variable',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter Variable',
+                'weight' => '300..800',
+                'style' => 'normal',
+                'is_variable' => true,
+                'axes' => [
+                    'WGHT' => ['min' => '300', 'default' => '400', 'max' => '800'],
+                    'OPSZ' => ['min' => '8', 'default' => '14', 'max' => '32'],
+                    'XTRA' => ['min' => '400', 'default' => '500', 'max' => '600'],
+                ],
+                'variation_defaults' => [
+                    'WGHT' => '650',
+                    'OPSZ' => '14',
+                    'XTRA' => '500',
+                ],
+                'files' => ['woff2' => 'upload/inter-variable/Inter Variable-VariableFont.woff2'],
+                'paths' => ['woff2' => 'upload/inter-variable/Inter Variable-VariableFont.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings(['variable_fonts_enabled' => '1']);
+    $services['settings']->setAutoApplyRoles(true);
+
+    $families = $services['planner']->getEditorFontFamilies();
+    $face = (array) (($families[0]['fontFace'][0] ?? null) ?: []);
+
+    assertSameValue('300 800', (string) ($face['fontWeight'] ?? ''), 'Editor font-face payloads should keep the variable weight range available for live weight selection.');
+    assertSameValue('"XTRA" 500', (string) ($face['fontVariationSettings'] ?? ''), 'Editor font-face payloads should keep custom axis defaults.');
+    assertSameValue(false, str_contains((string) ($face['fontVariationSettings'] ?? ''), '"wght"'), 'Editor font-face payloads should not pin the registered WGHT axis.');
+    assertSameValue(false, str_contains((string) ($face['fontVariationSettings'] ?? ''), '"opsz"'), 'Editor font-face payloads should not pin the registered OPSZ axis.');
+};
+
+$tests['block_editor_font_library_sync_omits_registered_axis_defaults_from_face_payloads'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $remoteRequestResponses;
+    global $remoteRequestCalls;
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter Variable',
+        'inter-variable',
+        [
+            'id' => 'local-self_hosted-variable',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'variable',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter Variable',
+                'weight' => '300..800',
+                'style' => 'normal',
+                'is_variable' => true,
+                'axes' => [
+                    'WGHT' => ['min' => '300', 'default' => '400', 'max' => '800'],
+                    'OPSZ' => ['min' => '8', 'default' => '14', 'max' => '32'],
+                    'XTRA' => ['min' => '400', 'default' => '500', 'max' => '600'],
+                ],
+                'variation_defaults' => [
+                    'WGHT' => '650',
+                    'OPSZ' => '14',
+                    'XTRA' => '500',
+                ],
+                'files' => ['woff2' => 'upload/inter-variable/Inter Variable-VariableFont.woff2'],
+                'paths' => ['woff2' => 'upload/inter-variable/Inter Variable-VariableFont.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings([
+        'variable_fonts_enabled' => '1',
+        'block_editor_font_library_sync_enabled' => '1',
+    ]);
+
+    $baseUrl = 'https://example.test/wp-json/wp/v2/font-families';
+    $findUrl = $baseUrl . '?slug=tasty-fonts-inter-variable&context=edit';
+    $remoteGetResponses[$findUrl] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode([]),
+    ];
+    $remoteRequestResponses['POST ' . $baseUrl] = [
+        'response' => ['code' => 201],
+        'body' => wp_json_encode(['id' => 321]),
+    ];
+    $remoteRequestResponses['POST ' . $baseUrl . '/321/font-faces'] = [
+        'response' => ['code' => 201],
+        'body' => wp_json_encode(['id' => 654]),
+    ];
+
+    $services['block_editor_font_library']->syncImportedFamily(['family' => 'Inter Variable'], 'local');
+
+    assertSameValue(2, count($remoteRequestCalls), 'Block Editor sync should create one family and one font face for the managed variable family.');
+
+    $faceRequest = (array) ($remoteRequestCalls[1] ?? []);
+    $faceBody = json_decode((string) (($faceRequest['args']['body']['font_face_settings'] ?? '') ?: ''), true);
+
+    assertSameValue('300 800', (string) ($faceBody['fontWeight'] ?? ''), 'Block Editor sync should preserve the variable weight range for the self-hosted face.');
+    assertSameValue('"XTRA" 500', (string) ($faceBody['fontVariationSettings'] ?? ''), 'Block Editor sync should preserve custom axis defaults on the synced face payload.');
+    assertSameValue(false, str_contains((string) ($faceBody['fontVariationSettings'] ?? ''), '"wght"'), 'Block Editor sync should not pin the registered WGHT axis in synced face payloads.');
+    assertSameValue(false, str_contains((string) ($faceBody['fontVariationSettings'] ?? ''), '"opsz"'), 'Block Editor sync should not pin the registered OPSZ axis in synced face payloads.');
 };
 
 $tests['settings_repository_tracks_builder_integration_state'] = static function (): void {

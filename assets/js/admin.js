@@ -202,6 +202,7 @@
     const unicodeRangeCustomInput = document.querySelector('[data-unicode-range-custom]');
     const settingsForms = Array.from(document.querySelectorAll('[data-settings-form]'));
     const settingsSaveShell = document.querySelector('[data-settings-save-shell]');
+    const siteTransferForms = Array.from(document.querySelectorAll('[data-site-transfer-form]'));
 
     let selectedSearchFamily = null;
     let searchResults = [];
@@ -296,6 +297,8 @@
         uploadSuccess: __('Upload complete. Refreshing the library…', 'tasty-fonts'),
         uploadError: __('The font upload failed.', 'tasty-fonts'),
         uploadNoFile: __('No file chosen', 'tasty-fonts'),
+        siteTransferNoFile: __('No bundle selected', 'tasty-fonts'),
+        siteTransferImporting: __('Importing the site transfer bundle… Large font libraries can take a minute.', 'tasty-fonts'),
         uploadButtonIdle: __('Upload to Library', 'tasty-fonts'),
         uploadButtonBusy: __('Uploading…', 'tasty-fonts'),
         uploadRowQueued: __('Queued', 'tasty-fonts'),
@@ -8407,6 +8410,107 @@
         );
     }
 
+    function getSiteTransferFieldParts(form) {
+        if (!form) {
+            return {
+                fileInput: null,
+                submitButton: null,
+                status: null,
+                fileName: null,
+            };
+        }
+
+        return {
+            fileInput: form.querySelector('[data-site-transfer-file-input]'),
+            submitButton: form.querySelector('[data-site-transfer-submit]'),
+            status: form.querySelector('[data-site-transfer-status]'),
+            fileName: form.querySelector('[data-site-transfer-file-name]'),
+        };
+    }
+
+    function syncSiteTransferFormState(form, options = {}) {
+        if (!form) {
+            return false;
+        }
+
+        const {
+            fileInput,
+            submitButton,
+            status,
+            fileName,
+        } = getSiteTransferFieldParts(form);
+        const selectedFile = fileInput && fileInput.files && fileInput.files.length > 0
+            ? fileInput.files[0]
+            : null;
+        const hasFile = !!selectedFile;
+        const isSubmitting = form.dataset.siteTransferSubmitting === '1';
+
+        form.classList.toggle('has-selected-file', hasFile);
+
+        if (fileName) {
+            fileName.textContent = hasFile
+                ? (selectedFile.name || getString('siteTransferNoFile', 'No bundle selected'))
+                : getString('siteTransferNoFile', 'No bundle selected');
+        }
+
+        if (submitButton) {
+            submitButton.disabled = !hasFile || isSubmitting;
+        }
+
+        if (!hasFile && submitButton) {
+            resetDestructiveButton(submitButton);
+        }
+
+        if (status && !isSubmitting && options.clearStatus !== false) {
+            setStatus(status, '', '');
+        }
+
+        return hasFile;
+    }
+
+    function setSiteTransferSubmittingState(form, submitButton, status) {
+        if (!form || !submitButton) {
+            return;
+        }
+
+        form.dataset.siteTransferSubmitting = '1';
+        form.setAttribute('aria-busy', 'true');
+
+        Array.from(form.elements || []).forEach((field) => {
+            if (!(field instanceof HTMLElement)) {
+                return;
+            }
+
+            if (field.matches('input[type="hidden"]')) {
+                return;
+            }
+
+            field.disabled = true;
+        });
+
+        setButtonBusyState(
+            submitButton,
+            true,
+            submitButton.dataset.idleLabel || getString('importButtonIdle', 'Import Bundle'),
+            submitButton.dataset.busyLabel || getString('siteTransferImporting', 'Importing the site transfer bundle… Large font libraries can take a minute.')
+        );
+
+        if (status) {
+            setStatus(
+                status,
+                getString('siteTransferImporting', 'Importing the site transfer bundle… Large font libraries can take a minute.'),
+                'progress',
+                38
+            );
+
+            const progressBar = status.querySelector('.tasty-fonts-import-progress-bar');
+
+            if (progressBar) {
+                progressBar.classList.add('is-indeterminate');
+            }
+        }
+    }
+
     async function importGoogleFont() {
         const family = manualFamily ? manualFamily.value.trim() : '';
         const deliveryMode = currentGoogleDeliveryMode();
@@ -10401,6 +10505,18 @@
     }
 
     function bindDeveloperToolsControls() {
+        siteTransferForms.forEach((form) => {
+            const { fileInput } = getSiteTransferFieldParts(form);
+
+            syncSiteTransferFormState(form);
+
+            if (fileInput) {
+                fileInput.addEventListener('change', () => {
+                    syncSiteTransferFormState(form);
+                });
+            }
+        });
+
         developerConfirmForms.forEach((form) => {
             const confirmMessage = String(form.getAttribute('data-developer-confirm-message') || '').trim();
 
@@ -10409,10 +10525,25 @@
             }
 
             form.addEventListener('submit', (event) => {
-                const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+                const submitButton = event.submitter instanceof HTMLElement
+                    ? event.submitter
+                    : form.querySelector('button[type="submit"], input[type="submit"]');
+                const isSiteTransferForm = form.hasAttribute('data-site-transfer-form');
+
+                if (isSiteTransferForm && !syncSiteTransferFormState(form, { clearStatus: false })) {
+                    event.preventDefault();
+                    return;
+                }
 
                 if (!armDestructiveButton(submitButton, confirmMessage)) {
                     event.preventDefault();
+                    return;
+                }
+
+                if (isSiteTransferForm) {
+                    const { status } = getSiteTransferFieldParts(form);
+
+                    setSiteTransferSubmittingState(form, submitButton, status);
                 }
             });
         });

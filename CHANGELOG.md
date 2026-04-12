@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added a portable Site Transfer workflow in Settings -> Transfer to export and import bundles containing managed fonts, library data, settings, and live role assignments.
+- Added support for supplying a fresh Google Fonts API key during site-transfer imports so destination sites can restore search access without exporting secrets.
+
+### Changed
+
+- Moved Google Fonts API key material into dedicated encrypted option storage and excluded it from portable exports.
+- Refined the Transfer settings UI with a dedicated tab, cleaner export and import cards, token-driven controls, and a polished bundle upload field.
+
+### Fixed
+
+- Fixed variable-font output so registered axis defaults are omitted from generated CSS and Block Editor sync payloads when they would be redundant.
+- Fixed CSS minification to preserve significant whitespace in output where collapsing it would change behavior.
+
 ## [1.12.0-beta.1] - 2026-04-13
 
 ### Changed

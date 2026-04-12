@@ -250,7 +250,7 @@ trait SharedRenderHelpers
 
     public function renderFallbackInput(string $name, string $value, array $attributes = []): void
     {
-        $className = 'regular-text';
+        $className = 'regular-text tasty-fonts-text-control';
         $wrapperClassName = 'tasty-fonts-combobox-field';
         $clearValue = null;
         $clearLabel = '';

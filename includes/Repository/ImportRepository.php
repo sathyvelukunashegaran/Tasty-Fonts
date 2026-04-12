@@ -286,6 +286,14 @@ final class ImportRepository
         delete_option(self::LEGACY_OPTION_IMPORTS);
     }
 
+    public function replaceLibrary(array $library): array
+    {
+        $normalized = $this->normalizeLibrary($library);
+        $this->persistLibrary($normalized);
+
+        return $normalized;
+    }
+
     private function getLibrary(): array
     {
         $value = get_option(self::OPTION_LIBRARY, null);

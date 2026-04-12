@@ -359,6 +359,7 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
     assertSameValue(1, preg_match('/id="tasty-fonts-page-tab-library"[\s\S]*?tabindex="-1"/', $output), 'Inactive top-level page tabs should be removed from the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-integrations"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
     assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-plugin-behavior"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-transfer"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
     assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-developer"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
     assertSameValue(1, preg_match('/id="tasty-fonts-preview-tab-code"[\s\S]*?tabindex="-1"/', $output), 'Inactive preview tabs should be removed from the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-add-font-tab-bunny"[\s\S]*?tabindex="-1"/', $output), 'Inactive add-font tabs should be removed from the normal keyboard tab order.');
@@ -2092,6 +2093,7 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     $output = (string) ob_get_clean();
 
     assertContainsValue('Behavior', $output, 'The settings switcher should expose the dedicated Behavior tab.');
+    assertContainsValue('Transfer', $output, 'The settings switcher should expose the dedicated Transfer tab.');
     assertContainsValue('Developer', $output, 'The settings switcher should expose the dedicated Developer tab.');
     assertContainsValue('Integrations', $output, 'The settings switcher should expose the dedicated Integrations tab.');
     assertContainsValue('Gutenberg Font Library', $output, 'The Integrations tab should expose the Gutenberg integration card.');
@@ -2113,6 +2115,15 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should still render the uninstall cleanup toggle.');
     assertContainsValue('Reset Plugin Settings', $output, 'The Developer tab should expose the reset-settings action.');
     assertContainsValue('Wipe Managed Font Library', $output, 'The Developer tab should expose the library-wipe action.');
+    assertContainsValue('Site Transfer', $output, 'The Transfer tab should render the dedicated site transfer panel.');
+    assertContainsValue('Export Site Transfer Bundle', $output, 'The Transfer tab should expose the portable export action.');
+    assertContainsValue('Import Site Transfer Bundle', $output, 'The Transfer tab should expose the portable import action.');
+    assertContainsValue('data-site-transfer-form', $output, 'The site transfer panel should expose the dedicated import form hook for client-side state management.');
+    assertSameValue(
+        1,
+        preg_match('/data-site-transfer-submit[\s\S]*disabled/', $output),
+        'The site transfer import button should render disabled until a bundle file is selected.'
+    );
     assertContainsValue('Clear Plugin Caches and Regenerate Assets', $output, 'The Developer tab should expose the cache-reset action.');
     assertContainsValue('Regenerate Generated CSS', $output, 'The Developer tab should expose the CSS-regeneration action.');
     assertContainsValue('Reset Integration Detection State', $output, 'The Developer tab should expose the integration-reset action.');
@@ -2128,6 +2139,10 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('tasty-fonts-header-logo', $output, 'The masthead should render the branded logo in place of the plain text title.');
     assertContainsValue('https://tastywp.com/tastyfonts/', $output, 'The branded masthead logo should link to the Tasty Fonts product page.');
     assertContainsValue('screen-reader-text', $output, 'The branded masthead should keep an accessible text label for assistive technology.');
+    assertContainsValue('tasty-fonts-version-link-meta', $output, 'The masthead version pill should render the channel and updater state meta line.');
+    assertContainsValue('Beta', $output, 'The masthead version pill should disclose the selected update channel.');
+    assertContainsValue('Beta · Update Available', $output, 'The masthead version pill should summarize channel and update status together.');
+    assertContainsValue('Latest available: 1.7.1-beta.2.', $output, 'The masthead version pill tooltip should expose the latest package for the selected channel.');
     assertContainsValue('is-training-wheels-off', $output, 'Hide Onboarding Hints should add the admin state class used to suppress descriptive copy.');
     assertNotContainsValue('Typography Workspace', $output, 'The masthead should omit the eyebrow label in the streamlined header layout.');
     assertNotContainsValue('Professional Typography Management For WordPress', $output, 'The streamlined masthead should omit the legacy hero tagline.');
@@ -2210,6 +2225,8 @@ $tests['admin_page_renderer_attaches_update_channel_rollback_action_to_the_field
     assertContainsValue('Rollback Available', $output, 'The Behavior tab should render rollback state copy inline with the update channel field.');
     assertContainsValue('Installed: 1.8.0-dev. Latest for Stable: 1.7.0.', $output, 'The Behavior tab should render rollback version context inline.');
     assertContainsValue('data-help-tooltip="The selected channel points to an older package than the one installed now. Use the reinstall action below to switch immediately."', $output, 'The Behavior tab should expose rollback guidance through the shared passive help tooltip system.');
+    assertContainsValue('Stable · Rollback Available', $output, 'The masthead version pill should expose rollback state alongside the selected channel.');
+    assertContainsValue('Latest available: 1.7.0.', $output, 'The masthead version pill tooltip should expose the latest rollback target version.');
     assertNotContainsValue('aria-controls="tasty-fonts-help-tooltip-layer"', $output, 'Passive help triggers should not misuse aria-controls for tooltip relationships.');
     assertNotContainsValue('<p class="tasty-fonts-settings-flat-row-note tasty-fonts-settings-flat-row-note--channel">The selected channel points to an older package than the one installed now. Use the reinstall action below to switch immediately.</p>', $output, 'Rollback guidance should no longer render as an inline sentence when the reinstall action is available.');
     assertContainsValue('Reinstall', $output, 'The Behavior tab should attach the rollback action directly to the update channel field.');

@@ -151,6 +151,7 @@ final class AdminPageViewBuilder
         $generatedCssPanel = is_array($context['generated_css_panel'] ?? null) ? $context['generated_css_panel'] : [];
         $previewPanels = is_array($context['preview_panels'] ?? null) ? $context['preview_panels'] : [];
         $localEnvironmentNotice = is_array($context['local_environment_notice'] ?? null) ? $context['local_environment_notice'] : [];
+        $siteTransfer = is_array($context['site_transfer'] ?? null) ? $context['site_transfer'] : [];
         $gutenbergIntegration = is_array($context['gutenberg_integration'] ?? null) ? $context['gutenberg_integration'] : [];
         $etchIntegration = is_array($context['etch_integration'] ?? null) ? $context['etch_integration'] : [];
         $acssIntegration = is_array($context['acss_integration'] ?? null) ? $context['acss_integration'] : [];
@@ -207,6 +208,21 @@ final class AdminPageViewBuilder
         $pluginVersionUrl = $pluginVersion !== '' && !str_contains($pluginVersion, '-dev')
             ? $pluginRepositoryUrl . '/releases/tag/' . rawurlencode($pluginVersion)
             : $pluginRepositoryUrl . '/releases';
+        $pluginVersionChannelLabel = $this->buildPluginVersionChannelLabel($pluginVersion, $updateChannelStatus);
+        $pluginVersionStateLabel = $this->buildPluginVersionStateLabel($updateChannelStatus);
+        $pluginVersionMeta = $this->buildPluginVersionMeta($pluginVersionChannelLabel, $pluginVersionStateLabel);
+        $pluginVersionBadgeClass = $this->buildPluginVersionBadgeClass($updateChannelStatus);
+        $pluginVersionTooltip = $this->buildPluginVersionTooltip(
+            $pluginVersion,
+            $pluginVersionChannelLabel,
+            $pluginVersionStateLabel,
+            trim((string) ($updateChannelStatus['latest_version'] ?? ''))
+        );
+        $pluginVersionAriaLabel = $this->buildPluginVersionAriaLabel(
+            $pluginVersion,
+            $pluginVersionChannelLabel,
+            $pluginVersionStateLabel
+        );
         $roleDeploymentBadge = (string) ($roleDeployment['badge'] ?? '');
         $roleDeploymentBadgeClass = (string) ($roleDeployment['badge_class'] ?? '');
         $roleDeploymentTitle = trim((string) ($roleDeployment['title'] ?? ''));
@@ -259,6 +275,135 @@ final class AdminPageViewBuilder
         unset($view['context']);
 
         return $view;
+    }
+
+    private function buildPluginVersionChannelLabel(string $pluginVersion, array $updateChannelStatus): string
+    {
+        $selectedChannelLabel = trim((string) ($updateChannelStatus['selected_channel_label'] ?? ''));
+
+        if ($selectedChannelLabel !== '') {
+            return $selectedChannelLabel;
+        }
+
+        if (str_contains($pluginVersion, '-beta.')) {
+            return __('Beta', 'tasty-fonts');
+        }
+
+        if (str_contains($pluginVersion, '-dev')) {
+            return __('Nightly', 'tasty-fonts');
+        }
+
+        return __('Stable', 'tasty-fonts');
+    }
+
+    private function buildPluginVersionStateLabel(array $updateChannelStatus): string
+    {
+        $state = $this->resolvePluginVersionState($updateChannelStatus);
+
+        return match ($state) {
+            'current' => __('Latest', 'tasty-fonts'),
+            'upgrade' => __('Update Available', 'tasty-fonts'),
+            'rollback' => __('Rollback Available', 'tasty-fonts'),
+            default => trim((string) ($updateChannelStatus['state_label'] ?? '')),
+        };
+    }
+
+    private function buildPluginVersionBadgeClass(array $updateChannelStatus): string
+    {
+        $state = $this->resolvePluginVersionState($updateChannelStatus);
+
+        return match ($state) {
+            'upgrade', 'rollback' => 'is-danger',
+            'current' => 'is-role',
+            default => '',
+        };
+    }
+
+    private function resolvePluginVersionState(array $updateChannelStatus): string
+    {
+        $state = trim((string) ($updateChannelStatus['state'] ?? ''));
+
+        if ($state !== '') {
+            return $state;
+        }
+
+        $stateLabel = strtolower(trim((string) ($updateChannelStatus['state_label'] ?? '')));
+        $stateClass = trim((string) ($updateChannelStatus['state_class'] ?? ''));
+
+        if (str_contains($stateLabel, 'rollback')) {
+            return 'rollback';
+        }
+
+        if (str_contains($stateLabel, 'upgrade') || str_contains($stateLabel, 'update')) {
+            return 'upgrade';
+        }
+
+        if (str_contains($stateLabel, 'current') || str_contains($stateLabel, 'latest')) {
+            return 'current';
+        }
+
+        return match ($stateClass) {
+            'is-success' => 'upgrade',
+            'is-warning' => 'rollback',
+            'is-role' => 'current',
+            default => '',
+        };
+    }
+
+    private function buildPluginVersionMeta(string $channelLabel, string $stateLabel): string
+    {
+        if ($channelLabel !== '' && $stateLabel !== '') {
+            return sprintf(__('%1$s · %2$s', 'tasty-fonts'), $channelLabel, $stateLabel);
+        }
+
+        return $channelLabel !== '' ? $channelLabel : $stateLabel;
+    }
+
+    private function buildPluginVersionTooltip(
+        string $pluginVersion,
+        string $channelLabel,
+        string $stateLabel,
+        string $latestVersion
+    ): string {
+        $parts = [];
+
+        if ($pluginVersion !== '') {
+            $parts[] = sprintf(__('View changelog for version %s on GitHub.', 'tasty-fonts'), $pluginVersion);
+        }
+
+        if ($channelLabel !== '') {
+            $parts[] = $channelLabel . '.';
+        }
+
+        if ($stateLabel !== '' && $latestVersion !== '') {
+            $parts[] = sprintf(__('%1$s Latest available: %2$s.', 'tasty-fonts'), $stateLabel, $latestVersion);
+        } elseif ($stateLabel !== '') {
+            $parts[] = $stateLabel . '.';
+        }
+
+        return trim(implode(' ', $parts));
+    }
+
+    private function buildPluginVersionAriaLabel(
+        string $pluginVersion,
+        string $channelLabel,
+        string $stateLabel
+    ): string {
+        $parts = [];
+
+        if ($pluginVersion !== '') {
+            $parts[] = sprintf(__('View GitHub changelog for version %s', 'tasty-fonts'), $pluginVersion);
+        }
+
+        if ($channelLabel !== '') {
+            $parts[] = $channelLabel;
+        }
+
+        if ($stateLabel !== '') {
+            $parts[] = $stateLabel;
+        }
+
+        return implode('. ', $parts);
     }
 
     private function deriveOutputQuickMode(

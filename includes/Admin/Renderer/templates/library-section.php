@@ -14,7 +14,7 @@
                                         <input
                                             type="search"
                                             id="tasty-fonts-library-search"
-                                            class="regular-text"
+                                            class="regular-text tasty-fonts-text-control"
                                             placeholder="<?php esc_attr_e('Filter fonts', 'tasty-fonts'); ?>"
                                             aria-label="<?php esc_attr_e('Filter fonts', 'tasty-fonts'); ?>"
                                         >
@@ -130,7 +130,7 @@
                                                             <?php $this->renderFieldLabel(__('Google Fonts API Key', 'tasty-fonts')); ?>
                                                             <input
                                                                 type="password"
-                                                                class="regular-text"
+                                                                class="regular-text tasty-fonts-text-control"
                                                                 name="google_api_key"
                                                                 value=""
                                                                 placeholder="<?php echo esc_attr($googleApiSaved ? __('Saved API key. Enter a new key to replace it.', 'tasty-fonts') : __('Paste your Google Fonts API key', 'tasty-fonts')); ?>"
@@ -170,7 +170,7 @@
                                                     <input
                                                         type="search"
                                                         id="tasty-fonts-google-search"
-                                                        class="regular-text"
+                                                        class="regular-text tasty-fonts-text-control"
                                                         placeholder="<?php echo esc_attr($googleApiEnabled ? __('Search Google Fonts families', 'tasty-fonts') : __('Add or verify a Google Fonts API key to search', 'tasty-fonts')); ?>"
                                                         <?php if (!$googleApiEnabled): ?>
                                                             aria-describedby="tasty-fonts-google-search-note"
@@ -196,11 +196,11 @@
                                                 <div class="tasty-fonts-import-manual-grid">
                                                     <label class="tasty-fonts-stack-field">
                                                         <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
-                                                        <input type="text" id="tasty-fonts-manual-family" class="regular-text" placeholder="<?php esc_attr_e('e.g. Inter', 'tasty-fonts'); ?>">
+                                                        <input type="text" id="tasty-fonts-manual-family" class="regular-text tasty-fonts-text-control" placeholder="<?php esc_attr_e('e.g. Inter', 'tasty-fonts'); ?>">
                                                     </label>
                                                     <label class="tasty-fonts-stack-field">
                                                         <span id="tasty-fonts-google-manual-variants-label" class="tasty-fonts-field-label"><?php esc_html_e('Manual Variants', 'tasty-fonts'); ?></span>
-                                                        <input type="text" id="tasty-fonts-manual-variants" class="regular-text" placeholder="<?php esc_attr_e('e.g. 400,700', 'tasty-fonts'); ?>">
+                                                        <input type="text" id="tasty-fonts-manual-variants" class="regular-text tasty-fonts-text-control" placeholder="<?php esc_attr_e('e.g. 400,700', 'tasty-fonts'); ?>">
                                                     </label>
                                                 </div>
 
@@ -326,7 +326,7 @@
                                                     <input
                                                         type="search"
                                                         id="tasty-fonts-bunny-search"
-                                                        class="regular-text"
+                                                        class="regular-text tasty-fonts-text-control"
                                                         placeholder="<?php esc_attr_e('Search Bunny Fonts families', 'tasty-fonts'); ?>"
                                                     >
                                                 </label>
@@ -343,11 +343,11 @@
                                                 <div class="tasty-fonts-import-manual-grid">
                                                     <label class="tasty-fonts-stack-field">
                                                         <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
-                                                        <input type="text" id="tasty-fonts-bunny-family" class="regular-text" placeholder="<?php esc_attr_e('e.g. Inter', 'tasty-fonts'); ?>">
+                                                        <input type="text" id="tasty-fonts-bunny-family" class="regular-text tasty-fonts-text-control" placeholder="<?php esc_attr_e('e.g. Inter', 'tasty-fonts'); ?>">
                                                     </label>
                                                     <label class="tasty-fonts-stack-field">
                                                         <span id="tasty-fonts-bunny-manual-variants-label" class="tasty-fonts-field-label"><?php esc_html_e('Manual Variants', 'tasty-fonts'); ?></span>
-                                                        <input type="text" id="tasty-fonts-bunny-variants" class="regular-text" placeholder="<?php esc_attr_e('Leave blank, or enter 400,700italic', 'tasty-fonts'); ?>">
+                                                        <input type="text" id="tasty-fonts-bunny-variants" class="regular-text tasty-fonts-text-control" placeholder="<?php esc_attr_e('Leave blank, or enter 400,700italic', 'tasty-fonts'); ?>">
                                                     </label>
                                                 </div>
 
@@ -471,7 +471,7 @@
                                                             <?php $this->renderFieldLabel(__('Adobe Fonts Project ID', 'tasty-fonts')); ?>
                                                             <input
                                                                 type="text"
-                                                                class="regular-text"
+                                                                class="regular-text tasty-fonts-text-control"
                                                                 id="tasty-fonts-adobe-project-id"
                                                                 name="adobe_project_id"
                                                                 value="<?php echo esc_attr($adobeProjectId); ?>"
@@ -559,7 +559,7 @@
                                                                     <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
                                                                     <input
                                                                         type="text"
-                                                                        class="regular-text"
+                                                                        class="regular-text tasty-fonts-text-control"
                                                                         data-upload-group-field="family"
                                                                         placeholder="<?php esc_attr_e('Example: Satoshi', 'tasty-fonts'); ?>"
                                                                     >
@@ -688,7 +688,7 @@
                                                                     <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
                                                                     <input
                                                                         type="text"
-                                                                        class="regular-text"
+                                                                        class="regular-text tasty-fonts-text-control"
                                                                         data-upload-group-field="family"
                                                                         placeholder="<?php esc_attr_e('Example: Satoshi', 'tasty-fonts'); ?>"
                                                                     >

@@ -591,6 +591,49 @@ final class SettingsRepository
         return $this->getSettings();
     }
 
+    public function clearGoogleApiKeyData(): void
+    {
+        delete_option(self::OPTION_GOOGLE_API_KEY_DATA);
+        $this->settingsCache = null;
+    }
+
+    public function replaceImportedSettings(array $settings): array
+    {
+        $settings = $this->withoutGoogleApiKeyData($settings);
+        $settings = wp_parse_args($settings, self::DEFAULT_SETTINGS);
+        $settings['acss_font_role_sync_applied'] = false;
+        $settings['acss_font_role_sync_previous_heading_font_family'] = '';
+        $settings['acss_font_role_sync_previous_text_font_family'] = '';
+        $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
+        $settings['acss_font_role_sync_previous_text_font_weight'] = '';
+
+        if (trim((string) ($settings['adobe_project_id'] ?? '')) === '') {
+            $settings['adobe_enabled'] = false;
+            $settings['adobe_project_status'] = 'empty';
+        } else {
+            $settings['adobe_project_status'] = 'unknown';
+        }
+
+        $settings['adobe_project_status_message'] = '';
+        $settings['adobe_project_checked_at'] = 0;
+
+        update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($settings), false);
+        $this->settingsCache = null;
+
+        $normalized = $this->getSettings();
+        update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($normalized), false);
+
+        return $this->cacheSettings($normalized);
+    }
+
+    public function replaceImportedRoles(array $roles): array
+    {
+        $normalized = $this->normalizeRoleSet($roles, []);
+        update_option(self::OPTION_ROLES, $normalized, false);
+
+        return $normalized;
+    }
+
     public function resetLibraryStateAfterWipe(): array
     {
         $settings = $this->getSettings();

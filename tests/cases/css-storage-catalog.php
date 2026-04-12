@@ -788,9 +788,55 @@ $tests['css_builder_emits_variable_font_ranges_and_role_variation_settings'] = s
     $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertContainsValue("font-weight:100 900;", $css, 'Variable font-face output should emit CSS font-weight ranges from the weight axis.');
-    assertContainsValue('font-variation-settings:"opsz" 14, "wght" 420;', $css, 'Variable font-face output should keep stored face defaults when present.');
+    assertContainsValue(
+        "@font-face{\n  font-family:\"Inter Variable\";\n  font-weight:100 900;\n  font-style:normal;\n  src:url(\"https://example.com/fonts/inter-variable.woff2\") format(\"woff2\");\n  font-display:swap;\n}",
+        $css,
+        'Variable font-face output should omit face-level variation defaults when only registered axes are present.'
+    );
     assertContainsValue('--font-heading-settings: "opsz" 18, "wght" 720;', $css, 'Role variable output should emit configured heading variation settings.');
     assertContainsValue('font-variation-settings: var(--font-body-settings);', $css, 'Role usage output should reference the body variation-settings variable.');
+};
+
+$tests['css_builder_minify_preserves_variable_font_descriptor_spacing'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter Variable' => [
+            'family' => 'Inter Variable',
+            'slug' => 'inter-variable',
+            'faces' => [
+                [
+                    'family' => 'Inter Variable',
+                    'weight' => '100..900',
+                    'style' => 'normal',
+                    'is_variable' => true,
+                    'axes' => [
+                        'WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'],
+                        'OPSZ' => ['min' => '8', 'default' => '14', 'max' => '32'],
+                    ],
+                    'variation_defaults' => [
+                        'WGHT' => '420',
+                        'OPSZ' => '14',
+                    ],
+                    'files' => [
+                        'woff2' => 'https://example.com/fonts/inter-variable.woff2',
+                    ],
+                ],
+            ],
+        ],
+    ];
+    $settings = [
+        'font_display' => 'swap',
+        'auto_apply_roles' => false,
+        'minify_css_output' => true,
+        'variable_fonts_enabled' => true,
+    ];
+
+    $css = $builder->build($catalog, [], $settings, $catalog);
+
+    assertContainsValue('font-weight:100 900;', $css, 'Minified variable font-face output should preserve the required space inside weight ranges.');
+    assertNotContainsValue('font-variation-settings:', $css, 'Minified variable font-face output should not bake registered axis defaults into @font-face rules.');
+    assertNotContainsValue('font-weight:100900;', $css, 'Minified variable font-face output should not collapse weight ranges into invalid numeric tokens.');
+    assertNotContainsValue('font-variation-settings:"opsz" 14,"wght" 420;', $css, 'Minified variable font-face output should not pin the registered WGHT axis inside @font-face.');
 };
 
 $tests['css_builder_emits_role_weight_variables_when_enabled'] = static function (): void {

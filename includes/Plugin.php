@@ -30,6 +30,7 @@ use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Maintenance\DeveloperToolsService;
+use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -80,6 +81,7 @@ final class Plugin
     private readonly RuntimeService $runtime;
     private readonly BlockEditorFontLibraryService $blockEditorFontLibrary;
     private readonly DeveloperToolsService $developerTools;
+    private readonly SiteTransferService $siteTransfer;
     private readonly AdminController $admin;
     private readonly RestController $rest;
     private readonly GitHubUpdater $updater;
@@ -183,6 +185,16 @@ final class Plugin
             $this->blockEditorFontLibrary,
             $this->googleClient
         );
+        $this->siteTransfer = new SiteTransferService(
+            $this->storage,
+            $this->settings,
+            $this->imports,
+            $this->log,
+            $this->developerTools,
+            $this->library,
+            $this->blockEditorFontLibrary,
+            new NativeUploadedFileValidator()
+        );
         $this->updater = new GitHubUpdater($this->settings);
         $this->admin = new AdminController(
             $this->storage,
@@ -202,6 +214,7 @@ final class Plugin
             $this->bricksIntegration,
             $this->oxygenIntegration,
             $this->developerTools,
+            $this->siteTransfer,
             $this->updater
         );
         $this->rest = new RestController($this->admin);

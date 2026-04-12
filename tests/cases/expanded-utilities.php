@@ -191,6 +191,14 @@ $tests['font_utils_normalizes_axis_maps_and_builds_variation_settings'] = static
         'OPSZ' => '14',
         'WGHT' => '400',
     ]), 'Variation settings output should use CSS axis tags in registered lowercase form.');
+    assertSameValue(
+        ['XTRA' => '500'],
+        FontUtils::faceLevelVariationDefaults(
+            ['WGHT' => '400', 'OPSZ' => '14', 'XTRA' => '500'],
+            ['WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'], 'OPSZ' => ['min' => '8', 'default' => '14', 'max' => '32']]
+        ),
+        'Face-level defaults should strip registered axes so self-hosted variable faces do not pin weight or optical sizing.'
+    );
 };
 
 // ---------------------------------------------------------------------------

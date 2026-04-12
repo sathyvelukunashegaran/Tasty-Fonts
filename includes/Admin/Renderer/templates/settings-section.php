@@ -50,6 +50,19 @@
                                     <button
                                         type="button"
                                         class="tasty-fonts-studio-tab tasty-fonts-tab-button"
+                                        id="tasty-fonts-settings-tab-transfer"
+                                        data-tab-group="settings"
+                                        data-tab-target="transfer"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                        aria-controls="tasty-fonts-settings-panel-transfer"
+                                        role="tab"
+                                    >
+                                        <?php esc_html_e('Transfer', 'tasty-fonts'); ?>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="tasty-fonts-studio-tab tasty-fonts-tab-button"
                                         id="tasty-fonts-settings-tab-developer"
                                         data-tab-group="settings"
                                         data-tab-target="developer"
@@ -170,7 +183,7 @@
                                                     id="tasty-fonts-unicode-range-custom-value"
                                                     name="unicode_range_custom_value"
                                                     rows="3"
-                                                    class="tasty-fonts-output-settings-textarea"
+                                                    class="tasty-fonts-text-control tasty-fonts-output-settings-textarea"
                                                     data-unicode-range-custom
                                                 ><?php echo esc_textarea($unicodeRangeCustomValue); ?></textarea>
                                             </div>
@@ -1277,6 +1290,147 @@
                             </form>
                         <?php endif; ?>
 
+                        <?php
+                        $siteTransferAvailable = !empty($siteTransfer['available']);
+                        $siteTransferMessage = trim((string) ($siteTransfer['message'] ?? ''));
+                        $siteTransferExportUrl = (string) ($siteTransfer['export_url'] ?? '');
+                        $siteTransferImportFileField = (string) ($siteTransfer['import_file_field'] ?? 'tasty_fonts_site_transfer_bundle');
+                        $siteTransferImportGoogleField = (string) ($siteTransfer['import_google_api_key_field'] ?? 'tasty_fonts_import_google_api_key');
+                        $siteTransferImportAction = (string) ($siteTransfer['import_action_field'] ?? 'tasty_fonts_import_site_transfer_bundle');
+                        ?>
+                        <section
+                            id="tasty-fonts-settings-panel-transfer"
+                            class="tasty-fonts-studio-panel"
+                            data-tab-group="settings"
+                            data-tab-panel="transfer"
+                            role="tabpanel"
+                            aria-labelledby="tasty-fonts-settings-tab-transfer"
+                            hidden
+                        >
+                            <div class="tasty-fonts-output-settings-panel tasty-fonts-developer-panel">
+                                <section class="tasty-fonts-site-transfer-panel" aria-labelledby="tasty-fonts-site-transfer-title">
+                                    <div class="tasty-fonts-site-transfer-panel-head">
+                                        <span class="tasty-fonts-eyebrow"><?php esc_html_e('Portable Setup', 'tasty-fonts'); ?></span>
+                                        <div class="tasty-fonts-developer-tool-title-row tasty-fonts-site-transfer-title-row">
+                                            <h3 id="tasty-fonts-site-transfer-title"><?php esc_html_e('Site Transfer', 'tasty-fonts'); ?></h3>
+                                            <span class="tasty-fonts-badge"><?php esc_html_e('Settings + Fonts', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <?php if ($showSettingsDescriptions): ?>
+                                            <p><?php esc_html_e('Move the full Tasty Fonts setup between sites with one portable bundle. Export from the source site, then import on the destination.', 'tasty-fonts'); ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="tasty-fonts-site-transfer-grid">
+                                        <article class="tasty-fonts-site-transfer-card tasty-fonts-site-transfer-card--export">
+                                            <div class="tasty-fonts-site-transfer-card-top">
+                                                <div class="tasty-fonts-developer-tool-title-row">
+                                                    <h4><?php esc_html_e('Export Site Transfer Bundle', 'tasty-fonts'); ?></h4>
+                                                    <span class="tasty-fonts-badge"><?php esc_html_e('Portable', 'tasty-fonts'); ?></span>
+                                                </div>
+                                                <?php if ($showSettingsDescriptions): ?>
+                                                    <p><?php esc_html_e('Downloads a portable bundle you can import on another Tasty Fonts site.', 'tasty-fonts'); ?></p>
+                                                <?php endif; ?>
+                                                <ul class="tasty-fonts-site-transfer-points" aria-label="<?php esc_attr_e('Export bundle contents', 'tasty-fonts'); ?>">
+                                                    <li><?php esc_html_e('Includes saved settings, live roles, library metadata, and managed font files.', 'tasty-fonts'); ?></li>
+                                                    <li><?php esc_html_e('Excludes Google API keys, generated CSS, logs, and transient runtime state.', 'tasty-fonts'); ?></li>
+                                                </ul>
+                                                <?php if (!$siteTransferAvailable && $siteTransferMessage !== ''): ?>
+                                                    <p class="tasty-fonts-site-transfer-note tasty-fonts-site-transfer-note--muted"><?php echo esc_html($siteTransferMessage); ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="tasty-fonts-site-transfer-card-foot">
+                                                <?php if ($siteTransferAvailable && $siteTransferExportUrl !== ''): ?>
+                                                    <a class="button tasty-fonts-developer-action-button tasty-fonts-site-transfer-button" href="<?php echo esc_url($siteTransferExportUrl); ?>">
+                                                        <?php esc_html_e('Export Bundle', 'tasty-fonts'); ?>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <button type="button" class="button tasty-fonts-developer-action-button tasty-fonts-site-transfer-button" disabled>
+                                                        <?php esc_html_e('Export Bundle', 'tasty-fonts'); ?>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </article>
+
+                                        <article class="tasty-fonts-site-transfer-card tasty-fonts-site-transfer-card--import">
+                                            <form
+                                                method="post"
+                                                enctype="multipart/form-data"
+                                                class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-site-transfer-form"
+                                                data-developer-confirm-message="<?php echo esc_attr__('Replace the current Tasty Fonts settings, library, and managed files with the uploaded site transfer bundle?', 'tasty-fonts'); ?>"
+                                                data-site-transfer-form
+                                            >
+                                                <?php wp_nonce_field($siteTransferImportAction); ?>
+                                                <input type="hidden" name="<?php echo esc_attr($siteTransferImportAction); ?>" value="1">
+                                                <div class="tasty-fonts-site-transfer-card-top">
+                                                    <div class="tasty-fonts-developer-tool-title-row">
+                                                        <h4><?php esc_html_e('Import Site Transfer Bundle', 'tasty-fonts'); ?></h4>
+                                                    </div>
+                                                    <?php if ($showSettingsDescriptions): ?>
+                                                        <p><?php esc_html_e('Imports a bundle exported from another Tasty Fonts site and replaces the current setup. Google Fonts API keys are never exported.', 'tasty-fonts'); ?></p>
+                                                    <?php endif; ?>
+                                                    <?php if (!$siteTransferAvailable && $siteTransferMessage !== ''): ?>
+                                                        <p class="tasty-fonts-site-transfer-note tasty-fonts-site-transfer-note--muted"><?php echo esc_html($siteTransferMessage); ?></p>
+                                                    <?php endif; ?>
+                                                    <div class="tasty-fonts-site-transfer-import-grid">
+                                                        <div class="tasty-fonts-site-transfer-field">
+                                                            <span class="tasty-fonts-field-label"><?php esc_html_e('Transfer Bundle', 'tasty-fonts'); ?></span>
+                                                            <div class="tasty-fonts-site-transfer-file-picker">
+                                                                <input
+                                                                    type="file"
+                                                                    id="tasty-fonts-site-transfer-bundle-upload"
+                                                                    class="screen-reader-text"
+                                                                    name="<?php echo esc_attr($siteTransferImportFileField); ?>"
+                                                                    accept=".zip,application/zip"
+                                                                    data-site-transfer-file-input
+                                                                    <?php disabled(!$siteTransferAvailable); ?>
+                                                                >
+                                                                <div class="tasty-fonts-site-transfer-file-copy">
+                                                                    <span class="tasty-fonts-site-transfer-file-label"><?php esc_html_e('ZIP bundle', 'tasty-fonts'); ?></span>
+                                                                    <span class="tasty-fonts-site-transfer-file-name" data-site-transfer-file-name><?php esc_html_e('No bundle selected', 'tasty-fonts'); ?></span>
+                                                                </div>
+                                                                <label for="tasty-fonts-site-transfer-bundle-upload" class="button tasty-fonts-site-transfer-picker-trigger<?php echo !$siteTransferAvailable ? ' is-disabled' : ''; ?>">
+                                                                    <?php esc_html_e('Choose File', 'tasty-fonts'); ?>
+                                                                </label>
+                                                            </div>
+                                                            <span class="tasty-fonts-site-transfer-note"><?php esc_html_e('Choose a bundle exported from another Tasty Fonts site.', 'tasty-fonts'); ?></span>
+                                                        </div>
+                                                        <label for="tasty-fonts-site-transfer-google-api-key" class="tasty-fonts-site-transfer-field tasty-fonts-site-transfer-field--secret">
+                                                            <span class="tasty-fonts-field-label"><?php esc_html_e('Google Fonts API Key', 'tasty-fonts'); ?></span>
+                                                            <input
+                                                                type="text"
+                                                                id="tasty-fonts-site-transfer-google-api-key"
+                                                                class="regular-text tasty-fonts-text-control tasty-fonts-site-transfer-input"
+                                                                name="<?php echo esc_attr($siteTransferImportGoogleField); ?>"
+                                                                value=""
+                                                                placeholder="<?php echo esc_attr__('Optional on the destination site', 'tasty-fonts'); ?>"
+                                                                <?php disabled(!$siteTransferAvailable); ?>
+                                                            >
+                                                            <span class="tasty-fonts-site-transfer-note"><?php esc_html_e('Add a key only if this site should keep Google search enabled.', 'tasty-fonts'); ?></span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="tasty-fonts-site-transfer-card-foot tasty-fonts-site-transfer-card-foot--import">
+                                                    <div class="tasty-fonts-site-transfer-danger-note">
+                                                        <span><?php esc_html_e('Import replaces this site’s library, settings, and managed files.', 'tasty-fonts'); ?></span>
+                                                    </div>
+                                                    <button
+                                                        type="submit"
+                                                        class="button tasty-fonts-button-danger tasty-fonts-developer-action-button tasty-fonts-site-transfer-button"
+                                                        data-site-transfer-submit
+                                                        data-idle-label="<?php echo esc_attr__('Import Bundle', 'tasty-fonts'); ?>"
+                                                        data-busy-label="<?php echo esc_attr__('Importing Bundle…', 'tasty-fonts'); ?>"
+                                                        disabled
+                                                    >
+                                                        <?php esc_html_e('Import Bundle', 'tasty-fonts'); ?>
+                                                    </button>
+                                                </div>
+                                                <div class="tasty-fonts-import-status tasty-fonts-site-transfer-status" data-site-transfer-status></div>
+                                            </form>
+                                        </article>
+                                    </div>
+                                </section>
+                            </div>
+                        </section>
+
                         <section
                             id="tasty-fonts-settings-panel-developer"
                             class="tasty-fonts-studio-panel"
@@ -1291,6 +1445,7 @@
                                     <h3><?php esc_html_e('Developer Tools', 'tasty-fonts'); ?></h3>
                                 </div>
                                 <div class="tasty-fonts-output-settings-list tasty-fonts-developer-tool-sections">
+
                                     <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--developer tasty-fonts-settings-flat-row tasty-fonts-settings-flat-row--developer-inline">
                                         <div class="tasty-fonts-output-settings-submenu-copy tasty-fonts-settings-flat-row-copy">
                                             <div class="tasty-fonts-developer-tool-title-row">

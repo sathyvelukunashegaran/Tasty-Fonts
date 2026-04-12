@@ -1,0 +1,852 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TastyFonts\Maintenance;
+
+defined('ABSPATH') || exit;
+
+use TastyFonts\Fonts\BlockEditorFontLibraryService;
+use TastyFonts\Fonts\LibraryService;
+use TastyFonts\Fonts\UploadedFileValidatorInterface;
+use TastyFonts\Repository\ImportRepository;
+use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\Storage;
+use WP_Error;
+use ZipArchive;
+
+final class SiteTransferService
+{
+    public const SCHEMA_VERSION = 1;
+    public const MANIFEST_FILENAME = 'tasty-fonts-export.json';
+    private const ARCHIVE_FONTS_DIRECTORY = 'fonts/';
+    private const GENERATED_CSS_RELATIVE_PATH = '.generated/tasty-fonts.css';
+    private const TEMP_DIRECTORY_PREFIX = 'tasty-fonts-transfer-';
+    private const TEMP_ZIP_PREFIX = 'tasty-fonts-transfer-';
+
+    public function __construct(
+        private readonly Storage $storage,
+        private readonly SettingsRepository $settings,
+        private readonly ImportRepository $imports,
+        private readonly LogRepository $log,
+        private readonly DeveloperToolsService $developerTools,
+        private readonly LibraryService $library,
+        private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
+        private readonly UploadedFileValidatorInterface $uploadedFileValidator
+    ) {
+    }
+
+    public function getCapabilityStatus(): array
+    {
+        if ($this->zipSupported()) {
+            return [
+                'available' => true,
+                'message' => '',
+            ];
+        }
+
+        return [
+            'available' => false,
+            'message' => __('ZipArchive is unavailable on this server, so site transfer bundles cannot be created or imported.', 'tasty-fonts'),
+        ];
+    }
+
+    public function buildExportBundle(): array|WP_Error
+    {
+        if (!$this->zipSupported()) {
+            return $this->error(
+                'tasty_fonts_transfer_zip_unavailable',
+                __('ZipArchive is unavailable on this server, so site transfer bundles cannot be created.', 'tasty-fonts')
+            );
+        }
+
+        if (!$this->developerTools->ensureStorageScaffolding()) {
+            return $this->error(
+                'tasty_fonts_transfer_storage_unavailable',
+                $this->storageErrorMessage(__('The managed fonts directory could not be prepared for export.', 'tasty-fonts'))
+            );
+        }
+
+        $manifest = $this->buildManifest();
+        $zipPath = $this->createTemporaryZipPath();
+
+        if (is_wp_error($zipPath)) {
+            return $zipPath;
+        }
+
+        $zip = new ZipArchive();
+        $openResult = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        if ($openResult !== true) {
+            @unlink($zipPath);
+
+            return $this->error(
+                'tasty_fonts_transfer_zip_open_failed',
+                __('The export bundle could not be created.', 'tasty-fonts')
+            );
+        }
+
+        $manifestJson = wp_json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if (!is_string($manifestJson) || !$zip->addFromString(self::MANIFEST_FILENAME, $manifestJson)) {
+            $zip->close();
+            @unlink($zipPath);
+
+            return $this->error(
+                'tasty_fonts_transfer_manifest_write_failed',
+                __('The export manifest could not be written into the bundle.', 'tasty-fonts')
+            );
+        }
+
+        foreach ((array) ($manifest['files'] ?? []) as $file) {
+            $relativePath = (string) ($file['relative_path'] ?? '');
+            $absolutePath = $this->storage->pathForRelativePath($relativePath);
+
+            if ($relativePath === '' || !is_string($absolutePath) || !is_readable($absolutePath)) {
+                $zip->close();
+                @unlink($zipPath);
+
+                return $this->error(
+                    'tasty_fonts_transfer_missing_export_file',
+                    __('A managed font file was missing while the export bundle was being built.', 'tasty-fonts')
+                );
+            }
+
+            if (!$zip->addFile($absolutePath, self::ARCHIVE_FONTS_DIRECTORY . $relativePath)) {
+                $zip->close();
+                @unlink($zipPath);
+
+                return $this->error(
+                    'tasty_fonts_transfer_zip_write_failed',
+                    __('A managed font file could not be added to the export bundle.', 'tasty-fonts')
+                );
+            }
+        }
+
+        $zip->close();
+
+        return [
+            'path' => $zipPath,
+            'filename' => $this->buildExportFilename(),
+            'content_type' => 'application/zip',
+            'size' => is_file($zipPath) ? (int) filesize($zipPath) : 0,
+            'manifest' => $manifest,
+        ];
+    }
+
+    public function validateImportBundle(string $zipPath): array|WP_Error
+    {
+        if (!$this->zipSupported()) {
+            return $this->error(
+                'tasty_fonts_transfer_zip_unavailable',
+                __('ZipArchive is unavailable on this server, so site transfer bundles cannot be imported.', 'tasty-fonts')
+            );
+        }
+
+        $zipPath = wp_normalize_path($zipPath);
+
+        if ($zipPath === '' || !is_readable($zipPath)) {
+            return $this->error(
+                'tasty_fonts_transfer_missing_bundle',
+                __('The uploaded site transfer bundle was not readable on the server.', 'tasty-fonts')
+            );
+        }
+
+        $extractDirectory = $this->createTemporaryDirectory();
+
+        if (is_wp_error($extractDirectory)) {
+            return $extractDirectory;
+        }
+
+        $zip = new ZipArchive();
+        $openResult = $zip->open($zipPath);
+
+        if ($openResult !== true) {
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_invalid_zip',
+                __('The uploaded file is not a valid Tasty Fonts transfer bundle.', 'tasty-fonts')
+            );
+        }
+
+        $archiveFiles = [];
+        $archiveHasManifest = false;
+
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $entryName = $zip->getNameIndex($index);
+            $normalizedEntry = $this->normalizeArchiveEntryName($entryName);
+
+            if ($normalizedEntry === '') {
+                continue;
+            }
+
+            if ($this->isDirectoryEntry($normalizedEntry)) {
+                continue;
+            }
+
+            if (!$this->isSafeArchiveEntry($normalizedEntry)) {
+                $zip->close();
+                $this->deleteDirectory($extractDirectory);
+
+                return $this->error(
+                    'tasty_fonts_transfer_unsafe_archive',
+                    __('The uploaded bundle contains an unsafe file path.', 'tasty-fonts')
+                );
+            }
+
+            if ($normalizedEntry === self::MANIFEST_FILENAME) {
+                $archiveHasManifest = true;
+                continue;
+            }
+
+            if (!str_starts_with($normalizedEntry, self::ARCHIVE_FONTS_DIRECTORY)) {
+                $zip->close();
+                $this->deleteDirectory($extractDirectory);
+
+                return $this->error(
+                    'tasty_fonts_transfer_unexpected_archive_entry',
+                    __('The uploaded bundle contains an unexpected file outside the managed fonts payload.', 'tasty-fonts')
+                );
+            }
+
+            $relativePath = substr($normalizedEntry, strlen(self::ARCHIVE_FONTS_DIRECTORY));
+
+            if (!$this->isSafeRelativePath($relativePath)) {
+                $zip->close();
+                $this->deleteDirectory($extractDirectory);
+
+                return $this->error(
+                    'tasty_fonts_transfer_unsafe_font_path',
+                    __('The uploaded bundle contains an invalid managed font path.', 'tasty-fonts')
+                );
+            }
+
+            $archiveFiles[$relativePath] = true;
+        }
+
+        if (!$archiveHasManifest) {
+            $zip->close();
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_missing_manifest',
+                __('The uploaded bundle is missing its export manifest.', 'tasty-fonts')
+            );
+        }
+
+        if (!$zip->extractTo($extractDirectory)) {
+            $zip->close();
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_extract_failed',
+                __('The uploaded bundle could not be extracted for validation.', 'tasty-fonts')
+            );
+        }
+
+        $zip->close();
+
+        $manifestPath = wp_normalize_path($extractDirectory . DIRECTORY_SEPARATOR . self::MANIFEST_FILENAME);
+        $manifestJson = is_readable($manifestPath) ? file_get_contents($manifestPath) : false;
+
+        if (!is_string($manifestJson) || trim($manifestJson) === '') {
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_manifest_unreadable',
+                __('The uploaded bundle manifest could not be read after extraction.', 'tasty-fonts')
+            );
+        }
+
+        $manifest = json_decode($manifestJson, true);
+
+        if (!is_array($manifest)) {
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_manifest_invalid',
+                __('The uploaded bundle manifest is not valid JSON.', 'tasty-fonts')
+            );
+        }
+
+        if ((int) ($manifest['schema_version'] ?? 0) !== self::SCHEMA_VERSION) {
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_schema_unsupported',
+                __('This transfer bundle uses an unsupported schema version.', 'tasty-fonts')
+            );
+        }
+
+        if (!is_array($manifest['settings'] ?? null) || !is_array($manifest['roles'] ?? null) || !is_array($manifest['applied_roles'] ?? null) || !is_array($manifest['library'] ?? null)) {
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_manifest_shape_invalid',
+                __('The uploaded bundle manifest is missing required settings, role, or library data.', 'tasty-fonts')
+            );
+        }
+
+        $manifestFiles = $this->normalizeManifestFiles($manifest['files'] ?? null);
+
+        if (is_wp_error($manifestFiles)) {
+            $this->deleteDirectory($extractDirectory);
+
+            return $manifestFiles;
+        }
+
+        if (count($manifestFiles) !== count($archiveFiles)) {
+            $this->deleteDirectory($extractDirectory);
+
+            return $this->error(
+                'tasty_fonts_transfer_file_count_mismatch',
+                __('The uploaded bundle file list does not match the files stored in the archive.', 'tasty-fonts')
+            );
+        }
+
+        foreach ($manifestFiles as $file) {
+            $relativePath = (string) ($file['relative_path'] ?? '');
+
+            if (!isset($archiveFiles[$relativePath])) {
+                $this->deleteDirectory($extractDirectory);
+
+                return $this->error(
+                    'tasty_fonts_transfer_missing_archive_file',
+                    __('The uploaded bundle manifest references a managed font file that is missing from the archive.', 'tasty-fonts')
+                );
+            }
+
+            $absolutePath = wp_normalize_path($extractDirectory . DIRECTORY_SEPARATOR . self::ARCHIVE_FONTS_DIRECTORY . $relativePath);
+
+            if (!is_file($absolutePath) || !$this->isWithinExtractedFontsDirectory($absolutePath, $extractDirectory)) {
+                $this->deleteDirectory($extractDirectory);
+
+                return $this->error(
+                    'tasty_fonts_transfer_invalid_extracted_file',
+                    __('The uploaded bundle extracted a managed font file outside the expected directory.', 'tasty-fonts')
+                );
+            }
+
+            $size = (int) filesize($absolutePath);
+            $checksum = hash_file('sha256', $absolutePath);
+
+            if ($size !== (int) ($file['size'] ?? -1) || !is_string($checksum) || $checksum !== (string) ($file['sha256'] ?? '')) {
+                $this->deleteDirectory($extractDirectory);
+
+                return $this->error(
+                    'tasty_fonts_transfer_checksum_mismatch',
+                    __('The uploaded bundle failed checksum validation.', 'tasty-fonts')
+                );
+            }
+        }
+
+        return [
+            'manifest' => $manifest,
+            'files' => $manifestFiles,
+            'extract_dir' => $extractDirectory,
+            'zip_path' => $zipPath,
+        ];
+    }
+
+    public function importBundleReplacingCurrentState(array $uploadedFile, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        $preparedUpload = $this->prepareUploadedBundle($uploadedFile);
+
+        if (is_wp_error($preparedUpload)) {
+            return $preparedUpload;
+        }
+
+        $validation = $this->validateImportBundle((string) ($preparedUpload['path'] ?? ''));
+
+        if (is_wp_error($validation)) {
+            @unlink((string) ($preparedUpload['path'] ?? ''));
+
+            return $validation;
+        }
+
+        try {
+            $root = $this->storage->getRoot();
+            $manifest = is_array($validation['manifest'] ?? null) ? $validation['manifest'] : [];
+            $settings = is_array($manifest['settings'] ?? null) ? $manifest['settings'] : [];
+            $settings['applied_roles'] = is_array($manifest['applied_roles'] ?? null) ? $manifest['applied_roles'] : [];
+            $roles = is_array($manifest['roles'] ?? null) ? $manifest['roles'] : [];
+            $library = is_array($manifest['library'] ?? null) ? $manifest['library'] : [];
+            $files = is_array($validation['files'] ?? null) ? $validation['files'] : [];
+
+            $this->blockEditorFontLibrary->deleteAllSyncedFamilies(true);
+
+            if (is_string($root) && $root !== '' && file_exists($root) && !$this->storage->deleteAbsolutePath($root)) {
+                return $this->error(
+                    'tasty_fonts_transfer_existing_storage_delete_failed',
+                    __('The current managed fonts directory could not be removed before import.', 'tasty-fonts')
+                );
+            }
+
+            $this->imports->clearLibrary();
+            $this->settings->resetStoredSettingsToDefaults();
+            $this->log->clear();
+
+            if (!$this->developerTools->ensureStorageScaffolding()) {
+                return $this->error(
+                    'tasty_fonts_transfer_storage_scaffold_failed',
+                    $this->storageErrorMessage(__('The managed fonts directory could not be recreated for import.', 'tasty-fonts'))
+                );
+            }
+
+            if (!$this->restoreBundleFiles((string) ($validation['extract_dir'] ?? ''), $files)) {
+                return $this->error(
+                    'tasty_fonts_transfer_restore_files_failed',
+                    __('The managed font files could not be restored from the uploaded bundle.', 'tasty-fonts')
+                );
+            }
+
+            $savedSettings = $this->settings->replaceImportedSettings($settings);
+            $savedRoles = $this->settings->replaceImportedRoles($roles);
+            $savedLibrary = $this->imports->replaceLibrary($library);
+
+            if (trim($freshGoogleApiKey) !== '') {
+                $savedSettings = $this->settings->saveSettings(['google_api_key' => $freshGoogleApiKey]);
+            }
+
+            $this->library->syncLiveRolePublishStates(
+                is_array($savedSettings['applied_roles'] ?? null) ? $savedSettings['applied_roles'] : [],
+                !empty($savedSettings['auto_apply_roles'])
+            );
+
+            if (!$this->developerTools->clearPluginCachesAndRegenerateAssets()) {
+                return $this->error(
+                    'tasty_fonts_transfer_assets_rebuild_failed',
+                    __('The bundle imported successfully, but generated assets could not be rebuilt.', 'tasty-fonts')
+                );
+            }
+
+            $this->resyncBlockEditorFontLibrary();
+
+            return [
+                'settings' => $this->settings->getSettings(),
+                'roles' => $savedRoles,
+                'library' => $savedLibrary,
+                'families' => count($savedLibrary),
+                'files' => count($files),
+                'used_fresh_google_api_key' => trim($freshGoogleApiKey) !== '',
+            ];
+        } finally {
+            $this->deleteDirectory((string) ($validation['extract_dir'] ?? ''));
+            @unlink((string) ($preparedUpload['path'] ?? ''));
+        }
+    }
+
+    private function buildManifest(): array
+    {
+        return [
+            'schema_version' => self::SCHEMA_VERSION,
+            'plugin_version' => defined('TASTY_FONTS_VERSION') ? (string) TASTY_FONTS_VERSION : '',
+            'exported_at' => current_time('mysql', true),
+            'settings' => $this->buildPortableSettingsSnapshot(),
+            'roles' => $this->settings->getRoles([]),
+            'applied_roles' => $this->settings->getAppliedRoles([]),
+            'library' => $this->imports->allFamilies(),
+            'secret_requirements' => [
+                [
+                    'key' => 'google_api_key',
+                    'label' => __('Google Fonts API key', 'tasty-fonts'),
+                    'required' => false,
+                    'exported' => false,
+                ],
+            ],
+            'files' => $this->collectManagedFiles(),
+        ];
+    }
+
+    private function buildPortableSettingsSnapshot(): array
+    {
+        $settings = $this->settings->getSettings();
+
+        unset(
+            $settings['google_api_key'],
+            $settings['google_api_key_status'],
+            $settings['google_api_key_status_message'],
+            $settings['google_api_key_checked_at'],
+            $settings['applied_roles']
+        );
+
+        $settings['acss_font_role_sync_applied'] = false;
+        $settings['acss_font_role_sync_previous_heading_font_family'] = '';
+        $settings['acss_font_role_sync_previous_text_font_family'] = '';
+        $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
+        $settings['acss_font_role_sync_previous_text_font_weight'] = '';
+
+        if (trim((string) ($settings['adobe_project_id'] ?? '')) === '') {
+            $settings['adobe_enabled'] = false;
+            $settings['adobe_project_status'] = 'empty';
+        } else {
+            $settings['adobe_project_status'] = 'unknown';
+        }
+
+        $settings['adobe_project_status_message'] = '';
+        $settings['adobe_project_checked_at'] = 0;
+
+        return $settings;
+    }
+
+    private function collectManagedFiles(): array
+    {
+        $root = $this->storage->getRoot();
+
+        if (!is_string($root) || $root === '' || !is_dir($root)) {
+            return [];
+        }
+
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $item) {
+            if (!$item instanceof \SplFileInfo || !$item->isFile()) {
+                continue;
+            }
+
+            $absolutePath = wp_normalize_path($item->getPathname());
+            $relativePath = $this->storage->relativePath($absolutePath);
+
+            if ($relativePath === '' || $relativePath === self::GENERATED_CSS_RELATIVE_PATH) {
+                continue;
+            }
+
+            $checksum = hash_file('sha256', $absolutePath);
+
+            if (!is_string($checksum) || $checksum === '') {
+                continue;
+            }
+
+            $files[] = [
+                'relative_path' => $relativePath,
+                'size' => (int) $item->getSize(),
+                'sha256' => $checksum,
+            ];
+        }
+
+        usort(
+            $files,
+            static fn (array $left, array $right): int => strcmp((string) ($left['relative_path'] ?? ''), (string) ($right['relative_path'] ?? ''))
+        );
+
+        return $files;
+    }
+
+    private function prepareUploadedBundle(array $uploadedFile): array|WP_Error
+    {
+        $name = sanitize_file_name((string) ($uploadedFile['name'] ?? ''));
+        $tmpName = (string) ($uploadedFile['tmp_name'] ?? '');
+        $error = isset($uploadedFile['error']) ? (int) $uploadedFile['error'] : UPLOAD_ERR_NO_FILE;
+
+        if ($error === UPLOAD_ERR_NO_FILE || $name === '' || $tmpName === '') {
+            return $this->error(
+                'tasty_fonts_transfer_missing_upload',
+                __('Choose a Tasty Fonts transfer bundle before importing.', 'tasty-fonts')
+            );
+        }
+
+        if ($error !== UPLOAD_ERR_OK) {
+            return $this->error(
+                'tasty_fonts_transfer_upload_failed',
+                __('The uploaded transfer bundle was incomplete or failed to upload.', 'tasty-fonts')
+            );
+        }
+
+        if (strtolower((string) pathinfo($name, PATHINFO_EXTENSION)) !== 'zip') {
+            return $this->error(
+                'tasty_fonts_transfer_upload_not_zip',
+                __('The uploaded transfer bundle must be a .zip file.', 'tasty-fonts')
+            );
+        }
+
+        if (!$this->uploadedFileValidator->isUploadedFile($tmpName)) {
+            return $this->error(
+                'tasty_fonts_transfer_upload_unverified',
+                __('The uploaded transfer bundle could not be verified as a valid upload.', 'tasty-fonts')
+            );
+        }
+
+        if (!is_readable($tmpName)) {
+            return $this->error(
+                'tasty_fonts_transfer_upload_unreadable',
+                __('The uploaded transfer bundle was not readable on the server.', 'tasty-fonts')
+            );
+        }
+
+        $temporaryZipPath = $this->createTemporaryZipPath();
+
+        if (is_wp_error($temporaryZipPath)) {
+            return $temporaryZipPath;
+        }
+
+        if (!copy($tmpName, $temporaryZipPath)) {
+            @unlink($temporaryZipPath);
+
+            return $this->error(
+                'tasty_fonts_transfer_upload_copy_failed',
+                __('The uploaded transfer bundle could not be copied into temporary storage.', 'tasty-fonts')
+            );
+        }
+
+        return [
+            'path' => $temporaryZipPath,
+            'name' => $name,
+        ];
+    }
+
+    private function restoreBundleFiles(string $extractDirectory, array $files): bool
+    {
+        if ($extractDirectory === '' || !is_dir($extractDirectory)) {
+            return false;
+        }
+
+        foreach ($files as $file) {
+            $relativePath = (string) ($file['relative_path'] ?? '');
+
+            if (!$this->isSafeRelativePath($relativePath)) {
+                return false;
+            }
+
+            $sourcePath = wp_normalize_path($extractDirectory . DIRECTORY_SEPARATOR . self::ARCHIVE_FONTS_DIRECTORY . $relativePath);
+            $targetPath = $this->storage->pathForRelativePath($relativePath);
+
+            if (!is_string($targetPath) || $targetPath === '' || !is_readable($sourcePath)) {
+                return false;
+            }
+
+            if (!$this->storage->copyAbsoluteFile($sourcePath, $targetPath)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function resyncBlockEditorFontLibrary(): void
+    {
+        foreach ($this->imports->allFamilies() as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
+            $deliveryId = (string) ($family['active_delivery_id'] ?? '');
+            $profile = $deliveryId !== '' && is_array($profiles[$deliveryId] ?? null)
+                ? $profiles[$deliveryId]
+                : reset($profiles);
+
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $resolvedDeliveryId = $deliveryId !== '' ? $deliveryId : (string) ($profile['id'] ?? '');
+            $provider = trim((string) ($profile['provider'] ?? 'import'));
+
+            $this->blockEditorFontLibrary->syncImportedFamily(
+                [
+                    'status' => 'imported',
+                    'family' => (string) ($family['family'] ?? ''),
+                    'delivery_id' => $resolvedDeliveryId,
+                    'family_record' => $family,
+                ],
+                $provider !== '' ? $provider : 'import'
+            );
+        }
+    }
+
+    private function normalizeManifestFiles(mixed $files): array|WP_Error
+    {
+        if (!is_array($files)) {
+            return $this->error(
+                'tasty_fonts_transfer_manifest_files_missing',
+                __('The uploaded bundle manifest is missing its managed font file list.', 'tasty-fonts')
+            );
+        }
+
+        $normalized = [];
+
+        foreach ($files as $file) {
+            if (!is_array($file)) {
+                return $this->error(
+                    'tasty_fonts_transfer_manifest_file_invalid',
+                    __('The uploaded bundle manifest contains an invalid file entry.', 'tasty-fonts')
+                );
+            }
+
+            $relativePath = (string) ($file['relative_path'] ?? '');
+            $size = (int) ($file['size'] ?? -1);
+            $checksum = trim((string) ($file['sha256'] ?? ''));
+
+            if (!$this->isSafeRelativePath($relativePath) || $size < 0 || $checksum === '') {
+                return $this->error(
+                    'tasty_fonts_transfer_manifest_file_invalid',
+                    __('The uploaded bundle manifest contains an invalid managed font file entry.', 'tasty-fonts')
+                );
+            }
+
+            $normalized[$relativePath] = [
+                'relative_path' => $relativePath,
+                'size' => $size,
+                'sha256' => $checksum,
+            ];
+        }
+
+        ksort($normalized, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return array_values($normalized);
+    }
+
+    private function buildExportFilename(): string
+    {
+        $timestamp = gmdate('Ymd-His');
+        $version = defined('TASTY_FONTS_VERSION') ? sanitize_file_name((string) TASTY_FONTS_VERSION) : 'bundle';
+
+        return sprintf('tasty-fonts-transfer-%s-%s.zip', $version, $timestamp);
+    }
+
+    private function createTemporaryZipPath(): string|WP_Error
+    {
+        $path = tempnam($this->temporaryBaseDirectory(), self::TEMP_ZIP_PREFIX);
+
+        if (!is_string($path) || $path === '') {
+            return $this->error(
+                'tasty_fonts_transfer_temp_file_failed',
+                __('A temporary zip file could not be created for the transfer bundle.', 'tasty-fonts')
+            );
+        }
+
+        return wp_normalize_path($path);
+    }
+
+    private function createTemporaryDirectory(): string|WP_Error
+    {
+        $directory = wp_normalize_path(
+            trailingslashit($this->temporaryBaseDirectory()) . self::TEMP_DIRECTORY_PREFIX . md5(uniqid((string) mt_rand(), true))
+        );
+
+        if (is_dir($directory)) {
+            $this->deleteDirectory($directory);
+        }
+
+        if (!wp_mkdir_p($directory)) {
+            return $this->error(
+                'tasty_fonts_transfer_temp_directory_failed',
+                __('A temporary directory could not be created for the transfer bundle.', 'tasty-fonts')
+            );
+        }
+
+        return $directory;
+    }
+
+    private function temporaryBaseDirectory(): string
+    {
+        $baseDirectory = function_exists('sys_get_temp_dir') ? sys_get_temp_dir() : '';
+
+        if (!is_string($baseDirectory) || trim($baseDirectory) === '') {
+            $baseDirectory = ABSPATH;
+        }
+
+        return wp_normalize_path($baseDirectory);
+    }
+
+    private function deleteDirectory(string $directory): void
+    {
+        $directory = wp_normalize_path($directory);
+
+        if ($directory === '' || !file_exists($directory)) {
+            return;
+        }
+
+        if (is_dir($directory)) {
+            $entries = scandir($directory);
+
+            if (is_array($entries)) {
+                foreach (array_diff($entries, ['.', '..']) as $entry) {
+                    $this->deleteDirectory(wp_normalize_path($directory . DIRECTORY_SEPARATOR . $entry));
+                }
+            }
+
+            @rmdir($directory);
+
+            return;
+        }
+
+        @unlink($directory);
+    }
+
+    private function normalizeArchiveEntryName(mixed $entryName): string
+    {
+        return ltrim(str_replace('\\', '/', is_string($entryName) ? $entryName : ''), '/');
+    }
+
+    private function isDirectoryEntry(string $entryName): bool
+    {
+        return str_ends_with($entryName, '/');
+    }
+
+    private function isSafeArchiveEntry(string $entryName): bool
+    {
+        if ($entryName === '' || str_contains($entryName, '../') || str_contains($entryName, '/..') || preg_match('#^[A-Za-z]:#', $entryName) === 1) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function isSafeRelativePath(string $relativePath): bool
+    {
+        $relativePath = ltrim(str_replace('\\', '/', $relativePath), '/');
+
+        if ($relativePath === '' || str_contains($relativePath, '../') || str_contains($relativePath, '/..') || preg_match('#^[A-Za-z]:#', $relativePath) === 1) {
+            return false;
+        }
+
+        $segments = array_filter(explode('/', $relativePath), 'strlen');
+
+        foreach ($segments as $segment) {
+            if ($segment === '.' || $segment === '..') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function isWithinExtractedFontsDirectory(string $path, string $extractDirectory): bool
+    {
+        $fontsDirectory = wp_normalize_path($extractDirectory . DIRECTORY_SEPARATOR . self::ARCHIVE_FONTS_DIRECTORY);
+        $realFontsDirectory = realpath($fontsDirectory);
+        $realPath = realpath($path);
+
+        if (!is_string($realFontsDirectory) || !is_string($realPath)) {
+            return false;
+        }
+
+        $realFontsDirectory = wp_normalize_path($realFontsDirectory);
+        $realPath = wp_normalize_path($realPath);
+
+        return $realPath === $realFontsDirectory || str_starts_with($realPath, trailingslashit($realFontsDirectory));
+    }
+
+    private function zipSupported(): bool
+    {
+        return class_exists(ZipArchive::class);
+    }
+
+    private function storageErrorMessage(string $default): string
+    {
+        $message = trim($this->storage->getLastFilesystemErrorMessage());
+
+        return $message !== '' ? $message : $default;
+    }
+
+    private function error(string $code, string $message): WP_Error
+    {
+        return new WP_Error($code, $message);
+    }
+}

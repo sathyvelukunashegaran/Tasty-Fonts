@@ -381,6 +381,19 @@ final class FontUtils
         return implode(', ', $parts);
     }
 
+    public static function faceLevelVariationDefaults(mixed $defaults, array $axes = []): array
+    {
+        $normalized = self::normalizeVariationDefaults($defaults, $axes);
+
+        foreach (array_keys($normalized) as $tag) {
+            if (self::isRegisteredAxisTag($tag)) {
+                unset($normalized[$tag]);
+            }
+        }
+
+        return $normalized;
+    }
+
     public static function cssAxisTag(string $tag): string
     {
         return match (self::normalizeAxisTag($tag)) {
@@ -721,6 +734,15 @@ final class FontUtils
         }
 
         return '';
+    }
+
+    private static function isRegisteredAxisTag(string $tag): bool
+    {
+        return in_array(
+            self::normalizeAxisTag($tag),
+            ['WGHT', 'WDTH', 'SLNT', 'ITAL', 'OPSZ'],
+            true
+        );
     }
 
     public static function normalizeHostedAxisList(array $axes): array

@@ -122,6 +122,7 @@ use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Maintenance\DeveloperToolsService;
+use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
@@ -456,6 +457,19 @@ if (!function_exists('sanitize_text_field')) {
         $value = preg_replace('/[\r\n\t ]+/', ' ', $value) ?? $value;
 
         return trim($value);
+    }
+}
+
+if (!function_exists('sanitize_file_name')) {
+    function sanitize_file_name(string $filename): string
+    {
+        $filename = trim(str_replace('\\', '/', $filename));
+        $filename = basename($filename);
+        $filename = preg_replace('/[\r\n\t ]+/', '-', $filename) ?? $filename;
+        $filename = preg_replace('/[^A-Za-z0-9._-]/', '', $filename) ?? $filename;
+        $filename = preg_replace('/-+/', '-', $filename) ?? $filename;
+
+        return trim($filename, '.-');
     }
 }
 
@@ -1782,6 +1796,16 @@ function makeServiceGraph(): array
         $blockEditorFontLibrary,
         $google
     );
+    $siteTransfer = new SiteTransferService(
+        $storage,
+        $settings,
+        $imports,
+        $log,
+        $developerTools,
+        $library,
+        $blockEditorFontLibrary,
+        new StubUploadedFileValidator()
+    );
     $updater = new GitHubUpdater($settings);
     $controller = new AdminController(
         $storage,
@@ -1801,6 +1825,7 @@ function makeServiceGraph(): array
         $bricksIntegration,
         $oxygenIntegration,
         $developerTools,
+        $siteTransfer,
         $updater
     );
     $rest = new RestController($controller);
@@ -1826,6 +1851,7 @@ function makeServiceGraph(): array
         'oxygen_integration' => $oxygenIntegration,
         'block_editor_font_library' => $blockEditorFontLibrary,
         'developer_tools' => $developerTools,
+        'site_transfer' => $siteTransfer,
         'updater' => $updater,
         'controller' => $controller,
         'rest' => $rest,

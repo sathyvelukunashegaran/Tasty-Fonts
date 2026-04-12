@@ -297,7 +297,7 @@ final class BlockEditorFontLibraryService
 
             if ($variableFontsEnabled) {
                 $variationSettings = FontUtils::buildFontVariationSettings(
-                    FontUtils::normalizeVariationDefaults($face['variation_defaults'] ?? [], $face['axes'] ?? [])
+                    FontUtils::faceLevelVariationDefaults($face['variation_defaults'] ?? [], $face['axes'] ?? [])
                 );
 
                 if ($variationSettings !== 'normal') {

@@ -69,6 +69,10 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         $currentPage = (string) ($view['currentPage'] ?? AdminController::PAGE_ROLES);
         $pluginVersion = (string) ($view['pluginVersion'] ?? '');
         $pluginVersionUrl = (string) ($view['pluginVersionUrl'] ?? '');
+        $pluginVersionMeta = (string) ($view['pluginVersionMeta'] ?? '');
+        $pluginVersionBadgeClass = (string) ($view['pluginVersionBadgeClass'] ?? 'is-role');
+        $pluginVersionTooltip = (string) ($view['pluginVersionTooltip'] ?? '');
+        $pluginVersionAriaLabel = (string) ($view['pluginVersionAriaLabel'] ?? '');
 
         ob_start();
         $this->studioRenderer->render($view);
@@ -117,14 +121,17 @@ final class AdminPageRenderer extends AbstractSectionRenderer
                                 </h1>
                                 <?php if ($pluginVersion !== ''): ?>
                                     <a
-                                        class="tasty-fonts-version-link tasty-fonts-badge is-role"
+                                        class="tasty-fonts-version-link tasty-fonts-badge <?php echo esc_attr($pluginVersionBadgeClass); ?>"
                                         href="<?php echo esc_url($pluginVersionUrl); ?>"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        aria-label="<?php echo esc_attr(sprintf(__('View GitHub changelog for version %s', 'tasty-fonts'), $pluginVersion)); ?>"
-                                        title="<?php echo esc_attr(sprintf(__('View changelog for version %s on GitHub', 'tasty-fonts'), $pluginVersion)); ?>"
+                                        aria-label="<?php echo esc_attr($pluginVersionAriaLabel !== '' ? $pluginVersionAriaLabel : sprintf(__('View GitHub changelog for version %s', 'tasty-fonts'), $pluginVersion)); ?>"
+                                        title="<?php echo esc_attr($pluginVersionTooltip !== '' ? $pluginVersionTooltip : sprintf(__('View changelog for version %s on GitHub', 'tasty-fonts'), $pluginVersion)); ?>"
                                     >
-                                        <?php echo esc_html(sprintf(__('v%s', 'tasty-fonts'), $pluginVersion)); ?>
+                                        <span class="tasty-fonts-version-link-primary"><?php echo esc_html(sprintf(__('v%s', 'tasty-fonts'), $pluginVersion)); ?></span>
+                                        <?php if ($pluginVersionMeta !== ''): ?>
+                                            <span class="tasty-fonts-version-link-meta"><?php echo esc_html($pluginVersionMeta); ?></span>
+                                        <?php endif; ?>
                                     </a>
                                 <?php endif; ?>
                             </div>
