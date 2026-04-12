@@ -50,7 +50,7 @@ bin/                     — release helper script
 - `Admin/`: controller, page context building, view building, and section rendering
 - `Api/`: REST adapter over admin actions
 - `Updates/`: GitHub release updater integration
-- `Maintenance/`: developer tooling, cache management, and site transfer — `DeveloperToolsService` handles cache clears, resets, and storage scaffolding; `SiteTransferService` (added in 1.12.0) coordinates portable export bundles (builds a ZIP containing a manifest and font files), validates and imports bundles (replaces library, settings, and role data), and handles the optional fresh Google API key flow during import. Both require the underlying `ZipArchive` PHP extension for bundle operations.
+- `Maintenance/`: developer tooling, cache management, and site transfer — `DeveloperToolsService` handles cache clears, resets, and storage scaffolding; `SiteTransferService` (added in 1.12.0) coordinates portable export bundles (builds a ZIP containing a manifest and font files), validates and imports bundles (replaces library, settings, and role data), and handles the optional fresh Google API key flow during import. `SiteTransferService` requires the underlying `ZipArchive` PHP extension for bundle export/import operations.
 
 ### Service Container
 
