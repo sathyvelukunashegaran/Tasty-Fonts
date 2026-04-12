@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.12.0-beta.2] - 2026-04-13
+
 ### Added
 
 - Added a portable Site Transfer workflow in Settings -> Transfer to export and import bundles containing managed fonts, library data, settings, and live role assignments.
