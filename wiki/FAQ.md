@@ -98,6 +98,46 @@ Having multiple profiles on one family means you can switch between them without
 
 ---
 
+## Site Transfer
+
+### Can I move my font setup from one WordPress site to another?
+
+Yes. Use `Settings → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.12.0-beta.2 or later, and PHP's ZipArchive extension must be available on both servers.
+
+See [Site Transfer](Site-Transfer) for the full step-by-step walkthrough.
+
+### What does a Site Transfer bundle contain?
+
+A Site Transfer bundle contains:
+
+- all managed font files from `wp-content/uploads/fonts/`
+- font library data (all families, delivery profiles, variant metadata, and per-family settings)
+- plugin settings (Output, Integrations, and Behavior tabs)
+- live and draft role assignments
+
+It does **not** include the Google Fonts API key, WordPress user accounts, theme or plugin files, or non-font media.
+
+### Why is my Google Fonts API key missing after importing a transfer bundle?
+
+By design. API keys are excluded from bundles because they are tied to a Google Cloud project on the source site. Using the source site's key on the destination could expose the source site's credentials and quota.
+
+To restore Google Fonts search access on the destination:
+
+- **Option A:** paste a key into the optional Google Fonts API Key field in the Import card before importing.
+- **Option B:** go to `Settings → Output` after the import and save a key there.
+
+Already-imported families continue to work without a key — you only need one for the live search feature.
+
+### What server requirements does Site Transfer need?
+
+PHP's ZipArchive extension must be installed and enabled. Most managed WordPress hosts (WP Engine, Kinsta, Flywheel, etc.) include it by default. If the Transfer tab shows a warning that ZipArchive is unavailable, contact your hosting provider and ask them to enable the `zip` PHP extension.
+
+### Is it safe to import a bundle on a live production site?
+
+The import replaces your current Tasty Fonts library, settings, and role assignments — it cannot be undone from within the plugin. Take a database backup before importing onto a live production site. The import form shows an explicit confirmation prompt explaining exactly what will be replaced.
+
+---
+
 ## Variable Fonts
 
 ### How do I enable variable font support?
@@ -205,6 +245,10 @@ Leave it off if you do not use Automatic.css.
 ### What does "Enable Monospace Role" do?
 
 It turns on a third role slot for code and `pre` elements. When enabled, you can assign a monospace font family (like Fira Code or JetBrains Mono) and the plugin outputs `--font-monospace` for you to reference in CSS. Most sites do not need this unless they display code heavily.
+
+### How is my Google Fonts API key stored?
+
+Since 1.12.0, the key is stored in a dedicated encrypted WordPress option (`tasty_fonts_google_api_key_data`) rather than in the main settings record. It is isolated from normal settings and never included in [Site Transfer](Site-Transfer) exports. If you supply a fresh key during a bundle import, it is stored using the same encrypted model as a key saved manually in `Settings → Output`.
 
 ---
 

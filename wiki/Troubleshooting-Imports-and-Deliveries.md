@@ -82,7 +82,44 @@ For live Google and Bunny CDN deliveries, the runtime planner promotes `optional
 
 - [Font Library](Font-Library)
 - [Generated CSS](Troubleshooting-Generated-CSS)
+- [Site Transfer](Site-Transfer)
 - [Google Fonts](Provider-Google-Fonts)
 - [Bunny Fonts](Provider-Bunny-Fonts)
 - [Adobe Fonts](Provider-Adobe-Fonts)
 - [FAQ](FAQ)
+
+---
+
+## Site Transfer Issues
+
+### The Transfer tab shows "ZipArchive is unavailable"
+
+**Cause:** PHP's ZipArchive extension is not installed or enabled on this server. The plugin cannot create or validate ZIP bundles without it.
+
+**Fix:** contact your hosting provider and ask them to enable the `zip` PHP extension (sometimes referred to as `php-zip`). Most managed WordPress hosts include it by default. After it is enabled, reload the Transfer tab — the export and import controls will become available.
+
+### Import fails with a permissions error
+
+**Cause:** the WordPress uploads directory is not writable by the web server process.
+
+**Fix:** check file system permissions on `wp-content/uploads/fonts/`. The directory and its subdirectories need to be writable by the user your web server runs as (often `www-data` or `apache`). Contact your host or use a file manager or FTP client to fix permissions.
+
+### Fonts are not showing after a successful import
+
+**Cause:** the plugin rebuilds generated CSS automatically on import, but a page caching layer may be serving a stale stylesheet.
+
+**Fix:**
+1. Go to `Settings → Developer` and use **Clear Plugin Caches** to force the generated stylesheet to regenerate.
+2. Purge any page-caching plugin (WP Rocket, W3 Total Cache, LiteSpeed Cache, etc.) and any CDN cache in front of WordPress.
+3. Hard-refresh your browser (Ctrl+Shift+R or Cmd+Shift+R).
+
+### Google Fonts search is broken after import
+
+**Cause:** Google Fonts API keys are excluded from transfer bundles by design. They are tied to the source site's Google Cloud project and are never exported.
+
+**Fix:** add a Google Fonts API key for the destination site.
+
+- **Option A:** re-import the bundle and paste a key into the optional Google Fonts API Key field in the Import card before confirming.
+- **Option B:** go to `Settings → Output` and save a key there after the import.
+
+Already-imported families continue to display and serve correctly without a key. The key is only needed for live catalog search.

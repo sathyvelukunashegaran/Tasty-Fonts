@@ -1,10 +1,14 @@
 ## User Guides
 
-[Getting Started](Getting-Started) · [Concepts](Concepts) · [Deploy Fonts](Deploy-Fonts) · [Font Library](Font-Library) · [Settings](Settings) · [Advanced Tools](Advanced-Tools)
+[Getting Started](Getting-Started) · [Concepts](Concepts) · [Deploy Fonts](Deploy-Fonts) · [Font Library](Font-Library) · [Settings](Settings) · [Site Transfer](Site-Transfer) · [Advanced Tools](Advanced-Tools)
 
 ## Font Sources
 
 [Local Fonts](Provider-Local-Fonts) · [Google Fonts](Provider-Google-Fonts) · [Bunny Fonts](Provider-Bunny-Fonts) · [Adobe Fonts](Provider-Adobe-Fonts)
+
+## Guides
+
+[GDPR And Font Privacy](GDPR) · [Caching And Font Loading](Caching-And-Font-Loading)
 
 ## Troubleshooting
 

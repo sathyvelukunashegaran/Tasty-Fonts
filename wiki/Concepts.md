@@ -129,7 +129,9 @@ When you enable it in `Settings → Output → Variable Font Support`:
 - **Upload flow**: an axis editor appears per uploaded variable file so you can review detected axes and set axis defaults before saving.
 - **Google and Bunny search**: variable families are marked in search results so you can spot them at a glance.
 - **Deploy Fonts**: each role (Heading, Body, Monospace) gains per-role axis controls. You can pin a specific axis value (e.g., `wght: 650`) or a weight range override for that role.
-- **Generated CSS**: `font-variation-settings` is included in `@font-face` and usage rules where variable faces are active. Weight ranges are expressed as `<number> <number>` in `font-weight` descriptors.
+- **Generated CSS**: `font-variation-settings` is included in `@font-face` and usage rules where variable faces are active, but **only when a role axis value differs from the font's registered default**. Axes already at their registered default are omitted to keep generated output clean and non-redundant. Weight ranges are expressed as `<number> <number>` in `font-weight` descriptors.
+
+  > **Why this matters:** a variable font's axis defaults are already the "do nothing" values. Emitting them in `font-variation-settings` adds bytes without changing rendering. Omitting them produces a smaller, cleaner stylesheet without any visible difference.
 - **Editor presets and Block Editor sync**: variation metadata travels with the family so the block editor and site editor reflect the correct design space.
 
 ### Static fallback

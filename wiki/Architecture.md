@@ -50,6 +50,7 @@ bin/                     — release helper script
 - `Admin/`: controller, page context building, view building, and section rendering
 - `Api/`: REST adapter over admin actions
 - `Updates/`: GitHub release updater integration
+- `Maintenance/`: developer tooling, cache management, and site transfer — `DeveloperToolsService` handles cache clears, resets, and storage scaffolding; `SiteTransferService` (added in 1.12.0) coordinates portable export bundles (builds a ZIP containing a manifest and font files), validates and imports bundles (replaces library, settings, and role data), and handles the optional fresh Google API key flow during import. `SiteTransferService` requires the underlying `ZipArchive` PHP extension for bundle export/import operations.
 
 ### Service Container
 
@@ -139,6 +140,7 @@ The admin UI operates entirely through a plugin REST API adapter (`Api/RestContr
 | What | Where |
 |---|---|
 | Settings | `get_option('tasty_fonts_settings')` — see `Repository/SettingsRepository.php` |
+| Google Fonts API key | `get_option('tasty_fonts_google_api_key_data')` — stored encrypted in a dedicated option, isolated from `tasty_fonts_settings`, never exported in transfer bundles (since 1.12.0) |
 | Font library | `get_option('tasty_fonts_library')` — see `Repository/ImportRepository.php` |
 | Draft roles | `get_option('tasty_fonts_roles')` — see `SettingsRepository::OPTION_ROLES` |
 | Applied (live) roles | Stored under `applied_roles` within `tasty_fonts_settings`; used by `CssBuilder` at runtime |

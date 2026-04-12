@@ -16,7 +16,7 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 ## Before You Start
 
-`1.10.0` is the current stable release. The plugin is production-ready.
+`1.12.0-beta.2` is the current active build, which is a **pre-release beta**. The plugin is feature-complete and suitable for testing. If you need a fully stable release for a production environment, go to `Settings → Behavior → Update Channel` and switch to `Stable` — the updater will offer the latest stable version for reinstall.
 
 **Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No Composer install, no npm install, no build step.
 
@@ -48,11 +48,12 @@ Open `Tasty Fonts` and explore the four sections:
 | **Settings** | Control CSS output, integrations with builders and editors, behavior options, and developer tools |
 | **Advanced Tools** | Inspect generated CSS, review system details, and read activity history |
 
-Inside `Settings`, four tabs group related controls:
+Inside `Settings`, five tabs group related controls:
 
 - `Output` — what CSS gets generated and how
 - `Integrations` — Gutenberg, Automatic.css, Bricks, Oxygen
 - `Behavior` — feature flags and uninstall behavior
+- `Transfer` — export and import portable site bundles
 - `Developer` — cache clearing, resets, and maintenance (proceed carefully)
 
 ### 3. Add Families To The Library
@@ -119,6 +120,7 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 - review **Block Editor sync** behavior on local or staging environments (it often needs to be turned off on local)
 - use the **Developer tab** when you need to reset caches or re-bootstrap integration detection during testing
 - enable **Variable Font Support** (in `Settings → Output`) if any of your families are variable fonts — this unlocks axis controls, per-role weight overrides, and `font-variation-settings` in the generated CSS
+- use **Site Transfer** (`Settings → Transfer`) when you need to replicate your fonts to a staging, production, or client site — export a bundle from the source site and import it on the destination
 
 ---
 

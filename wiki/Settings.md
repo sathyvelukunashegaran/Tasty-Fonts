@@ -30,11 +30,12 @@ Once you have a working font deployment, revisit Settings and adjust from these 
 
 ## Settings Tabs At A Glance
 
-The Settings page is split into four tabs:
+The Settings page is split into five tabs:
 
 - `Output`: what CSS gets generated and how it is delivered
 - `Integrations`: how the plugin cooperates with editor and builder ecosystems
 - `Behavior`: plugin-level feature defaults and uninstall behavior
+- `Transfer`: portable export and import bundles for cross-site migrations
 - `Developer`: maintenance and reset workflows intended for advanced users, testers, and support
 
 ## Steps
@@ -222,7 +223,51 @@ Available actions include:
 
 The destructive actions require explicit confirmation phrases. That is intentional and should stay that way.
 
-### 5. Understand Autosave
+### 5. Use The Transfer Tab
+
+The `Transfer` tab lets you move your complete Tasty Fonts setup between WordPress sites using a single portable ZIP bundle — without manually re-importing fonts or reconfiguring settings on the destination.
+
+> **Beginner tip:** the most common use cases are pushing a finished font setup from staging to production, handing off a client build, and quickly cloning your typography to a second site.
+
+> **Prerequisite:** PHP's ZipArchive extension must be installed and enabled on both the source and destination servers. Most managed WordPress hosts include it by default. If the tab shows an unavailability warning, contact your host.
+
+#### Export Card
+
+The **Export Site Transfer Bundle** card generates a downloadable ZIP that contains:
+
+- all managed font files from `wp-content/uploads/fonts/`
+- a manifest (`tasty-fonts-export.json`) recording library data, settings, role assignments, and file checksums
+- **does not include** the Google Fonts API key, WordPress user accounts, theme or plugin files, or the `.generated/tasty-fonts.css` file (which is regenerated on import)
+
+To export:
+
+1. Open the `Transfer` tab.
+2. Confirm the export action is available (not disabled).
+3. Click **Export Bundle**. Your browser downloads the ZIP.
+
+#### Import Card
+
+> ⚠️ **Warning:** importing a bundle **replaces** the current Tasty Fonts library, settings, and role assignments on the destination site. Take a database backup before importing onto a live production site.
+
+To import on the destination site:
+
+1. Open the `Transfer` tab on the **destination site**.
+2. In the **Import Site Transfer Bundle** card, click the file picker and choose the ZIP you exported.
+3. (Optional) Paste a **Google Fonts API key** into the key field if this destination site needs Google catalog search. This key is stored encrypted and applies only to the destination.
+4. Click **Import Bundle** and confirm the destructive confirmation prompt.
+5. The plugin validates the bundle, restores font files, applies library data, settings, and role assignments, then rebuilds the generated CSS automatically.
+
+#### Why Google API Keys Are Excluded
+
+Google Fonts API keys are never bundled because they are tied to a specific Google Cloud project on the source site. Including a key in a portable bundle would risk sharing source-site credentials and quota with the destination site owner. Since 1.12.0, keys are stored in a dedicated **encrypted** WordPress option (`tasty_fonts_google_api_key_data`) that is isolated from the main settings record and excluded from all exports.
+
+To restore Google Fonts search access on the destination, supply a fresh key in the Import card's optional key field before importing, or add one later in `Settings → Output`.
+
+> **Beginner tip:** if you are not planning to use Google Fonts search on the destination, you can skip the key entirely. Transferred fonts that were already imported will still load and display correctly.
+
+See [Site Transfer](Site-Transfer) for the full step-by-step guide and troubleshooting reference.
+
+### 6. Understand Autosave
 
 The standard settings tabs autosave through the plugin REST API. That means:
 
@@ -232,7 +277,7 @@ The standard settings tabs autosave through the plugin REST API. That means:
 
 The main autosave path applies to standard settings toggles. The destructive Developer actions still use deliberate form submissions and confirmations.
 
-### 6. Know What Changes Runtime Output
+### 7. Know What Changes Runtime Output
 
 Output settings can affect:
 
@@ -267,6 +312,14 @@ Developer actions can affect:
 - whether saved notices remain hidden
 - whether plugin settings or the entire managed library are reset
 
+Transfer actions can affect:
+
+- the entire managed font library (replaced by the bundle's library data)
+- all plugin settings (replaced by the bundle's settings)
+- live and draft role assignments (replaced by the bundle's role data)
+- managed font files on disk (replaced by the bundle's font files)
+- the Google Fonts API key on the destination (if a fresh key was supplied during import)
+
 ## Notes
 
 - Per-family `font-display` overrides from the library take precedence over the global default for that family.
@@ -274,11 +327,16 @@ Developer actions can affect:
 - Block Editor sync is intentionally cautious on local development environments because loopback TLS trust issues are common there.
 - Variable Font Support is off by default. Enable it only when you are actively using variable font files so static-only installs stay clean.
 - WordPress 6.5 or later is required. The minimum was raised from 6.1 to align with the Block Editor Font Library APIs used in this release.
+- The Transfer tab requires PHP's ZipArchive extension. If the tab shows an unavailability warning, contact your hosting provider to enable the `zip` PHP extension.
+- Google Fonts API keys supplied during a bundle import are stored using the same encrypted option storage as keys saved manually in `Settings → Output`.
 
 ## Related Docs
 
 - [Deploy Fonts](Deploy-Fonts)
 - [Font Library](Font-Library)
+- [Site Transfer](Site-Transfer)
 - [Local Development](Troubleshooting-Local-Development)
 - [Generated CSS](Troubleshooting-Generated-CSS)
+- [Caching And Font Loading](Caching-And-Font-Loading)
+- [GDPR And Font Privacy](GDPR)
 - [FAQ](FAQ)

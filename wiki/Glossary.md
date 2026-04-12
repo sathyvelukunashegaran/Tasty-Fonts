@@ -57,6 +57,9 @@ The design principle that separates "what you are experimenting with" from "what
 **Etch (EtchWP)**
 A WordPress page-builder environment. The plugin integrates with Etch by providing runtime stylesheet URLs through the Etch canvas bridge, so preview typography inside the builder matches the live site.
 
+**Encrypted option storage**
+The storage model used since 1.12.0 for the Google Fonts API key. The key is stored in a dedicated WordPress option (`tasty_fonts_google_api_key_data`) using symmetric encryption, isolated from the main `tasty_fonts_settings` record. It is never serialised into Site Transfer bundles or any other portable export.
+
 ## F
 
 **Fallback stack**
@@ -164,6 +167,12 @@ A button on the Deploy Fonts page that stores your current role selections witho
 **Self-hosted delivery**
 A delivery mode where downloaded font files live on your own server and are served from there. The plugin generates `@font-face` rules pointing to local file paths. Self-hosted delivery gives you full control over privacy, caching, and file availability.
 
+**Site Transfer**
+The portable bundle export and import feature in `Settings → Transfer` (added in 1.12.0). Use it to move the full Tasty Fonts setup — managed font files, library data, settings, and live role assignments — between WordPress sites with one ZIP bundle. Google Fonts API keys are excluded from bundles for security. See [Site Transfer](Site-Transfer) for the full guide.
+
+**Site Transfer Bundle**
+A ZIP file produced by the Site Transfer export action. It contains a manifest (`tasty-fonts-export.json`) that records library state, settings, role assignments, and file checksums, plus all managed font files under a `fonts/` subdirectory. Imported on the destination site to replace the current Tasty Fonts setup.
+
 **Swap (font-display: swap)**
 A `font-display` value that shows a fallback font until the custom font loads, then swaps in the custom font. Good for content-heavy sites where brand typography matters. Admin previews always force `swap` for safety.
 
@@ -171,6 +180,12 @@ A `font-display` value that shows a fallback font until the custom font loads, t
 
 **Text domain**
 The identifier used to namespace translatable strings in WordPress plugins. Tasty Custom Fonts uses the text domain `tasty-fonts`.
+
+**Transfer Bundle**
+Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.12.0-beta.2 or later.
+
+**Transfer Tab**
+The fifth tab in the Settings page, added in 1.12.0. Contains the Export and Import cards for the Site Transfer workflow.
 
 **TTF (TrueType Font)**
 An older cross-platform font format. Supported for local upload. Modern browsers prefer WOFF2, but TTF works as a fallback.
