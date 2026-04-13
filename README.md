@@ -115,8 +115,8 @@ Published fonts reach every layer of your WordPress site automatically.
 
 Each family stores one or more delivery profiles. The active profile controls what the plugin serves at runtime — switch it any time without rebuilding your typography system.
 
-Self-hosted Google Fonts are stored at `wp-content/uploads/fonts/google/<family-slug>/`.  
-Self-hosted Bunny Fonts are stored at `wp-content/uploads/fonts/bunny/<family-slug>/`.
+Self-hosted Google Fonts are stored under your uploads directory (typically `wp-content/uploads/fonts/google/<family-slug>/`).  
+Self-hosted Bunny Fonts are stored under your uploads directory (typically `wp-content/uploads/fonts/bunny/<family-slug>/`).
 
 ---
 
