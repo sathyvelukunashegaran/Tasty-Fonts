@@ -376,8 +376,8 @@ $tests['font_utils_normalize_hosted_axis_list_infers_wght_default_when_missing']
 
     assertSameValue('200', $result['WGHT']['min'], 'min should be preserved when default is absent.');
     assertSameValue('800', $result['WGHT']['max'], 'max should be preserved when default is absent.');
-    // When min ≤ 400 ≤ max the inferred default should be 400.
-    assertSameValue('400', $result['WGHT']['default'], 'normalizeHostedAxisList should infer a default of 400 for WGHT when min ≤ 400 ≤ max.');
+    // When min <= 400 <= max the inferred default should be 400.
+    assertSameValue('400', $result['WGHT']['default'], 'normalizeHostedAxisList should infer a default of 400 for WGHT when min <= 400 <= max.');
 };
 
 $tests['font_utils_normalize_hosted_axis_list_skips_axes_with_empty_tags'] = static function (): void {
@@ -561,10 +561,13 @@ $tests['uninstall_handler_skips_managed_file_deletion_when_preference_is_off'] =
 
     $handler->run();
 
-    // When delete_uploaded_files_on_uninstall is false the root storage
-    // directory should still exist after uninstall.
-    if (is_string($root) && is_dir($root)) {
-        assertTrueValue(is_dir($root), 'The font storage root should remain when delete_uploaded_files_on_uninstall is false.');
+    // When delete_uploaded_files_on_uninstall is false, the root storage
+    // directory should not have been removed by the handler.
+    if (is_string($root) && $root !== '') {
+        assertFalseValue(
+            is_string($root) && !is_dir($root) && is_dir(dirname($root)),
+            'UninstallHandler should not remove the storage root when delete_uploaded_files_on_uninstall is false.'
+        );
     }
 };
 
