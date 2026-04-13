@@ -295,6 +295,7 @@ node --test tests/js/*.test.cjs
 find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
 ```
 
+## AI Usage
 AI is used in this repository only to help generate test cases and documentation. Plugin code, architecture, and release behavior are authored and reviewed manually by [Tasty WP](https://github.com/sathyvelukunashegaran).
 
 ---
