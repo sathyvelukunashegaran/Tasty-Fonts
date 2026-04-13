@@ -214,7 +214,7 @@ Yes. Google Fonts and Bunny Fonts can both be imported into your own server stor
 <details>
 <summary><strong>How do I self-host Google Fonts in WordPress using this plugin?</strong></summary>
 
-Search for a Google Fonts family inside the Font Library, choose **Self-hosted** as the delivery mode, and import. The plugin downloads the font files to `wp-content/uploads/fonts/google/<family-slug>/` and generates the runtime CSS automatically. A Google API key is not required for self-hosted imports.
+Search for a Google Fonts family inside the Font Library, choose **Self-hosted** as the delivery mode, and import. The plugin downloads the font files to `wp-content/uploads/fonts/google/<family-slug>/` and generates the runtime CSS automatically. A valid Google Fonts API key is required to browse/search and import Google Fonts from inside the dashboard, but once imported in **Self-hosted** mode the fonts are served from your own site with no calls to Google at runtime.
 
 </details>
 
