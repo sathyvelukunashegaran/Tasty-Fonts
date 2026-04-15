@@ -79,6 +79,37 @@
             : { role: 'status', live: 'polite' };
     }
 
+    function tokenizeAttributeValue(value) {
+        return String(value || '').split(/\s+/).filter(Boolean);
+    }
+
+    function rowMatchesLibraryFilters(row = {}, filters = {}) {
+        const query = String(filters.query || '').trim().toLowerCase();
+        const sourceFilter = String(filters.sourceFilter || 'all').trim().toLowerCase();
+        const categoryFilter = String(filters.categoryFilter || 'all').trim().toLowerCase();
+        const name = String(row.name || '').trim().toLowerCase();
+        const sourceTokens = tokenizeAttributeValue(row.sources || '');
+        const categoryTokens = tokenizeAttributeValue(row.categories || '');
+        const matchesQuery = !query || name.includes(query);
+        const matchesSource = !sourceFilter
+            || sourceFilter === 'all'
+            || sourceTokens.includes(sourceFilter)
+            || (sourceFilter === 'published' && sourceTokens.includes('role_active'));
+        const matchesCategory = !categoryFilter
+            || categoryFilter === 'all'
+            || categoryTokens.includes(categoryFilter);
+
+        return matchesQuery && matchesSource && matchesCategory;
+    }
+
+    function shouldHydrateFamilyDetails(target = {}) {
+        if (!target || typeof target !== 'object') {
+            return false;
+        }
+
+        return !target.loaded && !target.loading && String(target.familySlug || '').trim() !== '';
+    }
+
     function normalizeAxisTag(tag) {
         const normalized = String(tag || '').trim().toUpperCase();
 
@@ -396,12 +427,14 @@
         hasVariableFontMetadata,
         isTrustedHostedStylesheetUrl,
         normalizeOutputQuickModePreference,
+        rowMatchesLibraryFilters,
         resolveStatusAnnouncement,
         resolveAssignedRoleState,
         roleStatesMatch,
         settingsStatesMatch,
         sanitizeFallback,
         sanitizeOutputQuickModePreference,
+        shouldHydrateFamilyDetails,
         slugify,
     };
 });

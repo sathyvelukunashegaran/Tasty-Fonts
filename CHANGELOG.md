@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.0-beta.1] - 2026-04-16
+
+### Changed
+
+- Centralized settings save validation and REST schema generation from a shared field-definition source.
+- Split the library family card into a lightweight summary shell and an on-demand hydrated details fragment.
+
+### Added
+
+- Added a lazy-loaded `families/card` REST fragment for expanding library cards without rendering the full detail panel up front.
+
+### Fixed
+
+- Improved keyboard focus, loading announcements, and async status handling for hydrated family-card content.
+
 ## [1.12.0] - 2026-04-16
 
 ### Changed

@@ -1267,7 +1267,7 @@ $tests['css_builder_can_add_readable_comments_to_admin_role_snippets_only'] = st
     assertNotContainsValue('/* Body text */', $runtimeCss, 'Role usage comments should not leak into the live generated CSS.');
 };
 
-$tests['css_builder_defaults_font_display_to_optional'] = static function (): void {
+$tests['css_builder_defaults_font_display_to_swap'] = static function (): void {
     $builder = new CssBuilder();
     $catalog = [
         'Inter' => [
@@ -1292,7 +1292,7 @@ $tests['css_builder_defaults_font_display_to_optional'] = static function (): vo
 
     $css = $builder->buildFontFaceOnly($catalog, ['minify_css_output' => false]);
 
-    assertContainsValue('font-display:optional;', $css, 'Generated font-face CSS should default to font-display optional when no explicit setting is stored.');
+    assertContainsValue('font-display:swap;', $css, 'Generated font-face CSS should default to font-display swap when no explicit setting is stored.');
 };
 
 $tests['css_builder_uses_per_family_font_display_overrides'] = static function (): void {

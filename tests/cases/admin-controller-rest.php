@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Api\RestController;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
@@ -65,6 +66,24 @@ $tests['rest_controller_route_reference_builds_full_api_paths_and_ignores_unknow
         '/tasty-fonts/v1/',
         RestController::routeReference('missing'),
         'Unknown route keys should fall back to the API namespace root instead of producing malformed paths.'
+    );
+    assertSameValue(
+        '/tasty-fonts/v1/families/card',
+        RestController::routeReference('familyCard'),
+        'Family card route references should include the REST namespace and lazy fragment path.'
+    );
+};
+
+$tests['rest_controller_settings_args_stay_in_sync_with_shared_settings_save_field_definitions'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $args = invokePrivateMethod($services['rest'], 'settingsArgs', []);
+
+    assertSameValue(
+        SettingsSaveFields::names(),
+        array_keys($args),
+        'REST settings args should stay in lockstep with the shared settings save field definitions.'
     );
 };
 
@@ -267,6 +286,51 @@ $tests['admin_controller_collects_only_allowlisted_posted_settings_fields'] = st
     );
 };
 
+$tests['admin_controller_renders_lazy_family_card_fragments_for_known_slugs'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'source' => 'local',
+                    'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $result = $services['controller']->renderFamilyCardFragment('inter');
+
+    assertSameValue(false, is_wp_error($result), 'Known family slugs should render a lazy family-card fragment.');
+    assertSameValue('inter', (string) ($result['family_slug'] ?? ''), 'The fragment response should echo the normalized family slug.');
+    assertContainsValue('Delivery Profiles', (string) ($result['html'] ?? ''), 'Lazy family-card fragments should include the heavy delivery details markup.');
+    assertContainsValue('Font Faces', (string) ($result['html'] ?? ''), 'Lazy family-card fragments should include the face detail section.');
+};
+
+$tests['admin_controller_returns_a_not_found_error_for_unknown_family_card_fragments'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $result = $services['controller']->renderFamilyCardFragment('missing-family');
+
+    assertWpErrorCode('tasty_fonts_family_not_found', $result, 'Unknown family slugs should return the shared not-found error for lazy family-card fragments.');
+};
+
 $tests['admin_controller_builds_specific_settings_saved_message'] = static function (): void {
     resetTestState();
 
@@ -345,15 +409,15 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
     assertContainsValue('Reload the page to apply this change.', $message, 'Settings save messages should mention reload-only behavior changes.');
 };
 
-$tests['admin_controller_exposes_all_font_display_options_with_optional_first'] = static function (): void {
+$tests['admin_controller_exposes_all_font_display_options_with_swap_first'] = static function (): void {
     resetTestState();
 
     $controller = makeAdminControllerTestInstance();
     $options = invokePrivateMethod($controller, 'buildFontDisplayOptions', []);
 
-    assertSameValue('optional', (string) ($options[0]['value'] ?? ''), 'Optional should be the first font-display choice so the recommended default is selected first.');
+    assertSameValue('swap', (string) ($options[0]['value'] ?? ''), 'Swap should be the first font-display choice so the recommended default is selected first.');
     assertSameValue(
-        ['optional', 'swap', 'fallback', 'block', 'auto'],
+        ['swap', 'fallback', 'block', 'auto', 'optional'],
         array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), $options)),
         'Output Settings should expose every supported font-display option.'
     );
@@ -368,7 +432,7 @@ $tests['admin_controller_exposes_family_font_display_options_with_inherit_first'
     assertSameValue('inherit', (string) ($options[0]['value'] ?? ''), 'Per-family font-display controls should offer inherit as the first option.');
     assertContainsValue('Swap', (string) ($options[0]['label'] ?? ''), 'The inherit option should explain which global font-display value will be used.');
     assertSameValue(
-        ['inherit', 'optional', 'swap', 'fallback', 'block', 'auto'],
+        ['inherit', 'swap', 'fallback', 'block', 'auto', 'optional'],
         array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), $options)),
         'Per-family font-display controls should expose inherit plus every supported override option.'
     );
@@ -1527,6 +1591,7 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/families/delivery' => 'PATCH',
         'tasty-fonts/v1/families/publish-state' => 'PATCH',
         'tasty-fonts/v1/families/delivery-profile' => 'DELETE',
+        'tasty-fonts/v1/families/card' => 'GET',
     ];
 
     assertSameValue(

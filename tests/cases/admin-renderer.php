@@ -94,6 +94,73 @@ $tests['admin_page_renderer_uses_inline_delivery_badge_for_single_delivery_famil
     assertNotContainsValue('widefat striped tasty-fonts-table', $output, 'Family details should no longer use widefat table markup.');
 };
 
+$tests['family_card_renderer_summary_rows_omit_heavy_details_until_hydrated'] = static function (): void {
+    resetTestState();
+
+    $renderer = new FamilyCardRenderer(new Storage());
+    $family = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'delivery_filter_tokens' => ['published', 'same-origin'],
+        'font_category_tokens' => ['sans-serif'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'local-self-hosted',
+        'active_delivery' => [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular', '700'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'local-self-hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['regular', '700'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'local',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ],
+        ],
+    ];
+
+    ob_start();
+    try {
+        $renderer->renderFamilySummaryRow(
+            $family,
+            ['heading' => 'Inter', 'body' => ''],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            [],
+            ['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true],
+            false,
+            ['enabled' => true, 'role_heading' => true, 'role_body' => true, 'role_alias_interface' => true, 'role_alias_ui' => true, 'category_sans' => true, 'families' => true]
+        );
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('data-family-details-loaded="false"', $output, 'Summary family cards should mark their details containers as not yet hydrated.');
+    assertContainsValue('data-family-details-toggle', $output, 'Summary family cards should expose a dedicated details trigger for lazy hydration.');
+    assertContainsValue('data-family-details-status', $output, 'Summary family cards should render a status region for async detail loading.');
+    assertNotContainsValue('Delivery Profiles', $output, 'Summary family cards should omit heavy delivery markup until hydrated.');
+    assertNotContainsValue('Font Faces', $output, 'Summary family cards should omit face detail markup until hydrated.');
+};
+
 $tests['admin_page_renderer_hides_collapsed_delivery_notes_for_multi_delivery_families'] = static function (): void {
     resetTestState();
 

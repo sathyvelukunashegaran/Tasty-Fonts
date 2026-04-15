@@ -91,7 +91,7 @@ final class AdminPageViewBuilder
         $adobeAccessButtonLabel = $adobeProjectSaved ? __('Project Settings', 'tasty-fonts') : __('Add Project', 'tasty-fonts');
         $cssDeliveryMode = (string) ($context['css_delivery_mode'] ?? 'file');
         $cssDeliveryModeOptions = is_array($context['css_delivery_mode_options'] ?? null) ? $context['css_delivery_mode_options'] : [];
-        $fontDisplay = (string) ($context['font_display'] ?? 'optional');
+        $fontDisplay = (string) ($context['font_display'] ?? 'swap');
         $fontDisplayOptions = is_array($context['font_display_options'] ?? null) ? $context['font_display_options'] : [];
         $unicodeRangeMode = (string) ($context['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF);
         $unicodeRangeCustomValue = (string) ($context['unicode_range_custom_value'] ?? '');

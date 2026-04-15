@@ -335,7 +335,7 @@ final class RuntimeAssetPlanner
         $settings = $this->settings->getSettings();
         $saved = $this->settings->getFamilyFontDisplay($familyName);
 
-        return $saved !== '' ? $saved : (string) ($settings['font_display'] ?? 'optional');
+        return $saved !== '' ? $saved : (string) ($settings['font_display'] ?? 'swap');
     }
 
     private function runtimeStylesheetDisplay(string $familyName, string $provider, string $type, string $displayOverride = ''): string

@@ -31,7 +31,7 @@ final class CssBuilder
         string $displayOverride = ''
     ): string {
         $blocks = [];
-        $defaultDisplay = $this->resolveFontDisplay((string) ($settings['font_display'] ?? 'optional'));
+        $defaultDisplay = $this->resolveFontDisplay((string) ($settings['font_display'] ?? 'swap'));
         $familyDisplays = is_array($settings['family_font_displays'] ?? null) ? $settings['family_font_displays'] : [];
         $includeMonospace = !empty($settings['monospace_role_enabled']);
 
@@ -401,7 +401,7 @@ final class CssBuilder
         return $this->sanitizeKeyword(
             $display,
             ['auto', 'block', 'swap', 'fallback', 'optional'],
-            'optional'
+            'swap'
         );
     }
 

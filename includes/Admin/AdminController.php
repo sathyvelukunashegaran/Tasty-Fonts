@@ -47,57 +47,6 @@ final class AdminController
     private const ACTION_IMPORT_SITE_TRANSFER_BUNDLE = 'tasty_fonts_import_site_transfer_bundle';
     private const IMPORT_SITE_TRANSFER_FILE_FIELD = 'tasty_fonts_site_transfer_bundle';
     private const IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD = 'tasty_fonts_import_google_api_key';
-    private const SETTINGS_SAVE_SCALAR_FIELDS = [
-        'google_api_key',
-        'tasty_fonts_clear_google_api_key',
-        'css_delivery_mode',
-        'font_display',
-        'unicode_range_mode',
-        'unicode_range_custom_value',
-        'output_quick_mode_preference',
-        'preview_sentence',
-        'update_channel',
-        'bricks_theme_style_target_mode',
-        'bricks_theme_style_target_id',
-        'bricks_create_theme_style',
-        'bricks_delete_theme_style',
-        'bricks_reset_integration',
-    ];
-    private const SETTINGS_SAVE_BOOLEAN_FIELDS = [
-        'minify_css_output',
-        'class_output_enabled',
-        'class_output_role_heading_enabled',
-        'class_output_role_body_enabled',
-        'class_output_role_monospace_enabled',
-        'class_output_role_alias_interface_enabled',
-        'class_output_role_alias_ui_enabled',
-        'class_output_role_alias_code_enabled',
-        'class_output_category_sans_enabled',
-        'class_output_category_serif_enabled',
-        'class_output_category_mono_enabled',
-        'class_output_families_enabled',
-        'per_variant_font_variables_enabled',
-        'minimal_output_preset_enabled',
-        'role_usage_font_weight_enabled',
-        'extended_variable_role_weight_vars_enabled',
-        'extended_variable_weight_tokens_enabled',
-        'extended_variable_role_aliases_enabled',
-        'extended_variable_category_sans_enabled',
-        'extended_variable_category_serif_enabled',
-        'extended_variable_category_mono_enabled',
-        'preload_primary_fonts',
-        'remote_connection_hints',
-        'block_editor_font_library_sync_enabled',
-        'bricks_integration_enabled',
-        'bricks_theme_styles_sync_enabled',
-        'bricks_disable_google_fonts_enabled',
-        'oxygen_integration_enabled',
-        'acss_font_role_sync_enabled',
-        'delete_uploaded_files_on_uninstall',
-        'training_wheels_off',
-        'variable_fonts_enabled',
-        'monospace_role_enabled',
-    ];
     public const LOCAL_ENV_NOTICE_OPTION = 'tasty_fonts_local_environment_notice_preferences';
     private const LOCAL_ENV_NOTICE_FORM_FIELD = 'tasty_fonts_local_environment_notice';
     private const LOCAL_ENV_NOTICE_ACTION_FIELD = 'tasty_fonts_local_environment_notice_action';
@@ -954,6 +903,69 @@ final class AdminController
         return $this->library->deleteDeliveryProfile($familySlug, $deliveryId);
     }
 
+    public function renderFamilyCardFragment(string $familySlug): array|WP_Error
+    {
+        $familySlug = FontUtils::slugify($familySlug);
+
+        if ($familySlug === '') {
+            return new WP_Error(
+                'tasty_fonts_family_not_found',
+                __('That font family could not be found in the library.', 'tasty-fonts')
+            );
+        }
+
+        $context = array_merge(
+            $this->pageContextBuilder->build(),
+            ['current_page' => self::PAGE_LIBRARY]
+        );
+        $view = (new AdminPageViewBuilder($this->storage))->build($context);
+        $catalog = is_array($view['catalog'] ?? null) ? $view['catalog'] : [];
+        $family = null;
+
+        foreach ($catalog as $candidate) {
+            if (!is_array($candidate)) {
+                continue;
+            }
+
+            if (FontUtils::slugify((string) ($candidate['slug'] ?? $candidate['family'] ?? '')) !== $familySlug) {
+                continue;
+            }
+
+            $family = $candidate;
+            break;
+        }
+
+        if ($family === null) {
+            return new WP_Error(
+                'tasty_fonts_family_not_found',
+                __('That font family could not be found in the library.', 'tasty-fonts')
+            );
+        }
+
+        $renderer = new \TastyFonts\Admin\Renderer\FamilyCardRenderer($this->storage);
+        $renderer->setTrainingWheelsOff(!empty($view['trainingWheelsOff']));
+
+        ob_start();
+        $renderer->renderFamilyCardDetails(
+            $family,
+            is_array($view['roles'] ?? null) ? $view['roles'] : [],
+            is_array($view['familyFallbacks'] ?? null) ? $view['familyFallbacks'] : [],
+            is_array($view['familyFontDisplays'] ?? null) ? $view['familyFontDisplays'] : [],
+            is_array($view['familyFontDisplayOptions'] ?? null) ? $view['familyFontDisplayOptions'] : [],
+            (string) ($view['previewText'] ?? ''),
+            is_array($view['categoryAliasOwners'] ?? null) ? $view['categoryAliasOwners'] : [],
+            is_array($view['extendedVariableOptions'] ?? null) ? $view['extendedVariableOptions'] : [],
+            !empty($view['monospaceRoleEnabled']),
+            is_array($view['classOutputOptions'] ?? null) ? $view['classOutputOptions'] : []
+        );
+        $html = (string) ob_get_clean();
+
+        return [
+            'family_slug' => $familySlug,
+            'html' => $html,
+        ];
+    }
+
     public function statusForError(WP_Error $error, int $defaultStatus = 400): int
     {
         return match ($error->get_error_code()) {
@@ -1576,7 +1588,7 @@ final class AdminController
         if (($before['font_display'] ?? '') !== ($after['font_display'] ?? '')) {
             $changes[] = sprintf(
                 __('font-display set to %s', 'tasty-fonts'),
-                (string) ($after['font_display'] ?? 'optional')
+                (string) ($after['font_display'] ?? 'swap')
             );
         }
 
@@ -1741,7 +1753,7 @@ final class AdminController
     private function settingsChangeRequiresAssetRefresh(array $before, array $after): bool
     {
         return ($before['css_delivery_mode'] ?? 'file') !== ($after['css_delivery_mode'] ?? 'file')
-            || ($before['font_display'] ?? 'optional') !== ($after['font_display'] ?? 'optional')
+            || ($before['font_display'] ?? 'swap') !== ($after['font_display'] ?? 'swap')
             || ($before['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF) !== ($after['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF)
             || ($before['unicode_range_custom_value'] ?? '') !== ($after['unicode_range_custom_value'] ?? '')
             || !empty($before['class_output_enabled']) !== !empty($after['class_output_enabled'])
@@ -1820,11 +1832,11 @@ final class AdminController
     {
         if (!isset($this->pageContextBuilder)) {
             return [
-                ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
                 ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
                 ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
                 ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
                 ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
+                ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
             ];
         }
 
@@ -1862,11 +1874,11 @@ final class AdminController
                         $this->formatFontDisplayLabel($globalDisplay)
                     ),
                 ],
-                ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
                 ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
                 ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
                 ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
                 ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
+                ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
             ];
         }
 
@@ -2410,7 +2422,7 @@ final class AdminController
         $savedDisplay = $this->settings->getFamilyFontDisplay($family);
         $effectiveDisplay = $savedDisplay !== ''
             ? $savedDisplay
-            : (string) ($settings['font_display'] ?? 'optional');
+            : (string) ($settings['font_display'] ?? 'swap');
 
         $this->assets->refreshGeneratedAssets(false);
 
@@ -2505,7 +2517,7 @@ final class AdminController
     {
         $settingsInput = [];
 
-        foreach (self::SETTINGS_SAVE_SCALAR_FIELDS as $field) {
+        foreach (SettingsSaveFields::namesForKinds(['text', 'enum']) as $field) {
             if (!array_key_exists($field, $submittedValues)) {
                 continue;
             }
@@ -2519,7 +2531,7 @@ final class AdminController
             $settingsInput[$field] = is_string($value) ? wp_unslash($value) : $value;
         }
 
-        foreach (self::SETTINGS_SAVE_BOOLEAN_FIELDS as $field) {
+        foreach (SettingsSaveFields::namesForKinds(['toggle']) as $field) {
             if (array_key_exists($field, $submittedValues)) {
                 $settingsInput[$field] = $submittedValues[$field];
             }
@@ -2532,7 +2544,7 @@ final class AdminController
     {
         $submittedValues = [];
 
-        foreach (array_merge(self::SETTINGS_SAVE_SCALAR_FIELDS, self::SETTINGS_SAVE_BOOLEAN_FIELDS) as $field) {
+        foreach (SettingsSaveFields::names() as $field) {
             if (!array_key_exists($field, $_POST)) {
                 continue;
             }

@@ -387,11 +387,11 @@ final class BlockEditorFontLibraryService
     {
         $settings = $this->settings->getSettings();
         $familyDisplays = is_array($settings['family_font_displays'] ?? null) ? $settings['family_font_displays'] : [];
-        $display = strtolower(trim((string) ($familyDisplays[$familyName] ?? ($settings['font_display'] ?? 'optional'))));
+        $display = strtolower(trim((string) ($familyDisplays[$familyName] ?? ($settings['font_display'] ?? 'swap'))));
 
         return in_array($display, self::SUPPORTED_DISPLAY_VALUES, true)
             ? $display
-            : 'optional';
+            : 'swap';
     }
 
     private function findExistingFontFamily(string $managedSlug): ?array

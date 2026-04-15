@@ -6,6 +6,7 @@ namespace TastyFonts\Api;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Admin\AdminController;
 use WP_Error;
 use WP_REST_Request;
@@ -29,6 +30,7 @@ final class RestController
         'saveFamilyDelivery' => 'families/delivery',
         'saveFamilyPublishState' => 'families/publish-state',
         'deleteDeliveryProfile' => 'families/delivery-profile',
+        'familyCard' => 'families/card',
     ];
 
     public function __construct(private readonly AdminController $admin)
@@ -87,6 +89,9 @@ final class RestController
         $this->registerRoute(self::ROUTES['deleteDeliveryProfile'], 'DELETE', [$this, 'deleteDeliveryProfile'], [
             'family_slug' => $this->buildTextArg(true),
             'delivery_id' => $this->buildTextArg(true),
+        ]);
+        $this->registerRoute(self::ROUTES['familyCard'], 'GET', [$this, 'renderFamilyCard'], [
+            'family_slug' => $this->buildTextArg(true),
         ]);
     }
 
@@ -219,6 +224,16 @@ final class RestController
         );
     }
 
+    public function renderFamilyCard(WP_REST_Request $request): mixed
+    {
+        return $this->restResult(
+            $this->admin->renderFamilyCardFragment(
+                $this->getTextParam($request, 'family_slug')
+            ),
+            404
+        );
+    }
+
     private function registerRoute(string $path, string $methods, callable $callback, array $args = []): void
     {
         register_rest_route(
@@ -314,58 +329,21 @@ final class RestController
     {
         $args = [];
 
-        foreach (
-            [
-                'google_api_key' => $this->buildTextArg(),
-                'tasty_fonts_clear_google_api_key' => $this->buildToggleArg(),
-                'css_delivery_mode' => $this->buildTextArg(false, ['file', 'inline']),
-                'font_display' => $this->buildTextArg(false, ['auto', 'block', 'swap', 'fallback', 'optional']),
-                'unicode_range_mode' => $this->buildTextArg(false, ['preserve', 'latin_basic', 'latin_extended', 'off', 'custom']),
-                'unicode_range_custom_value' => $this->buildTextArg(),
-                'output_quick_mode_preference' => $this->buildTextArg(false, ['minimal', 'variables', 'classes', 'custom']),
-                'preview_sentence' => $this->buildTextArg(),
-                'update_channel' => $this->buildTextArg(false, ['stable', 'beta', 'nightly']),
-            ] as $key => $schema
-        ) {
-            $args[$key] = $schema;
-        }
+        foreach (SettingsSaveFields::definitions() as $definition) {
+            $name = (string) ($definition['name'] ?? '');
+            $kind = (string) ($definition['kind'] ?? '');
 
-        foreach (
-            [
-                'minify_css_output',
-                'class_output_enabled',
-                'class_output_role_heading_enabled',
-                'class_output_role_body_enabled',
-                'class_output_role_monospace_enabled',
-                'class_output_role_alias_interface_enabled',
-                'class_output_role_alias_ui_enabled',
-                'class_output_role_alias_code_enabled',
-                'class_output_category_sans_enabled',
-                'class_output_category_serif_enabled',
-                'class_output_category_mono_enabled',
-                'class_output_families_enabled',
-                'per_variant_font_variables_enabled',
-                'minimal_output_preset_enabled',
-                'role_usage_font_weight_enabled',
-                'extended_variable_role_weight_vars_enabled',
-                'extended_variable_weight_tokens_enabled',
-                'extended_variable_role_aliases_enabled',
-                'extended_variable_category_sans_enabled',
-                'extended_variable_category_serif_enabled',
-                'extended_variable_category_mono_enabled',
-                'preload_primary_fonts',
-                'remote_connection_hints',
-                'block_editor_font_library_sync_enabled',
-                'bricks_integration_enabled',
-                'oxygen_integration_enabled',
-                'acss_font_role_sync_enabled',
-                'delete_uploaded_files_on_uninstall',
-                'training_wheels_off',
-                'variable_fonts_enabled',
-                'monospace_role_enabled',
-            ] as $key
-        ) {
-            $args[$key] = $this->buildToggleArg();
+            if ($name === '') {
+                continue;
+            }
+
+            if ($kind === 'toggle') {
+                $args[$name] = $this->buildToggleArg();
+                continue;
+            }
+
+            $allowedValues = is_array($definition['values'] ?? null) ? array_values((array) $definition['values']) : null;
+            $args[$name] = $this->buildTextArg(false, $allowedValues);
         }
 
         return $args;
@@ -425,7 +403,6 @@ final class RestController
     private function buildToggleArg(): array
     {
         return [
-            'type' => 'string',
             'sanitize_callback' => [$this, 'sanitizeToggleArg'],
             'validate_callback' => [$this, 'validateToggleArg'],
         ];

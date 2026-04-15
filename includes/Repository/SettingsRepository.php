@@ -55,7 +55,7 @@ final class SettingsRepository
         'applied_roles' => [],
         'delete_uploaded_files_on_uninstall' => false,
         'css_delivery_mode' => 'file',
-        'font_display' => 'optional',
+        'font_display' => 'swap',
         'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_OFF,
         'unicode_range_custom_value' => '',
         'output_quick_mode_preference' => self::OUTPUT_QUICK_MODE_MINIMAL,
@@ -145,7 +145,7 @@ final class SettingsRepository
         $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions($settings));
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($storedSettings, $settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
-        $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'optional'));
+        $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'swap'));
         $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF));
         $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue((string) ($settings['unicode_range_custom_value'] ?? ''));
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
@@ -1498,7 +1498,7 @@ final class SettingsRepository
     {
         return $this->isSupportedFontDisplay($display)
             ? $display
-            : 'optional';
+            : 'swap';
     }
 
     private function isSupportedFontDisplay(string $display): bool

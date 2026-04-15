@@ -55,3 +55,6 @@ AGENTS.md
 dist/
 build/
 *.zip
+
+# Air artifacts
+.air/

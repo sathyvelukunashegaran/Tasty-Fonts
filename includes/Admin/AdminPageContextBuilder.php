@@ -91,7 +91,7 @@ final class AdminPageContextBuilder
             'activity_actor_options' => $this->buildActivityActorOptions($logs),
             'family_fallbacks' => $familyFallbacks,
             'family_font_displays' => $familyFontDisplays,
-            'family_font_display_options' => $this->buildFamilyFontDisplayOptions((string) ($settings['font_display'] ?? 'optional')),
+            'family_font_display_options' => $this->buildFamilyFontDisplayOptions((string) ($settings['font_display'] ?? 'swap')),
             'preview_text' => $previewContext['preview_text'],
             'preview_size' => $previewContext['preview_size'],
             'google_api_state' => $googleAccessContext['google_api_state'],
@@ -114,7 +114,7 @@ final class AdminPageContextBuilder
             'adobe_detected_families' => $adobeAccessContext['adobe_detected_families'],
             'css_delivery_mode' => (string) ($settings['css_delivery_mode'] ?? 'file'),
             'css_delivery_mode_options' => $this->buildCssDeliveryModeOptions(),
-            'font_display' => (string) ($settings['font_display'] ?? 'optional'),
+            'font_display' => (string) ($settings['font_display'] ?? 'swap'),
             'font_display_options' => $this->buildFontDisplayOptions(),
             'unicode_range_mode' => (string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF),
             'unicode_range_custom_value' => (string) ($settings['unicode_range_custom_value'] ?? ''),
@@ -254,7 +254,7 @@ final class AdminPageContextBuilder
             ],
             [
                 'label' => __('Default Font Display', 'tasty-fonts'),
-                'value' => (string) ($settings['font_display'] ?? 'optional'),
+                'value' => (string) ($settings['font_display'] ?? 'swap'),
                 'code' => false,
             ],
         ];
@@ -542,11 +542,11 @@ final class AdminPageContextBuilder
     public function buildFontDisplayOptions(): array
     {
         return [
-            ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
             ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
             ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
             ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
             ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
+            ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
         ];
     }
 
@@ -579,11 +579,11 @@ final class AdminPageContextBuilder
                     $this->formatFontDisplayLabel($globalDisplay)
                 ),
             ],
-            ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
             ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
             ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
             ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
             ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
+            ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
         ];
     }
 

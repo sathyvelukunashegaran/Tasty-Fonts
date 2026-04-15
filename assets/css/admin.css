@@ -6253,6 +6253,14 @@ h3.tasty-fonts-section-title {
     border-radius: var(--tasty-radius-control);
 }
 
+.tasty-fonts-role-assign-button:focus-visible,
+.tasty-fonts-font-action-button--icon:focus-visible,
+.tasty-fonts-font-actions-primary .tasty-fonts-disclosure-button--card:focus-visible {
+    border-color: var(--tasty-control-border-active);
+    box-shadow: var(--tasty-shadow-focus);
+    outline: none;
+}
+
 .tasty-fonts-admin .tasty-fonts-button-danger.tasty-fonts-font-action-button--icon {
     width: var(--tasty-library-action-icon-size);
     min-width: var(--tasty-library-action-icon-size);
@@ -6266,6 +6274,26 @@ h3.tasty-fonts-section-title {
     margin-top: var(--tasty-space-1);
     padding-top: var(--tasty-space-3);
     border-top: 1px solid var(--tasty-border-subtle);
+}
+
+.tasty-fonts-family-details-status {
+    padding: var(--tasty-space-3);
+    border: 1px solid var(--tasty-border-subtle-strong);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface-soft);
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-caption-size);
+}
+
+.tasty-fonts-family-details-status.is-loading {
+    border-color: var(--tasty-border-accent-soft);
+    color: var(--tasty-text);
+}
+
+.tasty-fonts-family-details-status.is-error {
+    border-color: var(--tasty-border-danger-soft);
+    background: var(--tasty-surface-danger);
+    color: var(--tasty-danger);
 }
 
 .tasty-fonts-family-details-grid {

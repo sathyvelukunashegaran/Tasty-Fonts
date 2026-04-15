@@ -432,7 +432,7 @@ $tests['developer_tools_reset_plugin_settings_preserves_library_and_files'] = st
     assertFalseValue(is_wp_error($result), 'Reset plugin settings should succeed.');
     assertSameValue(true, file_exists($filePath), 'Reset plugin settings should preserve managed font files.');
     assertSameValue(true, $services['imports']->getFamily('inter') !== null, 'Reset plugin settings should preserve the saved font library.');
-    assertSameValue('optional', (string) ($result['font_display'] ?? ''), 'Reset plugin settings should restore the default font-display.');
+    assertSameValue('swap', (string) ($result['font_display'] ?? ''), 'Reset plugin settings should restore the default font-display.');
     assertSameValue(false, !empty($result['training_wheels_off']), 'Reset plugin settings should restore behavior toggles to their defaults.');
     assertSameValue('', (string) ($result['google_api_key'] ?? ''), 'Reset plugin settings should clear the saved Google API key.');
     assertSameValue(false, array_key_exists(AdminController::LOCAL_ENV_NOTICE_OPTION, $optionStore), 'Reset plugin settings should clear suppressed notice preferences.');
@@ -1435,18 +1435,18 @@ $tests['settings_repository_defaults_update_channel_to_stable_and_normalizes_inv
     assertSameValue(SettingsRepository::UPDATE_CHANNEL_STABLE, $settings->getUpdateChannel(), 'Invalid update channels should normalize back to stable.');
 };
 
-$tests['settings_repository_defaults_font_display_to_optional_and_normalizes_invalid_values'] = static function (): void {
+$tests['settings_repository_defaults_font_display_to_swap_and_normalizes_invalid_values'] = static function (): void {
     resetTestState();
 
     $settings = new SettingsRepository();
 
-    assertSameValue('optional', $settings->getSettings()['font_display'], 'Font display should default to optional for new installs.');
+    assertSameValue('swap', $settings->getSettings()['font_display'], 'Font display should default to swap for new installs.');
 
     $settings->saveSettings(['font_display' => 'block']);
     assertSameValue('block', $settings->getSettings()['font_display'], 'Settings should persist supported font-display values.');
 
     $settings->saveSettings(['font_display' => 'unsupported-value']);
-    assertSameValue('optional', $settings->getSettings()['font_display'], 'Invalid saved font-display values should normalize back to optional.');
+    assertSameValue('swap', $settings->getSettings()['font_display'], 'Invalid saved font-display values should normalize back to swap.');
 };
 
 $tests['settings_repository_defaults_unicode_range_mode_and_normalizes_custom_values'] = static function (): void {

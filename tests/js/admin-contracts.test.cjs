@@ -11,12 +11,14 @@ const {
     hasVariableFontMetadata,
     isTrustedHostedStylesheetUrl,
     normalizeOutputQuickModePreference,
+    rowMatchesLibraryFilters,
     resolveStatusAnnouncement,
     resolveAssignedRoleState,
     roleStatesMatch,
     settingsStatesMatch,
     sanitizeFallback,
     sanitizeOutputQuickModePreference,
+    shouldHydrateFamilyDetails,
     slugify,
 } = require('../../assets/js/admin-contracts.js');
 
@@ -69,6 +71,46 @@ test('admin contracts resolve status announcements by urgency', () => {
     assert.deepEqual(resolveStatusAnnouncement('error'), { role: 'alert', live: 'assertive' });
     assert.deepEqual(resolveStatusAnnouncement('success'), { role: 'status', live: 'polite' });
     assert.deepEqual(resolveStatusAnnouncement('progress'), { role: 'status', live: 'polite' });
+});
+
+test('admin contracts match library rows against query and filter combinations', () => {
+    assert.equal(
+        rowMatchesLibraryFilters(
+            {
+                name: 'inter',
+                sources: 'published same-origin role_active',
+                categories: 'sans-serif variable',
+            },
+            {
+                query: 'int',
+                sourceFilter: 'published',
+                categoryFilter: 'sans-serif',
+            }
+        ),
+        true
+    );
+    assert.equal(
+        rowMatchesLibraryFilters(
+            {
+                name: 'inter',
+                sources: 'same-origin',
+                categories: 'sans-serif',
+            },
+            {
+                query: 'lora',
+                sourceFilter: 'all',
+                categoryFilter: 'all',
+            }
+        ),
+        false
+    );
+});
+
+test('admin contracts only request family detail hydration when a slug exists and no fetch is active', () => {
+    assert.equal(shouldHydrateFamilyDetails({ familySlug: 'inter', loaded: false, loading: false }), true);
+    assert.equal(shouldHydrateFamilyDetails({ familySlug: 'inter', loaded: true, loading: false }), false);
+    assert.equal(shouldHydrateFamilyDetails({ familySlug: 'inter', loaded: false, loading: true }), false);
+    assert.equal(shouldHydrateFamilyDetails({ familySlug: '', loaded: false, loading: false }), false);
 });
 
 test('admin contracts detect variable metadata from family and face entries', () => {

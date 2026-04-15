@@ -20,6 +20,28 @@
         ? wpI18n._n
         : (single, plural, count) => (count === 1 ? single : plural);
     const wpSprintf = typeof wpI18n.sprintf === 'function' ? wpI18n.sprintf : null;
+    const rowMatchesLibraryFilters = typeof adminContracts.rowMatchesLibraryFilters === 'function'
+        ? adminContracts.rowMatchesLibraryFilters
+        : ({ name = '', sources = '', categories = '' }, filters = {}) => {
+            const query = String(filters.query || '').trim().toLowerCase();
+            const sourceFilter = String(filters.sourceFilter || 'all').trim().toLowerCase();
+            const categoryFilter = String(filters.categoryFilter || 'all').trim().toLowerCase();
+            const sourceTokens = String(sources || '').split(/\s+/).filter(Boolean);
+            const categoryTokens = String(categories || '').split(/\s+/).filter(Boolean);
+            const matchesQuery = !query || String(name || '').toLowerCase().includes(query);
+            const matchesSource = !sourceFilter
+                || sourceFilter === 'all'
+                || sourceTokens.includes(sourceFilter)
+                || (sourceFilter === 'published' && sourceTokens.includes('role_active'));
+            const matchesCategory = !categoryFilter
+                || categoryFilter === 'all'
+                || categoryTokens.includes(categoryFilter);
+
+            return matchesQuery && matchesSource && matchesCategory;
+        };
+    const shouldHydrateFamilyDetails = typeof adminContracts.shouldHydrateFamilyDetails === 'function'
+        ? adminContracts.shouldHydrateFamilyDetails
+        : (state = {}) => !state.loaded && !state.loading && String(state.familySlug || '').trim() !== '';
     const roleHeading = document.getElementById('tasty_fonts_heading_font');
     const roleBody = document.getElementById('tasty_fonts_body_font');
     const roleMonospace = document.getElementById('tasty_fonts_monospace_font');
@@ -98,8 +120,6 @@
     };
     const previewTextInput = document.getElementById('tasty-fonts-preview-text');
     const previewSizeInput = document.getElementById('tasty-fonts-preview-size');
-    const roleAssignButtons = Array.from(document.querySelectorAll('[data-role-assign]'));
-    const deleteFamilyButtons = Array.from(document.querySelectorAll('[data-delete-family]'));
     const roleHeadingPreviews = Array.from(document.querySelectorAll('[data-role-preview="heading"]'));
     const roleBodyPreviews = Array.from(document.querySelectorAll('[data-role-preview="body"]'));
     const roleMonospacePreviews = Array.from(document.querySelectorAll('[data-role-preview="monospace"]'));
@@ -260,6 +280,22 @@
         'tasty-fonts-google-access-panel',
         'tasty-fonts-adobe-project-panel'
     ]);
+
+    function roleAssignButtons() {
+        return Array.from(document.querySelectorAll('[data-role-assign]'));
+    }
+
+    function deleteFamilyButtons() {
+        return Array.from(document.querySelectorAll('[data-delete-family]'));
+    }
+
+    function familyDetailsState(target) {
+        return {
+            familySlug: String(target?.getAttribute('data-family-slug') || '').trim(),
+            loaded: String(target?.getAttribute('data-family-details-loaded') || '') === 'true',
+            loading: String(target?.getAttribute('data-family-details-loading') || '') === 'true',
+        };
+    }
     const staticStrings = {
         previewFallback: __('The quick brown fox jumps over the lazy dog. 1234567890', 'tasty-fonts'),
         importPreviewSample: __('Aa Bb Cc Dd Ee Ff Gg Hh\n0123456789', 'tasty-fonts'),
@@ -1219,7 +1255,7 @@
         }
 
         if (Object.prototype.hasOwnProperty.call(settings, 'font_display')) {
-            syncRadioFields('font_display', settings.font_display || 'optional');
+            syncRadioFields('font_display', settings.font_display || 'swap');
         }
 
         if (Object.prototype.hasOwnProperty.call(settings, 'unicode_range_mode')) {
@@ -3072,7 +3108,7 @@
     function setRoleDraftSavingState(isSaving) {
         roleDraftSaveInFlight = isSaving;
 
-        roleAssignButtons.forEach((button) => {
+        roleAssignButtons().forEach((button) => {
             button.disabled = isSaving;
             button.setAttribute('aria-busy', isSaving ? 'true' : 'false');
         });
@@ -4288,6 +4324,109 @@
         disclosureToggleElements().forEach((toggle) => {
             setDisclosureState(toggle, isDisclosureExpanded(toggle));
         });
+    }
+
+    function setFamilyDetailsStatus(target, message, tone = 'info') {
+        if (!target) {
+            return;
+        }
+
+        let status = target.querySelector('[data-family-details-status]');
+
+        if (!status) {
+            status = document.createElement('div');
+            status.className = 'tasty-fonts-family-details-status';
+            status.setAttribute('data-family-details-status', '');
+            status.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+            target.prepend(status);
+        }
+
+        status.textContent = message || '';
+        status.classList.remove('is-error', 'is-loading');
+
+        if (!message) {
+            status.hidden = true;
+            status.removeAttribute('role');
+            return;
+        }
+
+        status.hidden = false;
+        status.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+        status.classList.add(tone === 'error' ? 'is-error' : 'is-loading');
+    }
+
+    function initializeHydratedFamilyDetails(target) {
+        if (!target) {
+            return;
+        }
+
+        initHelpTooltips();
+
+        target.querySelectorAll('[data-family-fallback-form]').forEach((form) => {
+            syncFamilyFallbackSaveState(form);
+        });
+        target.querySelectorAll('[data-family-font-display-form]').forEach((form) => {
+            syncFamilyFontDisplaySaveState(form);
+        });
+        target.querySelectorAll('[data-family-delivery-form]').forEach((form) => {
+            syncFamilyDeliverySaveState(form);
+        });
+        target.querySelectorAll('[data-family-publish-state-form]').forEach((form) => {
+            syncFamilyPublishStateSaveState(form);
+        });
+    }
+
+    async function hydrateFamilyDetails(toggle) {
+        const target = getDisclosureTarget(toggle);
+
+        if (!toggle || !target) {
+            return false;
+        }
+
+        const state = familyDetailsState(target);
+
+        if (!shouldHydrateFamilyDetails(state)) {
+            return state.loaded;
+        }
+
+        const familySlug = state.familySlug || String(toggle.getAttribute('data-family-slug') || '').trim();
+
+        if (!familySlug || !hasRestConfig()) {
+            return false;
+        }
+
+        target.setAttribute('data-family-details-loading', 'true');
+        target.setAttribute('aria-busy', 'true');
+        toggle.setAttribute('aria-busy', 'true');
+        setFamilyDetailsStatus(target, getString('familyDetailsLoading', 'Loading family details...'), 'loading');
+        setDisclosureState(toggle, true);
+
+        try {
+            const payload = await requestJson(getRoutePath('familyCard', 'families/card'), {
+                method: 'GET',
+                query: { family_slug: familySlug },
+                fallbackMessage: getString('familyDetailsLoadError', 'The family details could not be loaded.')
+            });
+
+            target.innerHTML = payload.html || '';
+            target.setAttribute('data-family-details-loaded', 'true');
+            initializeHydratedFamilyDetails(target);
+            setDisclosureState(toggle, true);
+
+            return true;
+        } catch (error) {
+            setFamilyDetailsStatus(
+                target,
+                getErrorMessage(error, getString('familyDetailsLoadError', 'The family details could not be loaded.')),
+                'error'
+            );
+
+            return false;
+        } finally {
+            target.removeAttribute('data-family-details-loading');
+            target.removeAttribute('aria-busy');
+            toggle.removeAttribute('aria-busy');
+        }
     }
 
     function focusAddFontPanel() {
@@ -5711,7 +5850,7 @@
         syncRoleActionButtonStates();
         syncPreviewActionButtonStates();
 
-        roleAssignButtons.forEach((button) => {
+        roleAssignButtons().forEach((button) => {
             const family = button.getAttribute('data-font-family') || '';
             const role = button.getAttribute('data-role-assign');
             const isCurrent = (role === 'heading' && family === data.heading)
@@ -5738,7 +5877,7 @@
             }
         });
 
-        deleteFamilyButtons.forEach((button) => {
+        deleteFamilyButtons().forEach((button) => {
             const family = button.getAttribute('data-delete-family') || '';
             const blockedRoleKeys = selectedRoleKeysForFamily(family, data);
             const blockedMessage = blockedRoleKeys.length > 0
@@ -8648,8 +8787,9 @@
         }
 
         const toggle = row.querySelector('[data-disclosure-toggle]');
+        const target = toggle ? getDisclosureTarget(toggle) : null;
 
-        if (toggle) {
+        if (toggle && target && familyDetailsState(target).loaded) {
             const wasExpanded = isDisclosureExpanded(toggle);
 
             if (!wasExpanded) {
@@ -8713,11 +8853,18 @@
             let visibleCount = 0;
 
             libraryRows.forEach((row) => {
-                const name = row.getAttribute('data-font-name') || '';
-                const matchesQuery = !query || name.includes(query);
-                const matchesSource = rowMatchesSource(row, activeLibrarySourceFilter);
-                const matchesCategory = rowMatchesCategory(row, activeLibraryCategoryFilter);
-                const matches = matchesQuery && matchesSource && matchesCategory;
+                const matches = rowMatchesLibraryFilters(
+                    {
+                        name: row.getAttribute('data-font-name') || '',
+                        sources: row.getAttribute('data-font-sources') || '',
+                        categories: row.getAttribute('data-font-categories') || '',
+                    },
+                    {
+                        query,
+                        sourceFilter: activeLibrarySourceFilter,
+                        categoryFilter: activeLibraryCategoryFilter,
+                    }
+                );
 
                 row.hidden = !matches;
 
@@ -8927,6 +9074,7 @@
         const nextExpanded = !isExpanded;
         const targetId = disclosureToggle.getAttribute('data-disclosure-toggle') || '';
         const isRoleToolToggle = targetId === 'tasty-fonts-role-preview-panel' || targetId === 'tasty-fonts-role-snippets-panel';
+        const isFamilyDetailsToggle = disclosureToggle.hasAttribute('data-family-details-toggle');
 
         if (nextExpanded && isRoleToolToggle) {
             const pairedTargetId = targetId === 'tasty-fonts-role-preview-panel'
@@ -8937,6 +9085,27 @@
             if (pairedToggle) {
                 setDisclosureState(pairedToggle, false);
             }
+        }
+
+        if (nextExpanded && isFamilyDetailsToggle) {
+            void hydrateFamilyDetails(disclosureToggle).then((hydrated) => {
+                if (!hydrated) {
+                    return;
+                }
+
+                if (disclosureToggle.getAttribute('aria-expanded') !== 'true') {
+                    return;
+                }
+
+                if (isTrackedDisclosureToggle(disclosureToggle)) {
+                    syncTrackedUiUrl('push');
+                }
+
+                focusDisclosureTarget(targetId);
+                announceDisclosureExpansion(disclosureToggle);
+            });
+
+            return true;
         }
 
         setDisclosureState(disclosureToggle, nextExpanded);

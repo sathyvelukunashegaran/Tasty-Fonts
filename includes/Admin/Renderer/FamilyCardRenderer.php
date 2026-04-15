@@ -56,6 +56,64 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         <?php
     }
 
+    public function renderFamilyCardDetails(
+        array $family,
+        array $roles,
+        array $familyFallbacks,
+        array $familyFontDisplays,
+        array $familyFontDisplayOptions,
+        string $previewText,
+        array $categoryAliasOwners = [],
+        array $extendedVariableOptions = [],
+        bool $monospaceRoleEnabled = false,
+        array $classOutputOptions = []
+    ): void {
+        $view = $this->buildFamilyTemplateView(
+            $family,
+            $roles,
+            $familyFallbacks,
+            $familyFontDisplays,
+            $familyFontDisplayOptions,
+            $previewText,
+            $categoryAliasOwners,
+            $extendedVariableOptions,
+            $monospaceRoleEnabled,
+            $classOutputOptions
+        );
+        $view['includeDetails'] = true;
+        $this->renderTemplate('family-card-details.php', $view);
+    }
+
+    public function renderFamilySummaryRow(
+        array $family,
+        array $roles,
+        array $familyFallbacks,
+        array $familyFontDisplays,
+        array $familyFontDisplayOptions,
+        string $previewText,
+        array $categoryAliasOwners = [],
+        array $extendedVariableOptions = [],
+        bool $monospaceRoleEnabled = false,
+        array $classOutputOptions = []
+    ): void {
+        $view = $this->buildFamilyTemplateView(
+            $family,
+            $roles,
+            $familyFallbacks,
+            $familyFontDisplays,
+            $familyFontDisplayOptions,
+            $previewText,
+            $categoryAliasOwners,
+            $extendedVariableOptions,
+            $monospaceRoleEnabled,
+            $classOutputOptions
+        );
+        $view['trainingWheelsOff'] = $this->trainingWheelsOff;
+        $view['includeDetails'] = false;
+
+        $this->render($view);
+    }
+
     public function renderFamilyRow(
         array $family,
         array $roles,
@@ -68,6 +126,36 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         bool $monospaceRoleEnabled = false,
         array $classOutputOptions = []
     ): void {
+        $templateView = $this->buildFamilyTemplateView(
+            $family,
+            $roles,
+            $familyFallbacks,
+            $familyFontDisplays,
+            $familyFontDisplayOptions,
+            $previewText,
+            $categoryAliasOwners,
+            $extendedVariableOptions,
+            $monospaceRoleEnabled,
+            $classOutputOptions
+        );
+        $templateView['trainingWheelsOff'] = $this->trainingWheelsOff;
+        $templateView['includeDetails'] = true;
+
+        $this->render($templateView);
+    }
+
+    private function buildFamilyTemplateView(
+        array $family,
+        array $roles,
+        array $familyFallbacks,
+        array $familyFontDisplays,
+        array $familyFontDisplayOptions,
+        string $previewText,
+        array $categoryAliasOwners = [],
+        array $extendedVariableOptions = [],
+        bool $monospaceRoleEnabled = false,
+        array $classOutputOptions = []
+    ): array {
         $familyName = (string) ($family['family'] ?? '');
         $familySlug = (string) ($family['slug'] ?? FontUtils::slugify($familyName));
         $isHeading = ($roles['heading'] ?? '') === $familyName;
@@ -152,9 +240,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $isExpanded = false;
         $detailsId = 'tasty-fonts-family-details-' . sanitize_html_class($familySlug !== '' ? $familySlug : FontUtils::slugify($familyName));
         $templateView = get_defined_vars();
-        $templateView['trainingWheelsOff'] = $this->trainingWheelsOff;
 
-        $this->render($templateView);
+        return $templateView;
     }
 
     public function renderMigrateDeliveryButton(string $familyName, array $profile, string $className = 'button'): void
