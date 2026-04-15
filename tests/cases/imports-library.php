@@ -966,8 +966,96 @@ $tests['library_service_save_family_delivery_returns_error_for_unknown_slug'] = 
     assertSameValue('tasty_fonts_family_not_found', $result->get_error_code(), 'saveFamilyDelivery() should use the family_not_found error code for an unknown slug.');
 };
 
+$tests['library_service_save_family_delivery_switches_the_active_profile_and_logs_the_change'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [],
+            'meta' => [],
+        ],
+        'published',
+        false
+    );
+
+    $result = $services['library']->saveFamilyDelivery('inter', 'google-cdn');
+    $saved = $services['imports']->getFamily('inter');
+    $logEntries = $services['log']->all();
+
+    assertFalseValue(is_wp_error($result), 'saveFamilyDelivery() should switch to a known delivery profile.');
+    assertSameValue('inter', (string) ($result['family_slug'] ?? ''), 'saveFamilyDelivery() should return the saved family slug.');
+    assertSameValue('google-cdn', (string) ($result['delivery_id'] ?? ''), 'saveFamilyDelivery() should return the newly active delivery id.');
+    assertSameValue('Google CDN', (string) ($result['delivery_label'] ?? ''), 'saveFamilyDelivery() should return the saved delivery label.');
+    assertSameValue('google-cdn', (string) ($saved['active_delivery_id'] ?? ''), 'saveFamilyDelivery() should persist the new active delivery on the stored family.');
+    assertContainsValue('Live delivery for Inter switched to Google CDN.', (string) ($result['message'] ?? ''), 'saveFamilyDelivery() should describe the active delivery switch in its result payload.');
+    assertContainsValue('Live delivery for Inter switched to Google CDN.', (string) ($logEntries[0]['message'] ?? ''), 'saveFamilyDelivery() should log the active delivery switch.');
+};
+
+$tests['library_service_save_family_delivery_returns_error_for_unknown_delivery'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $result = $services['library']->saveFamilyDelivery('inter', 'missing-delivery');
+
+    assertTrueValue(is_wp_error($result), 'saveFamilyDelivery() should reject unknown delivery ids for an existing family.');
+    assertSameValue('tasty_fonts_delivery_not_found', $result->get_error_code(), 'saveFamilyDelivery() should use the delivery-not-found error for missing profiles.');
+};
+
 // ---------------------------------------------------------------------------
-// LibraryService::saveFamilyPublishState – error path
+// LibraryService::saveFamilyPublishState – success and error paths
 // ---------------------------------------------------------------------------
 
 $tests['library_service_save_family_publish_state_returns_error_for_unknown_slug'] = static function (): void {
@@ -979,6 +1067,90 @@ $tests['library_service_save_family_publish_state_returns_error_for_unknown_slug
 
     assertTrueValue(is_wp_error($result), 'saveFamilyPublishState() should return a WP_Error when the given family slug is not in the library.');
     assertSameValue('tasty_fonts_family_not_found', $result->get_error_code(), 'saveFamilyPublishState() should use the family_not_found error code for an unknown slug.');
+};
+
+$tests['library_service_save_family_publish_state_rejects_invalid_states'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2'), 'font-data');
+
+    $result = $services['library']->saveFamilyPublishState('inter', 'archived');
+
+    assertTrueValue(is_wp_error($result), 'saveFamilyPublishState() should reject unsupported publish states.');
+    assertSameValue('tasty_fonts_publish_state_invalid', $result->get_error_code(), 'saveFamilyPublishState() should use the invalid-state error code for unsupported values.');
+};
+
+$tests['library_service_save_family_publish_state_blocks_pausing_live_families'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $catalog = ['Inter'];
+    $services['settings']->saveRoles(
+        [
+            'heading' => 'Inter',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        $catalog
+    );
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => 'Inter',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        $catalog
+    );
+    $services['settings']->setAutoApplyRoles(true);
+
+    $result = $services['library']->saveFamilyPublishState('inter', 'library_only');
+
+    assertTrueValue(is_wp_error($result), 'saveFamilyPublishState() should block pausing families that are currently live through sitewide roles.');
+    assertSameValue('tasty_fonts_family_live', $result->get_error_code(), 'saveFamilyPublishState() should use the live-family error when attempting to pause an active family.');
+};
+
+$tests['library_service_save_family_publish_state_updates_stored_state_and_logs_the_change'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2'), 'font-data');
+
+    $result = $services['library']->saveFamilyPublishState('inter', 'library_only');
+    $saved = $services['imports']->getFamily('inter');
+    $logEntries = $services['log']->all();
+
+    assertFalseValue(is_wp_error($result), 'saveFamilyPublishState() should persist supported states for known families.');
+    assertSameValue('library_only', (string) ($result['publish_state'] ?? ''), 'saveFamilyPublishState() should return the saved publish state.');
+    assertSameValue('library_only', (string) ($saved['publish_state'] ?? ''), 'saveFamilyPublishState() should persist the new publish state.');
+    assertContainsValue('Inter is now In Library Only.', (string) ($result['message'] ?? ''), 'saveFamilyPublishState() should return a human-readable status message.');
+    assertContainsValue('Inter is now In Library Only.', (string) ($logEntries[0]['message'] ?? ''), 'saveFamilyPublishState() should log publish-state changes.');
 };
 
 // ---------------------------------------------------------------------------

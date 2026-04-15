@@ -55,6 +55,149 @@ $tests['rest_controller_falls_back_to_variant_tokens_when_variants_are_missing']
     assertSameValue(['regular', '700italic'], $variants, 'REST import requests should fall back to the comma-separated variant token field when an explicit variants array is absent.');
 };
 
+$tests['rest_controller_route_reference_builds_full_api_paths_and_ignores_unknown_keys'] = static function (): void {
+    assertSameValue(
+        '/tasty-fonts/v1/settings',
+        RestController::routeReference('saveSettings'),
+        'Route references should include the REST namespace and the mapped route path for known route keys.'
+    );
+    assertSameValue(
+        '/tasty-fonts/v1/',
+        RestController::routeReference('missing'),
+        'Unknown route keys should fall back to the API namespace root instead of producing malformed paths.'
+    );
+};
+
+$tests['rest_controller_sanitizes_text_toggle_string_and_nested_array_args'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $rest = $services['rest'];
+    $invalidLeaf = new stdClass();
+
+    assertSameValue('Inter (1)', $rest->sanitizeTextArg("  Inter <alert>(1)\n"), 'Text args should be normalized through sanitize_text_field semantics.');
+    assertSameValue('', $rest->sanitizeTextArg(['nope']), 'Text args should collapse non-scalar payloads to an empty string.');
+
+    assertSameValue('1', $rest->sanitizeToggleArg('yes'), 'Truthy toggle values should normalize to 1.');
+    assertSameValue('0', $rest->sanitizeToggleArg(''), 'Empty toggle values should normalize to 0.');
+    assertSameValue('0', $rest->sanitizeToggleArg(['bad']), 'Non-scalar toggle values should normalize to 0.');
+
+    assertSameValue(
+        ['regular', '700italic', '0'],
+        $rest->sanitizeStringArrayArg([' regular ', '', '700italic', ['bad'], 0]),
+        'String array args should keep only sanitized scalar items in order.'
+    );
+
+    assertSameValue(
+        [
+            'family' => 'Inter',
+            'axes' => [
+                'WGHT' => '700',
+                'deep' => [
+                    'ITAL' => '1',
+                ],
+            ],
+            3 => 'keep-int-key',
+        ],
+        $rest->sanitizeNestedArrayArg([
+            'family' => "Inter <script>",
+            'axes' => [
+                'WGHT' => '700',
+                'deep' => [
+                    'ITAL' => '1',
+                    'skip' => $invalidLeaf,
+                ],
+            ],
+            3 => 'keep-int-key',
+            'drop' => $invalidLeaf,
+        ]),
+        'Nested array args should sanitize string keys and values recursively while skipping non-scalar leaf values.'
+    );
+};
+
+$tests['rest_controller_validates_text_toggle_string_and_nested_array_args'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $rest = $services['rest'];
+    $invalidLeaf = new stdClass();
+
+    assertTrueValue(
+        (bool) invokePrivateMethod($rest, 'validateTextArg', [' SWAP ', false, ['swap', 'optional']]),
+        'Text arg validation should accept allowed values case-insensitively after sanitization.'
+    );
+    assertFalseValue(
+        (bool) invokePrivateMethod($rest, 'validateTextArg', ['invalid', false, ['swap', 'optional']]),
+        'Text arg validation should reject values outside the allowlist.'
+    );
+    assertFalseValue(
+        (bool) invokePrivateMethod($rest, 'validateTextArg', [null, true, null]),
+        'Required text args should reject null payloads.'
+    );
+    assertFalseValue(
+        (bool) invokePrivateMethod($rest, 'validateTextArg', [['bad'], false, null]),
+        'Text arg validation should reject non-scalar payloads.'
+    );
+
+    assertTrueValue($rest->validateToggleArg('0'), 'Toggle arg validation should accept scalar values.');
+    assertTrueValue($rest->validateToggleArg(null), 'Toggle arg validation should accept null values.');
+    assertFalseValue($rest->validateToggleArg(['bad']), 'Toggle arg validation should reject non-scalar payloads.');
+
+    assertTrueValue(
+        $rest->validateStringArrayArg(['regular', 700, null]),
+        'String array validation should accept scalar and null array items.'
+    );
+    assertFalseValue(
+        $rest->validateStringArrayArg([['bad']]),
+        'String array validation should reject nested non-scalar items.'
+    );
+    assertFalseValue(
+        $rest->validateStringArrayArg('regular', true),
+        'Required string array validation should reject non-array payloads.'
+    );
+
+    assertTrueValue(
+        $rest->validateNestedArrayArg(['family' => 'Inter', 'axes' => ['WGHT' => '700', 'ITAL' => null]]),
+        'Nested array validation should accept recursive scalar structures.'
+    );
+    assertFalseValue(
+        $rest->validateNestedArrayArg(['axes' => [['bad' => ['deeper' => $invalidLeaf]]]]),
+        'Nested array validation should reject nested non-scalar leaf values.'
+    );
+    assertFalseValue(
+        $rest->validateNestedArrayArg('invalid', true),
+        'Required nested array validation should reject non-array payloads.'
+    );
+};
+
+$tests['rest_controller_role_draft_input_keeps_only_present_supported_fields'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/roles/draft');
+    $request->set_body_params([
+        'heading' => 'Inter',
+        'body' => 'Lora',
+        'heading_weight' => '700',
+        'heading_axes' => ['WGHT' => '700', 'ITAL' => '1'],
+        'body_axes' => 'invalid',
+        'ignored_field' => 'should-not-pass',
+    ]);
+
+    $input = invokePrivateMethod($services['rest'], 'getRoleDraftInput', [$request]);
+
+    assertSameValue(
+        [
+            'heading' => 'Inter',
+            'body' => 'Lora',
+            'heading_weight' => '700',
+            'heading_axes' => ['WGHT' => '700', 'ITAL' => '1'],
+        ],
+        $input,
+        'Role draft requests should keep only supported submitted fields and preserve axis maps only when they are arrays.'
+    );
+};
+
 $tests['admin_controller_normalizes_uploaded_files_by_sparse_row_index'] = static function (): void {
     resetTestState();
 

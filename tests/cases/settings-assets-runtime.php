@@ -991,6 +991,122 @@ $tests['site_transfer_service_import_leaves_google_api_key_empty_when_no_fresh_s
     assertSameValue('', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Importing without a fresh Google API key should leave the destination site with no saved Google secret.');
 };
 
+$tests['site_transfer_service_import_rejects_missing_uploads_before_validation'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $result = $services['site_transfer']->importBundleReplacingCurrentState([
+        'name' => '',
+        'tmp_name' => '',
+        'error' => UPLOAD_ERR_NO_FILE,
+    ]);
+
+    assertWpErrorCode(
+        'tasty_fonts_transfer_missing_upload',
+        $result,
+        'Importing a site transfer bundle should reject requests that do not include an uploaded file.'
+    );
+};
+
+$tests['site_transfer_service_import_rejects_non_zip_uploads_before_reading_the_file'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $tmpPath = tempnam(sys_get_temp_dir(), 'tasty-fonts-transfer-text-');
+    file_put_contents((string) $tmpPath, 'not-a-zip');
+
+    $result = $services['site_transfer']->importBundleReplacingCurrentState([
+        'name' => 'tasty-fonts-transfer.txt',
+        'tmp_name' => (string) $tmpPath,
+        'error' => UPLOAD_ERR_OK,
+        'size' => (int) filesize((string) $tmpPath),
+    ]);
+
+    assertWpErrorCode(
+        'tasty_fonts_transfer_upload_not_zip',
+        $result,
+        'Importing a site transfer bundle should reject uploads whose filename is not a zip archive.'
+    );
+
+    @unlink((string) $tmpPath);
+};
+
+$tests['site_transfer_service_import_rejects_unverified_zip_uploads'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $tmpPath = tempnam(sys_get_temp_dir(), 'tasty-fonts-transfer-upload-');
+    file_put_contents((string) $tmpPath, 'placeholder');
+
+    $result = $services['site_transfer']->importBundleReplacingCurrentState([
+        'name' => 'tasty-fonts-transfer.zip',
+        'tmp_name' => (string) $tmpPath,
+        'error' => UPLOAD_ERR_OK,
+        'size' => (int) filesize((string) $tmpPath),
+    ]);
+
+    assertWpErrorCode(
+        'tasty_fonts_transfer_upload_unverified',
+        $result,
+        'Importing a site transfer bundle should reject zip files that were not verified as uploaded files by the validator.'
+    );
+
+    @unlink((string) $tmpPath);
+};
+
+$tests['site_transfer_service_validation_rejects_archives_without_a_manifest'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $zipPath = tempnam(sys_get_temp_dir(), 'tasty-fonts-transfer-no-manifest-');
+    $zip = new ZipArchive();
+    $zip->open((string) $zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('fonts/upload/inter/inter-400-normal.woff2', 'font-data');
+    $zip->close();
+
+    $validation = $services['site_transfer']->validateImportBundle((string) $zipPath);
+
+    assertWpErrorCode(
+        'tasty_fonts_transfer_missing_manifest',
+        $validation,
+        'Bundle validation should reject archives that do not include the export manifest.'
+    );
+
+    @unlink((string) $zipPath);
+};
+
+$tests['site_transfer_service_validation_rejects_unexpected_root_entries'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $zipPath = tempnam(sys_get_temp_dir(), 'tasty-fonts-transfer-unexpected-entry-');
+    $zip = new ZipArchive();
+    $zip->open((string) $zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString(
+        SiteTransferService::MANIFEST_FILENAME,
+        (string) wp_json_encode([
+            'schema_version' => SiteTransferService::SCHEMA_VERSION,
+            'settings' => [],
+            'roles' => [],
+            'applied_roles' => [],
+            'library' => [],
+            'files' => [],
+        ])
+    );
+    $zip->addFromString('notes.txt', 'unexpected');
+    $zip->close();
+
+    $validation = $services['site_transfer']->validateImportBundle((string) $zipPath);
+
+    assertWpErrorCode(
+        'tasty_fonts_transfer_unexpected_archive_entry',
+        $validation,
+        'Bundle validation should reject unexpected root-level files outside the managed fonts payload.'
+    );
+
+    @unlink((string) $zipPath);
+};
+
 $tests['settings_repository_defaults_and_persists_class_output_settings'] = static function (): void {
     resetTestState();
 
