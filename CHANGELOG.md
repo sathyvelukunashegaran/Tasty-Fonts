@@ -4,9 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-04-16
+
 ### Changed
 
+- Renamed the packaged plugin directory from `etch-fonts/` to `tasty-fonts/` across release archives, install instructions, and test fixtures to match the current product branding.
+- Moved Google Fonts API key material into dedicated encrypted option storage and excluded it from portable exports.
+- Refined the Transfer settings UI with a dedicated tab, cleaner export and import cards, token-driven controls, and a polished bundle upload field.
+- Always render the embedded Studio tools section so the Studio shell keeps its tools markup available on every page.
 - Promoted the validated `1.12.0` beta line to stable.
+
+### Added
+
+- Added a portable Site Transfer workflow in Settings -> Transfer to export and import bundles containing managed fonts, library data, settings, and live role assignments.
+- Added support for supplying a fresh Google Fonts API key during site-transfer imports so destination sites can restore search access without exporting secrets.
+- Added a centralized admin design-token scale covering spacing, typography, motion, layers, component sizing, and syntax highlighting.
+
+### Fixed
+
+- Fixed variable-font output so registered axis defaults are omitted from generated CSS and Block Editor sync payloads when they would be redundant.
+- Fixed CSS minification to preserve significant whitespace in output where collapsing it would change behavior.
 
 ## [1.12.0-beta.3] - 2026-04-16
 
