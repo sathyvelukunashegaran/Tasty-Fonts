@@ -6,8 +6,10 @@ namespace TastyFonts\Api;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Repository\SettingsRepository;
 use WP_Error;
 use WP_REST_Request;
 
@@ -23,6 +25,7 @@ final class RestController
         'bunnyFamily' => 'bunny/family',
         'importGoogle' => 'google/import',
         'importBunny' => 'bunny/import',
+        'validateSiteTransfer' => 'transfer/validate',
         'uploadLocal' => 'local/upload',
         'saveFamilyFallback' => 'families/fallback',
         'saveFamilyFontDisplay' => 'families/font-display',
@@ -33,8 +36,11 @@ final class RestController
         'familyCard' => 'families/card',
     ];
 
-    public function __construct(private readonly AdminController $admin)
+    private readonly AdminAccessService $adminAccess;
+
+    public function __construct(private readonly AdminController $admin, ?AdminAccessService $adminAccess = null)
     {
+        $this->adminAccess = $adminAccess ?? new AdminAccessService(new SettingsRepository());
     }
 
     public static function routeMap(): array
@@ -66,6 +72,7 @@ final class RestController
         ]);
         $this->registerRoute(self::ROUTES['importGoogle'], 'POST', [$this, 'importGoogleFamily'], $this->hostedImportArgs());
         $this->registerRoute(self::ROUTES['importBunny'], 'POST', [$this, 'importBunnyFamily'], $this->hostedImportArgs());
+        $this->registerRoute(self::ROUTES['validateSiteTransfer'], 'POST', [$this, 'validateSiteTransferBundle']);
         $this->registerRoute(self::ROUTES['uploadLocal'], 'POST', [$this, 'uploadLocalFonts'], [
             'rows' => $this->buildNestedArrayArg(true),
         ]);
@@ -97,7 +104,7 @@ final class RestController
 
     public function canManageOptions(): bool
     {
-        return current_user_can('manage_options');
+        return $this->adminAccess->canCurrentUserAccess();
     }
 
     public function searchGoogle(WP_REST_Request $request): mixed
@@ -148,6 +155,17 @@ final class RestController
                 $this->getTextParam($request, 'family'),
                 $this->getVariantTokens($request),
                 $this->getTextParam($request, 'delivery_mode', 'self_hosted')
+            )
+        );
+    }
+
+    public function validateSiteTransferBundle(WP_REST_Request $request): mixed
+    {
+        $rawFiles = $request->get_file_params();
+
+        return $this->restResult(
+            $this->admin->stageSiteTransferBundle(
+                is_array($rawFiles['bundle'] ?? null) ? $rawFiles['bundle'] : []
             )
         );
     }
@@ -342,6 +360,16 @@ final class RestController
                 continue;
             }
 
+            if ($kind === 'string_array') {
+                $args[$name] = $this->buildStringArrayArg();
+                continue;
+            }
+
+            if ($kind === 'int_array') {
+                $args[$name] = $this->buildIntegerArrayArg();
+                continue;
+            }
+
             $allowedValues = is_array($definition['values'] ?? null) ? array_values((array) $definition['values']) : null;
             $args[$name] = $this->buildTextArg(false, $allowedValues);
         }
@@ -429,6 +457,17 @@ final class RestController
         ];
     }
 
+    private function buildIntegerArrayArg(bool $required = false): array
+    {
+        return [
+            'type' => 'array',
+            'required' => $required,
+            'items' => ['type' => 'integer'],
+            'sanitize_callback' => [$this, 'sanitizeIntegerArrayArg'],
+            'validate_callback' => fn (mixed $value): bool => $this->validateIntegerArrayArg($value, $required),
+        ];
+    }
+
     public function sanitizeTextArg(mixed $value): string
     {
         if (!is_scalar($value) && $value !== null) {
@@ -464,6 +503,31 @@ final class RestController
         );
     }
 
+    public function sanitizeIntegerArrayArg(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $sanitized = [];
+
+        foreach ($value as $item) {
+            if (!is_scalar($item) && $item !== null) {
+                continue;
+            }
+
+            $item = absint($item);
+
+            if ($item <= 0) {
+                continue;
+            }
+
+            $sanitized[] = $item;
+        }
+
+        return $sanitized;
+    }
+
     public function sanitizeNestedArrayArg(mixed $value): array
     {
         if (!is_array($value)) {
@@ -496,6 +560,25 @@ final class RestController
     }
 
     public function validateStringArrayArg(mixed $value, bool $required = false): bool
+    {
+        if ($value === null) {
+            return !$required;
+        }
+
+        if (!is_array($value)) {
+            return false;
+        }
+
+        foreach ($value as $item) {
+            if (!is_scalar($item) && $item !== null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function validateIntegerArrayArg(mixed $value, bool $required = false): bool
     {
         if ($value === null) {
             return !$required;

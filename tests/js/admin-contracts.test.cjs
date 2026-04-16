@@ -10,12 +10,16 @@ const {
     hasStaticFontMetadata,
     hasVariableFontMetadata,
     isTrustedHostedStylesheetUrl,
+    logEntryMatchesFilters,
     normalizeOutputQuickModePreference,
+    parsePhpIniSizeToBytes,
     rowMatchesLibraryFilters,
     resolveStatusAnnouncement,
     resolveAssignedRoleState,
     roleStatesMatch,
+    serializeSettingsFormEntries,
     settingsStatesMatch,
+    shouldDisableFieldDuringSiteTransferSubmit,
     sanitizeFallback,
     sanitizeOutputQuickModePreference,
     shouldHydrateFamilyDetails,
@@ -71,6 +75,67 @@ test('admin contracts resolve status announcements by urgency', () => {
     assert.deepEqual(resolveStatusAnnouncement('error'), { role: 'alert', live: 'assertive' });
     assert.deepEqual(resolveStatusAnnouncement('success'), { role: 'status', live: 'polite' });
     assert.deepEqual(resolveStatusAnnouncement('progress'), { role: 'status', live: 'polite' });
+});
+
+test('admin contracts only disable submit controls during site transfer submission', () => {
+    assert.equal(shouldDisableFieldDuringSiteTransferSubmit('button', ''), true);
+    assert.equal(shouldDisableFieldDuringSiteTransferSubmit('input', 'submit'), true);
+    assert.equal(shouldDisableFieldDuringSiteTransferSubmit('input', 'file'), false);
+    assert.equal(shouldDisableFieldDuringSiteTransferSubmit('input', 'hidden'), false);
+    assert.equal(shouldDisableFieldDuringSiteTransferSubmit('input', 'text'), false);
+});
+
+test('admin contracts match log entries against actor and search filters', () => {
+    assert.equal(logEntryMatchesFilters('System', '2026-04-17 System Exported a site transfer bundle.', '', ''), true);
+    assert.equal(logEntryMatchesFilters('System', 'Exported a site transfer bundle.', 'system', ''), true);
+    assert.equal(logEntryMatchesFilters('Alicia', 'Imported the site transfer bundle.', 'system', ''), false);
+    assert.equal(logEntryMatchesFilters('System', 'Imported the site transfer bundle.', '', 'imported'), true);
+    assert.equal(logEntryMatchesFilters('System', 'Imported the site transfer bundle.', '', 'deleted'), false);
+});
+
+test('admin contracts parse PHP ini byte shorthand for upload limits', () => {
+    assert.equal(parsePhpIniSizeToBytes('512'), 512);
+    assert.equal(parsePhpIniSizeToBytes('2K'), 2048);
+    assert.equal(parsePhpIniSizeToBytes('8M'), 8 * 1024 * 1024);
+    assert.equal(parsePhpIniSizeToBytes('1.5G'), Math.round(1.5 * 1024 * 1024 * 1024));
+    assert.equal(parsePhpIniSizeToBytes('not-a-size'), 0);
+});
+
+test('admin contracts serialize settings entries with array fields and empty sentinels', () => {
+    assert.deepEqual(
+        serializeSettingsFormEntries([
+            ['_wpnonce', 'nonce-value'],
+            ['admin_access_role_slugs[]', ''],
+            ['admin_access_role_slugs[]', 'editor'],
+            ['admin_access_role_slugs[]', 'author'],
+            ['admin_access_user_ids[]', ''],
+            ['admin_access_user_ids[]', '3'],
+            ['training_wheels_off', '0'],
+            ['training_wheels_off', '1'],
+            ['font_display', 'swap'],
+        ], {
+            ignoredKeys: ['_wpnonce'],
+        }),
+        {
+            admin_access_role_slugs: ['editor', 'author'],
+            admin_access_user_ids: ['3'],
+            training_wheels_off: '1',
+            font_display: 'swap',
+        }
+    );
+});
+
+test('admin contracts keep empty arrays when only hidden sentinels are submitted', () => {
+    assert.deepEqual(
+        serializeSettingsFormEntries([
+            ['admin_access_role_slugs[]', ''],
+            ['admin_access_user_ids[]', ''],
+        ]),
+        {
+            admin_access_role_slugs: [],
+            admin_access_user_ids: [],
+        }
+    );
 });
 
 test('admin contracts match library rows against query and filter combinations', () => {

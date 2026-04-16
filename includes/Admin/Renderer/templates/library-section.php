@@ -1,12 +1,7 @@
                     <?php $showUploadVariableControls = !empty($variableFontsEnabled); ?>
-                    <section class="tasty-fonts-card tasty-fonts-library-card" id="tasty-fonts-library">
+                    <section class="tasty-fonts-card tasty-fonts-library-card" id="tasty-fonts-library" aria-labelledby="tasty-fonts-library-panel-title">
                         <div class="tasty-fonts-card-head tasty-fonts-card-head--library">
-                            <?php
-                            $this->renderSectionHeading(
-                                'h2',
-                                __('Font Library', 'tasty-fonts')
-                            );
-                            ?>
+                            <h2 class="screen-reader-text" id="tasty-fonts-library-panel-title"><?php esc_html_e('Font Library', 'tasty-fonts'); ?></h2>
                             <div class="tasty-fonts-library-tools">
                                 <div class="tasty-fonts-library-filterbar">
                                     <div class="tasty-fonts-search-field tasty-fonts-search-field--compact">

@@ -72,6 +72,11 @@ $tests['rest_controller_route_reference_builds_full_api_paths_and_ignores_unknow
         RestController::routeReference('familyCard'),
         'Family card route references should include the REST namespace and lazy fragment path.'
     );
+    assertSameValue(
+        '/tasty-fonts/v1/transfer/validate',
+        RestController::routeReference('validateSiteTransfer'),
+        'Site transfer validation should expose a dedicated REST route reference.'
+    );
 };
 
 $tests['rest_controller_settings_args_stay_in_sync_with_shared_settings_save_field_definitions'] = static function (): void {
@@ -105,6 +110,12 @@ $tests['rest_controller_sanitizes_text_toggle_string_and_nested_array_args'] = s
         ['regular', '700italic', '0'],
         $rest->sanitizeStringArrayArg([' regular ', '', '700italic', ['bad'], 0]),
         'String array args should keep only sanitized scalar items in order.'
+    );
+
+    assertSameValue(
+        [2, 7],
+        $rest->sanitizeIntegerArrayArg(['2', '0', ['bad'], null, ' 7 ']),
+        'Integer array args should keep only positive scalar items in order.'
     );
 
     assertSameValue(
@@ -173,6 +184,19 @@ $tests['rest_controller_validates_text_toggle_string_and_nested_array_args'] = s
     assertFalseValue(
         $rest->validateStringArrayArg('regular', true),
         'Required string array validation should reject non-array payloads.'
+    );
+
+    assertTrueValue(
+        $rest->validateIntegerArrayArg(['2', 7, null]),
+        'Integer array validation should accept scalar and null array items.'
+    );
+    assertFalseValue(
+        $rest->validateIntegerArrayArg([['bad']]),
+        'Integer array validation should reject nested non-scalar items.'
+    );
+    assertFalseValue(
+        $rest->validateIntegerArrayArg('2', true),
+        'Required integer array validation should reject non-array payloads.'
     );
 
     assertTrueValue(
@@ -268,6 +292,9 @@ $tests['admin_controller_collects_only_allowlisted_posted_settings_fields'] = st
         'google_api_key' => " api-key\\with-slash ",
         'preload_primary_fonts' => '1',
         'monospace_role_enabled' => '0',
+        'admin_access_custom_enabled' => '1',
+        'admin_access_role_slugs' => ['editor', '', ['nested']],
+        'admin_access_user_ids' => ['2', '0', ['nested'], 3],
         'unexpected_setting' => 'should-not-pass',
         'nested_payload' => ['nope'],
     ];
@@ -280,10 +307,122 @@ $tests['admin_controller_collects_only_allowlisted_posted_settings_fields'] = st
             'google_api_key' => ' api-key\\with-slash ',
             'preload_primary_fonts' => '1',
             'monospace_role_enabled' => '0',
+            'admin_access_custom_enabled' => '1',
+            'admin_access_role_slugs' => ['editor', ''],
+            'admin_access_user_ids' => ['2', '0', 3],
         ],
         $submitted,
-        'Classic settings saves should only forward explicitly allowlisted scalar setting fields from $_POST.'
+        'Classic settings saves should only forward explicitly allowlisted fields from $_POST, including array-valued admin access settings.'
     );
+};
+
+$tests['admin_access_service_allows_administrators_roles_and_individual_users'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+
+    $services = makeServiceGraph();
+
+    assertTrueValue($services['admin_access']->canCurrentUserAccess(), 'Administrators should retain Tasty Fonts admin access by default.');
+
+    $currentUserId = 2;
+    assertFalseValue($services['admin_access']->canCurrentUserAccess(), 'Non-admin users should be denied by default when they are not explicitly granted access.');
+
+    $services['settings']->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => ['editor'],
+    ]);
+    assertTrueValue($services['admin_access']->canCurrentUserAccess(), 'Users in an explicitly granted role should gain access when custom access is enabled.');
+
+    $currentUserId = 3;
+    $services['settings']->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => [],
+        'admin_access_user_ids' => [3],
+    ]);
+    assertTrueValue($services['admin_access']->canCurrentUserAccess(), 'Explicitly granted individual users should gain access even when their role is not allowlisted.');
+};
+
+$tests['rest_controller_permissions_follow_the_shared_admin_access_policy'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+
+    $services = makeServiceGraph();
+
+    assertTrueValue($services['rest']->canManageOptions(), 'REST permissions should allow administrators by default.');
+
+    $currentUserId = 2;
+    assertFalseValue($services['rest']->canManageOptions(), 'REST permissions should deny unlisted non-admin users.');
+
+    $services['settings']->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => ['editor'],
+    ]);
+    assertTrueValue($services['rest']->canManageOptions(), 'REST permissions should allow explicitly granted roles when custom access is enabled.');
+
+    $currentUserId = 3;
+    $services['settings']->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => [],
+        'admin_access_user_ids' => [3],
+    ]);
+    assertTrueValue($services['rest']->canManageOptions(), 'REST permissions should allow explicitly granted users.');
+};
+
+$tests['admin_controller_register_menu_uses_the_shared_access_policy_and_read_capability'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+    global $menuPageCalls;
+    global $submenuPageCalls;
+
+    $currentUserId = 2;
+    $services = makeServiceGraph();
+    $services['controller']->registerMenu();
+
+    assertSameValue([], $menuPageCalls, 'Disallowed users should not receive registered Tasty Fonts menu pages.');
+    assertSameValue([], $submenuPageCalls, 'Disallowed users should not receive registered Tasty Fonts submenu pages.');
+
+    $services['settings']->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => ['editor'],
+    ]);
+    $services['controller']->registerMenu();
+
+    assertSameValue('read', (string) ($menuPageCalls[0]['capability'] ?? ''), 'Allowed users should receive menu pages registered with the shared read capability.');
+    assertSameValue('read', (string) ($submenuPageCalls[0]['capability'] ?? ''), 'Allowed users should receive submenu pages registered with the shared read capability.');
+};
+
+$tests['admin_controller_enqueue_assets_skips_unauthorized_plugin_requests'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+    global $enqueuedScripts;
+    global $enqueuedStyles;
+
+    $currentUserId = 2;
+    $services = makeServiceGraph();
+    $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
+
+    assertSameValue([], $enqueuedStyles, 'Unauthorized plugin page requests should not enqueue admin styles.');
+    assertSameValue([], $enqueuedScripts, 'Unauthorized plugin page requests should not enqueue admin scripts.');
+};
+
+$tests['admin_controller_render_page_denies_direct_access_for_disallowed_users'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+
+    $currentUserId = 2;
+    $services = makeServiceGraph();
+
+    try {
+        $services['controller']->renderPage();
+        throw new RuntimeException('Expected renderPage() to deny access.');
+    } catch (WpDieException $e) {
+        assertContainsValue('You do not have permission to access Tasty Fonts.', $e->getMessage(), 'Direct admin page access should be denied with a plugin-specific permission message.');
+    }
 };
 
 $tests['admin_controller_renders_lazy_family_card_fragments_for_known_slugs'] = static function (): void {
@@ -603,6 +742,45 @@ $tests['admin_controller_detects_which_setting_changes_require_reload'] = static
             ]
         ),
         'Settings that apply without rebuilding the admin shell should not ask for a page reload.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresReload',
+            [
+                ['admin_access_role_slugs' => [], 'admin_access_user_ids' => []],
+                ['admin_access_role_slugs' => ['editor'], 'admin_access_user_ids' => []],
+            ]
+        ),
+        'Changing the admin access role allowlist should require a page reload because menu and page access are evaluated on page load.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresReload',
+            [
+                ['admin_access_role_slugs' => [], 'admin_access_user_ids' => []],
+                ['admin_access_role_slugs' => [], 'admin_access_user_ids' => [3]],
+            ]
+        ),
+        'Changing the admin access user allowlist should require a page reload because menu and page access are evaluated on page load.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresReload',
+            [
+                ['admin_access_custom_enabled' => false, 'admin_access_role_slugs' => [], 'admin_access_user_ids' => []],
+                ['admin_access_custom_enabled' => true, 'admin_access_role_slugs' => [], 'admin_access_user_ids' => []],
+            ]
+        ),
+        'Turning custom admin access on or off should require a page reload because menu and page access are evaluated on page load.'
     );
 };
 
@@ -958,6 +1136,55 @@ $tests['admin_controller_exposes_css_delivery_mode_in_page_context'] = static fu
         array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), (array) ($context['css_delivery_mode_options'] ?? []))),
         'Page context should expose the supported CSS delivery mode options for the Output Settings form.'
     );
+};
+
+$tests['admin_controller_exposes_admin_access_settings_in_page_context'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => ['editor'],
+        'admin_access_user_ids' => [3],
+    ]);
+
+    $context = invokePrivateMethod($services['controller'], 'buildPageContext', []);
+    $roleOptions = (array) ($context['admin_access_role_options'] ?? []);
+    $userOptions = (array) ($context['admin_access_user_options'] ?? []);
+    $roleOptionValues = array_values(array_map(static fn (array $option): string => (string) ($option['value'] ?? ''), $roleOptions));
+    $roleOptionDisabledByValue = [];
+    $userOptionLabelsByValue = [];
+    $userOptionDisabledByValue = [];
+
+    foreach ($roleOptions as $option) {
+        if (!is_array($option)) {
+            continue;
+        }
+
+        $roleOptionDisabledByValue[(string) ($option['value'] ?? '')] = !empty($option['disabled']);
+    }
+
+    foreach ($userOptions as $option) {
+        if (!is_array($option)) {
+            continue;
+        }
+
+        $optionValue = (string) ($option['value'] ?? '');
+        $userOptionLabelsByValue[$optionValue] = (string) ($option['label'] ?? '');
+        $userOptionDisabledByValue[$optionValue] = !empty($option['disabled']);
+    }
+
+    assertSameValue(true, !empty($context['admin_access_custom_enabled']), 'Page context should expose whether custom admin access is enabled.');
+    assertSameValue(['editor'], $context['admin_access_role_slugs'] ?? null, 'Page context should expose the saved admin-access role grants.');
+    assertSameValue([3], $context['admin_access_user_ids'] ?? null, 'Page context should expose the saved admin-access user grants.');
+    assertSameValue(['administrator', 'author', 'contributor', 'editor', 'subscriber'], $roleOptionValues, 'Page context should expose sorted admin-access role options including the implicit administrator role.');
+    assertSameValue(true, $roleOptionDisabledByValue['administrator'] ?? false, 'Page context should mark the implicit administrator role as disabled in the role list.');
+    assertSameValue(false, $roleOptionDisabledByValue['editor'] ?? true, 'Page context should keep non-administrator roles selectable in the role list.');
+    assertSameValue('Admin User (admin)', $userOptionLabelsByValue['1'] ?? '', 'Page context should still expose administrator users in the individual user list.');
+    assertSameValue(true, $userOptionDisabledByValue['1'] ?? false, 'Page context should mark implicit administrator users as disabled individual grant options.');
+    assertSameValue('Author User (author)', $userOptionLabelsByValue['3'] ?? '', 'Page context should expose user admin-access options with readable labels.');
+    assertSameValue(false, $userOptionDisabledByValue['3'] ?? true, 'Page context should keep non-administrator users selectable in the individual user list.');
+    assertSameValue(1, $context['admin_access_summary']['implicit_admin_count'] ?? null, 'Page context should expose the implicit administrator count in the admin-access summary.');
 };
 
 $tests['admin_controller_builds_variant_variable_output_panel_content'] = static function (): void {
@@ -1584,6 +1811,7 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/bunny/family' => 'GET',
         'tasty-fonts/v1/google/import' => 'POST',
         'tasty-fonts/v1/bunny/import' => 'POST',
+        'tasty-fonts/v1/transfer/validate' => 'POST',
         'tasty-fonts/v1/local/upload' => 'POST',
         'tasty-fonts/v1/families/fallback' => 'PATCH',
         'tasty-fonts/v1/families/font-display' => 'PATCH',
@@ -1894,6 +2122,28 @@ $tests['rest_controller_settings_reload_toast_mentions_reload_when_needed'] = st
     assertSameValue(true, $response instanceof WP_REST_Response, 'The settings autosave route should return a native REST response object.');
     assertSameValue(true, !empty($data['reload_required']), 'Reload-only settings should return an explicit reload flag for the autosave client.');
     assertContainsValue('Reload the page to apply this change.', (string) ($data['message'] ?? ''), 'Reload-only settings should mention the required page reload in the autosave toast message.');
+};
+
+$tests['rest_controller_settings_persists_admin_access_lists_and_requests_reload'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => ['editor', 'administrator', 'missing'],
+        'admin_access_user_ids' => ['3', '0', '999'],
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The settings autosave route should return a native REST response when saving admin access settings.');
+    assertSameValue(true, !empty($data['settings']['admin_access_custom_enabled']), 'The settings autosave route should persist the custom admin-access toggle.');
+    assertSameValue(['editor'], $data['settings']['admin_access_role_slugs'] ?? null, 'The settings autosave route should persist normalized admin access role grants.');
+    assertSameValue([3], $data['settings']['admin_access_user_ids'] ?? null, 'The settings autosave route should persist normalized admin access user grants.');
+    assertSameValue(true, !empty($data['reload_required']), 'Admin access setting changes should request a reload because menu and page access update on page load.');
+    assertContainsValue('admin access updated', (string) ($data['message'] ?? ''), 'Admin access setting saves should mention the access change in the returned settings toast.');
 };
 
 $tests['rest_controller_settings_reenables_monospace_class_outputs_when_the_role_is_first_enabled'] = static function (): void {
@@ -2594,6 +2844,39 @@ $tests['admin_controller_queues_redirect_toasts_for_the_current_user'] = static 
     assertSameValue('alert', (string) ($toasts[0]['role'] ?? ''), 'Queued redirect toasts should persist the ARIA role.');
 };
 
+$tests['admin_controller_surfaces_oversized_site_transfer_posts_before_the_action_field_reaches_php'] = static function (): void {
+    resetTestState();
+
+    global $isAdminRequest;
+
+    $isAdminRequest = true;
+
+    $services = makeServiceGraph();
+    $controller = $services['controller'];
+    $transientKey = invokePrivateMethod($controller, 'getPendingNoticeTransientKey');
+
+    $_GET['page'] = AdminController::MENU_SLUG;
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_SERVER['CONTENT_TYPE'] = 'multipart/form-data; boundary=----tasty-fonts-test';
+    $_SERVER['CONTENT_LENGTH'] = '999999999';
+    $_POST = [];
+    $_FILES = [];
+
+    $controller->handleAdminActions();
+
+    $toasts = get_transient($transientKey);
+    $logEntry = $services['log']->all()[0] ?? [];
+
+    assertSameValue('error', (string) ($toasts[0]['tone'] ?? ''), 'Oversized site transfer requests should queue an error toast instead of failing silently.');
+    assertContainsValue(
+        'larger than this server allows in a single request',
+        (string) ($toasts[0]['message'] ?? ''),
+        'Oversized site transfer requests should explain that the server rejected the upload before PHP populated the form fields.'
+    );
+    assertSameValue('transfer', (string) ($logEntry['category'] ?? ''), 'Oversized site transfer failures should be tagged as transfer log entries.');
+    assertSameValue('site_transfer_import_failure', (string) ($logEntry['event'] ?? ''), 'Oversized site transfer failures should record the transfer failure event type.');
+};
+
 $tests['admin_controller_builds_a_clean_plugin_redirect_url'] = static function (): void {
     resetTestState();
 
@@ -2721,6 +3004,69 @@ $tests['admin_controller_preserves_developer_studio_tab_in_redirect_urls'] = sta
     assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'Developer deep links should canonicalize to the single admin page.');
     assertSameValue(AdminController::PAGE_SETTINGS, (string) ($query['tf_page'] ?? ''), 'Developer deep links should activate the Settings top-level tab.');
     assertSameValue('developer', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the Developer tab selection when it is active.');
+};
+
+$tests['admin_controller_preserves_transfer_studio_tab_in_redirect_urls'] = static function (): void {
+    resetTestState();
+
+    $_GET = [
+        'page' => AdminController::MENU_SLUG,
+        'tf_studio' => 'transfer',
+    ];
+
+    $controller = makeAdminControllerTestInstance();
+    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
+    $parts = parse_url($url);
+    $query = [];
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+
+    assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'Transfer deep links should canonicalize to the single admin page.');
+    assertSameValue(AdminController::PAGE_SETTINGS, (string) ($query['tf_page'] ?? ''), 'Transfer deep links should activate the Settings top-level tab.');
+    assertSameValue('transfer', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the Transfer tab selection when it is active.');
+};
+
+$tests['admin_controller_builds_site_transfer_download_urls_for_the_transfer_tab'] = static function (): void {
+    resetTestState();
+
+    $controller = makeAdminControllerTestInstance();
+    $url = (string) invokePrivateMethod($controller, 'buildSiteTransferDownloadUrl');
+
+    assertContainsValue('tf_page=settings', $url, 'Site transfer downloads should keep the Settings page active.');
+    assertContainsValue('tf_studio=transfer', $url, 'Site transfer downloads should return to the Transfer tab.');
+};
+
+$tests['admin_controller_builds_transfer_context_from_filtered_activity_entries'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $controller = $services['controller'];
+    $context = invokePrivateMethod(
+        $controller,
+        'buildSiteTransferContext',
+        [[
+            [
+                'message' => 'Exported a site transfer bundle.',
+                'actor' => 'System',
+                'category' => 'transfer',
+            ],
+            [
+                'message' => 'Imported the site transfer bundle (1 family, 2 files).',
+                'actor' => 'Alicia',
+            ],
+            [
+                'message' => 'Plugin caches cleared and generated assets refreshed.',
+                'actor' => 'System',
+            ],
+        ]]
+    );
+
+    assertSameValue(2, count($context['logs'] ?? []), 'The transfer tab should receive only transfer-related activity entries.');
+    assertSameValue(
+        ['Alicia', 'System'],
+        $context['actor_options'] ?? [],
+        'The transfer tab should build actor filters from the filtered transfer activity entries only.'
+    );
 };
 
 $tests['admin_controller_maps_legacy_diagnostics_tabs_to_the_diagnostics_page'] = static function (): void {
@@ -2985,21 +3331,57 @@ $tests['handle_admin_actions_is_a_no_op_for_non_admin_requests'] = static functi
     assertSameValue('', $redirectLocation, 'handleAdminActions() should do nothing when is_admin() returns false.');
 };
 
-$tests['handle_admin_actions_is_a_no_op_when_user_lacks_manage_options'] = static function (): void {
+$tests['handle_admin_actions_is_a_no_op_when_user_lacks_admin_access'] = static function (): void {
     resetTestState();
 
     global $currentUserCapabilities;
+    global $currentUserId;
     global $isAdminRequest;
     global $redirectLocation;
 
     $isAdminRequest = true;
-    $currentUserCapabilities = ['manage_options' => false];
+    $currentUserId = 2;
+    $currentUserCapabilities = ['manage_options' => true];
     $_POST['tasty_fonts_clear_log'] = '1';
 
     $services = makeServiceGraph();
     $services['controller']->handleAdminActions();
 
-    assertSameValue('', $redirectLocation, 'handleAdminActions() should do nothing when the current user lacks manage_options.');
+    assertSameValue('', $redirectLocation, 'handleAdminActions() should do nothing when the current user is not allowed by the shared admin access policy.');
+};
+
+$tests['handle_admin_actions_allows_explicitly_granted_roles_without_manage_options'] = static function (): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $currentUserId;
+    global $isAdminRequest;
+    global $redirectLocation;
+
+    $isAdminRequest = true;
+    $currentUserId = 2;
+    $currentUserCapabilities = ['manage_options' => false, 'read' => true];
+    $_POST['tasty_fonts_clear_log'] = '1';
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => ['editor'],
+    ]);
+    add_action(
+        'tasty_fonts_before_admin_redirect_exit',
+        static function (): void {
+            throw new WpDieException('redirect');
+        }
+    );
+
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected redirect exit.
+    }
+
+    assertSameValue(false, empty($redirectLocation), 'Explicitly granted roles should be allowed through admin actions even without manage_options.');
 };
 
 $tests['handle_admin_actions_dispatches_clear_log_and_redirects'] = static function (): void {
@@ -3061,4 +3443,43 @@ $tests['handle_admin_actions_returns_early_after_first_matching_handler'] = stat
     // If the dispatch stops after clear-log, only the "Activity log cleared." entry should be present.
     $logMessages = implode(' ', array_column($services['log']->all(), 'message'));
     assertNotContainsValue('rescanned', $logMessages, 'Only the clear-log handler should have fired; the rescan log message should be absent.');
+};
+
+$tests['handle_admin_actions_records_failed_site_transfer_imports_and_queues_inline_status'] = static function (): void {
+    resetTestState();
+
+    global $isAdminRequest;
+    global $redirectLocation;
+
+    $isAdminRequest = true;
+    $_POST['tasty_fonts_import_site_transfer_bundle'] = '1';
+    $_FILES['tasty_fonts_site_transfer_bundle'] = [];
+
+    $services = makeServiceGraph();
+    add_action(
+        'tasty_fonts_before_admin_redirect_exit',
+        static function (): void {
+            throw new WpDieException('redirect');
+        }
+    );
+
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected: the redirect handler terminates after wp_safe_redirect().
+    }
+
+    $logs = $services['log']->all();
+    $logMessages = implode(' ', array_column($logs, 'message'));
+    $status = invokePrivateMethod($services['controller'], 'consumeQueuedSiteTransferStatus');
+    $logEntry = $logs[0] ?? [];
+
+    assertContainsValue('tasty_fonts_transfer_missing_upload', $logMessages, 'Failed site transfer imports should be recorded in Activity with the specific WP_Error code.');
+    assertContainsValue('Choose a Tasty Fonts transfer bundle before importing.', $logMessages, 'Failed site transfer imports should record the user-facing error message in Activity.');
+    assertSameValue('transfer', (string) ($logEntry['category'] ?? ''), 'Failed site transfer imports should be tagged as transfer log entries.');
+    assertSameValue('site_transfer_import_failure', (string) ($logEntry['event'] ?? ''), 'Failed site transfer imports should record the transfer failure event type.');
+    assertSameValue('error', (string) ($status['tone'] ?? ''), 'Failed site transfer imports should queue an inline error status for the import panel after redirect.');
+    assertSameValue('tasty_fonts_transfer_missing_upload', (string) ($status['code'] ?? ''), 'The inline import status should keep the exact WP_Error code.');
+    assertContainsValue('Choose a Tasty Fonts transfer bundle before importing.', (string) ($status['message'] ?? ''), 'The inline import status should keep the user-facing failure message.');
+    assertSameValue(false, empty($redirectLocation), 'Failed site transfer imports should still redirect back to the admin page.');
 };

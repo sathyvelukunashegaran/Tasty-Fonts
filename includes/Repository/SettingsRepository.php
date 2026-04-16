@@ -6,6 +6,7 @@ namespace TastyFonts\Repository;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Support\FontUtils;
 
 final class SettingsRepository
@@ -95,6 +96,9 @@ final class SettingsRepository
         'training_wheels_off' => false,
         'monospace_role_enabled' => false,
         'variable_fonts_enabled' => false,
+        'admin_access_custom_enabled' => false,
+        'admin_access_role_slugs' => [],
+        'admin_access_user_ids' => [],
         'acss_font_role_sync_enabled' => null,
         'acss_font_role_sync_applied' => false,
         'acss_font_role_sync_previous_heading_font_family' => '',
@@ -175,6 +179,12 @@ final class SettingsRepository
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
         $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);
+        $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
+        $settings['admin_access_user_ids'] = $this->normalizeAdminAccessUserIds($settings['admin_access_user_ids'] ?? []);
+        $settings['admin_access_custom_enabled'] = $this->normalizeAdminAccessCustomEnabled(
+            $storedSettings['admin_access_custom_enabled'] ?? null,
+            $settings
+        );
         $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($settings['acss_font_role_sync_enabled'] ?? null);
         $settings['acss_font_role_sync_applied'] = !empty($settings['acss_font_role_sync_applied']);
         $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_family'] ?? '');
@@ -281,6 +291,21 @@ final class SettingsRepository
 
         if (array_key_exists('variable_fonts_enabled', $input)) {
             $settings['variable_fonts_enabled'] = !empty($input['variable_fonts_enabled']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('admin_access_custom_enabled', $input)) {
+            $settings['admin_access_custom_enabled'] = !empty($input['admin_access_custom_enabled']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('admin_access_role_slugs', $input)) {
+            $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($input['admin_access_role_slugs']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('admin_access_user_ids', $input)) {
+            $settings['admin_access_user_ids'] = $this->normalizeAdminAccessUserIds($input['admin_access_user_ids']);
             $settingsChanged = true;
         }
 
@@ -597,38 +622,29 @@ final class SettingsRepository
         $this->settingsCache = null;
     }
 
+    public function previewImportedSettings(array $settings): array
+    {
+        return $this->normalizeImportedSettings($settings);
+    }
+
     public function replaceImportedSettings(array $settings): array
     {
-        $settings = $this->withoutGoogleApiKeyData($settings);
-        $settings = wp_parse_args($settings, self::DEFAULT_SETTINGS);
-        $settings['acss_font_role_sync_applied'] = false;
-        $settings['acss_font_role_sync_previous_heading_font_family'] = '';
-        $settings['acss_font_role_sync_previous_text_font_family'] = '';
-        $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
-        $settings['acss_font_role_sync_previous_text_font_weight'] = '';
-
-        if (trim((string) ($settings['adobe_project_id'] ?? '')) === '') {
-            $settings['adobe_enabled'] = false;
-            $settings['adobe_project_status'] = 'empty';
-        } else {
-            $settings['adobe_project_status'] = 'unknown';
-        }
-
-        $settings['adobe_project_status_message'] = '';
-        $settings['adobe_project_checked_at'] = 0;
-
-        update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($settings), false);
-        $this->settingsCache = null;
-
-        $normalized = $this->getSettings();
+        $normalized = $this->normalizeImportedSettings($settings);
         update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($normalized), false);
+        delete_option(self::OPTION_GOOGLE_API_KEY_DATA);
+        $this->settingsCache = null;
 
         return $this->cacheSettings($normalized);
     }
 
+    public function previewImportedRoles(array $roles): array
+    {
+        return $this->normalizeImportedRoles($roles);
+    }
+
     public function replaceImportedRoles(array $roles): array
     {
-        $normalized = $this->normalizeRoleSet($roles, []);
+        $normalized = $this->normalizeImportedRoles($roles);
         update_option(self::OPTION_ROLES, $normalized, false);
 
         return $normalized;
@@ -871,6 +887,112 @@ final class SettingsRepository
         return $legacyValue;
     }
 
+    private function normalizeImportedSettings(array $settings): array
+    {
+        $settings = $this->withoutGoogleApiKeyData($settings);
+        $hasAdminAccessCustomEnabled = array_key_exists('admin_access_custom_enabled', $settings);
+        $settings = wp_parse_args($settings, self::DEFAULT_SETTINGS);
+        $settings['acss_font_role_sync_applied'] = false;
+        $settings['acss_font_role_sync_previous_heading_font_family'] = '';
+        $settings['acss_font_role_sync_previous_text_font_family'] = '';
+        $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
+        $settings['acss_font_role_sync_previous_text_font_weight'] = '';
+
+        if (trim((string) ($settings['adobe_project_id'] ?? '')) === '') {
+            $settings['adobe_enabled'] = false;
+            $settings['adobe_project_status'] = 'empty';
+        } else {
+            $settings['adobe_project_status'] = 'unknown';
+        }
+
+        $settings['adobe_project_status_message'] = '';
+        $settings['adobe_project_checked_at'] = 0;
+
+        $settings = array_replace($settings, $this->normalizeClassOutputSettings($settings));
+        $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
+        $settings['admin_access_user_ids'] = $this->normalizeAdminAccessUserIds($settings['admin_access_user_ids'] ?? []);
+        $settings['admin_access_custom_enabled'] = $this->normalizeAdminAccessCustomEnabled(
+            $hasAdminAccessCustomEnabled ? ($settings['admin_access_custom_enabled'] ?? null) : null,
+            $settings
+        );
+        $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
+            (string) ($settings['output_quick_mode_preference'] ?? ''),
+            $settings
+        );
+        $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
+        $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'swap'));
+        $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF));
+        $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue((string) ($settings['unicode_range_custom_value'] ?? ''));
+        $settings['minify_css_output'] = !empty($settings['minify_css_output']);
+        $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
+        $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
+        $settings['minimal_output_preset_enabled'] = !empty($settings['minimal_output_preset_enabled']);
+        $settings['extended_variable_role_weight_vars_enabled'] = !empty($settings['extended_variable_role_weight_vars_enabled']);
+        $settings['extended_variable_weight_tokens_enabled'] = !empty($settings['extended_variable_weight_tokens_enabled']);
+        $settings['extended_variable_role_aliases_enabled'] = !empty($settings['extended_variable_role_aliases_enabled']);
+        $settings['extended_variable_category_sans_enabled'] = !empty($settings['extended_variable_category_sans_enabled']);
+        $settings['extended_variable_category_serif_enabled'] = !empty($settings['extended_variable_category_serif_enabled']);
+        $settings['extended_variable_category_mono_enabled'] = !empty($settings['extended_variable_category_mono_enabled']);
+        $settings['preload_primary_fonts'] = !empty($settings['preload_primary_fonts']);
+        $settings['remote_connection_hints'] = !empty($settings['remote_connection_hints']);
+        $settings['update_channel'] = $this->normalizeUpdateChannel((string) ($settings['update_channel'] ?? self::UPDATE_CHANNEL_STABLE));
+        $settings['block_editor_font_library_sync_enabled'] = $this->normalizeBlockEditorFontLibrarySyncSetting(
+            $settings['block_editor_font_library_sync_enabled'] ?? null
+        );
+        $settings['bricks_integration_enabled'] = $this->normalizeOptionalBoolean($settings['bricks_integration_enabled'] ?? null);
+        $settings['bricks_selector_fonts_enabled'] = !empty($settings['bricks_selector_fonts_enabled']);
+        $settings['bricks_builder_preview_enabled'] = !empty($settings['bricks_builder_preview_enabled']);
+        $settings['bricks_theme_styles_sync_enabled'] = !empty($settings['bricks_theme_styles_sync_enabled']);
+        $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($settings['bricks_theme_style_target_mode'] ?? 'managed');
+        $settings['bricks_theme_style_target_id'] = $this->normalizeBricksThemeStyleTargetId($settings['bricks_theme_style_target_id'] ?? 'managed');
+        $settings['bricks_disable_google_fonts_enabled'] = !empty($settings['bricks_disable_google_fonts_enabled']);
+        $settings['oxygen_integration_enabled'] = $this->normalizeOptionalBoolean($settings['oxygen_integration_enabled'] ?? null);
+        $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
+        $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
+        $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);
+        $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
+        $settings['admin_access_custom_enabled'] = $this->normalizeAdminAccessCustomEnabled(
+            $settings['admin_access_custom_enabled'] ?? null,
+            $settings
+        );
+        $settings['admin_access_user_ids'] = [];
+        $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($settings['acss_font_role_sync_enabled'] ?? null);
+        $settings['acss_font_role_sync_applied'] = false;
+        $settings['acss_font_role_sync_previous_heading_font_family'] = '';
+        $settings['acss_font_role_sync_previous_text_font_family'] = '';
+        $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
+        $settings['acss_font_role_sync_previous_text_font_weight'] = '';
+        $settings['preview_sentence'] = $this->sanitizePreviewSentence($settings['preview_sentence'] ?? '');
+        $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
+        $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
+        $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
+            (string) ($settings['adobe_project_status'] ?? 'empty'),
+            (string) ($settings['adobe_project_id'] ?? '')
+        );
+        $settings['adobe_project_status_message'] = $this->sanitizeStatusMessage($settings['adobe_project_status_message'] ?? '');
+        $settings['adobe_project_checked_at'] = $this->normalizeTimestamp($settings['adobe_project_checked_at'] ?? 0);
+        $settings['google_api_key_status'] = $this->normalizeGoogleApiKeyStatus(
+            (string) ($settings['google_api_key_status'] ?? 'empty'),
+            (string) ($settings['google_api_key'] ?? '')
+        );
+        $settings['google_api_key_status_message'] = $this->sanitizeStatusMessage($settings['google_api_key_status_message'] ?? '');
+        $settings['google_api_key_checked_at'] = $this->normalizeTimestamp($settings['google_api_key_checked_at'] ?? 0);
+        $settings['family_fallbacks'] = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
+        $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
+        $settings['delete_uploaded_files_on_uninstall'] = !empty($settings['delete_uploaded_files_on_uninstall']);
+        $settings = $this->normalizeBricksBaselineSettings($settings);
+        $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        unset($settings['bricks_variables_sync_enabled']);
+
+        return $this->withoutGoogleApiKeyData($settings);
+    }
+
+    private function normalizeImportedRoles(array $roles): array
+    {
+        return $this->normalizeRoleSet($roles, []);
+    }
+
     private function normalizeRoleSet(array $roles, array $catalog): array
     {
         $defaults = $this->getDefaultRoles($catalog);
@@ -1000,6 +1122,137 @@ final class SettingsRepository
         return !empty($value);
     }
 
+    private function normalizeAdminAccessCustomEnabled(mixed $value, array $settings = []): bool
+    {
+        if ($value !== null) {
+            return !empty($value);
+        }
+
+        $roleSlugs = is_array($settings['admin_access_role_slugs'] ?? null)
+            ? $settings['admin_access_role_slugs']
+            : [];
+        $userIds = is_array($settings['admin_access_user_ids'] ?? null)
+            ? $settings['admin_access_user_ids']
+            : [];
+
+        return $roleSlugs !== [] || $userIds !== [];
+    }
+
+    private function normalizeAdminAccessRoleSlugs(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $registeredRoleSlugs = $this->registeredRoleSlugs();
+        $normalized = [];
+
+        foreach ($value as $roleSlug) {
+            if (!is_scalar($roleSlug) && $roleSlug !== null) {
+                continue;
+            }
+
+            $roleSlug = sanitize_key((string) $roleSlug);
+
+            if (
+                $roleSlug === ''
+                || $roleSlug === AdminAccessService::IMPLICIT_ROLE
+                || !in_array($roleSlug, $registeredRoleSlugs, true)
+            ) {
+                continue;
+            }
+
+            $normalized[$roleSlug] = $roleSlug;
+        }
+
+        ksort($normalized, SORT_STRING);
+
+        return array_values($normalized);
+    }
+
+    private function normalizeAdminAccessUserIds(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $requestedUserIds = [];
+
+        foreach ($value as $userId) {
+            if (!is_scalar($userId) && $userId !== null) {
+                continue;
+            }
+
+            $userId = absint($userId);
+
+            if ($userId <= 0) {
+                continue;
+            }
+
+            $requestedUserIds[$userId] = $userId;
+        }
+
+        if ($requestedUserIds === []) {
+            return [];
+        }
+
+        $existingUsers = get_users(
+            [
+                'include' => array_values($requestedUserIds),
+            ]
+        );
+
+        if (!is_array($existingUsers)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($existingUsers as $user) {
+            if (!is_object($user)) {
+                continue;
+            }
+
+            $userId = absint($user->ID ?? 0);
+            $userRoles = is_array($user->roles ?? null) ? array_values(array_map('sanitize_key', $user->roles)) : [];
+
+            if ($userId <= 0 || in_array('administrator', $userRoles, true)) {
+                continue;
+            }
+
+            $normalized[$userId] = $userId;
+        }
+
+        ksort($normalized, SORT_NUMERIC);
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function registeredRoleSlugs(): array
+    {
+        $roles = wp_roles();
+        $registeredRoleSlugs = is_object($roles) && is_array($roles->roles ?? null)
+            ? array_keys($roles->roles)
+            : [];
+
+        $registeredRoleSlugs = array_values(
+            array_filter(
+                array_map(
+                    static fn (mixed $roleSlug): string => sanitize_key(is_scalar($roleSlug) ? (string) $roleSlug : ''),
+                    $registeredRoleSlugs
+                ),
+                'strlen'
+            )
+        );
+
+        sort($registeredRoleSlugs, SORT_STRING);
+
+        return $registeredRoleSlugs;
+    }
+
     private function normalizeUpdateChannel(string $channel): string
     {
         $channel = strtolower(trim($channel));
@@ -1058,6 +1311,12 @@ final class SettingsRepository
 
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($settings));
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
+        $settings['admin_access_user_ids'] = $this->normalizeAdminAccessUserIds($settings['admin_access_user_ids'] ?? []);
+        $settings['admin_access_custom_enabled'] = $this->normalizeAdminAccessCustomEnabled(
+            $settings['admin_access_custom_enabled'] ?? null,
+            $settings
+        );
         $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
             (string) ($settings['output_quick_mode_preference'] ?? ''),
             $settings

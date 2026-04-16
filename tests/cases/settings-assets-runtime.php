@@ -938,6 +938,96 @@ $tests['site_transfer_service_import_replaces_existing_state_and_accepts_a_fresh
     assertSameValue(2, count($remoteRequestCalls), 'Importing a site transfer bundle should create one managed family and one managed font face for the restored library.');
 };
 
+$tests['site_transfer_service_stage_import_bundle_stages_a_validated_bundle_for_follow_up_import'] = static function (): void {
+    resetTestState();
+
+    global $uploadedFilePaths;
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings([
+        'google_api_key' => 'source-secret',
+        'block_editor_font_library_sync_enabled' => '0',
+    ]);
+    $services['settings']->saveRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+    $services['settings']->saveAppliedRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+
+    $bundle = $services['site_transfer']->buildExportBundle();
+    $uploadedFilePaths[] = (string) $bundle['path'];
+
+    $stage = $services['site_transfer']->stageImportBundle([
+        'name' => 'tasty-fonts-transfer.zip',
+        'tmp_name' => (string) $bundle['path'],
+        'error' => UPLOAD_ERR_OK,
+        'size' => (int) filesize((string) $bundle['path']),
+    ]);
+
+    assertFalseValue(is_wp_error($stage), 'Dry-running a valid site transfer bundle should succeed.');
+    assertSameValue(true, trim((string) ($stage['stage_token'] ?? '')) !== '', 'Dry-running should return a staged bundle token for the follow-up import.');
+    assertSameValue(1, (int) ($stage['families'] ?? 0), 'Dry-running should report the number of importable families from the validated bundle.');
+    assertSameValue(true, (int) ($stage['files'] ?? 0) >= 1, 'Dry-running should report at least one managed file from the validated bundle.');
+
+    $existingFile = (string) $services['storage']->pathForRelativePath('upload/existing/existing-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($existingFile, 'existing-font-data');
+    $services['imports']->saveProfile(
+        'Existing Sans',
+        'existing-sans',
+        [
+            'id' => 'existing-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Existing Sans',
+                    'slug' => 'existing-sans',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/existing/existing-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/existing/existing-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings(['google_api_key' => 'old-secret']);
+
+    $result = $services['site_transfer']->importStagedBundle((string) ($stage['stage_token'] ?? ''), 'fresh-destination-key');
+
+    assertFalseValue(is_wp_error($result), 'Importing a staged site transfer bundle should succeed.');
+    assertSameValue(false, file_exists($existingFile), 'Importing a staged site transfer bundle should replace previously managed files that are not in the bundle.');
+    assertSameValue('fresh-destination-key', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Importing a staged site transfer bundle should still accept a fresh destination Google API key.');
+    assertSameValue(false, get_transient('tasty_fonts_transfer_stage_1') !== false, 'The staged bundle should be cleared after the destructive import completes.');
+};
+
 $tests['site_transfer_service_import_leaves_google_api_key_empty_when_no_fresh_secret_is_provided'] = static function (): void {
     resetTestState();
 
@@ -2215,6 +2305,61 @@ $tests['admin_page_context_builder_ignores_legacy_role_delivery_ids_when_compari
 
     assertSameValue('Live', (string) ($context['role_deployment']['badge'] ?? ''), 'Role deployment should stay live when draft and applied roles only differ by legacy delivery IDs.');
     assertSameValue('Live Roles Active', (string) ($context['role_deployment']['title'] ?? ''), 'Role deployment should ignore legacy delivery ID differences.');
+};
+
+$tests['admin_page_context_builder_uses_catalog_family_count_for_delete_library_summary'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-static',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'static',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Lora',
+        'lora',
+        [
+            'id' => 'lora-static',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'static',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'library_only',
+        true
+    );
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+
+    $context = $builder->build();
+    $summary = (string) ($context['developer_tool_statuses']['wipe_managed_font_library']['summary'] ?? '');
+
+    assertSameValue('2 managed font families in the library.', $summary, 'The delete-library summary should use the catalog family count instead of a missing total key.');
 };
 
 $tests['admin_controller_applies_acss_font_mapping_when_sync_is_enabled'] = static function (): void {

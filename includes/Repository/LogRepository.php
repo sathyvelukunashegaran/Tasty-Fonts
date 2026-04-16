@@ -10,6 +10,10 @@ final class LogRepository
 {
     public const OPTION_LOG = 'tasty_fonts_log';
     public const LEGACY_OPTION_LOG = 'etch_fonts_log';
+    public const CATEGORY_TRANSFER = 'transfer';
+    public const EVENT_SITE_TRANSFER_EXPORT = 'site_transfer_export';
+    public const EVENT_SITE_TRANSFER_IMPORT_SUCCESS = 'site_transfer_import_success';
+    public const EVENT_SITE_TRANSFER_IMPORT_FAILURE = 'site_transfer_import_failure';
     private const MAX_ENTRIES = 100;
 
     public function add(string $message, array $context = []): void
@@ -17,11 +21,21 @@ final class LogRepository
         $log = $this->all();
         $actionLabel = sanitize_text_field((string) ($context['action_label'] ?? ''));
         $actionUrl = esc_url_raw((string) ($context['action_url'] ?? ''));
+        $category = sanitize_key((string) ($context['category'] ?? ''));
+        $event = sanitize_key((string) ($context['event'] ?? ''));
         $entry = [
             'time' => current_time('mysql', true),
             'message' => $message,
             'actor' => $this->getActorLabel(),
         ];
+
+        if ($category !== '') {
+            $entry['category'] = $category;
+        }
+
+        if ($event !== '') {
+            $entry['event'] = $event;
+        }
 
         if ($actionLabel !== '' && $actionUrl !== '') {
             $entry['action_label'] = $actionLabel;

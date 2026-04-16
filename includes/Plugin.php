@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
+use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyCssParser;
@@ -62,6 +63,7 @@ final class Plugin
 
     private readonly Storage $storage;
     private readonly SettingsRepository $settings;
+    private readonly AdminAccessService $adminAccess;
     private readonly ImportRepository $imports;
     private readonly LogRepository $log;
     private readonly CatalogService $catalog;
@@ -95,6 +97,7 @@ final class Plugin
 
         $this->storage = new Storage();
         $this->settings = new SettingsRepository();
+        $this->adminAccess = new AdminAccessService($this->settings);
         $this->imports = new ImportRepository();
         $this->log = new LogRepository();
         $this->adobe = new AdobeProjectClient($this->settings, $adobeCssParser);
@@ -195,7 +198,7 @@ final class Plugin
             $this->blockEditorFontLibrary,
             new NativeUploadedFileValidator()
         );
-        $this->updater = new GitHubUpdater($this->settings);
+        $this->updater = new GitHubUpdater($this->settings, $this->adminAccess);
         $this->admin = new AdminController(
             $this->storage,
             $this->settings,
@@ -215,9 +218,10 @@ final class Plugin
             $this->oxygenIntegration,
             $this->developerTools,
             $this->siteTransfer,
-            $this->updater
+            $this->updater,
+            $this->adminAccess
         );
-        $this->rest = new RestController($this->admin);
+        $this->rest = new RestController($this->admin, $this->adminAccess);
     }
 
     public static function instance(): self

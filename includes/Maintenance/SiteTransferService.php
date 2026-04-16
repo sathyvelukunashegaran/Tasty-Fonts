@@ -24,6 +24,8 @@ final class SiteTransferService
     private const GENERATED_CSS_RELATIVE_PATH = '.generated/tasty-fonts.css';
     private const TEMP_DIRECTORY_PREFIX = 'tasty-fonts-transfer-';
     private const TEMP_ZIP_PREFIX = 'tasty-fonts-transfer-';
+    private const STAGED_IMPORT_TRANSIENT_PREFIX = 'tasty_fonts_transfer_stage_';
+    private const STAGED_IMPORT_TTL = 3600;
 
     public function __construct(
         private readonly Storage $storage,
@@ -350,7 +352,7 @@ final class SiteTransferService
         ];
     }
 
-    public function importBundleReplacingCurrentState(array $uploadedFile, string $freshGoogleApiKey = ''): array|WP_Error
+    public function stageImportBundle(array $uploadedFile): array|WP_Error
     {
         $preparedUpload = $this->prepareUploadedBundle($uploadedFile);
 
@@ -362,6 +364,74 @@ final class SiteTransferService
 
         if (is_wp_error($validation)) {
             @unlink((string) ($preparedUpload['path'] ?? ''));
+
+            return $validation;
+        }
+
+        try {
+            $manifest = is_array($validation['manifest'] ?? null) ? $validation['manifest'] : [];
+            $files = is_array($validation['files'] ?? null) ? $validation['files'] : [];
+            $stageToken = md5(uniqid('tasty-fonts-transfer-stage-', true));
+
+            $this->clearStagedImportBundle();
+
+            set_transient(
+                $this->getStagedImportTransientKey(),
+                [
+                    'token' => $stageToken,
+                    'path' => (string) ($preparedUpload['path'] ?? ''),
+                    'bundle_name' => (string) ($preparedUpload['name'] ?? ''),
+                    'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
+                    'exported_at' => (string) ($manifest['exported_at'] ?? ''),
+                    'families' => count(is_array($manifest['library'] ?? null) ? $manifest['library'] : []),
+                    'files' => count($files),
+                ],
+                self::STAGED_IMPORT_TTL
+            );
+
+            return [
+                'stage_token' => $stageToken,
+                'bundle_name' => (string) ($preparedUpload['name'] ?? ''),
+                'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
+                'exported_at' => (string) ($manifest['exported_at'] ?? ''),
+                'families' => count(is_array($manifest['library'] ?? null) ? $manifest['library'] : []),
+                'files' => count($files),
+            ];
+        } finally {
+            $this->deleteDirectory((string) ($validation['extract_dir'] ?? ''));
+        }
+    }
+
+    public function importStagedBundle(string $stageToken, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        $stagedBundle = $this->consumeStagedImportBundle($stageToken);
+
+        if (is_wp_error($stagedBundle)) {
+            return $stagedBundle;
+        }
+
+        return $this->importPreparedBundle((string) ($stagedBundle['path'] ?? ''), $freshGoogleApiKey, true);
+    }
+
+    public function importBundleReplacingCurrentState(array $uploadedFile, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        $preparedUpload = $this->prepareUploadedBundle($uploadedFile);
+
+        if (is_wp_error($preparedUpload)) {
+            return $preparedUpload;
+        }
+
+        return $this->importPreparedBundle((string) ($preparedUpload['path'] ?? ''), $freshGoogleApiKey, true);
+    }
+
+    private function importPreparedBundle(string $zipPath, string $freshGoogleApiKey = '', bool $deleteZipWhenDone = false): array|WP_Error
+    {
+        $validation = $this->validateImportBundle($zipPath);
+
+        if (is_wp_error($validation)) {
+            if ($deleteZipWhenDone) {
+                @unlink($zipPath);
+            }
 
             return $validation;
         }
@@ -434,7 +504,10 @@ final class SiteTransferService
             ];
         } finally {
             $this->deleteDirectory((string) ($validation['extract_dir'] ?? ''));
-            @unlink((string) ($preparedUpload['path'] ?? ''));
+
+            if ($deleteZipWhenDone) {
+                @unlink($zipPath);
+            }
         }
     }
 
@@ -707,6 +780,57 @@ final class SiteTransferService
         $version = defined('TASTY_FONTS_VERSION') ? sanitize_file_name((string) TASTY_FONTS_VERSION) : 'bundle';
 
         return sprintf('tasty-fonts-transfer-%s-%s.zip', $version, $timestamp);
+    }
+
+    private function getStagedImportTransientKey(): string
+    {
+        return self::STAGED_IMPORT_TRANSIENT_PREFIX . (string) get_current_user_id();
+    }
+
+    private function clearStagedImportBundle(): void
+    {
+        $existing = get_transient($this->getStagedImportTransientKey());
+
+        if (is_array($existing)) {
+            $path = wp_normalize_path((string) ($existing['path'] ?? ''));
+
+            if ($path !== '') {
+                @unlink($path);
+            }
+        }
+
+        delete_transient($this->getStagedImportTransientKey());
+    }
+
+    private function consumeStagedImportBundle(string $stageToken): array|WP_Error
+    {
+        $stageToken = trim($stageToken);
+        $stored = get_transient($this->getStagedImportTransientKey());
+
+        delete_transient($this->getStagedImportTransientKey());
+
+        if (!is_array($stored)) {
+            return $this->error(
+                'tasty_fonts_transfer_stage_missing',
+                __('Run the dry run again before importing this bundle.', 'tasty-fonts')
+            );
+        }
+
+        $storedToken = trim((string) ($stored['token'] ?? ''));
+        $storedPath = wp_normalize_path((string) ($stored['path'] ?? ''));
+
+        if ($stageToken === '' || !hash_equals($storedToken, $stageToken) || $storedPath === '' || !is_readable($storedPath)) {
+            if ($storedPath !== '') {
+                @unlink($storedPath);
+            }
+
+            return $this->error(
+                'tasty_fonts_transfer_stage_missing',
+                __('Run the dry run again before importing this bundle.', 'tasty-fonts')
+            );
+        }
+
+        return $stored;
     }
 
     private function createTemporaryZipPath(): string|WP_Error

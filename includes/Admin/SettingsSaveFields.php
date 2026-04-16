@@ -79,6 +79,9 @@ final class SettingsSaveFields
             ['name' => 'training_wheels_off', 'kind' => 'toggle'],
             ['name' => 'variable_fonts_enabled', 'kind' => 'toggle'],
             ['name' => 'monospace_role_enabled', 'kind' => 'toggle'],
+            ['name' => 'admin_access_custom_enabled', 'kind' => 'toggle'],
+            ['name' => 'admin_access_role_slugs', 'kind' => 'string_array'],
+            ['name' => 'admin_access_user_ids', 'kind' => 'int_array'],
         ];
     }
 

@@ -9,6 +9,7 @@ defined('ABSPATH') || exit;
 use TastyFonts\Admin\FontTypeHelper;
 use TastyFonts\Admin\Renderer\SharedRenderHelpers;
 use TastyFonts\Admin\Renderer\LibraryRenderValueHelpers;
+use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 
@@ -141,6 +142,15 @@ final class AdminPageViewBuilder
         $updateChannel = (string) ($context['update_channel'] ?? 'stable');
         $updateChannelOptions = is_array($context['update_channel_options'] ?? null) ? $context['update_channel_options'] : [];
         $updateChannelStatus = is_array($context['update_channel_status'] ?? null) ? $context['update_channel_status'] : [];
+        $adminAccessCustomEnabled = !empty($context['admin_access_custom_enabled']);
+        $adminAccessRoleSlugs = is_array($context['admin_access_role_slugs'] ?? null) ? array_values(array_map('strval', $context['admin_access_role_slugs'])) : [];
+        $adminAccessRoleOptions = is_array($context['admin_access_role_options'] ?? null) ? $context['admin_access_role_options'] : [];
+        $adminAccessUserIds = is_array($context['admin_access_user_ids'] ?? null)
+            ? array_values(array_map(static fn ($value): string => (string) $value, $context['admin_access_user_ids']))
+            : [];
+        $adminAccessUserOptions = is_array($context['admin_access_user_options'] ?? null) ? $context['admin_access_user_options'] : [];
+        $adminAccessSummary = is_array($context['admin_access_summary'] ?? null) ? $context['admin_access_summary'] : [];
+        $developerToolStatuses = is_array($context['developer_tool_statuses'] ?? null) ? $context['developer_tool_statuses'] : [];
         $blockEditorFontLibrarySyncEnabled = !empty($context['block_editor_font_library_sync_enabled']);
         $trainingWheelsOff = !empty($context['training_wheels_off']);
         $variableFontsEnabled = !empty($context['variable_fonts_enabled']);
@@ -156,6 +166,7 @@ final class AdminPageViewBuilder
         $etchIntegration = is_array($context['etch_integration'] ?? null) ? $context['etch_integration'] : [];
         $acssIntegration = is_array($context['acss_integration'] ?? null) ? $context['acss_integration'] : [];
         $bricksIntegration = is_array($context['bricks_integration'] ?? null) ? $context['bricks_integration'] : [];
+        $bricksIntegration = $this->buildBricksIntegrationView($bricksIntegration);
         $oxygenIntegration = is_array($context['oxygen_integration'] ?? null) ? $context['oxygen_integration'] : [];
         $toasts = is_array($context['toasts'] ?? null) ? $context['toasts'] : [];
         $applyEverywhere = !empty($context['apply_everywhere']);
@@ -275,6 +286,265 @@ final class AdminPageViewBuilder
         unset($view['context']);
 
         return $view;
+    }
+
+    private function buildBricksIntegrationView(array $integration): array
+    {
+        $featureDescriptions = is_array($integration['feature_descriptions'] ?? null)
+            ? $integration['feature_descriptions']
+            : [];
+        $themeStyles = $this->buildBricksFeatureView(
+            'bricks_theme_styles_sync_enabled',
+            is_array($integration['theme_styles'] ?? null) ? $integration['theme_styles'] : [],
+            (string) ($featureDescriptions['theme_styles'] ?? '')
+        );
+        $googleFonts = $this->buildBricksFeatureView(
+            'bricks_disable_google_fonts_enabled',
+            is_array($integration['google_fonts'] ?? null) ? $integration['google_fonts'] : [],
+            (string) ($featureDescriptions['google_fonts'] ?? '')
+        );
+
+        $themeStyles['ui']['targeting'] = $this->buildBricksThemeStyleTargetView($themeStyles);
+        $themeStyles['ui']['details'] = $this->buildBricksMappingDetailsView($themeStyles, $googleFonts);
+        $integration['theme_styles'] = $themeStyles;
+        $integration['google_fonts'] = $googleFonts;
+        $integration['maintenance'] = [
+            'title' => __('Maintenance', 'tasty-fonts'),
+            'copy' => __('Remove the managed style or restore Bricks defaults.', 'tasty-fonts'),
+        ];
+
+        return $integration;
+    }
+
+    private function buildBricksFeatureView(string $featureKey, array $featureState, string $description): array
+    {
+        $status = trim((string) ($featureState['status'] ?? 'disabled'));
+
+        $featureState['description'] = $description;
+        $featureState['ui'] = [
+            'status_label' => $this->buildBricksFeatureStatusLabel($status),
+            'status_badge_class' => 'tasty-fonts-badge' . $this->buildBricksFeatureStatusBadgeClass($status),
+            'status_help' => $this->buildBricksFeatureStatusHelp($featureKey, $status),
+        ];
+
+        return $featureState;
+    }
+
+    private function buildBricksThemeStyleTargetView(array $themeStyles): array
+    {
+        $summary = is_array($themeStyles['summary'] ?? null) ? $themeStyles['summary'] : [];
+        $managedThemeStyleLabel = trim((string) ($summary['managed_style_label'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_LABEL));
+        $availableThemeStyles = is_array($summary['available_styles'] ?? null) ? $summary['available_styles'] : [];
+        $selectableThemeStyles = array_filter(
+            $availableThemeStyles,
+            static fn ($label, $styleId): bool => (string) $styleId !== BricksIntegrationService::MANAGED_THEME_STYLE_ID,
+            ARRAY_FILTER_USE_BOTH
+        );
+        $targetMode = trim((string) ($summary['target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED));
+        $targetStyleId = trim((string) ($summary['target_style_id'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_ID));
+        $targetStyleLabel = trim((string) ($summary['target_style_label'] ?? $managedThemeStyleLabel));
+        $hasThemeStyles = !empty($summary['has_theme_styles']);
+        $managedThemeStyleExists = !empty($summary['managed_style_exists']);
+        $targetIsManaged = !empty($summary['target_is_managed']);
+        $targetIsAll = !empty($summary['target_is_all']);
+
+        if ($targetMode === BricksIntegrationService::TARGET_MODE_SELECTED && $selectableThemeStyles === []) {
+            $targetMode = BricksIntegrationService::TARGET_MODE_MANAGED;
+        }
+
+        return [
+            'title' => __('Theme Style', 'tasty-fonts'),
+            'copy' => $this->buildBricksThemeStyleTargetCopy($summary),
+            'summary_copy' => '',
+            'mode' => $targetMode,
+            'selected_style_id' => $targetStyleId,
+            'selected_style_label' => $targetStyleLabel,
+            'managed_style_label' => $managedThemeStyleLabel,
+            'available_styles' => $availableThemeStyles,
+            'has_theme_styles' => $hasThemeStyles,
+            'managed_style_exists' => $managedThemeStyleExists,
+            'target_is_managed' => $targetIsManaged,
+            'target_is_all' => $targetIsAll,
+            'has_selectable_styles' => $selectableThemeStyles !== [],
+            'show_create_action' => !$hasThemeStyles && !$managedThemeStyleExists,
+            'show_delete_action' => $managedThemeStyleExists,
+            'select_visible' => $targetMode === BricksIntegrationService::TARGET_MODE_SELECTED,
+            'empty_select_label' => __('No existing Bricks Theme Styles yet', 'tasty-fonts'),
+            'select_label' => __('Choose Theme Style', 'tasty-fonts'),
+            'mode_options' => [
+                [
+                    'value' => BricksIntegrationService::TARGET_MODE_MANAGED,
+                    'label' => __('Managed Tasty style', 'tasty-fonts'),
+                ],
+                [
+                    'value' => BricksIntegrationService::TARGET_MODE_SELECTED,
+                    'label' => __('One existing style', 'tasty-fonts'),
+                ],
+                [
+                    'value' => BricksIntegrationService::TARGET_MODE_ALL,
+                    'label' => __('All styles', 'tasty-fonts'),
+                ],
+            ],
+        ];
+    }
+
+    private function buildBricksThemeStyleTargetCopy(array $summary): string
+    {
+        $managedThemeStyleLabel = trim((string) ($summary['managed_style_label'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_LABEL));
+        $targetStyleLabel = trim((string) ($summary['target_style_label'] ?? $managedThemeStyleLabel));
+
+        if (empty($summary['has_theme_styles']) && empty($summary['managed_style_exists'])) {
+            return __('Create the managed style to start syncing.', 'tasty-fonts');
+        }
+
+        if (!empty($summary['target_is_all'])) {
+            return __('Only updates font-family and font-weight on all Theme Styles.', 'tasty-fonts');
+        }
+
+        if (!empty($summary['target_is_managed'])) {
+            return sprintf(
+                /* translators: %s: theme style label */
+                __('Only updates font-family and font-weight on the managed style "%s".', 'tasty-fonts'),
+                $managedThemeStyleLabel
+            );
+        }
+
+        if ($targetStyleLabel !== '') {
+            return sprintf(
+                /* translators: %s: theme style label */
+                __('Only updates font-family and font-weight on "%s".', 'tasty-fonts'),
+                $targetStyleLabel
+            );
+        }
+
+        return __('Only updates font-family and font-weight.', 'tasty-fonts');
+    }
+
+    private function buildBricksMappingDetailsView(array $themeStyles, array $googleFonts): array
+    {
+        $summary = is_array($themeStyles['summary'] ?? null) ? $themeStyles['summary'] : [];
+        $targeting = is_array($themeStyles['ui']['targeting'] ?? null) ? $themeStyles['ui']['targeting'] : [];
+        $current = is_array($themeStyles['current'] ?? null) ? $themeStyles['current'] : [];
+        $desired = is_array($themeStyles['desired'] ?? null) ? $themeStyles['desired'] : [];
+        $googleCurrent = is_array($googleFonts['current'] ?? null) ? $googleFonts['current'] : [];
+        $managedThemeStyleLabel = trim((string) ($targeting['managed_style_label'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_LABEL));
+        $targetStyleLabel = trim((string) ($targeting['selected_style_label'] ?? ''));
+        $themeStylesApplied = !empty($themeStyles['applied']);
+        $currentIntro = '';
+
+        if (empty($summary['has_theme_styles']) && empty($summary['managed_style_exists'])) {
+            $currentIntro = __('No Theme Styles yet.', 'tasty-fonts');
+        } elseif (!empty($summary['target_is_all'])) {
+            $currentIntro = __('All Theme Styles are being updated.', 'tasty-fonts');
+        } elseif (!empty($summary['target_is_managed']) && !empty($summary['managed_style_exists'])) {
+            $currentIntro = sprintf(
+                /* translators: %s: theme style label */
+                __('Managed style: "%s".', 'tasty-fonts'),
+                $managedThemeStyleLabel
+            );
+        } elseif ($targetStyleLabel !== '') {
+            $currentIntro = sprintf(
+                /* translators: %s: theme style label */
+                $themeStylesApplied
+                    ? __('Updating "%s".', 'tasty-fonts')
+                    : __('Ready to update "%s".', 'tasty-fonts'),
+                $targetStyleLabel
+            );
+        }
+
+        return [
+            'summary_label' => __('Font mapping', 'tasty-fonts'),
+            'current_title' => __('Current values', 'tasty-fonts'),
+            'current_intro' => $currentIntro,
+            'target_title' => __('Target values', 'tasty-fonts'),
+            'current_rows' => [
+                [
+                    'label' => __('Body', 'tasty-fonts'),
+                    'value' => (string) ($current['body_family'] ?? '') !== ''
+                        ? (string) $current['body_family']
+                        : __('empty', 'tasty-fonts'),
+                ],
+                [
+                    'label' => __('Heading', 'tasty-fonts'),
+                    'value' => (string) ($current['heading_family'] ?? '') !== ''
+                        ? (string) $current['heading_family']
+                        : __('empty', 'tasty-fonts'),
+                ],
+                [
+                    'label' => __('Body Weight', 'tasty-fonts'),
+                    'value' => (string) ($current['body_weight'] ?? '') !== ''
+                        ? (string) $current['body_weight']
+                        : __('empty', 'tasty-fonts'),
+                ],
+                [
+                    'label' => __('Heading Weight', 'tasty-fonts'),
+                    'value' => (string) ($current['heading_weight'] ?? '') !== ''
+                        ? (string) $current['heading_weight']
+                        : __('empty', 'tasty-fonts'),
+                ],
+            ],
+            'desired_rows' => [
+                [
+                    'label' => __('Body', 'tasty-fonts'),
+                    'value' => (string) ($desired['body_family'] ?? BricksIntegrationService::DESIRED_BODY_VALUE),
+                ],
+                [
+                    'label' => __('Heading', 'tasty-fonts'),
+                    'value' => (string) ($desired['heading_family'] ?? BricksIntegrationService::DESIRED_HEADING_VALUE),
+                ],
+                [
+                    'label' => __('Body Weight', 'tasty-fonts'),
+                    'value' => (string) ($desired['body_weight'] ?? BricksIntegrationService::DESIRED_BODY_WEIGHT_VALUE),
+                ],
+                [
+                    'label' => __('Heading Weight', 'tasty-fonts'),
+                    'value' => (string) ($desired['heading_weight'] ?? BricksIntegrationService::DESIRED_HEADING_WEIGHT_VALUE),
+                ],
+            ],
+        ];
+    }
+
+    private function buildBricksFeatureStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'synced' => __('Synced', 'tasty-fonts'),
+            'active' => __('On', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Waiting', 'tasty-fonts'),
+            'ready' => __('Ready', 'tasty-fonts'),
+            'unavailable' => __('Not Active', 'tasty-fonts'),
+            default => __('Off', 'tasty-fonts'),
+        };
+    }
+
+    private function buildBricksFeatureStatusBadgeClass(string $status): string
+    {
+        return match ($status) {
+            'synced', 'active' => ' is-success',
+            'ready' => ' is-role',
+            'waiting_for_sitewide_roles' => ' is-warning',
+            'unavailable' => ' is-danger',
+            default => '',
+        };
+    }
+
+    private function buildBricksFeatureStatusHelp(string $featureKey, string $status): string
+    {
+        return match ($featureKey) {
+            'bricks_theme_styles_sync_enabled' => match ($status) {
+                'synced' => __('Bricks Theme Style sync is active. Tasty is keeping the selected Theme Style mapped to the live sitewide role variables.', 'tasty-fonts'),
+                'waiting_for_sitewide_roles' => __('Bricks Theme Style sync is enabled, but Tasty only applies it after sitewide role delivery is turned on.', 'tasty-fonts'),
+                'ready' => __('Bricks Theme Style sync is enabled and ready to apply the selected Theme Style mapping.', 'tasty-fonts'),
+                'unavailable' => __('Bricks is not active on this site yet, so Tasty cannot update Bricks Theme Styles.', 'tasty-fonts'),
+                default => __('Tasty is not managing Bricks Theme Styles right now.', 'tasty-fonts'),
+            },
+            'bricks_disable_google_fonts_enabled' => match ($status) {
+                'synced' => __('Bricks Google Fonts are disabled in Bricks now, so Bricks pickers only show Tasty-supplied fonts.', 'tasty-fonts'),
+                'ready' => __('Bricks Google font control is enabled and ready to update Bricks own disable Google Fonts setting.', 'tasty-fonts'),
+                'unavailable' => __('Bricks is not active on this site yet, so Tasty cannot update Bricks font settings.', 'tasty-fonts'),
+                default => __('Tasty is not managing the Bricks Google Fonts setting right now.', 'tasty-fonts'),
+            },
+            default => '',
+        };
     }
 
     private function buildPluginVersionChannelLabel(string $pluginVersion, array $updateChannelStatus): string

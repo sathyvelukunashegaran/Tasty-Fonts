@@ -98,6 +98,7 @@ require_once dirname(__DIR__) . '/bootstrap.php';
 
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
+use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Admin\AdminPageRenderer;
 use TastyFonts\Api\RestController;
@@ -460,6 +461,15 @@ if (!function_exists('sanitize_text_field')) {
     }
 }
 
+if (!function_exists('sanitize_key')) {
+    function sanitize_key(string $key): string
+    {
+        $key = strtolower((string) $key);
+
+        return preg_replace('/[^a-z0-9_\-]/', '', $key) ?? '';
+    }
+}
+
 if (!function_exists('sanitize_file_name')) {
     function sanitize_file_name(string $filename): string
     {
@@ -725,7 +735,21 @@ $siteTransientSet = [];
 $uploadBaseDir = sys_get_temp_dir() . '/tasty-fonts-tests/uploads';
 $uploadedFilePaths = [];
 $currentUserId = 1;
+$currentUserRoles = null;
 $currentUserCapabilities = ['manage_options' => true];
+$registeredRoleNames = [
+    'administrator' => 'Administrator',
+    'editor' => 'Editor',
+    'author' => 'Author',
+    'contributor' => 'Contributor',
+    'subscriber' => 'Subscriber',
+];
+$testUsers = [
+    1 => ['ID' => 1, 'user_login' => 'admin', 'display_name' => 'Admin User', 'roles' => ['administrator']],
+    2 => ['ID' => 2, 'user_login' => 'editor', 'display_name' => 'Editor User', 'roles' => ['editor']],
+    3 => ['ID' => 3, 'user_login' => 'author', 'display_name' => 'Author User', 'roles' => ['author']],
+    4 => ['ID' => 4, 'user_login' => 'contributor', 'display_name' => 'Contributor User', 'roles' => ['contributor']],
+];
 $pluginUpgraderInstallCalls = [];
 $pluginUpgraderInstallResult = true;
 $wpdb = null;
@@ -1368,6 +1392,17 @@ if (!function_exists('current_user_can')) {
             return !empty($currentUserCapabilities[$capability]);
         }
 
+        $user = wp_get_current_user();
+        $roles = is_array($user->roles ?? null) ? $user->roles : [];
+
+        if ($capability === 'manage_options') {
+            return in_array('administrator', $roles, true);
+        }
+
+        if ($capability === 'read') {
+            return (int) ($user->ID ?? 0) > 0;
+        }
+
         return true;
     }
 }
@@ -1429,10 +1464,98 @@ if (!function_exists('get_current_blog_id')) {
 if (!function_exists('wp_get_current_user')) {
     function wp_get_current_user(): object
     {
+        global $currentUserId;
+        global $currentUserRoles;
+        global $testUsers;
+
+        $currentUserId = absint($currentUserId);
+        $user = is_array($testUsers[$currentUserId] ?? null)
+            ? $testUsers[$currentUserId]
+            : [
+                'ID' => $currentUserId,
+                'user_login' => $currentUserId > 0 ? 'user-' . $currentUserId : '',
+                'display_name' => $currentUserId > 0 ? 'User ' . $currentUserId : '',
+                'roles' => [],
+            ];
+        $roles = is_array($currentUserRoles)
+            ? array_values($currentUserRoles)
+            : (is_array($user['roles'] ?? null) ? array_values($user['roles']) : []);
+
         return (object) [
-            'user_login' => 'admin',
-            'display_name' => 'Admin User',
+            'ID' => absint($user['ID'] ?? $currentUserId),
+            'user_login' => (string) ($user['user_login'] ?? ''),
+            'display_name' => (string) ($user['display_name'] ?? ''),
+            'roles' => $roles,
         ];
+    }
+}
+
+if (!class_exists('WP_Roles')) {
+    class WP_Roles
+    {
+        public function __construct(public array $roles = [])
+        {
+        }
+    }
+}
+
+if (!function_exists('wp_roles')) {
+    function wp_roles(): WP_Roles
+    {
+        global $registeredRoleNames;
+
+        $roles = [];
+
+        foreach ((array) $registeredRoleNames as $roleSlug => $roleName) {
+            $normalizedSlug = sanitize_key((string) $roleSlug);
+
+            if ($normalizedSlug === '') {
+                continue;
+            }
+
+            $roles[$normalizedSlug] = ['name' => (string) $roleName];
+        }
+
+        return new WP_Roles($roles);
+    }
+}
+
+if (!function_exists('get_users')) {
+    function get_users(array $args = []): array
+    {
+        global $testUsers;
+
+        $users = is_array($testUsers) ? $testUsers : [];
+        $include = is_array($args['include'] ?? null) ? array_map('absint', $args['include']) : [];
+
+        if ($include !== []) {
+            $users = array_intersect_key($users, array_flip($include));
+        }
+
+        $fields = $args['fields'] ?? null;
+
+        if ($fields === 'ids') {
+            return array_values(
+                array_map(
+                    static fn (array $user): int => absint($user['ID'] ?? 0),
+                    $users
+                )
+            );
+        }
+
+        return array_values(
+            array_map(
+                static function (array $user): object {
+                    return (object) [
+                        'ID' => absint($user['ID'] ?? 0),
+                        'display_name' => (string) ($user['display_name'] ?? ''),
+                        'user_login' => (string) ($user['user_login'] ?? ''),
+                        'roles' => is_array($user['roles'] ?? null) ? array_values($user['roles']) : [],
+                    ];
+                },
+                $users
+            )
+        );
     }
 }
 
@@ -1650,6 +1773,7 @@ function resetTestState(): void
     global $currentPostId;
     global $currentBlogId;
     global $currentUserId;
+    global $currentUserRoles;
     global $currentUserCapabilities;
     global $oxygenGlobalSettings;
     global $optionAutoload;
@@ -1673,6 +1797,8 @@ function resetTestState(): void
     global $siteTransientStore;
     global $supportedPostTypes;
     global $submenuPageCalls;
+    global $registeredRoleNames;
+    global $testUsers;
     global $transientDeleted;
     global $transientSet;
     global $transientStore;
@@ -1733,7 +1859,21 @@ function resetTestState(): void
     $currentPostId = 0;
     $currentBlogId = 1;
     $currentUserId = 1;
+    $currentUserRoles = null;
     $currentUserCapabilities = ['manage_options' => true];
+    $registeredRoleNames = [
+        'administrator' => 'Administrator',
+        'editor' => 'Editor',
+        'author' => 'Author',
+        'contributor' => 'Contributor',
+        'subscriber' => 'Subscriber',
+    ];
+    $testUsers = [
+        1 => ['ID' => 1, 'user_login' => 'admin', 'display_name' => 'Admin User', 'roles' => ['administrator']],
+        2 => ['ID' => 2, 'user_login' => 'editor', 'display_name' => 'Editor User', 'roles' => ['editor']],
+        3 => ['ID' => 3, 'user_login' => 'author', 'display_name' => 'Author User', 'roles' => ['author']],
+        4 => ['ID' => 4, 'user_login' => 'contributor', 'display_name' => 'Contributor User', 'roles' => ['contributor']],
+    ];
     $oxygenGlobalSettings = [];
     $pluginUpgraderInstallCalls = [];
     $pluginUpgraderInstallResult = true;
@@ -1806,7 +1946,8 @@ function makeServiceGraph(): array
         $blockEditorFontLibrary,
         new StubUploadedFileValidator()
     );
-    $updater = new GitHubUpdater($settings);
+    $adminAccess = new AdminAccessService($settings);
+    $updater = new GitHubUpdater($settings, $adminAccess);
     $controller = new AdminController(
         $storage,
         $settings,
@@ -1826,9 +1967,10 @@ function makeServiceGraph(): array
         $oxygenIntegration,
         $developerTools,
         $siteTransfer,
-        $updater
+        $updater,
+        $adminAccess
     );
-    $rest = new RestController($controller);
+    $rest = new RestController($controller, $adminAccess);
     $runtime = new RuntimeService($planner, $assets, $adobe, $settings, $acssIntegration, $bricksIntegration, $oxygenIntegration);
 
     return [
@@ -1852,6 +1994,7 @@ function makeServiceGraph(): array
         'block_editor_font_library' => $blockEditorFontLibrary,
         'developer_tools' => $developerTools,
         'site_transfer' => $siteTransfer,
+        'admin_access' => $adminAccess,
         'updater' => $updater,
         'controller' => $controller,
         'rest' => $rest,

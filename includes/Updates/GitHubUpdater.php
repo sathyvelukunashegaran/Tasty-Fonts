@@ -6,6 +6,7 @@ namespace TastyFonts\Updates;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
@@ -35,9 +36,11 @@ final class GitHubUpdater
     private ?array $pluginMetadata = null;
     private ?string $pluginBasename = null;
     private ?string $installedVersion = null;
+    private ?AdminAccessService $adminAccess = null;
 
-    public function __construct(private readonly ?SettingsRepository $settings = null)
+    public function __construct(private readonly ?SettingsRepository $settings = null, ?AdminAccessService $adminAccess = null)
     {
+        $this->adminAccess = $adminAccess;
     }
 
     public function registerHooks(): void
@@ -157,7 +160,7 @@ final class GitHubUpdater
 
     public function reinstallReleaseForChannel(?string $channel = null): array|WP_Error
     {
-        if (!current_user_can('manage_options')) {
+        if (!$this->adminAccess()->canCurrentUserAccess()) {
             return new WP_Error(
                 'tasty_fonts_update_channel_forbidden',
                 __('You do not have permission to reinstall this plugin.', 'tasty-fonts')
@@ -235,6 +238,17 @@ final class GitHubUpdater
             'version' => (string) ($release['version'] ?? ''),
             'package_url' => $packageUrl,
         ];
+    }
+
+    private function adminAccess(): AdminAccessService
+    {
+        if ($this->adminAccess instanceof AdminAccessService) {
+            return $this->adminAccess;
+        }
+
+        $this->adminAccess = new AdminAccessService($this->settings ?? new SettingsRepository());
+
+        return $this->adminAccess;
     }
 
     public function handleUpgraderProcessComplete(mixed $upgrader, array $hookExtra): void

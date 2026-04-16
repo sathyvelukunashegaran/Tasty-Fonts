@@ -413,8 +413,115 @@
         return true;
     }
 
+    function normalizeSettingsFieldName(name = '') {
+        return String(name || '').replace(/\[\]$/, '').trim();
+    }
+
+    function serializeSettingsFormEntries(entries = [], options = {}) {
+        const ignoredKeys = new Set(
+            Array.isArray(options.ignoredKeys)
+                ? options.ignoredKeys.map((key) => String(key || ''))
+                : []
+        );
+        const body = {};
+
+        Array.from(entries || []).forEach((entry) => {
+            if (!Array.isArray(entry) || entry.length < 2) {
+                return;
+            }
+
+            const rawKey = String(entry[0] || '');
+            const value = entry[1];
+
+            if (rawKey === '' || ignoredKeys.has(rawKey) || typeof value !== 'string') {
+                return;
+            }
+
+            const normalizedKey = normalizeSettingsFieldName(rawKey);
+
+            if (normalizedKey === '') {
+                return;
+            }
+
+            if (rawKey.endsWith('[]')) {
+                if (!Array.isArray(body[normalizedKey])) {
+                    body[normalizedKey] = [];
+                }
+
+                if (value !== '') {
+                    body[normalizedKey].push(value);
+                }
+
+                return;
+            }
+
+            body[normalizedKey] = value;
+        });
+
+        return body;
+    }
+
     function settingsStatesMatch(left = {}, right = {}) {
         return JSON.stringify(left || {}) === JSON.stringify(right || {});
+    }
+
+    function parsePhpIniSizeToBytes(value = '') {
+        const normalized = String(value || '').trim().toLowerCase();
+
+        if (!normalized) {
+            return 0;
+        }
+
+        const match = normalized.match(/^(\d+(?:\.\d+)?)\s*([gmk])?b?$/);
+
+        if (!match) {
+            return 0;
+        }
+
+        const amount = Number.parseFloat(match[1] || '0');
+        const unit = String(match[2] || '');
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return 0;
+        }
+
+        switch (unit) {
+            case 'g':
+                return Math.round(amount * 1024 * 1024 * 1024);
+            case 'm':
+                return Math.round(amount * 1024 * 1024);
+            case 'k':
+                return Math.round(amount * 1024);
+            default:
+                return Math.round(amount);
+        }
+    }
+
+    function shouldDisableFieldDuringSiteTransferSubmit(tagName = '', type = '') {
+        const normalizedTagName = String(tagName || '').trim().toLowerCase();
+        const normalizedType = String(type || '').trim().toLowerCase();
+
+        if (normalizedTagName === 'button') {
+            return true;
+        }
+
+        if (normalizedTagName === 'input') {
+            return normalizedType === 'submit' || normalizedType === 'button';
+        }
+
+        return false;
+    }
+
+    function logEntryMatchesFilters(actor = '', searchValue = '', actorFilter = '', query = '') {
+        const normalizedActor = String(actor || '').trim().toLowerCase();
+        const normalizedSearchValue = String(searchValue || '').trim().toLowerCase();
+        const normalizedActorFilter = String(actorFilter || '').trim().toLowerCase();
+        const normalizedQuery = String(query || '').trim().toLowerCase();
+
+        const matchesActor = !normalizedActorFilter || normalizedActor === normalizedActorFilter;
+        const matchesQuery = !normalizedQuery || normalizedSearchValue.includes(normalizedQuery);
+
+        return matchesActor && matchesQuery;
     }
 
     return {
@@ -426,12 +533,16 @@
         hasStaticFontMetadata,
         hasVariableFontMetadata,
         isTrustedHostedStylesheetUrl,
+        logEntryMatchesFilters,
         normalizeOutputQuickModePreference,
+        parsePhpIniSizeToBytes,
         rowMatchesLibraryFilters,
         resolveStatusAnnouncement,
         resolveAssignedRoleState,
         roleStatesMatch,
+        serializeSettingsFormEntries,
         settingsStatesMatch,
+        shouldDisableFieldDuringSiteTransferSubmit,
         sanitizeFallback,
         sanitizeOutputQuickModePreference,
         shouldHydrateFamilyDetails,

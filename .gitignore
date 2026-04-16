@@ -58,3 +58,6 @@ build/
 
 # Air artifacts
 .air/
+
+# Local AI planning exports
+prompt-exports/

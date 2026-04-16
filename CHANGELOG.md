@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added optional Tasty Fonts admin-access controls so administrators can delegate plugin access to selected non-administrator roles and specific users.
+- Added a dry-run site transfer validation flow that stages import bundles before destructive import and surfaces transfer activity directly in the Transfer tab.
+
+### Changed
+
+- Refined the Settings experience with a dedicated admin-access panel, improved transfer and developer-tool states, reusable log filtering, and polished header and settings layouts.
+- Routed admin menu registration, REST permissions, and updater reinstalls through a shared admin-access policy.
+
+### Fixed
+
+- Prevented transfer imports and destructive developer tools from running while settings changes are still unsaved, and kept bundle import disabled until a dry run succeeds.
+- Fixed oversized site-transfer uploads to surface a clear inline error and transfer-log entry instead of failing silently.
+- Cleared site-local individual-user grants from imported admin-access settings while preserving valid role-based access grants.
+
 ## [1.13.0-beta.1] - 2026-04-16
 
 ### Changed

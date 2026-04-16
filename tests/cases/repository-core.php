@@ -4,6 +4,66 @@ declare(strict_types=1);
 
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\SettingsRepository;
+
+// ---------------------------------------------------------------------------
+// SettingsRepository – admin access persistence
+// ---------------------------------------------------------------------------
+
+$tests['settings_repository_defaults_include_empty_admin_access_lists'] = static function (): void {
+    resetTestState();
+
+    $settings = (new SettingsRepository())->getSettings();
+
+    assertFalseValue(!empty($settings['admin_access_custom_enabled']), 'Settings defaults should keep custom admin access disabled until it is explicitly turned on.');
+    assertSameValue([], $settings['admin_access_role_slugs'] ?? null, 'Settings defaults should include an empty additional admin-access role allowlist.');
+    assertSameValue([], $settings['admin_access_user_ids'] ?? null, 'Settings defaults should include an empty additional admin-access user allowlist.');
+};
+
+$tests['settings_repository_normalizes_and_persists_admin_access_settings'] = static function (): void {
+    resetTestState();
+
+    $settingsRepository = new SettingsRepository();
+    $settings = $settingsRepository->saveSettings([
+        'admin_access_custom_enabled' => true,
+        'admin_access_role_slugs' => ['editor', 'administrator', 'author', 'editor', 'invalid role'],
+        'admin_access_user_ids' => ['3', '2', '1', '0', '999', 3],
+    ]);
+
+    assertTrueValue(!empty($settings['admin_access_custom_enabled']), 'Admin-access settings should persist the custom-access toggle when it is enabled.');
+    assertSameValue(['author', 'editor'], $settings['admin_access_role_slugs'] ?? null, 'Admin-access role settings should drop invalid, duplicate, and administrator entries and remain sorted.');
+    assertSameValue([2, 3], $settings['admin_access_user_ids'] ?? null, 'Admin-access user settings should drop invalid, unknown, and administrator users and remain sorted.');
+};
+
+$tests['settings_repository_normalizes_stored_admin_access_settings_on_read'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'admin_access_role_slugs' => ['editor', 'administrator', 'missing', 'editor'],
+        'admin_access_user_ids' => ['1', '4', '999', '0', '4'],
+    ];
+
+    $settings = (new SettingsRepository())->getSettings();
+
+    assertTrueValue(!empty($settings['admin_access_custom_enabled']), 'Legacy stored admin-access grants should infer that custom access is enabled when no explicit toggle has been saved yet.');
+    assertSameValue(['editor'], $settings['admin_access_role_slugs'] ?? null, 'Stored admin-access roles should normalize against currently registered roles.');
+    assertSameValue([4], $settings['admin_access_user_ids'] ?? null, 'Stored admin-access users should normalize against users that still exist on this site and exclude administrators.');
+};
+
+$tests['settings_repository_import_preview_clears_admin_access_user_ids_but_keeps_valid_roles'] = static function (): void {
+    resetTestState();
+
+    $settings = (new SettingsRepository())->previewImportedSettings([
+        'admin_access_role_slugs' => ['editor', 'administrator', 'missing'],
+        'admin_access_user_ids' => [2, 3, 999],
+    ]);
+
+    assertTrueValue(!empty($settings['admin_access_custom_enabled']), 'Imported admin-access role grants should keep custom access enabled when valid role grants survive normalization.');
+    assertSameValue(['editor'], $settings['admin_access_role_slugs'] ?? null, 'Imported admin-access role grants should survive only for valid non-administrator roles.');
+    assertSameValue([], $settings['admin_access_user_ids'] ?? null, 'Imported admin-access user grants should be cleared because user IDs are site-local.');
+};
 
 // ---------------------------------------------------------------------------
 // ImportRepository – getFamily / saveFamily

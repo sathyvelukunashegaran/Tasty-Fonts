@@ -14,6 +14,8 @@
         return allowedPages.has(requestedPage) ? requestedPage : 'roles';
     })();
     const trainingWheelsOff = !!config.trainingWheelsOff;
+    const pageHeaderTitle = document.querySelector('[data-page-header-title]');
+    const pageHeaderSummary = document.querySelector('[data-page-header-summary]');
     const wpI18n = window.wp && window.wp.i18n ? window.wp.i18n : {};
     const __ = typeof wpI18n.__ === 'function' ? wpI18n.__ : (text) => text;
     const _n = typeof wpI18n._n === 'function'
@@ -42,6 +44,67 @@
     const shouldHydrateFamilyDetails = typeof adminContracts.shouldHydrateFamilyDetails === 'function'
         ? adminContracts.shouldHydrateFamilyDetails
         : (state = {}) => !state.loaded && !state.loading && String(state.familySlug || '').trim() !== '';
+    const shouldDisableFieldDuringSiteTransferSubmit = typeof adminContracts.shouldDisableFieldDuringSiteTransferSubmit === 'function'
+        ? adminContracts.shouldDisableFieldDuringSiteTransferSubmit
+        : (tagName = '', type = '') => {
+            const normalizedTagName = String(tagName || '').trim().toLowerCase();
+            const normalizedType = String(type || '').trim().toLowerCase();
+
+            if (normalizedTagName === 'button') {
+                return true;
+            }
+
+            if (normalizedTagName === 'input') {
+                return normalizedType === 'submit' || normalizedType === 'button';
+            }
+
+            return false;
+        };
+    const logEntryMatchesFilters = typeof adminContracts.logEntryMatchesFilters === 'function'
+        ? adminContracts.logEntryMatchesFilters
+        : (actor = '', searchValue = '', actorFilter = '', query = '') => {
+            const normalizedActor = String(actor || '').trim().toLowerCase();
+            const normalizedSearchValue = String(searchValue || '').trim().toLowerCase();
+            const normalizedActorFilter = String(actorFilter || '').trim().toLowerCase();
+            const normalizedQuery = String(query || '').trim().toLowerCase();
+            const matchesActor = !normalizedActorFilter || normalizedActor === normalizedActorFilter;
+            const matchesQuery = !normalizedQuery || normalizedSearchValue.includes(normalizedQuery);
+
+            return matchesActor && matchesQuery;
+        };
+    const parsePhpIniSizeToBytes = typeof adminContracts.parsePhpIniSizeToBytes === 'function'
+        ? adminContracts.parsePhpIniSizeToBytes
+        : (value = '') => {
+            const normalized = String(value || '').trim().toLowerCase();
+
+            if (!normalized) {
+                return 0;
+            }
+
+            const match = normalized.match(/^(\d+(?:\.\d+)?)\s*([gmk])?b?$/);
+
+            if (!match) {
+                return 0;
+            }
+
+            const amount = Number.parseFloat(match[1] || '0');
+            const unit = String(match[2] || '');
+
+            if (!Number.isFinite(amount) || amount <= 0) {
+                return 0;
+            }
+
+            switch (unit) {
+                case 'g':
+                    return Math.round(amount * 1024 * 1024 * 1024);
+                case 'm':
+                    return Math.round(amount * 1024 * 1024);
+                case 'k':
+                    return Math.round(amount * 1024);
+                default:
+                    return Math.round(amount);
+            }
+        };
     const roleHeading = document.getElementById('tasty_fonts_heading_font');
     const roleBody = document.getElementById('tasty_fonts_body_font');
     const roleMonospace = document.getElementById('tasty_fonts_monospace_font');
@@ -190,11 +253,6 @@
     let helpButtons = [];
     let helpTooltipLayer = null;
     let helpTooltipEventsBound = false;
-    const activityActorFilter = document.querySelector('[data-activity-actor-filter]');
-    const activitySearch = document.querySelector('[data-activity-search]');
-    const activityCount = document.querySelector('[data-activity-count]');
-    const activityList = document.querySelector('[data-activity-list]');
-    const activityFilteredEmpty = document.getElementById('tasty-fonts-activity-empty-filtered');
     const pillOptionInputs = Array.from(document.querySelectorAll('[data-pill-option-input]'));
     const pillOptions = Array.from(document.querySelectorAll('[data-pill-option]'));
     const outputQuickModeInputs = Array.from(document.querySelectorAll('[data-output-quick-mode]'));
@@ -206,6 +264,13 @@
         : '';
     const outputQuickModeNotice = document.querySelector('[data-output-quick-mode-notice]');
     const developerConfirmForms = Array.from(document.querySelectorAll('[data-developer-confirm-message]'));
+    const developerToolForms = Array.from(document.querySelectorAll('[data-developer-tool-form]'));
+    const developerDirtyNotices = Array.from(document.querySelectorAll('[data-developer-dirty-notice]'));
+    const adminAccessGroups = Array.from(document.querySelectorAll('.tasty-fonts-admin-access-field[data-admin-access-group]'));
+    const adminAccessToggle = document.querySelector('[data-admin-access-toggle]');
+    const adminAccessManaged = document.querySelector('[data-admin-access-managed]');
+    const adminAccessEnabledSummary = document.querySelector('[data-admin-access-summary-state="enabled"]');
+    const adminAccessDisabledSummary = document.querySelector('[data-admin-access-summary-state="disabled"]');
     const outputMasterInputs = {
         classes: document.querySelector('[data-output-master="classes"]'),
         variables: document.querySelector('[data-output-master="variables"]'),
@@ -222,6 +287,9 @@
     const unicodeRangeCustomInput = document.querySelector('[data-unicode-range-custom]');
     const settingsForms = Array.from(document.querySelectorAll('[data-settings-form]'));
     const settingsSaveShell = document.querySelector('[data-settings-save-shell]');
+    const settingsSaveButton = settingsSaveShell ? settingsSaveShell.querySelector('[data-settings-save-button]') : null;
+    const settingsSaveButtonDefaultLabel = settingsSaveButton ? String(settingsSaveButton.textContent || '').trim() : '';
+    const settingsSaveButtonDefaultFormId = settingsSaveButton ? String(settingsSaveButton.getAttribute('form') || '').trim() : '';
     const siteTransferForms = Array.from(document.querySelectorAll('[data-site-transfer-form]'));
 
     let selectedSearchFamily = null;
@@ -335,6 +403,12 @@
         uploadNoFile: __('No file chosen', 'tasty-fonts'),
         siteTransferNoFile: __('No bundle selected', 'tasty-fonts'),
         siteTransferImporting: __('Importing the site transfer bundle… Large font libraries can take a minute.', 'tasty-fonts'),
+        siteTransferValidating: __('Running a dry run on the transfer bundle…', 'tasty-fonts'),
+        siteTransferValidateIdle: __('Dry Run Bundle', 'tasty-fonts'),
+        siteTransferValidateBusy: __('Validating Bundle…', 'tasty-fonts'),
+        siteTransferImportIdle: __('Import Bundle', 'tasty-fonts'),
+        siteTransferImportBusy: __('Importing Bundle…', 'tasty-fonts'),
+        siteTransferImportRequiresDryRun: __('Run the dry run before importing this bundle.', 'tasty-fonts'),
         uploadButtonIdle: __('Upload to Library', 'tasty-fonts'),
         uploadButtonBusy: __('Uploading…', 'tasty-fonts'),
         uploadRowQueued: __('Queued', 'tasty-fonts'),
@@ -381,6 +455,11 @@
         activityCountMultiple: __('%1$d entries', 'tasty-fonts'),
         activityCountFilteredSingle: __('%1$d of %2$d entry', 'tasty-fonts'),
         activityCountFilteredMultiple: __('%1$d of %2$d entries', 'tasty-fonts'),
+        siteTransferLimitNeutral: __('Ready to validate against the %s upload limit.', 'tasty-fonts'),
+        siteTransferLimitNeutralFallback: __('Ready to validate the selected bundle before import.', 'tasty-fonts'),
+        siteTransferLimitReady: __('Within upload limit', 'tasty-fonts'),
+        siteTransferGoogleSummaryEmpty: __('Optional — not provided', 'tasty-fonts'),
+        siteTransferGoogleSummaryFilled: __('Fresh Google API key will be saved', 'tasty-fonts'),
         variantCountSingle: __('%d variant', 'tasty-fonts'),
         variantCountMultiple: __('%d variants', 'tasty-fonts'),
         styleCountSingle: __('%d style', 'tasty-fonts'),
@@ -406,6 +485,16 @@
         roleWeightSummary: __('Available static weights for %1$s. Choose one to override the default role weight when role font-weight output is enabled.', 'tasty-fonts'),
         settingsUnsaved: __('Unsaved changes', 'tasty-fonts'),
         settingsLeaveWarning: __('You have unsaved settings changes.', 'tasty-fonts'),
+        adminAccessRoleMetricSingle: __('%d role', 'tasty-fonts'),
+        adminAccessRoleMetricMultiple: __('%d roles', 'tasty-fonts'),
+        adminAccessUserMetricSingle: __('%d user', 'tasty-fonts'),
+        adminAccessUserMetricMultiple: __('%d users', 'tasty-fonts'),
+          adminAccessImpactSingle: __('%d user', 'tasty-fonts'),
+          adminAccessImpactMultiple: __('%d users', 'tasty-fonts'),
+        adminAccessRoleSelectedSingle: __('%1$d role selected · reaches %2$d user.', 'tasty-fonts'),
+        adminAccessRoleSelectedMultiple: __('%1$d roles selected · reaches %2$d users.', 'tasty-fonts'),
+        adminAccessUserSelectedSingle: __('%d user selected.', 'tasty-fonts'),
+        adminAccessUserSelectedMultiple: __('%d users selected.', 'tasty-fonts'),
     };
 
     function getHelpTooltipLayer() {
@@ -457,6 +546,42 @@
     const settingsStatesMatch = typeof adminContracts.settingsStatesMatch === 'function'
         ? adminContracts.settingsStatesMatch
         : (left, right) => JSON.stringify(left || {}) === JSON.stringify(right || {});
+    const serializeSettingsFormEntries = typeof adminContracts.serializeSettingsFormEntries === 'function'
+        ? adminContracts.serializeSettingsFormEntries
+        : (entries, options = {}) => {
+            const ignoredKeys = new Set(Array.isArray(options.ignoredKeys) ? options.ignoredKeys.map((key) => String(key || '')) : []);
+            const body = {};
+
+            Array.from(entries || []).forEach((entry) => {
+                if (!Array.isArray(entry) || entry.length < 2) {
+                    return;
+                }
+
+                const rawKey = String(entry[0] || '');
+                const value = entry[1];
+                const normalizedKey = rawKey.replace(/\[\]$/, '').trim();
+
+                if (rawKey === '' || ignoredKeys.has(rawKey) || normalizedKey === '' || typeof value !== 'string') {
+                    return;
+                }
+
+                if (rawKey.endsWith('[]')) {
+                    if (!Array.isArray(body[normalizedKey])) {
+                        body[normalizedKey] = [];
+                    }
+
+                    if (value !== '') {
+                        body[normalizedKey].push(value);
+                    }
+
+                    return;
+                }
+
+                body[normalizedKey] = value;
+            });
+
+            return body;
+        };
     const getTabNavigationTargetIndex = typeof adminContracts.getTabNavigationTargetIndex === 'function'
         ? adminContracts.getTabNavigationTargetIndex
         : (key, currentIndex, count, orientation = 'horizontal') => {
@@ -1077,32 +1202,34 @@
     }
 
     function serializeSettingsForm(form) {
-        const body = {};
-
         if (!form || !window.FormData) {
-            return body;
+            return {};
         }
 
         const formData = new FormData(form);
 
-        formData.forEach((value, key) => {
-            if (
-                key === '_wpnonce'
-                || key === '_wp_http_referer'
-                || key === 'tasty_fonts_save_settings'
-                || key === 'tasty_fonts_output_quick_mode'
-            ) {
-                return;
-            }
-
-            if (typeof value !== 'string') {
-                return;
-            }
-
-            body[key] = value;
+        return serializeSettingsFormEntries(Array.from(formData.entries()), {
+            ignoredKeys: [
+                '_wpnonce',
+                '_wp_http_referer',
+                'tasty_fonts_save_settings',
+                'tasty_fonts_output_quick_mode',
+            ],
         });
+    }
 
-        return body;
+    function getSettingsFormFields(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return [];
+        }
+
+        return Array.from(new Set(
+            Array.from(form.elements || []).filter((field) => (
+                field instanceof HTMLInputElement
+                || field instanceof HTMLSelectElement
+                || field instanceof HTMLTextAreaElement
+            ))
+        ));
     }
 
     function syncCheckboxFields(name, checked) {
@@ -1177,6 +1304,7 @@
         });
 
         setSettingsFormStatus(form, isDirty);
+        syncDeveloperToolAvailability();
 
         return isDirty;
     }
@@ -1198,6 +1326,7 @@
         });
 
         setSettingsFormStatus(form, false);
+        syncDeveloperToolAvailability();
     }
 
     function getSettingsFormButtons(form) {
@@ -1228,12 +1357,249 @@
         return Array.from(new Set([...internalStatuses, ...externalStatuses]));
     }
 
-    function syncSettingsSaveShell() {
-        if (!settingsSaveShell) {
+    function formatCountString(count, singleKey, pluralKey, fallbackSingle, fallbackPlural) {
+        const template = getString(
+            count === 1 ? singleKey : pluralKey,
+            count === 1 ? fallbackSingle : fallbackPlural
+        );
+
+        return template.replace('%d', String(count));
+    }
+
+    function formatRoleAccessSummary(roleCount, roleImpact) {
+        const template = getString(
+            roleCount === 1 ? 'adminAccessRoleSelectedSingle' : 'adminAccessRoleSelectedMultiple',
+            roleCount === 1 ? '%1$d role selected · reaches %2$d user.' : '%1$d roles selected · reaches %2$d users.'
+        );
+
+        return template
+            .replace('%1$d', String(roleCount))
+            .replace('%2$d', String(roleImpact));
+    }
+
+    function formatUserAccessSummary(userCount) {
+        return formatCountString(
+            userCount,
+            'adminAccessUserSelectedSingle',
+            'adminAccessUserSelectedMultiple',
+            '%d user selected.',
+            '%d users selected.'
+        );
+    }
+
+    function syncAdminAccessMode() {
+        const enabled = adminAccessToggle instanceof HTMLInputElement && adminAccessToggle.checked;
+
+        if (adminAccessManaged instanceof HTMLElement) {
+            adminAccessManaged.hidden = !enabled;
+        }
+
+        if (adminAccessEnabledSummary instanceof HTMLElement) {
+            adminAccessEnabledSummary.hidden = !enabled;
+        }
+
+        if (adminAccessDisabledSummary instanceof HTMLElement) {
+            adminAccessDisabledSummary.hidden = enabled;
+        }
+
+        if (adminAccessToggle instanceof HTMLInputElement) {
+            adminAccessToggle.setAttribute('aria-expanded', enabled ? 'true' : 'false');
+        }
+    }
+
+    function syncAdminAccessControls() {
+        syncAdminAccessMode();
+
+        if (!adminAccessGroups.length) {
             return;
         }
 
-        settingsSaveShell.hidden = activeTabKeyForGroup('settings') === 'developer';
+        let roleCount = 0;
+        let roleImpact = 0;
+        let userCount = 0;
+
+        adminAccessGroups.forEach((group) => {
+            const groupKey = String(group.getAttribute('data-admin-access-group') || '').trim();
+            const searchInput = group.querySelector('[data-admin-access-search]');
+            const selectedOnlyInput = group.querySelector(`[data-admin-access-selected-only="${groupKey}"]`);
+            const emptyState = group.querySelector('[data-admin-access-empty]');
+            const selectedSummary = group.querySelector(`[data-admin-access-selected-summary="${groupKey}"]`);
+            const normalizedQuery = searchInput instanceof HTMLInputElement
+                ? String(searchInput.value || '').trim().toLowerCase()
+                : '';
+            const selectedOnly = selectedOnlyInput instanceof HTMLInputElement && selectedOnlyInput.checked;
+            const selectedOnlyControl = selectedOnlyInput instanceof HTMLInputElement
+                ? selectedOnlyInput.closest('.tasty-fonts-admin-access-filter-toggle')
+                : null;
+            let visibleCount = 0;
+            let selectedCount = 0;
+            let selectedImpact = 0;
+
+            Array.from(group.querySelectorAll('[data-admin-access-item]')).forEach((item) => {
+                const input = item.querySelector('input[type="checkbox"]');
+                const searchText = String(item.getAttribute('data-admin-access-search-text') || item.textContent || '').toLowerCase();
+                const queryMatches = normalizedQuery === '' || searchText.includes(normalizedQuery);
+                const checked = input instanceof HTMLInputElement && input.checked;
+                const matches = queryMatches && (!selectedOnly || checked);
+
+                item.hidden = !matches;
+                item.classList.toggle('is-selected', checked);
+                if (matches) {
+                    visibleCount += 1;
+                }
+
+                if (!checked) {
+                    return;
+                }
+
+                if (groupKey === 'roles') {
+                    const impact = Number.parseInt(item.getAttribute('data-admin-access-impact') || '0', 10) || 0;
+                    roleCount += 1;
+                    roleImpact += impact;
+                    selectedCount += 1;
+                    selectedImpact += impact;
+                } else if (groupKey === 'users') {
+                    userCount += 1;
+                    selectedCount += 1;
+                }
+            });
+
+            group.classList.toggle('has-selection', selectedCount > 0);
+
+            if (selectedOnlyControl instanceof HTMLElement) {
+                selectedOnlyControl.classList.toggle('is-active', selectedOnly);
+            }
+
+            if (emptyState instanceof HTMLElement) {
+                emptyState.hidden = visibleCount !== 0;
+            }
+
+            if (selectedSummary instanceof HTMLElement) {
+                selectedSummary.textContent = groupKey === 'roles'
+                    ? formatRoleAccessSummary(selectedCount, selectedImpact)
+                    : formatUserAccessSummary(selectedCount);
+            }
+        });
+
+        const roleMetric = document.querySelector('[data-admin-access-summary-count="roles"]');
+        const roleCopy = document.querySelector('[data-admin-access-summary-copy="roles"]');
+        const userMetric = document.querySelector('[data-admin-access-summary-count="users"]');
+
+        if (roleMetric instanceof HTMLElement) {
+            roleMetric.textContent = formatCountString(roleCount, 'adminAccessRoleMetricSingle', 'adminAccessRoleMetricMultiple', '%d role', '%d roles');
+            const roleStat = roleMetric.closest('.tasty-fonts-admin-access-stat');
+            if (roleStat instanceof HTMLElement) {
+                roleStat.classList.toggle('has-selection', roleCount > 0);
+            }
+        }
+
+        if (roleCopy instanceof HTMLElement) {
+            roleCopy.textContent = formatCountString(roleImpact, 'adminAccessImpactSingle', 'adminAccessImpactMultiple', '%d user', '%d users');
+        }
+
+        if (userMetric instanceof HTMLElement) {
+            userMetric.textContent = formatCountString(userCount, 'adminAccessUserMetricSingle', 'adminAccessUserMetricMultiple', '%d user', '%d users');
+            const userStat = userMetric.closest('.tasty-fonts-admin-access-stat');
+            if (userStat instanceof HTMLElement) {
+                userStat.classList.toggle('has-selection', userCount > 0);
+            }
+        }
+    }
+
+    function getDeveloperToolSubmitButton(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return null;
+        }
+
+        return form.querySelector('[data-developer-submit]');
+    }
+
+    function syncDeveloperToolFormState(form, hasUnsavedChanges = anySettingsFormHasUnsavedChanges()) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const submitButton = getDeveloperToolSubmitButton(form);
+        const confirmField = form.querySelector('[data-developer-confirm-field]');
+        const confirmLock = form.querySelector('[data-developer-confirm-lock]');
+        const confirmPhrase = String(form.getAttribute('data-developer-confirm-input') || '').trim();
+        const lockActive = confirmLock instanceof HTMLElement && !confirmLock.hidden;
+        const confirmReady = !lockActive
+            || (!(confirmField instanceof HTMLInputElement)
+                ? false
+                : String(confirmField.value || '').trim() === confirmPhrase);
+
+        if (submitButton instanceof HTMLButtonElement || submitButton instanceof HTMLInputElement) {
+            submitButton.disabled = hasUnsavedChanges || !confirmReady;
+        }
+    }
+
+    function syncDeveloperToolAvailability() {
+        const hasUnsavedChanges = anySettingsFormHasUnsavedChanges();
+
+        developerDirtyNotices.forEach((notice) => {
+            if (notice instanceof HTMLElement) {
+                notice.hidden = !hasUnsavedChanges;
+            }
+        });
+
+        developerToolForms.forEach((form) => {
+            const submitButton = getDeveloperToolSubmitButton(form);
+
+            if (hasUnsavedChanges && submitButton) {
+                resetDestructiveButton(submitButton);
+            }
+
+            syncDeveloperToolFormState(form, hasUnsavedChanges);
+        });
+    }
+
+    function syncSettingsSaveShell() {
+        if (!settingsSaveShell || !settingsSaveButton) {
+            return;
+        }
+
+        const activeSettingsTab = activeTabKeyForGroup('settings');
+        const isTransferTab = activeSettingsTab === 'transfer';
+        const siteTransferForm = siteTransferForms[0] instanceof HTMLFormElement ? siteTransferForms[0] : null;
+
+        settingsSaveShell.hidden = false;
+
+        if (!isTransferTab || !siteTransferForm) {
+            if (settingsSaveButtonDefaultFormId !== '') {
+                settingsSaveButton.setAttribute('form', settingsSaveButtonDefaultFormId);
+            } else {
+                settingsSaveButton.removeAttribute('form');
+            }
+
+            settingsSaveButton.classList.remove('tasty-fonts-button-danger');
+            setButtonBusyState(
+                settingsSaveButton,
+                false,
+                settingsSaveButtonDefaultLabel || getString('settingsSave', 'Save changes'),
+                settingsSaveButtonDefaultLabel || getString('settingsSave', 'Save changes')
+            );
+            settingsSaveButton.disabled = !anySettingsFormHasUnsavedChanges();
+            return;
+        }
+
+        const { stageTokenInput } = getSiteTransferFieldParts(siteTransferForm);
+        const transferFormId = String(siteTransferForm.getAttribute('id') || '').trim();
+        const isSubmitting = siteTransferForm.dataset.siteTransferSubmitting === '1';
+        const hasStagedBundle = !!(stageTokenInput && String(stageTokenInput.value || '').trim() !== '');
+
+        if (transferFormId !== '') {
+            settingsSaveButton.setAttribute('form', transferFormId);
+        }
+
+        settingsSaveButton.classList.add('tasty-fonts-button-danger');
+        setButtonBusyState(
+            settingsSaveButton,
+            isSubmitting,
+            getString('siteTransferImportIdle', 'Import Bundle'),
+            getString('siteTransferImportBusy', 'Importing Bundle…')
+        );
+        settingsSaveButton.disabled = isSubmitting || !hasStagedBundle;
     }
 
     function handleSettingsBeforeUnload(event) {
@@ -4261,6 +4627,28 @@
         return activeTab ? activeTab.getAttribute('data-tab-target') : '';
     }
 
+    function syncPageHeaderForTab(tab) {
+        if (!tab) {
+            return;
+        }
+
+        if (pageHeaderTitle) {
+            const label = String(tab.getAttribute('data-page-label') || '').trim();
+
+            if (label) {
+                pageHeaderTitle.textContent = label;
+            }
+        }
+
+        if (pageHeaderSummary) {
+            const summary = String(tab.getAttribute('data-page-summary') || '').trim();
+
+            if (summary) {
+                pageHeaderSummary.textContent = summary;
+            }
+        }
+    }
+
     function activateTabGroup(group, key) {
         tabButtonsForGroup(group).forEach((tab) => {
             const isActive = tab.getAttribute('data-tab-target') === key;
@@ -4287,6 +4675,8 @@
             if (rootPage) {
                 rootPage.setAttribute('data-current-page', key);
             }
+
+            syncPageHeaderForTab(tabButtonsForGroup(group).find((tab) => tab.getAttribute('data-tab-target') === key) || null);
         }
 
         if (group === 'settings') {
@@ -8553,18 +8943,108 @@
         if (!form) {
             return {
                 fileInput: null,
-                submitButton: null,
+                googleApiKeyInput: null,
+                validateButton: null,
+                stageTokenInput: null,
                 status: null,
                 fileName: null,
+                summaryBundle: null,
+                summaryLimit: null,
+                summaryGoogle: null,
             };
         }
 
         return {
             fileInput: form.querySelector('[data-site-transfer-file-input]'),
-            submitButton: form.querySelector('[data-site-transfer-submit]'),
+            googleApiKeyInput: form.querySelector('input[name="tasty_fonts_import_google_api_key"]'),
+            validateButton: form.querySelector('[data-site-transfer-validate-submit]'),
+            stageTokenInput: form.querySelector('[data-site-transfer-stage-token]'),
             status: form.querySelector('[data-site-transfer-status]'),
             fileName: form.querySelector('[data-site-transfer-file-name]'),
+            summaryBundle: form.querySelector('[data-site-transfer-summary="bundle"]'),
+            summaryLimit: form.querySelector('[data-site-transfer-summary="limit"]'),
+            summaryGoogle: form.querySelector('[data-site-transfer-summary="google"]'),
         };
+    }
+
+    function clearSiteTransferStagedBundle(form) {
+        if (!form) {
+            return;
+        }
+
+        const { stageTokenInput } = getSiteTransferFieldParts(form);
+
+        if (stageTokenInput) {
+            stageTokenInput.value = '';
+        }
+
+        delete form.dataset.siteTransferValidated;
+        syncSettingsSaveShell();
+    }
+
+    function getSiteTransferUploadLimitBytes(form) {
+        if (!form) {
+            return 0;
+        }
+
+        const explicitLimit = Number.parseInt(String(form.getAttribute('data-site-transfer-max-bytes') || '').trim(), 10);
+
+        if (Number.isFinite(explicitLimit) && explicitLimit > 0) {
+            return explicitLimit;
+        }
+
+        return parsePhpIniSizeToBytes(String(form.getAttribute('data-site-transfer-max-label') || ''));
+    }
+
+    function getSiteTransferUploadLimitLabel(form) {
+        return form ? String(form.getAttribute('data-site-transfer-max-label') || '').trim() : '';
+    }
+
+    function getSiteTransferFileTooLargeMessage(form) {
+        const limitLabel = getSiteTransferUploadLimitLabel(form);
+
+        if (limitLabel && wpSprintf) {
+            return wpSprintf(
+                __('The selected bundle is larger than this server allows in one upload (%s).', 'tasty-fonts'),
+                limitLabel
+            );
+        }
+
+        if (limitLabel) {
+            return `The selected bundle is larger than this server allows in one upload (${limitLabel}).`;
+        }
+
+        return getString('siteTransferTooLarge', 'The selected bundle is larger than this server allows in one upload.');
+    }
+
+    function setSiteTransferSummaryItem(element, value, state = 'neutral') {
+        if (!element) {
+            return;
+        }
+
+        element.textContent = value;
+        const item = element.closest('.tasty-fonts-site-transfer-summary-item');
+
+        if (item) {
+            item.setAttribute('data-state', state);
+        }
+    }
+
+    function buildSiteTransferNeutralLimitSummary(form) {
+        const limitLabel = getSiteTransferUploadLimitLabel(form);
+
+        if (limitLabel && wpSprintf) {
+            return wpSprintf(
+                getString('siteTransferLimitNeutral', 'Ready to validate against the %s upload limit.'),
+                limitLabel
+            );
+        }
+
+        if (limitLabel) {
+            return `Ready to validate against the ${limitLabel} upload limit.`;
+        }
+
+        return getString('siteTransferLimitNeutralFallback', 'Ready to validate the selected bundle before import.');
     }
 
     function syncSiteTransferFormState(form, options = {}) {
@@ -8574,17 +9054,30 @@
 
         const {
             fileInput,
-            submitButton,
+            googleApiKeyInput,
+            validateButton,
+            stageTokenInput,
             status,
             fileName,
+            summaryBundle,
+            summaryLimit,
+            summaryGoogle,
         } = getSiteTransferFieldParts(form);
         const selectedFile = fileInput && fileInput.files && fileInput.files.length > 0
             ? fileInput.files[0]
             : null;
         const hasFile = !!selectedFile;
+        const uploadLimitBytes = getSiteTransferUploadLimitBytes(form);
+        const isTooLarge = !!(hasFile && uploadLimitBytes > 0 && Number(selectedFile.size || 0) > uploadLimitBytes);
         const isSubmitting = form.dataset.siteTransferSubmitting === '1';
+        const isValidating = form.dataset.siteTransferValidating === '1';
+        const hasGoogleApiKey = !!(googleApiKeyInput && String(googleApiKeyInput.value || '').trim() !== '');
+        const hasStagedBundle = !!(stageTokenInput && String(stageTokenInput.value || '').trim() !== '');
 
         form.classList.toggle('has-selected-file', hasFile);
+        form.classList.toggle('is-ready-to-import', hasStagedBundle && !isSubmitting);
+        form.classList.toggle('has-file-error', hasFile && isTooLarge);
+        form.classList.toggle('is-submitting', isSubmitting || isValidating);
 
         if (fileName) {
             fileName.textContent = hasFile
@@ -8592,19 +9085,127 @@
                 : getString('siteTransferNoFile', 'No bundle selected');
         }
 
-        if (submitButton) {
-            submitButton.disabled = !hasFile || isSubmitting;
+        setSiteTransferSummaryItem(
+            summaryBundle,
+            hasFile ? (selectedFile.name || getString('siteTransferNoFile', 'No bundle selected')) : getString('siteTransferNoFile', 'No bundle selected'),
+            hasFile ? (isTooLarge ? 'warning' : (hasStagedBundle ? 'ready' : 'neutral')) : 'neutral'
+        );
+        setSiteTransferSummaryItem(
+            summaryLimit,
+            isTooLarge
+                ? getSiteTransferFileTooLargeMessage(form)
+                : (hasFile
+                    ? (hasStagedBundle
+                        ? getString('siteTransferLimitReady', 'Within upload limit')
+                        : buildSiteTransferNeutralLimitSummary(form))
+                    : buildSiteTransferNeutralLimitSummary(form)),
+            isTooLarge ? 'warning' : (hasStagedBundle ? 'ready' : 'neutral')
+        );
+        setSiteTransferSummaryItem(
+            summaryGoogle,
+            hasGoogleApiKey
+                ? getString('siteTransferGoogleSummaryFilled', 'Fresh Google API key will be saved')
+                : getString('siteTransferGoogleSummaryEmpty', 'Optional — not provided'),
+            hasGoogleApiKey ? 'ready' : 'neutral'
+        );
+
+        if (validateButton) {
+            validateButton.disabled = !hasFile || isTooLarge || isSubmitting || isValidating || !hasRestConfig();
         }
 
-        if (!hasFile && submitButton) {
-            resetDestructiveButton(submitButton);
+        syncSettingsSaveShell();
+
+        if (status && !isSubmitting && !isValidating && options.clearStatus !== false) {
+            if (isTooLarge) {
+                setStatus(status, getSiteTransferFileTooLargeMessage(form), 'error');
+            } else {
+                setStatus(status, '', '');
+            }
         }
 
-        if (status && !isSubmitting && options.clearStatus !== false) {
-            setStatus(status, '', '');
+        return hasFile && !isTooLarge;
+    }
+
+    async function stageSiteTransferBundle(form) {
+        if (!(form instanceof HTMLFormElement) || !hasRestConfig()) {
+            return false;
         }
 
-        return hasFile;
+        const {
+            fileInput,
+            validateButton,
+            status,
+            stageTokenInput,
+        } = getSiteTransferFieldParts(form);
+        const selectedFile = fileInput && fileInput.files && fileInput.files.length > 0
+            ? fileInput.files[0]
+            : null;
+
+        if (!selectedFile || !syncSiteTransferFormState(form, { clearStatus: false })) {
+            return false;
+        }
+
+        const formData = new FormData();
+        formData.append('bundle', selectedFile, selectedFile.name || 'tasty-fonts-transfer.zip');
+
+        form.dataset.siteTransferValidating = '1';
+        syncSiteTransferFormState(form, { clearStatus: false });
+        setButtonBusyState(
+            validateButton,
+            true,
+            validateButton && validateButton.dataset.idleLabel
+                ? validateButton.dataset.idleLabel
+                : getString('siteTransferValidateIdle', 'Dry Run Bundle'),
+            validateButton && validateButton.dataset.busyLabel
+                ? validateButton.dataset.busyLabel
+                : getString('siteTransferValidateBusy', 'Validating Bundle…')
+        );
+        setStatus(
+            status,
+            getString('siteTransferValidating', 'Running a dry run on the transfer bundle…'),
+            'progress',
+            20
+        );
+
+        try {
+            const payload = await requestMultipart(
+                getRoutePath('validateSiteTransfer', 'transfer/validate'),
+                formData,
+                null,
+                getString('requestFailed', 'Request failed.')
+            );
+
+            if (stageTokenInput) {
+                stageTokenInput.value = String(payload.stage_token || '').trim();
+            }
+
+            form.dataset.siteTransferValidated = '1';
+            syncSiteTransferFormState(form, { clearStatus: false });
+            setStatus(status, getApiMessage(payload, getString('requestFailed', 'Request failed.')), 'success', 100);
+            showToast(getApiMessage(payload, getString('requestFailed', 'Request failed.')), 'success');
+
+            return true;
+        } catch (error) {
+            clearSiteTransferStagedBundle(form);
+            syncSiteTransferFormState(form, { clearStatus: false });
+            const message = getErrorMessage(error, getString('requestFailed', 'Request failed.'));
+
+            setStatus(status, message, 'error');
+            showToast(message, 'error');
+
+            return false;
+        } finally {
+            delete form.dataset.siteTransferValidating;
+            if (validateButton) {
+                setButtonBusyState(
+                    validateButton,
+                    false,
+                    validateButton.dataset.idleLabel || getString('siteTransferValidateIdle', 'Dry Run Bundle'),
+                    validateButton.dataset.busyLabel || getString('siteTransferValidateBusy', 'Validating Bundle…')
+                );
+            }
+            syncSiteTransferFormState(form, { clearStatus: false });
+        }
     }
 
     function setSiteTransferSubmittingState(form, submitButton, status) {
@@ -8614,17 +9215,16 @@
 
         form.dataset.siteTransferSubmitting = '1';
         form.setAttribute('aria-busy', 'true');
+        form.classList.add('is-submitting');
 
         Array.from(form.elements || []).forEach((field) => {
             if (!(field instanceof HTMLElement)) {
                 return;
             }
 
-            if (field.matches('input[type="hidden"]')) {
-                return;
+            if (shouldDisableFieldDuringSiteTransferSubmit(field.tagName, field.getAttribute('type') || '')) {
+                field.disabled = true;
             }
-
-            field.disabled = true;
         });
 
         setButtonBusyState(
@@ -8633,6 +9233,8 @@
             submitButton.dataset.idleLabel || getString('importButtonIdle', 'Import Bundle'),
             submitButton.dataset.busyLabel || getString('siteTransferImporting', 'Importing the site transfer bundle… Large font libraries can take a minute.')
         );
+
+        syncSettingsSaveShell();
 
         if (status) {
             setStatus(
@@ -8910,54 +9512,65 @@
         applyLibraryFilter();
     }
 
-    function initActivityFiltering() {
-        if (!activityList || (!activityActorFilter && !activitySearch)) {
-            return;
-        }
+    function initLogFiltering() {
+        const logFilterRoots = Array.from(document.querySelectorAll('[data-log-filter-root]'));
 
-        const activityEntries = Array.from(activityList.querySelectorAll('[data-activity-entry]'));
-        const totalCount = activityEntries.length;
+        logFilterRoots.forEach((root) => {
+            const list = root.querySelector('[data-log-list]');
+            const actorFilter = root.querySelector('[data-log-actor-filter]');
+            const search = root.querySelector('[data-log-search]');
+            const count = root.querySelector('[data-log-count]');
+            const filteredEmpty = root.querySelector('[data-log-empty-filtered]');
 
-        const applyActivityFilter = () => {
-            const actorFilter = activityActorFilter ? activityActorFilter.value.trim().toLowerCase() : '';
-            const query = activitySearch ? activitySearch.value.trim().toLowerCase() : '';
-            let visibleCount = 0;
+            if (!list) {
+                return;
+            }
 
-            activityEntries.forEach((entry) => {
-                const actor = (entry.getAttribute('data-activity-actor') || '').trim().toLowerCase();
-                const searchValue = (entry.getAttribute('data-activity-search') || '').trim().toLowerCase();
-                const matchesActor = !actorFilter || actor === actorFilter;
-                const matchesQuery = !query || searchValue.includes(query);
-                const matches = matchesActor && matchesQuery;
+            const entries = Array.from(list.querySelectorAll('[data-log-entry]'));
+            const totalCount = entries.length;
 
-                entry.hidden = !matches;
+            const applyLogFilter = () => {
+                const actorFilterValue = actorFilter ? actorFilter.value : '';
+                const query = search ? search.value : '';
+                let visibleCount = 0;
 
-                if (matches) {
-                    visibleCount += 1;
+                entries.forEach((entry) => {
+                    const matches = logEntryMatchesFilters(
+                        entry.getAttribute('data-log-actor') || '',
+                        entry.getAttribute('data-log-search') || '',
+                        actorFilterValue,
+                        query
+                    );
+
+                    entry.hidden = !matches;
+
+                    if (matches) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (count) {
+                    count.textContent = formatActivityCount(visibleCount, totalCount);
                 }
-            });
 
-            if (activityCount) {
-                activityCount.textContent = formatActivityCount(visibleCount, totalCount);
+                if (filteredEmpty) {
+                    filteredEmpty.hidden = visibleCount !== 0;
+                }
+
+                list.hidden = visibleCount === 0;
+            };
+
+            if (actorFilter) {
+                actorFilter.addEventListener('change', applyLogFilter);
             }
 
-            if (activityFilteredEmpty) {
-                activityFilteredEmpty.hidden = visibleCount !== 0;
+            if (search) {
+                search.addEventListener('input', applyLogFilter);
+                search.addEventListener('search', applyLogFilter);
             }
 
-            activityList.hidden = visibleCount === 0;
-        };
-
-        if (activityActorFilter) {
-            activityActorFilter.addEventListener('change', applyActivityFilter);
-        }
-
-        if (activitySearch) {
-            activitySearch.addEventListener('input', applyActivityFilter);
-            activitySearch.addEventListener('search', applyActivityFilter);
-        }
-
-        applyActivityFilter();
+            applyLogFilter();
+        });
     }
 
     function getClearableSelectButtonTarget(button) {
@@ -10566,7 +11179,7 @@
 
         settingsForms.forEach((form) => {
             refreshSettingsFormBaseline(form);
-            form.querySelectorAll('input, select, textarea').forEach((field) => {
+            getSettingsFormFields(form).forEach((field) => {
                 const eventName = field.matches('input[type="text"], input[type="search"], input[type="url"], input[type="number"], textarea')
                     ? 'input'
                     : 'change';
@@ -10625,6 +11238,7 @@
         settingsForms.forEach((form) => {
             const modeInputs = Array.from(form.querySelectorAll('[data-bricks-theme-style-target-mode]'));
             const targetSelect = form.querySelector('[data-bricks-theme-style-target-select]');
+            const targetSelectWrap = form.querySelector('[data-bricks-theme-style-target-select-wrap]');
 
             if (!modeInputs.length || !(targetSelect instanceof HTMLSelectElement)) {
                 return;
@@ -10637,6 +11251,11 @@
 
                 targetSelect.disabled = !selectedMode;
 
+                if (targetSelectWrap instanceof HTMLElement) {
+                    targetSelectWrap.hidden = !selectedMode;
+                    targetSelectWrap.setAttribute('aria-hidden', selectedMode ? 'false' : 'true');
+                }
+
                 return mode;
             };
 
@@ -10646,8 +11265,9 @@
 
                     if (mode === 'selected') {
                         if (String(targetSelect.value || '').trim() !== '') {
-                            syncSettingsFormDirtyState(form);
-                            requestForcedSettingsSubmit(form);
+                            if (syncSettingsFormDirtyState(form)) {
+                                requestForcedSettingsSubmit(form);
+                            }
                             return;
                         }
 
@@ -10655,8 +11275,9 @@
                         return;
                     }
 
-                    syncSettingsFormDirtyState(form);
-                    requestForcedSettingsSubmit(form);
+                    if (syncSettingsFormDirtyState(form)) {
+                        requestForcedSettingsSubmit(form);
+                    }
                 });
             });
 
@@ -10665,23 +11286,98 @@
                     return;
                 }
 
-                syncSettingsFormDirtyState(form);
-                requestForcedSettingsSubmit(form);
+                if (syncSettingsFormDirtyState(form)) {
+                    requestForcedSettingsSubmit(form);
+                }
             });
 
             syncTargetSelectState();
         });
     }
 
+    function openDeveloperConfirmLock(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const confirmLock = form.querySelector('[data-developer-confirm-lock]');
+        const confirmField = form.querySelector('[data-developer-confirm-field]');
+
+        if (!(confirmLock instanceof HTMLElement)) {
+            return;
+        }
+
+        confirmLock.hidden = false;
+
+        if (confirmField instanceof HTMLInputElement) {
+            confirmField.value = '';
+            confirmField.focus();
+        }
+
+        syncDeveloperToolFormState(form);
+    }
+
+    function closeDeveloperConfirmLock(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const confirmLock = form.querySelector('[data-developer-confirm-lock]');
+        const confirmField = form.querySelector('[data-developer-confirm-field]');
+
+        if (confirmLock instanceof HTMLElement) {
+            confirmLock.hidden = true;
+        }
+
+        if (confirmField instanceof HTMLInputElement) {
+            confirmField.value = '';
+        }
+
+        syncDeveloperToolFormState(form);
+    }
+
+    function bindAdminAccessControls() {
+        if (adminAccessToggle instanceof HTMLInputElement) {
+            adminAccessToggle.addEventListener('change', syncAdminAccessControls);
+        }
+
+        adminAccessGroups.forEach((group) => {
+            const searchInput = group.querySelector('[data-admin-access-search]');
+
+            if (searchInput instanceof HTMLInputElement) {
+                searchInput.addEventListener('input', syncAdminAccessControls);
+            }
+
+            Array.from(group.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
+                input.addEventListener('change', syncAdminAccessControls);
+            });
+        });
+
+        syncAdminAccessControls();
+    }
+
     function bindDeveloperToolsControls() {
         siteTransferForms.forEach((form) => {
-            const { fileInput } = getSiteTransferFieldParts(form);
+            const { fileInput, googleApiKeyInput, validateButton } = getSiteTransferFieldParts(form);
 
             syncSiteTransferFormState(form);
 
             if (fileInput) {
                 fileInput.addEventListener('change', () => {
+                    clearSiteTransferStagedBundle(form);
                     syncSiteTransferFormState(form);
+                });
+            }
+
+            if (googleApiKeyInput) {
+                googleApiKeyInput.addEventListener('input', () => {
+                    syncSiteTransferFormState(form, { clearStatus: false });
+                });
+            }
+
+            if (validateButton) {
+                validateButton.addEventListener('click', () => {
+                    stageSiteTransferBundle(form);
                 });
             }
         });
@@ -10689,7 +11385,7 @@
         developerConfirmForms.forEach((form) => {
             const confirmMessage = String(form.getAttribute('data-developer-confirm-message') || '').trim();
 
-            if (!confirmMessage) {
+            if (!confirmMessage || !form.hasAttribute('data-site-transfer-form')) {
                 return;
             }
 
@@ -10697,10 +11393,11 @@
                 const submitButton = event.submitter instanceof HTMLElement
                     ? event.submitter
                     : form.querySelector('button[type="submit"], input[type="submit"]');
-                const isSiteTransferForm = form.hasAttribute('data-site-transfer-form');
+                const { status, stageTokenInput } = getSiteTransferFieldParts(form);
 
-                if (isSiteTransferForm && !syncSiteTransferFormState(form, { clearStatus: false })) {
+                if (!stageTokenInput || String(stageTokenInput.value || '').trim() === '') {
                     event.preventDefault();
+                    setStatus(status, getString('siteTransferImportRequiresDryRun', 'Run the dry run before importing this bundle.'), 'error');
                     return;
                 }
 
@@ -10709,13 +11406,64 @@
                     return;
                 }
 
-                if (isSiteTransferForm) {
-                    const { status } = getSiteTransferFieldParts(form);
-
-                    setSiteTransferSubmittingState(form, submitButton, status);
-                }
+                setSiteTransferSubmittingState(form, submitButton, status);
             });
         });
+
+        developerToolForms.forEach((form) => {
+            const confirmMessage = String(form.getAttribute('data-developer-confirm-message') || '').trim();
+            const confirmField = form.querySelector('[data-developer-confirm-field]');
+            const cancelButton = form.querySelector('[data-developer-confirm-cancel]');
+            const typedConfirmPhrase = String(form.getAttribute('data-developer-confirm-input') || '').trim();
+
+            if (confirmField instanceof HTMLInputElement) {
+                confirmField.addEventListener('input', () => {
+                    syncDeveloperToolFormState(form);
+                });
+            }
+
+            if (cancelButton instanceof HTMLButtonElement) {
+                cancelButton.addEventListener('click', () => {
+                    closeDeveloperConfirmLock(form);
+                });
+            }
+
+            form.addEventListener('submit', (event) => {
+                const submitButton = event.submitter instanceof HTMLElement
+                    ? event.submitter
+                    : getDeveloperToolSubmitButton(form);
+
+                if (anySettingsFormHasUnsavedChanges()) {
+                    event.preventDefault();
+                    syncDeveloperToolAvailability();
+                    return;
+                }
+
+                if (typedConfirmPhrase !== '') {
+                    const confirmLock = form.querySelector('[data-developer-confirm-lock]');
+                    const confirmReady = confirmLock instanceof HTMLElement
+                        && !confirmLock.hidden
+                        && confirmField instanceof HTMLInputElement
+                        && String(confirmField.value || '').trim() === typedConfirmPhrase;
+
+                    if (!confirmReady) {
+                        event.preventDefault();
+                        openDeveloperConfirmLock(form);
+                        return;
+                    }
+
+                    return;
+                }
+
+                if (confirmMessage && !armDestructiveButton(submitButton, confirmMessage)) {
+                    event.preventDefault();
+                }
+            });
+
+            syncDeveloperToolFormState(form);
+        });
+
+        syncDeveloperToolAvailability();
     }
 
     // Bootstrap
@@ -10744,6 +11492,7 @@
         bindOutputSettingsControls();
         bindBricksThemeStyleTargetControls();
         bindSettingsForms();
+        bindAdminAccessControls();
         bindDeveloperToolsControls();
 
         syncDisclosureToggles();
@@ -10751,7 +11500,7 @@
         initHelpTooltips();
         initUploadRows();
         initLibraryFiltering();
-        initActivityFiltering();
+        initLogFiltering();
         renderAllRoleWeightEditors();
         renderAllRoleAxisEditors();
         updatePreviewDynamicText();

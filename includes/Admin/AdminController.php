@@ -46,12 +46,14 @@ final class AdminController
     private const ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE = 'tasty_fonts_download_site_transfer_bundle';
     private const ACTION_IMPORT_SITE_TRANSFER_BUNDLE = 'tasty_fonts_import_site_transfer_bundle';
     private const IMPORT_SITE_TRANSFER_FILE_FIELD = 'tasty_fonts_site_transfer_bundle';
+    private const IMPORT_SITE_TRANSFER_STAGE_TOKEN_FIELD = 'tasty_fonts_site_transfer_stage_token';
     private const IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD = 'tasty_fonts_import_google_api_key';
     public const LOCAL_ENV_NOTICE_OPTION = 'tasty_fonts_local_environment_notice_preferences';
     private const LOCAL_ENV_NOTICE_FORM_FIELD = 'tasty_fonts_local_environment_notice';
     private const LOCAL_ENV_NOTICE_ACTION_FIELD = 'tasty_fonts_local_environment_notice_action';
     private const NOTICE_TTL = 300;
     public const NOTICE_TRANSIENT_PREFIX = 'tasty_fonts_admin_notices_';
+    private const SITE_TRANSFER_STATUS_TRANSIENT_PREFIX = 'tasty_fonts_site_transfer_status_';
     private const SEARCH_CACHE_TTL = 900;
     public const SEARCH_CACHE_TRANSIENT_PREFIX = 'tasty_fonts_search_cache_';
     public const SEARCH_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_search_cooldown_';
@@ -59,9 +61,10 @@ final class AdminController
     private const SEARCH_COOLDOWN_TRANSIENT_TTL = 1;
     public const ACTION_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_action_cooldown_';
     private const ACTION_COOLDOWN_DEFAULT_WINDOW_SECONDS = 2.0;
-    private const SETTINGS_STUDIO_TABS = ['output-settings', 'integrations', 'plugin-behavior', 'developer'];
+    private const SETTINGS_STUDIO_TABS = ['output-settings', 'integrations', 'plugin-behavior', 'transfer', 'developer'];
     private readonly AdminPageRenderer $renderer;
     private readonly AdminPageContextBuilder $pageContextBuilder;
+    private readonly AdminAccessService $adminAccess;
 
     public function __construct(
         private readonly Storage $storage,
@@ -82,9 +85,11 @@ final class AdminController
         private readonly OxygenIntegrationService $oxygenIntegration,
         private readonly DeveloperToolsService $developerTools,
         private readonly SiteTransferService $siteTransfer,
-        private readonly ?GitHubUpdater $updater = null
+        private readonly ?GitHubUpdater $updater = null,
+        ?AdminAccessService $adminAccess = null
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
+        $this->adminAccess = $adminAccess ?? new AdminAccessService($this->settings);
         $this->pageContextBuilder = new AdminPageContextBuilder(
             $this->storage,
             $this->settings,
@@ -103,10 +108,16 @@ final class AdminController
 
     public function registerMenu(): void
     {
+        if (!$this->adminAccess->canCurrentUserAccess()) {
+            return;
+        }
+
+        $capability = $this->adminAccess->menuRegistrationCapability();
+
         add_menu_page(
             __('Tasty Custom Fonts', 'tasty-fonts'),
             __('Tasty Fonts', 'tasty-fonts'),
-            'manage_options',
+            $capability,
             self::MENU_SLUG,
             [$this, 'renderPage'],
             TASTY_FONTS_URL . 'assets/images/tasty-sidebar-icon.svg',
@@ -117,7 +128,7 @@ final class AdminController
             '',
             __('Font Library', 'tasty-fonts'),
             __('Font Library', 'tasty-fonts'),
-            'manage_options',
+            $capability,
             self::MENU_SLUG_LIBRARY,
             [$this, 'renderPage']
         );
@@ -126,7 +137,7 @@ final class AdminController
             '',
             __('Settings', 'tasty-fonts'),
             __('Settings', 'tasty-fonts'),
-            'manage_options',
+            $capability,
             self::MENU_SLUG_SETTINGS,
             [$this, 'renderPage']
         );
@@ -135,7 +146,7 @@ final class AdminController
             '',
             __('Advanced Tools', 'tasty-fonts'),
             __('Advanced Tools', 'tasty-fonts'),
-            'manage_options',
+            $capability,
             self::MENU_SLUG_DIAGNOSTICS,
             [$this, 'renderPage']
         );
@@ -146,6 +157,10 @@ final class AdminController
         $currentPageSlug = $this->getCurrentPageSlug();
 
         if (!self::isPluginAdminHook($hookSuffix) && !self::isPluginPageSlug($currentPageSlug)) {
+            return;
+        }
+
+        if (!$this->adminAccess->canCurrentUserAccess()) {
             return;
         }
 
@@ -232,7 +247,11 @@ final class AdminController
 
     public function handleAdminActions(): void
     {
-        if (!is_admin() || !current_user_can('manage_options')) {
+        if (!is_admin() || !$this->adminAccess->canCurrentUserAccess()) {
+            return;
+        }
+
+        if ($this->handleOversizedSiteTransferUploadRequest()) {
             return;
         }
 
@@ -565,7 +584,7 @@ final class AdminController
         $this->assets->refreshGeneratedAssets(false, false);
 
         $message = $this->buildRolesSavedMessage('save', $roles, $appliedRoles, $applyEverywhere);
-        $this->log->add($message);
+        $this->log->add($message, $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_IMPORT_SUCCESS));
 
         return [
             'message' => $message,
@@ -831,10 +850,52 @@ final class AdminController
         return $this->siteTransfer->buildExportBundle();
     }
 
+    public function stageSiteTransferBundle(array $uploadedFile): array|WP_Error
+    {
+        $result = $this->siteTransfer->stageImportBundle($uploadedFile);
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $familyCount = (int) ($result['families'] ?? 0);
+        $fileCount = (int) ($result['files'] ?? 0);
+        $message = sprintf(
+            __('Dry run succeeded. Ready to import %1$d famil%2$s and %3$d file%4$s. Use Import Bundle in the top-right corner to continue.', 'tasty-fonts'),
+            $familyCount,
+            $familyCount === 1 ? 'y' : 'ies',
+            $fileCount,
+            $fileCount === 1 ? '' : 's'
+        );
+
+        return [
+            'status' => 'validated',
+            'message' => $message,
+            'stage_token' => (string) ($result['stage_token'] ?? ''),
+            'bundle_name' => (string) ($result['bundle_name'] ?? ''),
+            'plugin_version' => (string) ($result['plugin_version'] ?? ''),
+            'exported_at' => (string) ($result['exported_at'] ?? ''),
+            'families' => $familyCount,
+            'files' => $fileCount,
+        ];
+    }
+
+    public function importStagedSiteTransferBundle(string $stageToken, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        return $this->finalizeImportedSiteTransferResult(
+            $this->siteTransfer->importStagedBundle($stageToken, $freshGoogleApiKey)
+        );
+    }
+
     public function importSiteTransferBundle(array $uploadedFile, string $freshGoogleApiKey = ''): array|WP_Error
     {
-        $result = $this->siteTransfer->importBundleReplacingCurrentState($uploadedFile, $freshGoogleApiKey);
+        return $this->finalizeImportedSiteTransferResult(
+            $this->siteTransfer->importBundleReplacingCurrentState($uploadedFile, $freshGoogleApiKey)
+        );
+    }
 
+    private function finalizeImportedSiteTransferResult(array|WP_Error $result): array|WP_Error
+    {
         if (is_wp_error($result)) {
             return $result;
         }
@@ -980,8 +1041,12 @@ final class AdminController
 
     public function renderPage(): void
     {
-        if (!current_user_can('manage_options')) {
-            return;
+        if (!$this->adminAccess->canCurrentUserAccess()) {
+            wp_die(
+                __('You do not have permission to access Tasty Fonts.', 'tasty-fonts'),
+                '',
+                ['response' => 403]
+            );
         }
 
         $this->initializeDetectedIntegrations();
@@ -1147,13 +1212,23 @@ final class AdminController
         $uploadedFile = is_array($_FILES[self::IMPORT_SITE_TRANSFER_FILE_FIELD] ?? null)
             ? $_FILES[self::IMPORT_SITE_TRANSFER_FILE_FIELD]
             : [];
+        $stageToken = $this->getPostedText(self::IMPORT_SITE_TRANSFER_STAGE_TOKEN_FIELD);
         $freshGoogleApiKey = $this->getPostedText(self::IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD);
-        $result = $this->importSiteTransferBundle($uploadedFile, $freshGoogleApiKey);
+        $result = $stageToken !== ''
+            ? $this->importStagedSiteTransferBundle($stageToken, $freshGoogleApiKey)
+            : $this->importSiteTransferBundle($uploadedFile, $freshGoogleApiKey);
 
         if (is_wp_error($result)) {
-            $this->redirectWithError($result->get_error_message());
+            $status = $this->buildSiteTransferStatusPayload($result, 'error');
+            $this->queueSiteTransferStatus($status);
+            $this->log->add(
+                $this->formatSiteTransferStatusForActivityLog($status),
+                $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE)
+            );
+            $this->redirectWithError((string) ($status['message'] ?? $result->get_error_message()));
         }
 
+        $this->clearQueuedSiteTransferStatus();
         $this->redirectWithSuccess((string) ($result['message'] ?? __('Site transfer bundle imported.', 'tasty-fonts')));
     }
 
@@ -1461,7 +1536,10 @@ final class AdminController
         $filename = sanitize_file_name((string) ($bundle['filename'] ?? 'tasty-fonts-transfer.zip'));
         $contentType = trim((string) ($bundle['content_type'] ?? 'application/zip'));
         $size = is_file($path) ? (int) filesize($path) : 0;
-        $this->log->add(__('Exported a site transfer bundle.', 'tasty-fonts'));
+        $this->log->add(
+            __('Exported a site transfer bundle.', 'tasty-fonts'),
+            $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_EXPORT)
+        );
 
         header('Content-Type: ' . $contentType);
         header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -1478,9 +1556,11 @@ final class AdminController
     private function buildPageContext(): array
     {
         $pageType = $this->resolveRequestedPageType();
+        $baseContext = $this->pageContextBuilder->build();
+        $logs = is_array($baseContext['logs'] ?? null) ? $baseContext['logs'] : [];
 
         return array_merge(
-            $this->pageContextBuilder->build(),
+            $baseContext,
             [
                 'current_page' => $pageType,
                 'current_page_slug' => self::pageSlugForType($pageType),
@@ -1498,12 +1578,15 @@ final class AdminController
                     self::PAGE_SETTINGS . '_behavior' => $this->buildPageUrl(self::PAGE_SETTINGS, [
                         'tf_studio' => 'plugin-behavior',
                     ]),
+                    self::PAGE_SETTINGS . '_transfer' => $this->buildPageUrl(self::PAGE_SETTINGS, [
+                        'tf_studio' => 'transfer',
+                    ]),
                     self::PAGE_SETTINGS . '_developer' => $this->buildPageUrl(self::PAGE_SETTINGS, [
                         'tf_studio' => 'developer',
                     ]),
                     self::PAGE_DIAGNOSTICS => $this->buildPageUrl(self::PAGE_DIAGNOSTICS),
                 ],
-                'site_transfer' => $this->buildSiteTransferContext(),
+                'site_transfer' => $this->buildSiteTransferContext($logs),
             ]
         );
     }
@@ -1560,17 +1643,25 @@ final class AdminController
         return $this->pageContextBuilder->buildNoticeToasts();
     }
 
-    private function buildSiteTransferContext(): array
+    private function buildSiteTransferContext(array $logs = []): array
     {
         $capability = $this->siteTransfer->getCapabilityStatus();
+        $effectiveUploadLimitBytes = $this->getEffectiveSiteTransferUploadLimitBytes();
+        $transferLogs = $this->pageContextBuilder->buildTransferLogEntries($logs);
 
         return [
             'available' => !empty($capability['available']),
             'message' => (string) ($capability['message'] ?? ''),
             'export_url' => $this->buildSiteTransferDownloadUrl(),
             'import_file_field' => self::IMPORT_SITE_TRANSFER_FILE_FIELD,
+            'import_stage_token_field' => self::IMPORT_SITE_TRANSFER_STAGE_TOKEN_FIELD,
             'import_google_api_key_field' => self::IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD,
             'import_action_field' => self::ACTION_IMPORT_SITE_TRANSFER_BUNDLE,
+            'effective_upload_limit_bytes' => $effectiveUploadLimitBytes,
+            'effective_upload_limit_label' => $effectiveUploadLimitBytes > 0 ? size_format($effectiveUploadLimitBytes) : '',
+            'import_status' => $this->consumeQueuedSiteTransferStatus(),
+            'logs' => $transferLogs,
+            'actor_options' => $this->pageContextBuilder->buildActivityActorOptions($transferLogs),
         ];
     }
 
@@ -1659,6 +1750,10 @@ final class AdminController
                 __('update channel set to %s', 'tasty-fonts'),
                 $this->formatUpdateChannelLabel((string) ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE))
             );
+        }
+
+        if ($this->adminAccessSettingsDiffer($before, $after)) {
+            $changes[] = __('admin access updated', 'tasty-fonts');
         }
 
         if (!empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])) {
@@ -1772,6 +1867,7 @@ final class AdminController
         return !empty($before['training_wheels_off']) !== !empty($after['training_wheels_off'])
             || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled'])
             || !empty($before['variable_fonts_enabled']) !== !empty($after['variable_fonts_enabled'])
+            || $this->adminAccessSettingsDiffer($before, $after)
             || ($before['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE) !== ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE)
             || !empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])
             || ($before['bricks_integration_enabled'] ?? null) !== ($after['bricks_integration_enabled'] ?? null)
@@ -2517,23 +2613,38 @@ final class AdminController
     {
         $settingsInput = [];
 
-        foreach (SettingsSaveFields::namesForKinds(['text', 'enum']) as $field) {
-            if (!array_key_exists($field, $submittedValues)) {
+        foreach (SettingsSaveFields::definitions() as $definition) {
+            $field = (string) ($definition['name'] ?? '');
+            $kind = (string) ($definition['kind'] ?? '');
+
+            if ($field === '' || !array_key_exists($field, $submittedValues)) {
                 continue;
             }
 
             $value = $submittedValues[$field];
 
-            if (!is_scalar($value) && $value !== null) {
-                continue;
-            }
+            switch ($kind) {
+                case 'text':
+                case 'enum':
+                    if (!is_scalar($value) && $value !== null) {
+                        continue 2;
+                    }
 
-            $settingsInput[$field] = is_string($value) ? wp_unslash($value) : $value;
-        }
+                    $settingsInput[$field] = is_string($value) ? wp_unslash($value) : $value;
+                    break;
 
-        foreach (SettingsSaveFields::namesForKinds(['toggle']) as $field) {
-            if (array_key_exists($field, $submittedValues)) {
-                $settingsInput[$field] = $submittedValues[$field];
+                case 'toggle':
+                    $settingsInput[$field] = $value;
+                    break;
+
+                case 'string_array':
+                case 'int_array':
+                    if (!is_array($value)) {
+                        continue 2;
+                    }
+
+                    $settingsInput[$field] = $this->flattenSubmittedArrayLeaves(wp_unslash($value));
+                    break;
             }
         }
 
@@ -2544,21 +2655,78 @@ final class AdminController
     {
         $submittedValues = [];
 
-        foreach (SettingsSaveFields::names() as $field) {
-            if (!array_key_exists($field, $_POST)) {
+        foreach (SettingsSaveFields::definitions() as $definition) {
+            $field = (string) ($definition['name'] ?? '');
+            $kind = (string) ($definition['kind'] ?? '');
+
+            if ($field === '' || !array_key_exists($field, $_POST)) {
                 continue;
             }
 
             $value = $_POST[$field];
 
-            if (!is_scalar($value) && $value !== null) {
-                continue;
-            }
+            switch ($kind) {
+                case 'text':
+                case 'enum':
+                case 'toggle':
+                    if (!is_scalar($value) && $value !== null) {
+                        continue 2;
+                    }
 
-            $submittedValues[$field] = $value;
+                    $submittedValues[$field] = $value;
+                    break;
+
+                case 'string_array':
+                case 'int_array':
+                    if (!is_array($value)) {
+                        continue 2;
+                    }
+
+                    $submittedValues[$field] = array_values(
+                        array_filter(
+                            $value,
+                            static fn (mixed $item): bool => is_scalar($item) || $item === null
+                        )
+                    );
+                    break;
+            }
         }
 
         return $submittedValues;
+    }
+
+    private function adminAccessSettingsDiffer(array $before, array $after): bool
+    {
+        return !empty($before['admin_access_custom_enabled']) !== !empty($after['admin_access_custom_enabled'])
+            || ($before['admin_access_role_slugs'] ?? []) !== ($after['admin_access_role_slugs'] ?? [])
+            || ($before['admin_access_user_ids'] ?? []) !== ($after['admin_access_user_ids'] ?? []);
+    }
+
+    /**
+     * @return array<int, scalar|null>
+     */
+    private function flattenSubmittedArrayLeaves(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $flattened = [];
+
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                $flattened = array_merge($flattened, $this->flattenSubmittedArrayLeaves($item));
+                continue;
+            }
+
+            if (!is_scalar($item) && $item !== null) {
+                continue;
+            }
+
+            $flattened[] = $item;
+        }
+
+        return array_values($flattened);
     }
 
     private function preserveUnavailableIntegrationSettings(array $settingsInput): array
@@ -3467,9 +3635,115 @@ final class AdminController
         set_transient($transientKey, $toasts, self::NOTICE_TTL);
     }
 
+    private function queueSiteTransferStatus(array $status): void
+    {
+        $tone = (string) ($status['tone'] ?? '') === 'success' ? 'success' : 'error';
+        $title = sanitize_text_field((string) ($status['title'] ?? ''));
+        $message = sanitize_text_field((string) ($status['message'] ?? ''));
+        $code = $this->normalizeSiteTransferStatusCode((string) ($status['code'] ?? ''));
+
+        if ($message === '') {
+            return;
+        }
+
+        set_transient(
+            $this->getSiteTransferStatusTransientKey(),
+            [
+                'tone' => $tone,
+                'title' => $title,
+                'message' => $message,
+                'code' => $code,
+            ],
+            self::NOTICE_TTL
+        );
+    }
+
+    private function consumeQueuedSiteTransferStatus(): array
+    {
+        $transientKey = $this->getSiteTransferStatusTransientKey();
+        $storedStatus = get_transient($transientKey);
+
+        if ($storedStatus === false) {
+            return [];
+        }
+
+        delete_transient($transientKey);
+
+        if (!is_array($storedStatus)) {
+            return [];
+        }
+
+        $message = sanitize_text_field((string) ($storedStatus['message'] ?? ''));
+
+        if ($message === '') {
+            return [];
+        }
+
+        return [
+            'tone' => (string) ($storedStatus['tone'] ?? '') === 'success' ? 'success' : 'error',
+            'title' => sanitize_text_field((string) ($storedStatus['title'] ?? '')),
+            'message' => $message,
+            'code' => $this->normalizeSiteTransferStatusCode((string) ($storedStatus['code'] ?? '')),
+        ];
+    }
+
+    private function clearQueuedSiteTransferStatus(): void
+    {
+        delete_transient($this->getSiteTransferStatusTransientKey());
+    }
+
+    private function buildSiteTransferStatusPayload(\WP_Error $error, string $tone = 'error'): array
+    {
+        $errorMessage = sanitize_text_field($error->get_error_message());
+        $errorCode = $this->normalizeSiteTransferStatusCode($error->get_error_code());
+
+        return [
+            'tone' => $tone === 'success' ? 'success' : 'error',
+            'title' => __('Site transfer import failed.', 'tasty-fonts'),
+            'message' => $errorMessage,
+            'code' => $errorCode,
+        ];
+    }
+
+    private function formatSiteTransferStatusForActivityLog(array $status): string
+    {
+        $message = sanitize_text_field((string) ($status['message'] ?? ''));
+        $code = $this->normalizeSiteTransferStatusCode((string) ($status['code'] ?? ''));
+
+        if ($message === '') {
+            return __('Site transfer import failed.', 'tasty-fonts');
+        }
+
+        if ($code !== '') {
+            return sprintf(
+                __('Site transfer import failed (%1$s): %2$s', 'tasty-fonts'),
+                $code,
+                $message
+            );
+        }
+
+        return sprintf(
+            __('Site transfer import failed: %s', 'tasty-fonts'),
+            $message
+        );
+    }
+
+    private function normalizeSiteTransferStatusCode(string $code): string
+    {
+        $normalized = strtolower(trim($code));
+        $normalized = preg_replace('/[^a-z0-9_-]+/', '_', $normalized) ?? '';
+
+        return trim($normalized, '_');
+    }
+
     private function getPendingNoticeTransientKey(): string
     {
         return TransientKey::forSite(self::NOTICE_TRANSIENT_PREFIX . max(0, (int) get_current_user_id()));
+    }
+
+    private function getSiteTransferStatusTransientKey(): string
+    {
+        return TransientKey::forSite(self::SITE_TRANSFER_STATUS_TRANSIENT_PREFIX . max(0, (int) get_current_user_id()));
     }
 
     private function getActionCooldownTransientKey(string $action): string
@@ -3554,6 +3828,100 @@ final class AdminController
         return true;
     }
 
+    private function handleOversizedSiteTransferUploadRequest(): bool
+    {
+        if (!$this->isOversizedSiteTransferUploadRequest()) {
+            return false;
+        }
+
+        $limitLabel = $this->getEffectiveSiteTransferUploadLimitBytes();
+        $message = $limitLabel > 0
+            ? sprintf(
+                __('The uploaded site transfer bundle was larger than this server allows in a single request (%s). Reduce the bundle size or raise the PHP upload limits before trying again.', 'tasty-fonts'),
+                size_format($limitLabel)
+            )
+            : __('The uploaded site transfer bundle was larger than this server allows in a single request. Reduce the bundle size or raise the PHP upload limits before trying again.', 'tasty-fonts');
+
+        $status = [
+            'tone' => 'error',
+            'title' => __('Site transfer import failed.', 'tasty-fonts'),
+            'message' => $message,
+            'code' => 'tasty_fonts_transfer_request_too_large',
+        ];
+
+        $this->queueSiteTransferStatus($status);
+        $this->log->add(
+            $this->formatSiteTransferStatusForActivityLog($status),
+            $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE)
+        );
+        $this->queueNoticeToast('error', $message, 'alert');
+
+        return true;
+    }
+
+    private function isOversizedSiteTransferUploadRequest(): bool
+    {
+        if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') {
+            return false;
+        }
+
+        if ((string) ($_GET['page'] ?? '') !== self::MENU_SLUG) {
+            return false;
+        }
+
+        if (!empty($_POST) || !empty($_FILES)) {
+            return false;
+        }
+
+        $contentType = strtolower(trim((string) ($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '')));
+
+        if ($contentType !== '' && !str_contains($contentType, 'multipart/form-data')) {
+            return false;
+        }
+
+        $contentLength = max(0, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
+        $postMaxSize = $this->parsePhpIniSizeToBytes((string) ini_get('post_max_size'));
+
+        return $contentLength > 0 && $postMaxSize > 0 && $contentLength > $postMaxSize;
+    }
+
+    private function getEffectiveSiteTransferUploadLimitBytes(): int
+    {
+        $limits = array_filter([
+            $this->parsePhpIniSizeToBytes((string) ini_get('upload_max_filesize')),
+            $this->parsePhpIniSizeToBytes((string) ini_get('post_max_size')),
+        ]);
+
+        if ($limits === []) {
+            return 0;
+        }
+
+        return (int) min($limits);
+    }
+
+    private function parsePhpIniSizeToBytes(string $value): int
+    {
+        $normalized = strtolower(trim($value));
+
+        if ($normalized === '') {
+            return 0;
+        }
+
+        if (!preg_match('/^(\d+(?:\.\d+)?)\s*([gmk])?b?$/', $normalized, $matches)) {
+            return 0;
+        }
+
+        $bytes = (float) $matches[1];
+        $unit = $matches[2] ?? '';
+
+        return match ($unit) {
+            'g' => (int) round($bytes * 1024 * 1024 * 1024),
+            'm' => (int) round($bytes * 1024 * 1024),
+            'k' => (int) round($bytes * 1024),
+            default => (int) round($bytes),
+        };
+    }
+
     private function redirectWithSuccess(string $message): never
     {
         $this->queueNoticeToast('success', $message, 'status');
@@ -3615,12 +3983,20 @@ final class AdminController
             [
                 'page' => self::MENU_SLUG,
                 'tf_page' => self::PAGE_SETTINGS,
-                'tf_studio' => 'developer',
+                'tf_studio' => 'transfer',
                 self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE => '1',
                 '_wpnonce' => wp_create_nonce(self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE),
             ],
             admin_url('admin.php')
         );
+    }
+
+    private function buildTransferLogContext(string $event): array
+    {
+        return [
+            'category' => LogRepository::CATEGORY_TRANSFER,
+            'event' => $event,
+        ];
     }
 
     private function buildPageUrl(string $pageType, array $queryArgs = []): string

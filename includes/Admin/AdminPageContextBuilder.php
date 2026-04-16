@@ -71,6 +71,14 @@ final class AdminPageContextBuilder
         $oxygenIntegration = $this->buildOxygenIntegrationContext($settings);
         $updateChannel = (string) ($settings['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE);
         $updateChannelStatus = $this->buildUpdateChannelStatus($updateChannel);
+        $adminAccessCustomEnabled = !empty($settings['admin_access_custom_enabled']);
+        $adminAccessRoleSlugs = is_array($settings['admin_access_role_slugs'] ?? null) ? $settings['admin_access_role_slugs'] : [];
+        $adminAccessUserIds = is_array($settings['admin_access_user_ids'] ?? null) ? $settings['admin_access_user_ids'] : [];
+        $adminAccessRoleOptions = $this->buildAdminAccessRoleOptions();
+        $adminAccessUserOptions = $this->buildAdminAccessUserOptions();
+        $adminAccessImplicitAdminLabels = $this->buildAdminAccessImplicitAdminLabels();
+        $adminAccessSummary = $this->buildAdminAccessSummary($adminAccessRoleSlugs, $adminAccessUserIds, $adminAccessRoleOptions, $adminAccessImplicitAdminLabels);
+        $developerToolStatuses = $this->buildDeveloperToolStatuses($logs, $assetStatus, $counts);
         $previewBaselineSource = $applyEverywhere ? 'live_sitewide' : 'draft';
         $previewBaselineLabel = $applyEverywhere
             ? __('Live sitewide', 'tasty-fonts')
@@ -147,6 +155,13 @@ final class AdminPageContextBuilder
             'update_channel' => $updateChannel,
             'update_channel_options' => $this->buildUpdateChannelOptions(),
             'update_channel_status' => $updateChannelStatus,
+            'admin_access_custom_enabled' => $adminAccessCustomEnabled,
+            'admin_access_role_slugs' => $adminAccessRoleSlugs,
+            'admin_access_role_options' => $adminAccessRoleOptions,
+            'admin_access_user_ids' => $adminAccessUserIds,
+            'admin_access_user_options' => $adminAccessUserOptions,
+            'admin_access_summary' => $adminAccessSummary,
+            'developer_tool_statuses' => $developerToolStatuses,
             'block_editor_font_library_sync_enabled' => !empty($settings['block_editor_font_library_sync_enabled']),
             'training_wheels_off' => !empty($settings['training_wheels_off']),
             'monospace_role_enabled' => !empty($settings['monospace_role_enabled']),
@@ -706,6 +721,41 @@ final class AdminPageContextBuilder
         return array_values($actors);
     }
 
+    public function buildTransferLogEntries(array $logs): array
+    {
+        $entries = [];
+
+        foreach ($logs as $entry) {
+            if (!is_array($entry) || !$this->isTransferLogEntry($entry)) {
+                continue;
+            }
+
+            $entries[] = $entry;
+        }
+
+        return $entries;
+    }
+
+    private function isTransferLogEntry(array $entry): bool
+    {
+        $category = strtolower(trim((string) ($entry['category'] ?? '')));
+
+        if ($category === LogRepository::CATEGORY_TRANSFER) {
+            return true;
+        }
+
+        $message = strtolower(trim((string) ($entry['message'] ?? '')));
+
+        if ($message === '') {
+            return false;
+        }
+
+        return str_contains($message, 'site transfer bundle')
+            || str_starts_with($message, 'site transfer import failed')
+            || str_starts_with($message, 'imported the site transfer bundle')
+            || str_starts_with($message, 'exported a site transfer bundle');
+    }
+
     public function buildLocalEnvironmentNotice(array $settings): array
     {
         if (!$this->shouldShowLocalEnvironmentNotice()) {
@@ -734,13 +784,17 @@ final class AdminPageContextBuilder
             'enabled' => $enabled,
             'is_local' => $isLocal,
             'title' => __('Gutenberg Font Library', 'tasty-fonts'),
-            'description' => __('Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.', 'tasty-fonts'),
+            'description' => $enabled
+                ? ($isLocal
+                    ? __('Sync imported families into the WordPress Font Library. Turn this off if local SSL or loopback errors block sync.', 'tasty-fonts')
+                    : __('Sync imported families into the WordPress Font Library.', 'tasty-fonts'))
+                : __('Enable this to sync imported families into the WordPress Font Library.', 'tasty-fonts'),
             'status_label' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
             'status_copy' => $enabled
                 ? ($isLocal
-                    ? __('Sync is on. If this local site hits loopback SSL or certificate errors, turn it off here until PHP/cURL trusts the site certificate again.', 'tasty-fonts')
-                    : __('Sync is on. Imported families will be mirrored into the WordPress Font Library when core font-library support is available.', 'tasty-fonts'))
-                : __('Sync is off. Tasty Fonts will keep Gutenberg font library writes disabled until you enable them again here.', 'tasty-fonts'),
+                    ? __('On. Turn this off if local SSL or loopback errors block sync.', 'tasty-fonts')
+                    : __('On. Imported families sync to the WordPress Font Library.', 'tasty-fonts'))
+                : __('Off. Tasty will not sync families to the WordPress Font Library.', 'tasty-fonts'),
         ];
     }
 
@@ -757,8 +811,8 @@ final class AdminPageContextBuilder
             'status' => $available ? 'active' : 'inactive',
             'title' => __('Etch Canvas Bridge', 'tasty-fonts'),
             'description' => $available
-                ? __('Etch is active. Tasty Fonts will keep its generated and remote font stylesheets mirrored into Etch canvas iframes automatically.', 'tasty-fonts')
-                : __('Etch is not active on this site. If you install Etch later, the canvas bridge will turn on automatically.', 'tasty-fonts'),
+                ? __('Mirrors Tasty fonts in Etch canvas previews.', 'tasty-fonts')
+                : __('Turns on automatically when Etch is active.', 'tasty-fonts'),
         ];
     }
 
@@ -769,13 +823,22 @@ final class AdminPageContextBuilder
         $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
         $state = $this->acssIntegration->readState($sitewideRolesEnabled, $enabled, $applied);
 
+        $status = (string) ($state['status'] ?? 'disabled');
+
         return array_merge(
             $state,
             [
                 'title' => __('Automatic.css', 'tasty-fonts'),
-                'description' => __('Sync ACSS heading and body font-family and font-weight settings to Tasty Fonts role variables for clean interoperability.', 'tasty-fonts'),
-                'status_label' => $this->buildAcssIntegrationStatusLabel((string) ($state['status'] ?? 'disabled')),
-                'status_copy' => $this->buildAcssIntegrationStatusCopy((string) ($state['status'] ?? 'disabled'), $state),
+                'description' => match ($status) {
+                    'synced' => __('Sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
+                    'ready' => __('Save settings to sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
+                    'out_of_sync' => __('Re-save to sync Automatic.css font settings with Tasty role variables again.', 'tasty-fonts'),
+                    'waiting_for_sitewide_roles' => __('Enable sitewide role delivery to sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
+                    'unavailable' => __('Sync Automatic.css font settings with Tasty role variables when Automatic.css is active.', 'tasty-fonts'),
+                    default => __('Enable this to sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
+                },
+                'status_label' => $this->buildAcssIntegrationStatusLabel($status),
+                'status_copy' => $this->buildAcssIntegrationStatusCopy($status, $state),
             ]
         );
     }
@@ -784,18 +847,24 @@ final class AdminPageContextBuilder
     {
         $state = $this->bricksIntegration->readState($settings);
 
+        $status = (string) ($state['status'] ?? 'disabled');
+
         return array_merge(
             $state,
             [
                 'title' => __('Bricks Builder', 'tasty-fonts'),
-                'description' => __('Choose which Bricks controls Tasty Fonts should manage for selectors, builder previews, Theme Styles, and Bricks font settings.', 'tasty-fonts'),
-                'status_label' => $this->buildBuilderIntegrationStatusLabel((string) ($state['status'] ?? 'disabled')),
-                'status_copy' => $this->buildBricksIntegrationStatusCopy((string) ($state['status'] ?? 'disabled')),
+                'description' => match ($status) {
+                    'active' => __('Manage Bricks typography with Tasty. Selectors and previews stay automatic.', 'tasty-fonts'),
+                    'unavailable' => __('Manage Bricks typography with Tasty when Bricks is active.', 'tasty-fonts'),
+                    default => __('Enable this to let Tasty manage Bricks typography.', 'tasty-fonts'),
+                },
+                'status_label' => $this->buildBuilderIntegrationStatusLabel($status),
+                'status_copy' => $this->buildBricksIntegrationStatusCopy($status),
                 'feature_descriptions' => [
-                    'selectors' => __('Show published Tasty families directly inside Bricks font controls.', 'tasty-fonts'),
-                    'builder_preview' => __('Load the active Tasty delivery in Bricks builder previews for local, CDN, and Adobe fonts.', 'tasty-fonts'),
-                    'theme_styles' => __('Update only the font-family and font-weight fields on the managed Theme Style, one selected Theme Style, or every Bricks Theme Style.', 'tasty-fonts'),
-                    'google_fonts' => __('Turn on Bricks’ own “disable Google Fonts” setting so Bricks pickers show only Tasty-supplied fonts.', 'tasty-fonts'),
+                    'selectors' => __('Show published Tasty families in Bricks font controls.', 'tasty-fonts'),
+                    'builder_preview' => __('Load active Tasty fonts in Bricks previews.', 'tasty-fonts'),
+                    'theme_styles' => __('Sync Tasty role fonts to one Theme Style or all Theme Styles.', 'tasty-fonts'),
+                    'google_fonts' => __('Hide Bricks’ built-in Google Fonts so only Tasty fonts appear.', 'tasty-fonts'),
                 ],
             ]
         );
@@ -805,13 +874,19 @@ final class AdminPageContextBuilder
     {
         $state = $this->oxygenIntegration->readState($settings['oxygen_integration_enabled'] ?? null);
 
+        $status = (string) ($state['status'] ?? 'disabled');
+
         return array_merge(
             $state,
             [
                 'title' => __('Oxygen Builder', 'tasty-fonts'),
-                'description' => __('Expose published Tasty Fonts families through Oxygen’s custom-font compatibility layer and mirror Oxygen global font families into Gutenberg.', 'tasty-fonts'),
-                'status_label' => $this->buildBuilderIntegrationStatusLabel((string) ($state['status'] ?? 'disabled')),
-                'status_copy' => $this->buildOxygenIntegrationStatusCopy((string) ($state['status'] ?? 'disabled')),
+                'description' => match ($status) {
+                    'active' => __('Show published Tasty fonts in Oxygen and sync families to Gutenberg.', 'tasty-fonts'),
+                    'unavailable' => __('Show published Tasty fonts in Oxygen when Oxygen is active.', 'tasty-fonts'),
+                    default => __('Enable this to show published Tasty fonts in Oxygen and sync families to Gutenberg.', 'tasty-fonts'),
+                },
+                'status_label' => $this->buildBuilderIntegrationStatusLabel($status),
+                'status_copy' => $this->buildOxygenIntegrationStatusCopy($status),
             ]
         );
     }
@@ -920,6 +995,331 @@ final class AdminPageContextBuilder
         }
 
         return $options;
+    }
+
+    private function buildAdminAccessRoleOptions(): array
+    {
+        $roleObjects = wp_roles();
+        $roles = $roleObjects instanceof \WP_Roles && is_array($roleObjects->roles)
+            ? $roleObjects->roles
+            : [];
+        $userCountsByRole = $this->countUsersByRole();
+        $options = [];
+
+        foreach ($roles as $roleSlug => $roleConfig) {
+            $value = sanitize_key((string) $roleSlug);
+
+            if ($value === '') {
+                continue;
+            }
+
+            $label = trim((string) ($roleConfig['name'] ?? ''));
+            $count = (int) ($userCountsByRole[$value] ?? 0);
+            $isImplicitAdminRole = $value === AdminAccessService::IMPLICIT_ROLE;
+
+            $options[] = [
+                'value' => $value,
+                'label' => $label !== '' ? $label : ucfirst(str_replace('_', ' ', $value)),
+                'count' => $count,
+                'disabled' => $isImplicitAdminRole,
+                'meta' => $isImplicitAdminRole
+                    ? sprintf(_n('%d user · always allowed', '%d users · always allowed', $count, 'tasty-fonts'), $count)
+                    : '',
+            ];
+        }
+
+        usort(
+            $options,
+            static fn (array $left, array $right): int => strnatcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''))
+        );
+
+        return $options;
+    }
+
+    private function buildAdminAccessUserOptions(): array
+    {
+        $options = [];
+        $roleLabels = $this->roleLabelsBySlug();
+        $users = get_users();
+
+        foreach ($users as $user) {
+            if (!is_object($user)) {
+                continue;
+            }
+
+            $userId = absint($user->ID ?? 0);
+
+            if ($userId <= 0) {
+                continue;
+            }
+
+            $userLogin = trim((string) ($user->user_login ?? ''));
+            $userRoles = is_array($user->roles ?? null) ? array_values(array_map('sanitize_key', $user->roles)) : [];
+            $isImplicitAdmin = in_array(AdminAccessService::IMPLICIT_ROLE, $userRoles, true);
+            $userRoleLabels = [];
+
+            foreach ($userRoles as $roleSlug) {
+                $userRoleLabels[] = (string) ($roleLabels[$roleSlug] ?? ucfirst(str_replace('_', ' ', $roleSlug)));
+            }
+
+            $label = $this->buildAdminAccessUserLabel($user);
+
+            $options[] = [
+                'value' => (string) $userId,
+                'label' => $label,
+                'meta' => $isImplicitAdmin
+                    ? __('Administrator · already has access', 'tasty-fonts')
+                    : ($userRoleLabels === []
+                        ? __('No WordPress role assigned', 'tasty-fonts')
+                        : implode(', ', $userRoleLabels)),
+                'disabled' => $isImplicitAdmin,
+                'search_text' => strtolower(trim(implode(' ', array_filter([$label, $userLogin, implode(' ', $userRoleLabels)])))),
+            ];
+        }
+
+        usort(
+            $options,
+            static fn (array $left, array $right): int => strnatcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''))
+        );
+
+        return $options;
+    }
+
+    private function buildAdminAccessImplicitAdminLabels(): array
+    {
+        $labels = [];
+        $users = get_users();
+
+        foreach ($users as $user) {
+            if (!is_object($user)) {
+                continue;
+            }
+
+            $userRoles = is_array($user->roles ?? null) ? array_values(array_map('sanitize_key', $user->roles)) : [];
+
+            if (!in_array(AdminAccessService::IMPLICIT_ROLE, $userRoles, true)) {
+                continue;
+            }
+
+            $label = $this->buildAdminAccessUserLabel($user);
+
+            if ($label === '') {
+                continue;
+            }
+
+            $labels[$label] = $label;
+        }
+
+        natcasesort($labels);
+
+        return array_values($labels);
+    }
+
+    private function buildAdminAccessUserLabel(object $user): string
+    {
+        $userId = absint($user->ID ?? 0);
+        $displayName = trim((string) ($user->display_name ?? ''));
+        $userLogin = trim((string) ($user->user_login ?? ''));
+        $label = $displayName;
+
+        if ($userLogin !== '') {
+            $label = $displayName !== ''
+                ? sprintf('%1$s (%2$s)', $displayName, $userLogin)
+                : $userLogin;
+        }
+
+        if ($label === '' && $userId > 0) {
+            $label = sprintf(__('User #%d', 'tasty-fonts'), $userId);
+        }
+
+        return $label;
+    }
+
+    private function buildAdminAccessSummary(array $roleSlugs, array $userIds, array $roleOptions, array $implicitAdminLabels): array
+    {
+        $selectedRoleSlugs = array_values(array_filter(array_map('sanitize_key', $roleSlugs)));
+        $selectedUserIds = array_values(array_filter(array_map('absint', $userIds)));
+        $roleImpact = 0;
+
+        foreach ($roleOptions as $option) {
+            if (!is_array($option)) {
+                continue;
+            }
+
+            $roleSlug = sanitize_key((string) ($option['value'] ?? ''));
+
+            if ($roleSlug === '' || !in_array($roleSlug, $selectedRoleSlugs, true)) {
+                continue;
+            }
+
+            $roleImpact += max(0, (int) ($option['count'] ?? 0));
+        }
+
+        return [
+            'enabled' => !empty($this->settings->getSettings()['admin_access_custom_enabled']),
+            'role_count' => count($selectedRoleSlugs),
+            'role_user_impact' => $roleImpact,
+            'user_count' => count($selectedUserIds),
+            'implicit_admin_count' => count($implicitAdminLabels),
+            'implicit_admin_labels' => array_values($implicitAdminLabels),
+        ];
+    }
+
+    private function buildDeveloperToolStatuses(array $logs, array $assetStatus, array $counts): array
+    {
+        $libraryCount = max(0, (int) ($counts['families'] ?? $counts['total'] ?? 0));
+        $cssReady = !empty($assetStatus['exists']) && !empty($assetStatus['url']);
+        $statuses = [
+            'clear_plugin_caches' => [
+                'summary' => $cssReady
+                    ? ''
+                    : __('Generated CSS looks stale or unavailable.', 'tasty-fonts'),
+                'last_run' => '',
+            ],
+            'regenerate_css' => [
+                'summary' => $cssReady
+                    ? ''
+                    : __('Generated CSS needs a rebuild.', 'tasty-fonts'),
+                'last_run' => '',
+            ],
+            'reset_integration_detection_state' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
+            'reset_suppressed_notices' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
+            'reset_plugin_settings' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
+            'wipe_managed_font_library' => [
+                'summary' => sprintf(
+                    /* translators: %d: number of managed font families */
+                    _n(
+                        '%d managed font family in the library.',
+                        '%d managed font families in the library.',
+                        $libraryCount,
+                        'tasty-fonts'
+                    ),
+                    $libraryCount
+                ),
+                'last_run' => '',
+            ],
+        ];
+        $messageMap = [
+            'clear_plugin_caches' => __('Plugin caches cleared and generated assets refreshed.', 'tasty-fonts'),
+            'regenerate_css' => __('Generated CSS regenerated.', 'tasty-fonts'),
+            'reset_integration_detection_state' => __('Integration detection state reset.', 'tasty-fonts'),
+            'reset_suppressed_notices' => __('Suppressed notices reset. Hidden reminders can appear again.', 'tasty-fonts'),
+            'reset_plugin_settings' => __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts'),
+            'wipe_managed_font_library' => __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts'),
+        ];
+
+        foreach ($messageMap as $slug => $message) {
+            $statuses[$slug]['last_run'] = $this->buildDeveloperToolLastRunCopy($logs, $message);
+        }
+
+        return $statuses;
+    }
+
+    private function buildDeveloperToolLastRunCopy(array $logs, string $message): string
+    {
+        foreach ($logs as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            if (trim((string) ($entry['message'] ?? '')) !== $message) {
+                continue;
+            }
+
+            $timestamp = trim((string) ($entry['time'] ?? ''));
+            $actor = trim((string) ($entry['actor'] ?? __('System', 'tasty-fonts')));
+            $formattedTime = $this->formatLogTimestamp($timestamp);
+
+            if ($formattedTime === '') {
+                return $actor !== ''
+                    ? sprintf(__('Last run by %s.', 'tasty-fonts'), $actor)
+                    : __('Previously run from this site.', 'tasty-fonts');
+            }
+
+            return sprintf(
+                __('Last run %1$s by %2$s.', 'tasty-fonts'),
+                $formattedTime,
+                $actor !== '' ? $actor : __('System', 'tasty-fonts')
+            );
+        }
+
+        return __('Not run recently.', 'tasty-fonts');
+    }
+
+    private function formatLogTimestamp(string $timestamp): string
+    {
+        $timestamp = trim($timestamp);
+
+        if ($timestamp === '') {
+            return '';
+        }
+
+        $unix = strtotime($timestamp . ' UTC');
+
+        if ($unix === false) {
+            $unix = strtotime($timestamp);
+        }
+
+        if ($unix === false) {
+            return '';
+        }
+
+        return gmdate('M j, Y g:i a', $unix) . ' UTC';
+    }
+
+    private function countUsersByRole(): array
+    {
+        $counts = [];
+        $users = get_users();
+
+        foreach ($users as $user) {
+            if (!is_object($user) || !is_array($user->roles ?? null)) {
+                continue;
+            }
+
+            foreach ($user->roles as $roleSlug) {
+                $normalizedSlug = sanitize_key((string) $roleSlug);
+
+                if ($normalizedSlug === '') {
+                    continue;
+                }
+
+                $counts[$normalizedSlug] = (int) ($counts[$normalizedSlug] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
+    }
+
+    private function roleLabelsBySlug(): array
+    {
+        $roleObjects = wp_roles();
+        $roles = $roleObjects instanceof \WP_Roles && is_array($roleObjects->roles)
+            ? $roleObjects->roles
+            : [];
+        $labels = [];
+
+        foreach ($roles as $roleSlug => $roleConfig) {
+            $normalizedSlug = sanitize_key((string) $roleSlug);
+
+            if ($normalizedSlug === '') {
+                continue;
+            }
+
+            $label = trim((string) ($roleConfig['name'] ?? ''));
+            $labels[$normalizedSlug] = $label !== '' ? $label : ucfirst(str_replace('_', ' ', $normalizedSlug));
+        }
+
+        return $labels;
     }
 
     public function buildRoleDeliverySummary(array $roles, ?array $settings = null): string
@@ -1042,13 +1442,13 @@ final class AdminPageContextBuilder
         $current = is_array($state['current'] ?? null) ? $state['current'] : ['heading' => '', 'body' => ''];
 
         return match ($status) {
-            'synced' => __('Automatic.css is using the managed Tasty Fonts family and weight variables now. Tasty Fonts will restore the previous ACSS values if sitewide role delivery is turned off.', 'tasty-fonts'),
-            'ready' => __('Automatic.css is active and the sync is enabled. Save or re-open settings to apply the variable mapping.', 'tasty-fonts'),
-            'out_of_sync' => __('Automatic.css is active, but its current font settings differ from the managed Tasty Fonts mapping. Re-save the integration to reapply it.', 'tasty-fonts'),
-            'waiting_for_sitewide_roles' => __('Automatic.css sync is enabled, but Tasty Fonts only exposes its managed family and weight variables when sitewide role delivery is on. Publish roles sitewide first, then the sync will apply.', 'tasty-fonts'),
-            'unavailable' => __('Automatic.css is not active on this site, so there is nothing to sync yet.', 'tasty-fonts'),
+            'synced' => __('Automatic.css is using Tasty’s managed font and weight variables.', 'tasty-fonts'),
+            'ready' => __('Automatic.css is active. Save settings to apply the mapping.', 'tasty-fonts'),
+            'out_of_sync' => __('Automatic.css is active, but its font settings do not match Tasty’s mapping.', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Enable sitewide role delivery to apply Automatic.css sync.', 'tasty-fonts'),
+            'unavailable' => __('Automatic.css is not active on this site yet.', 'tasty-fonts'),
             default => sprintf(
-                __('Automatic.css currently uses heading `%1$s` and text `%2$s`.', 'tasty-fonts'),
+                __('Current values: heading `%1$s`, body `%2$s`.', 'tasty-fonts'),
                 $current['heading'] !== '' ? $current['heading'] : __('empty', 'tasty-fonts'),
                 $current['body'] !== '' ? $current['body'] : __('empty', 'tasty-fonts')
             ),
@@ -1067,18 +1467,18 @@ final class AdminPageContextBuilder
     private function buildBricksIntegrationStatusCopy(string $status): string
     {
         return match ($status) {
-            'active' => __('Bricks is active. Use the controls below to decide whether Tasty Fonts should sync Theme Styles or disable Bricks’ own Google fonts.', 'tasty-fonts'),
-            'unavailable' => __('Bricks is not active on this site yet. If you install or reactivate Bricks later, this integration can turn on automatically.', 'tasty-fonts'),
-            default => __('Bricks integration is off. Tasty Fonts will leave Bricks selectors, Theme Styles, and Google font settings unchanged.', 'tasty-fonts'),
+            'active' => __('Bricks is active. Published fonts already appear in selectors and previews.', 'tasty-fonts'),
+            'unavailable' => __('Bricks is not active on this site yet.', 'tasty-fonts'),
+            default => __('Bricks integration is off.', 'tasty-fonts'),
         };
     }
 
     private function buildOxygenIntegrationStatusCopy(string $status): string
     {
         return match ($status) {
-            'active' => __('Oxygen is active. Published Tasty Fonts families are exposed through the compatibility shim, and matching Oxygen global font families will be mirrored into Gutenberg.', 'tasty-fonts'),
-            'unavailable' => __('Oxygen is not active on this site yet. If you install or reactivate Oxygen later, this integration can turn on automatically.', 'tasty-fonts'),
-            default => __('Oxygen integration is off. Tasty Fonts will not register the Oxygen compatibility shim or mirror Oxygen font-family choices into Gutenberg.', 'tasty-fonts'),
+            'active' => __('Oxygen is active. Published fonts are available in Oxygen and mirrored to Gutenberg.', 'tasty-fonts'),
+            'unavailable' => __('Oxygen is not active on this site yet.', 'tasty-fonts'),
+            default => __('Oxygen integration is off.', 'tasty-fonts'),
         };
     }
 

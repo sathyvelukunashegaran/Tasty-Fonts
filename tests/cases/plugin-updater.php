@@ -525,6 +525,73 @@ $tests['github_updater_can_reinstall_the_selected_channel_when_it_requires_a_rol
     assertSameValue(true, !empty($pluginUpgraderInstallCalls[0]['args']['overwrite_package']), 'Rollback reinstalls should enable package overwrite.');
 };
 
+$tests['github_updater_denies_reinstalls_for_unlisted_non_admin_users_even_with_manage_options'] = static function () use ($releaseAssets): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $currentUserId;
+    global $optionStore;
+    global $remoteGetResponses;
+
+    $currentUserId = 2;
+    $currentUserCapabilities = ['manage_options' => true];
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_STABLE,
+    ];
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [[
+                'tag_name' => '1.0.0',
+                'draft' => false,
+                'prerelease' => false,
+                'body' => 'Stable release notes.',
+                'published_at' => '2026-04-08T00:00:00Z',
+                'assets' => $releaseAssets('1.0.0', 'https://example.test/1.0.0.zip'),
+            ]]
+        ),
+    ];
+
+    $result = makeServiceGraph()['updater']->reinstallReleaseForChannel(SettingsRepository::UPDATE_CHANNEL_STABLE);
+
+    assertWpErrorCode('tasty_fonts_update_channel_forbidden', $result, 'Rollback reinstalls should deny unlisted non-admin users even when they hold manage_options.');
+};
+
+$tests['github_updater_allows_reinstalls_for_explicitly_granted_roles_without_manage_options'] = static function () use ($releaseAssets): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $currentUserId;
+    global $optionStore;
+    global $pluginUpgraderInstallCalls;
+    global $remoteGetResponses;
+
+    $currentUserId = 2;
+    $currentUserCapabilities = ['manage_options' => false, 'read' => true];
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_STABLE,
+        'admin_access_role_slugs' => ['editor'],
+    ];
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [[
+                'tag_name' => '1.0.0',
+                'draft' => false,
+                'prerelease' => false,
+                'body' => 'Stable release notes.',
+                'published_at' => '2026-04-08T00:00:00Z',
+                'assets' => $releaseAssets('1.0.0', 'https://example.test/1.0.0.zip'),
+            ]]
+        ),
+    ];
+
+    $result = makeServiceGraph()['updater']->reinstallReleaseForChannel(SettingsRepository::UPDATE_CHANNEL_STABLE);
+
+    assertSameValue('stable', (string) ($result['channel'] ?? ''), 'Rollback reinstalls should allow explicitly granted roles through the shared admin access policy.');
+    assertSameValue('https://example.test/1.0.0.zip', (string) ($pluginUpgraderInstallCalls[0]['package'] ?? ''), 'Explicitly granted roles should still reach the WordPress upgrader reinstall path.');
+};
+
 $tests['github_updater_verifies_release_package_checksums_before_install'] = static function () use ($nextPatchVersion, $releaseAssets): void {
     resetTestState();
     resetPluginSingleton();

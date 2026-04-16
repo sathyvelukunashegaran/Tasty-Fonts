@@ -421,7 +421,7 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
 
     assertContainsValue('data-tab-group="page"', $output, 'The unified admin page should render the top-level horizontal tab group.');
     assertContainsValue('tasty-fonts-page-tab-settings', $output, 'The unified admin page should include a Settings top-level tab.');
-    assertContainsValue('<h2 class="tasty-fonts-section-title">Settings</h2>', $output, 'The Settings panel should keep a stable section heading regardless of tab activation order.');
+    assertContainsValue('<h2 class="screen-reader-text" id="tasty-fonts-settings-panel-title">Settings</h2>', $output, 'The Settings panel should keep an accessible stable section heading regardless of tab activation order.');
     assertSameValue(4, substr_count($output, 'id="tasty-fonts-page-tab-'), 'The unified admin page should render four top-level page tabs.');
     assertSameValue(1, preg_match('/id="tasty-fonts-page-tab-library"[\s\S]*?tabindex="-1"/', $output), 'Inactive top-level page tabs should be removed from the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-integrations"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
@@ -490,7 +490,7 @@ $tests['admin_page_renderer_renders_single_page_library_tab_for_empty_and_popula
     $emptyOutput = (string) ob_get_clean();
 
     assertContainsValue('Your Library Is Empty', $emptyOutput, 'The unified Library tab should preserve the empty-library state.');
-    assertContainsValue('<h2 class="tasty-fonts-section-title">Font Library</h2>', $emptyOutput, 'The library panel should keep a stable section heading regardless of tab activation order.');
+    assertContainsValue('<h2 class="screen-reader-text" id="tasty-fonts-library-panel-title">Font Library</h2>', $emptyOutput, 'The library panel should keep an accessible stable section heading regardless of tab activation order.');
 
     ob_start();
     try {
@@ -1041,6 +1041,29 @@ $tests['admin_page_view_builder_builds_typed_family_selector_options'] = static 
     assertSameValue('Legacy Stack', $view['availableFamilyOptions'][2]['label'] ?? '', 'Families missing from the current catalog should keep their plain selector label.');
     assertSameValue('Inter · Variable', $view['availableFamilyLabels']['Inter'] ?? '', 'The preview label lookup should reuse the typed selector label.');
     assertSameValue('Legacy Stack', $view['availableFamilyLabels']['Legacy Stack'] ?? '', 'Missing catalog families should stay selectable without a type suffix.');
+};
+
+$tests['admin_page_view_builder_casts_admin_access_user_ids_to_strings'] = static function (): void {
+    resetTestState();
+
+    $builder = new AdminPageViewBuilder(new Storage());
+    $view = $builder->build([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'admin_access_role_slugs' => ['editor'],
+        'admin_access_role_options' => [
+            ['value' => 'editor', 'label' => 'Editor'],
+        ],
+        'admin_access_user_ids' => [3],
+        'admin_access_user_options' => [
+            ['value' => '3', 'label' => 'Author User (author)'],
+        ],
+    ]);
+
+    assertSameValue(['editor'], $view['adminAccessRoleSlugs'] ?? null, 'The view builder should pass through selected admin-access roles for the template.');
+    assertSameValue(['3'], $view['adminAccessUserIds'] ?? null, 'The view builder should cast selected admin-access user IDs to strings for strict template comparisons.');
+    assertSameValue('Author User (author)', $view['adminAccessUserOptions'][0]['label'] ?? '', 'The view builder should pass through admin-access user options for the template.');
 };
 
 $tests['admin_page_view_builder_prefers_saved_custom_output_quick_mode_on_reload'] = static function (): void {
@@ -2134,6 +2157,26 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
                 'state_copy' => 'A newer package is available for the selected channel through the normal WordPress updates flow.',
                 'can_reinstall' => false,
             ],
+            'admin_access_custom_enabled' => true,
+            'admin_access_role_slugs' => ['editor'],
+            'admin_access_role_options' => [
+                ['value' => 'administrator', 'label' => 'Administrator', 'count' => 1, 'meta' => '1 user · always allowed', 'disabled' => true],
+                ['value' => 'author', 'label' => 'Author'],
+                ['value' => 'editor', 'label' => 'Editor'],
+            ],
+            'admin_access_user_ids' => [3],
+            'admin_access_user_options' => [
+                ['value' => '1', 'label' => 'Admin User (admin)', 'meta' => 'Administrator · already has access', 'disabled' => true],
+                ['value' => '2', 'label' => 'Editor User (editor)'],
+                ['value' => '3', 'label' => 'Author User (author)'],
+            ],
+            'admin_access_summary' => [
+                'role_count' => 1,
+                'role_user_impact' => 3,
+                'user_count' => 1,
+                'implicit_admin_count' => 1,
+                'implicit_admin_labels' => ['Admin User (admin)'],
+            ],
             'block_editor_font_library_sync_enabled' => false,
             'training_wheels_off' => true,
             'variable_fonts_enabled' => true,
@@ -2180,23 +2223,62 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Enable Monospace Role', $output, 'The Behavior panel should still render the monospace toggle.');
     assertContainsValue('Enable Variable Fonts', $output, 'The Behavior panel should render the opt-in variable font toggle.');
     assertContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should still render the uninstall cleanup toggle.');
-    assertContainsValue('Reset Plugin Settings', $output, 'The Developer tab should expose the reset-settings action.');
-    assertContainsValue('Wipe Managed Font Library', $output, 'The Developer tab should expose the library-wipe action.');
+    assertContainsValue('Enable custom access rules', $output, 'The admin-access panel should expose the master toggle for fine-grained access.');
+    assertContainsValue('Off: only administrators can open Tasty Fonts. On: choose extra roles and users below.', $output, 'The admin-access toggle should explain the two access modes inline like the other Behavior settings.');
+    assertNotContainsValue('Custom access is on.', $output, 'The admin-access row should no longer render a separate status summary line.');
+    assertNotContainsValue('Administrators:', $output, 'The admin-access row should no longer render a separate summary bar above the detailed controls.');
+    assertNotContainsValue('Specific users:', $output, 'The admin-access row should no longer render the removed summary bar labels.');
+    assertContainsValue('Admin User (admin)', $output, 'The admin-access panel should still show administrator users in the individual user list.');
+    assertContainsValue('Administrator · already has access', $output, 'The admin-access panel should explain why administrator users are not selectable in the individual user list.');
+    assertContainsValue('Additional Roles', $output, 'The admin-access panel should expose the additional roles field.');
+    assertContainsValue('Administrator', $output, 'The admin-access panel should show the implicit administrator role in the role list.');
+    assertContainsValue('1 user · always allowed', $output, 'The admin-access panel should explain that the administrator role is always allowed.');
+    assertContainsValue('Specific Users', $output, 'The admin-access panel should expose the specific users field.');
+    assertContainsValue('Filter users by name, login, or role', $output, 'The admin-access panel should replace the native multi-select with a searchable list.');
+    assertContainsValue('data-admin-access-summary-count="roles"', $output, 'The admin-access panel should show role-grant impact metrics when custom access is enabled.');
+    assertContainsValue('data-admin-access-summary-count="users"', $output, 'The admin-access panel should show specific-user grant metrics when custom access is enabled.');
+    assertContainsValue('name="admin_access_custom_enabled"', $output, 'The admin-access mode toggle should submit through the shared settings form.');
+    assertContainsValue('name="admin_access_role_slugs[]"', $output, 'The admin-access roles field should submit through the shared settings form.');
+    assertContainsValue('name="admin_access_user_ids[]"', $output, 'The admin-access users field should submit through the shared settings form.');
+    assertContainsValue('form="tasty-fonts-settings-form"', $output, 'Behavior-tab admin-access controls should stay associated with the shared settings form.');
+    assertSameValue(1, preg_match('/<input(?=[^>]*name="admin_access_role_slugs\[\]")(?=[^>]*value="administrator")(?=[^>]*disabled="disabled")[^>]*>/', $output), 'Administrator role should render as a disabled entry in the role checklist.');
+    assertSameValue(1, preg_match('/<input(?=[^>]*name="admin_access_role_slugs\[\]")(?=[^>]*value="editor")(?=[^>]*checked="checked")[^>]*>/', $output), 'Saved admin-access role grants should remain selected in the Behavior tab.');
+    assertSameValue(1, preg_match('/<input(?=[^>]*name="admin_access_user_ids\[\]")(?=[^>]*value="1")(?=[^>]*disabled="disabled")[^>]*>/', $output), 'Administrator users should render as disabled entries in the searchable Behavior-tab checklist.');
+    assertSameValue(1, preg_match('/<input(?=[^>]*name="admin_access_user_ids\[\]")(?=[^>]*value="3")(?=[^>]*checked="checked")[^>]*>/', $output), 'Saved admin-access user grants should remain selected in the searchable Behavior-tab checklist.');
+    assertContainsValue('Reset plugin settings only', $output, 'The Developer tab should expose the explicit settings-reset action.');
+    assertContainsValue('Delete managed font library', $output, 'The Developer tab should expose the explicit library-delete action.');
     assertContainsValue('Site Transfer', $output, 'The Transfer tab should render the dedicated site transfer panel.');
     assertContainsValue('Export Site Transfer Bundle', $output, 'The Transfer tab should expose the portable export action.');
-    assertContainsValue('Import Site Transfer Bundle', $output, 'The Transfer tab should expose the portable import action.');
+    assertContainsValue('Dry Run Bundle', $output, 'The Transfer tab should expose the dry-run transfer action card.');
+    assertContainsValue('Validate here first. Then use Import Bundle in the top-right corner to replace this site’s Tasty Fonts setup.', $output, 'The Transfer tab should explain the shorter two-step dry-run and import flow.');
+    assertContainsValue('id="tasty-fonts-site-transfer-form"', $output, 'The site transfer import form should expose a stable id so the shared header action can target it.');
     assertContainsValue('data-site-transfer-form', $output, 'The site transfer panel should expose the dedicated import form hook for client-side state management.');
+    assertContainsValue('data-site-transfer-stage-token', $output, 'The site transfer panel should keep a hidden staged-bundle token field for dry-run/import handoff.');
+    assertContainsValue('data-site-transfer-summary="bundle"', $output, 'The site transfer panel should expose the bundle readiness summary hook.');
+    assertContainsValue('data-site-transfer-summary="limit"', $output, 'The site transfer panel should expose the upload limit readiness summary hook.');
+    assertContainsValue('data-site-transfer-summary="google"', $output, 'The site transfer panel should expose the Google API key readiness summary hook.');
+    assertContainsValue('Transfer Activity', $output, 'The Transfer tab should render a dedicated transfer activity panel.');
+    assertContainsValue('No Transfer Activity Yet', $output, 'The Transfer tab should render a transfer-specific empty state when no transfer history exists.');
+    assertContainsValue('>Dry Run Bundle<', $output, 'The transfer card should expose a dry-run action before destructive import.');
     assertSameValue(
         1,
-        preg_match('/data-site-transfer-submit[\s\S]*disabled/', $output),
-        'The site transfer import button should render disabled until a bundle file is selected.'
+        preg_match('/data-site-transfer-validate-submit[\s\S]*disabled/', $output),
+        'The site transfer dry-run button should render disabled until a bundle file is selected.'
     );
-    assertContainsValue('Clear Plugin Caches and Regenerate Assets', $output, 'The Developer tab should expose the cache-reset action.');
-    assertContainsValue('Regenerate Generated CSS', $output, 'The Developer tab should expose the CSS-regeneration action.');
-    assertContainsValue('Reset Integration Detection State', $output, 'The Developer tab should expose the integration-reset action.');
-    assertContainsValue('Reset Suppressed Notices', $output, 'The Developer tab should expose the suppressed-notices reset action.');
-    assertContainsValue('data-developer-confirm-message=', $output, 'Destructive developer actions should use browser-level confirm messages.');
-    assertNotContainsValue('data-developer-confirm-input=', $output, 'Destructive developer actions should no longer render typed-confirmation inputs.');
+    assertContainsValue('Developer tools run immediately. Save settings first.', $output, 'The Developer tab should keep a single short note about immediate actions.');
+    assertContainsValue('Maintenance', $output, 'The Developer tab should group routine cleanup tools into a maintenance section.');
+    assertContainsValue('Danger Zone', $output, 'The Developer tab should separate destructive tools into a dedicated danger zone.');
+    assertNotContainsValue('Immediate actions', $output, 'The Developer tab should remove the redundant immediate-actions heading.');
+    assertNotContainsValue('Housekeeping', $output, 'The Developer tab should fold lightweight UI resets into the maintenance section.');
+    assertContainsValue('Clear caches and rebuild assets', $output, 'The Developer tab should expose the cache-reset action.');
+    assertContainsValue('Regenerate CSS file', $output, 'The Developer tab should expose the simplified CSS-regeneration action title.');
+    assertContainsValue('Run integration scan', $output, 'The Developer tab should expose the simplified integration re-detect action title.');
+    assertContainsValue('Restore notices', $output, 'The Developer tab should expose the simplified notices reset action title.');
+    assertNotContainsValue('Cache + CSS', $output, 'The Developer tab should no longer render developer badge pills.');
+    assertNotContainsValue('Check CSS', $output, 'The Developer tab should remove non-critical status badges from tool rows.');
+    assertNotContainsValue('Needs rebuild', $output, 'The Developer tab should remove non-critical status badges from tool rows.');
+    assertContainsValue('data-developer-confirm-message=', $output, 'Developer actions that need confirmation should expose confirm copy for client-side safeguards.');
+    assertContainsValue('data-developer-confirm-input=', $output, 'The most destructive developer actions should require typed confirmation before unlocking the submit button.');
     assertNotContainsValue('Editor Integrations', $output, 'The Behavior panel should no longer render the editor integrations subsection title.');
     assertNotContainsValue('Role Options', $output, 'The Behavior panel should no longer render the role options subsection title.');
     assertNotContainsValue('Uninstall Settings', $output, 'The Behavior panel should no longer render the uninstall settings subsection title.');
@@ -2206,6 +2288,8 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('tasty-fonts-header-logo', $output, 'The masthead should render the branded logo in place of the plain text title.');
     assertContainsValue('https://tastywp.com/tastyfonts/', $output, 'The branded masthead logo should link to the Tasty Fonts product page.');
     assertContainsValue('screen-reader-text', $output, 'The branded masthead should keep an accessible text label for assistive technology.');
+    assertContainsValue('tasty-fonts-page-header-kicker', $output, 'The refreshed masthead should render a compact product label beside the logo.');
+    assertContainsValue('Assign font roles, preview the result, and publish them sitewide when ready.', $output, 'The refreshed masthead should render contextual summary copy for the active page.');
     assertContainsValue('tasty-fonts-version-link-meta', $output, 'The masthead version pill should render the channel and updater state meta line.');
     assertContainsValue('Beta', $output, 'The masthead version pill should disclose the selected update channel.');
     assertContainsValue('Beta · Update Available', $output, 'The masthead version pill should summarize channel and update status together.');
@@ -2337,13 +2421,13 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
             'apply_everywhere' => false,
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
-                'description' => 'Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.',
+                'description' => 'Sync imported families into the WordPress Font Library.',
                 'status_label' => 'On',
                 'enabled' => true,
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync ACSS heading and body font-family and font-weight settings to Tasty Fonts role variables for clean interoperability.',
+                'description' => 'Sync Automatic.css font settings with Tasty role variables.',
                 'status_label' => 'Synced',
                 'available' => true,
                 'enabled' => true,
@@ -2373,17 +2457,21 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.', $output, 'The Gutenberg integration summary should still explain the integration.');
+    assertContainsValue('Sync imported families into the WordPress Font Library.', $output, 'The Gutenberg integration summary should render within the main toggle copy.');
     assertContainsValue('On', $output, 'The Gutenberg integration row should still surface its current status.');
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Gutenberg integration should no longer render a second row title.');
     assertSameValue(1, substr_count($output, 'Gutenberg Font Library'), 'The Gutenberg integration should render a single main title.');
-    assertContainsValue('Sync ACSS heading and body font-family and font-weight settings to Tasty Fonts role variables for clean interoperability.', $output, 'The Automatic.css integration summary should still explain the integration.');
+    assertContainsValue('Sync Automatic.css font settings with Tasty role variables.', $output, 'The Automatic.css integration summary should render within the main toggle copy.');
     assertContainsValue('Synced', $output, 'The Automatic.css integration row should still surface its current status.');
+    assertContainsValue('Font mapping', $output, 'The Automatic.css managed mapping should use the same quiet disclosure label as the Bricks integration.');
+    assertContainsValue('Current values', $output, 'The Automatic.css managed mapping should label the current column clearly.');
+    assertContainsValue('Target values', $output, 'The Automatic.css managed mapping should label the target column clearly.');
     assertContainsValue('Heading Weight', $output, 'The Automatic.css managed mapping should list the heading font-weight field.');
     assertContainsValue('Body Weight', $output, 'The Automatic.css managed mapping should list the body font-weight field.');
     assertContainsValue('var(--font-heading-weight)', $output, 'The Automatic.css managed mapping should expose the heading weight variable target.');
     assertContainsValue('var(--font-body-weight)', $output, 'The Automatic.css managed mapping should expose the body weight variable target.');
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Automatic.css integration should no longer render a second row title.');
+    assertNotContainsValue('Managed Mapping', $output, 'The Automatic.css integration should now use the quieter Font mapping disclosure instead of a loud subsection heading.');
     assertNotContainsValue('Sets ACSS `heading-font-family` to `var(--font-heading)` and `text-font-family` to `var(--font-body)` while the integration is enabled.', $output, 'The Automatic.css integration should no longer render a second explanatory line.');
 };
 
@@ -2556,13 +2644,13 @@ $tests['admin_page_renderer_hides_acss_managed_mapping_when_sync_is_not_enabled'
             'apply_everywhere' => false,
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
-                'description' => 'Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.',
+                'description' => 'Sync imported families into the WordPress Font Library.',
                 'status_label' => 'On',
                 'enabled' => true,
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.',
+                'description' => 'Enable this to sync Automatic.css font settings with Tasty role variables.',
                 'status_label' => 'Off',
                 'enabled' => false,
                 'available' => false,
@@ -2631,27 +2719,27 @@ $tests['admin_page_renderer_disables_unavailable_plugin_integrations'] = static 
             'apply_everywhere' => false,
             'bricks_integration' => [
                 'title' => 'Bricks Builder',
-                'description' => 'Expose published Tasty Fonts families inside Bricks selectors and mirror Bricks theme font families into Gutenberg.',
+                'description' => 'Manage Bricks typography with Tasty when Bricks is active.',
                 'status_label' => 'Not Active',
                 'enabled' => false,
                 'available' => false,
             ],
             'oxygen_integration' => [
                 'title' => 'Oxygen Builder',
-                'description' => 'Expose published Tasty Fonts families through Oxygen’s custom-font compatibility layer and mirror Oxygen global font families into Gutenberg.',
+                'description' => 'Show published Tasty fonts in Oxygen when Oxygen is active.',
                 'status_label' => 'Not Active',
                 'enabled' => false,
                 'available' => false,
             ],
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
-                'description' => 'Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.',
+                'description' => 'Sync imported families into the WordPress Font Library.',
                 'status_label' => 'On',
                 'enabled' => true,
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.',
+                'description' => 'Sync Automatic.css font settings with Tasty role variables when Automatic.css is active.',
                 'status_label' => 'Not Active',
                 'enabled' => false,
                 'available' => false,
@@ -2725,15 +2813,15 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
             'apply_everywhere' => true,
             'bricks_integration' => [
                 'title' => 'Bricks Builder',
-                'description' => 'Choose which Bricks controls Tasty Fonts should manage for selectors, builder previews, Theme Styles, and Bricks font settings.',
+                'description' => 'Manage Bricks typography with Tasty. Selectors and previews stay automatic.',
                 'status_label' => 'On',
                 'enabled' => true,
                 'available' => true,
                 'feature_descriptions' => [
                     'selectors' => 'Show published Tasty families directly inside Bricks font controls.',
                     'builder_preview' => 'Load the active Tasty delivery in Bricks builder previews for local, CDN, and Adobe fonts.',
-                    'theme_styles' => 'Update only the font-family and font-weight fields on one selected Bricks Theme Style.',
-                    'google_fonts' => 'Turn on Bricks’ own “disable Google Fonts” setting so Bricks pickers show only Tasty-supplied fonts.',
+'theme_styles' => 'Sync Tasty role fonts to one Theme Style or all Theme Styles.',
+                    'google_fonts' => 'Hide Bricks’ built-in Google Fonts so only Tasty-managed fonts appear.',
                 ],
                 'selectors' => ['enabled' => true, 'status' => 'active'],
                 'builder_preview' => ['enabled' => true, 'status' => 'active'],
@@ -2773,20 +2861,20 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
             ],
             'oxygen_integration' => [
                 'title' => 'Oxygen Builder',
-                'description' => 'Expose published Tasty Fonts families through Oxygen’s custom-font compatibility layer and mirror Oxygen global font families into Gutenberg.',
+                'description' => 'Enable this to show published Tasty fonts in Oxygen and sync families to Gutenberg.',
                 'status_label' => 'Off',
                 'enabled' => false,
                 'available' => true,
             ],
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
-                'description' => 'Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.',
+                'description' => 'Sync imported families into the WordPress Font Library.',
                 'status_label' => 'On',
                 'enabled' => true,
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.',
+                'description' => 'Enable this to sync Automatic.css font settings with Tasty role variables.',
                 'status_label' => 'Off',
                 'enabled' => false,
                 'available' => true,
@@ -2812,7 +2900,8 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('Bricks selectors and builder previews are included automatically', $output, 'The Bricks integration card should explain the baseline Bricks behavior inline instead of as a separate settings row.');
+    assertContainsValue('Manage Bricks typography with Tasty. Selectors and previews stay automatic.', $output, 'The Bricks integration card should combine the automatic selector and preview support into the main description.');
+    assertNotContainsValue('tasty-fonts-bricks-support-copy', $output, 'The Bricks integration card should not render a separate baseline support paragraph.');
     assertNotContainsValue('name="bricks_selector_fonts_enabled"', $output, 'The Bricks integration card should no longer render a separate selector exposure toggle.');
     assertNotContainsValue('name="bricks_builder_preview_enabled"', $output, 'The Bricks integration card should no longer render a separate builder preview toggle.');
     assertContainsValue('name="bricks_theme_styles_sync_enabled"', $output, 'The Bricks integration card should render the Theme Style sync toggle.');
@@ -2823,12 +2912,19 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
     assertContainsValue('Delete Tasty Theme Style', $output, 'The Bricks integration card should render the delete action for the managed Tasty Theme Style.');
     assertContainsValue('name="bricks_disable_google_fonts_enabled"', $output, 'The Bricks integration card should render the Bricks Google font toggle.');
     assertContainsValue('Reset Bricks Integration', $output, 'The Bricks integration card should render the reset action.');
-    assertContainsValue('Current Bricks State', $output, 'The Bricks integration card should render the current Bricks state summary.');
-    assertContainsValue('Target Mapping', $output, 'The Bricks integration card should render the target Bricks mapping summary.');
+    assertContainsValue('Theme Style', $output, 'The Bricks integration card should keep the Theme Style controls under a clearer heading.');
+    assertContainsValue('Choose Theme Style', $output, 'The Bricks integration card should label the existing Theme Style selector clearly.');
+    assertContainsValue('Current values', $output, 'The Bricks integration card should render the current Bricks state summary.');
+    assertContainsValue('Target values', $output, 'The Bricks integration card should render the target Bricks mapping summary.');
+    assertContainsValue('Font mapping', $output, 'The Bricks integration card should present the state comparison under a clearer details label.');
+    assertContainsValue('Maintenance', $output, 'The Bricks integration card should group destructive actions into a quieter maintenance area.');
+    assertNotContainsValue('Bricks Controls', $output, 'The Bricks integration card should remove the redundant internal Bricks heading.');
     assertContainsValue('data-help-tooltip="Bricks Theme Style sync is active. Tasty is keeping the selected Theme Style mapped to the live sitewide role variables."', $output, 'The Bricks Theme Style status badge should explain the synced state on hover.');
     assertContainsValue('data-help-tooltip="Bricks Google Fonts are disabled in Bricks now, so Bricks pickers only show Tasty-supplied fonts."', $output, 'The Bricks Google Fonts status badge should explain the synced state on hover.');
-    assertContainsValue('Tasty is applying Bricks font updates to &quot;Sitewide Primary&quot;.', $output, 'The Bricks integration card should explain which existing Theme Style Tasty is updating.');
-    assertContainsValue('Theme Style Target', $output, 'The Bricks integration card should show the selected Theme Style target.');
+    assertContainsValue('Updating &quot;Sitewide Primary&quot;.', $output, 'The Bricks integration card should explain which existing Theme Style Tasty is updating.');
+    assertContainsValue('Managed Tasty style', $output, 'The Bricks integration card should render the managed Theme Style radio label.');
+    assertContainsValue('One existing style', $output, 'The Bricks integration card should render the single-style target radio label.');
+    assertContainsValue('All styles', $output, 'The Bricks integration card should render the all-styles target radio label.');
     assertNotContainsValue('Body Role Variable', $output, 'The Bricks integration card should remove the redundant body role variable row from the managed mapping summary.');
     assertNotContainsValue('Heading Role Variable', $output, 'The Bricks integration card should remove the redundant heading role variable row from the managed mapping summary.');
 };
@@ -2870,7 +2966,7 @@ $tests['admin_page_renderer_exposes_bricks_waiting_badge_help'] = static functio
             'apply_everywhere' => false,
             'bricks_integration' => [
                 'title' => 'Bricks Builder',
-                'description' => 'Choose which Bricks controls Tasty Fonts should manage for selectors, builder previews, Theme Styles, and Bricks font settings.',
+                'description' => 'Manage Bricks typography with Tasty. Selectors and previews stay automatic.',
                 'status_label' => 'On',
                 'enabled' => true,
                 'available' => true,
@@ -2918,20 +3014,20 @@ $tests['admin_page_renderer_exposes_bricks_waiting_badge_help'] = static functio
             ],
             'oxygen_integration' => [
                 'title' => 'Oxygen Builder',
-                'description' => 'Expose published Tasty Fonts families through Oxygen’s custom-font compatibility layer and mirror Oxygen global font families into Gutenberg.',
+                'description' => 'Enable this to show published Tasty fonts in Oxygen and sync families to Gutenberg.',
                 'status_label' => 'Off',
                 'enabled' => false,
                 'available' => true,
             ],
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
-                'description' => 'Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.',
+                'description' => 'Sync imported families into the WordPress Font Library.',
                 'status_label' => 'On',
                 'enabled' => true,
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.',
+                'description' => 'Enable this to sync Automatic.css font settings with Tasty role variables.',
                 'status_label' => 'Off',
                 'enabled' => false,
                 'available' => true,
@@ -2998,7 +3094,7 @@ $tests['admin_page_renderer_offers_to_create_a_bricks_theme_style_when_none_exis
             'apply_everywhere' => true,
             'bricks_integration' => [
                 'title' => 'Bricks Builder',
-                'description' => 'Choose which Bricks controls Tasty Fonts should manage for selectors, builder previews, Theme Styles, and Bricks font settings.',
+                'description' => 'Manage Bricks typography with Tasty. Selectors and previews stay automatic.',
                 'status_label' => 'On',
                 'enabled' => true,
                 'available' => true,
@@ -3046,20 +3142,20 @@ $tests['admin_page_renderer_offers_to_create_a_bricks_theme_style_when_none_exis
             ],
             'oxygen_integration' => [
                 'title' => 'Oxygen Builder',
-                'description' => 'Expose published Tasty Fonts families through Oxygen’s custom-font compatibility layer and mirror Oxygen global font families into Gutenberg.',
+                'description' => 'Enable this to show published Tasty fonts in Oxygen and sync families to Gutenberg.',
                 'status_label' => 'Off',
                 'enabled' => false,
                 'available' => true,
             ],
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
-                'description' => 'Mirror imported families into WordPress typography controls so the block editor and site editor can use the same fonts managed by Tasty Fonts.',
+                'description' => 'Sync imported families into the WordPress Font Library.',
                 'status_label' => 'On',
                 'enabled' => true,
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync ACSS heading and body font-family settings to Tasty Fonts role variables for clean interoperability.',
+                'description' => 'Enable this to sync Automatic.css font settings with Tasty role variables.',
                 'status_label' => 'Off',
                 'enabled' => false,
                 'available' => true,
@@ -3085,8 +3181,7 @@ $tests['admin_page_renderer_offers_to_create_a_bricks_theme_style_when_none_exis
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('No Bricks Theme Style found yet.', $output, 'The Bricks integration card should say when no Theme Style exists yet.');
-    assertContainsValue('No Bricks Theme Style found yet. Tasty can create one for you.', $output, 'The Bricks integration card should explain that Tasty can create a managed Theme Style.');
+    assertContainsValue('Create the managed style to start syncing.', $output, 'The Bricks integration card should explain that Tasty can create the managed Theme Style when none exist.');
     assertContainsValue('Create Tasty Theme Style', $output, 'The Bricks integration card should offer a direct Theme Style creation action.');
 };
 
@@ -4676,7 +4771,6 @@ $tests['admin_page_renderer_uses_a_dedicated_code_preview_scene'] = static funct
         throw $e;
     }
     $output = (string) ob_get_clean();
-
     assertContainsValue('tasty-fonts-preview-scene--code', $output, 'The preview renderer should expose a dedicated Code scene.');
     assertContainsValue('data-tab-target="code"', $output, 'The preview tabs should include the new Code tab.');
     assertContainsValue('typography-preview.tsx', $output, 'The Code scene should render an editor-style file tab.');
