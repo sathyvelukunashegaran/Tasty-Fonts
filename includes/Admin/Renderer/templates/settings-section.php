@@ -1222,11 +1222,31 @@
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">
                                                 <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable custom access rules', 'tasty-fonts'); ?></span>
-                                                <?php if ($showSettingsDescriptions): ?>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Off: only administrators can open Tasty Fonts. On: choose extra roles and users below.', 'tasty-fonts'); ?></span>
-                                                <?php endif; ?>
+                                                <span class="tasty-fonts-admin-access-mode-copy"><?php esc_html_e('Off: only administrators can open Tasty Fonts. On: choose extra roles and users below.', 'tasty-fonts'); ?></span>
                                             </span>
                                         </label>
+                                        <div class="tasty-fonts-admin-access-summary-bar<?php echo $showSettingsDescriptions ? '' : ' is-compact'; ?>">
+                                            <p class="tasty-fonts-admin-access-summary-intro" data-admin-access-summary-state="disabled"<?php echo $adminAccessCustomEnabled ? ' hidden' : ''; ?>>
+                                                <strong><?php esc_html_e('Administrators always have access.', 'tasty-fonts'); ?></strong>
+                                                <span><?php esc_html_e('Turn custom access on to grant additional roles or users.', 'tasty-fonts'); ?></span>
+                                            </p>
+                                            <div class="tasty-fonts-admin-access-summary-intro" data-admin-access-summary-state="enabled"<?php echo $adminAccessCustomEnabled ? '' : ' hidden'; ?>>
+                                                <span class="tasty-fonts-admin-access-summary-token tasty-fonts-admin-access-stat<?php echo $adminAccessRoleCount > 0 ? ' has-selection' : ''; ?>">
+                                                    <strong data-admin-access-summary-count="roles"><?php echo esc_html(sprintf(_n('%d role', '%d roles', $adminAccessRoleCount, 'tasty-fonts'), $adminAccessRoleCount)); ?></strong>
+                                                    <span class="tasty-fonts-admin-access-summary-token-label" data-admin-access-summary-copy="roles"><?php echo esc_html(sprintf(_n('%d user', '%d users', $adminAccessRoleImpact, 'tasty-fonts'), $adminAccessRoleImpact)); ?></span>
+                                                </span>
+                                                <span class="tasty-fonts-admin-access-summary-token tasty-fonts-admin-access-stat<?php echo $adminAccessUserCount > 0 ? ' has-selection' : ''; ?>">
+                                                    <strong data-admin-access-summary-count="users"><?php echo esc_html(sprintf(_n('%d user', '%d users', $adminAccessUserCount, 'tasty-fonts'), $adminAccessUserCount)); ?></strong>
+                                                    <span class="tasty-fonts-admin-access-summary-token-label"><?php esc_html_e('specific users', 'tasty-fonts'); ?></span>
+                                                </span>
+                                                <?php if ($adminAccessImplicitAdminCount > 0): ?>
+                                                    <span class="tasty-fonts-admin-access-summary-token">
+                                                        <strong><?php echo esc_html(sprintf(_n('%d admin', '%d admins', $adminAccessImplicitAdminCount, 'tasty-fonts'), $adminAccessImplicitAdminCount)); ?></strong>
+                                                        <span class="tasty-fonts-admin-access-summary-token-label"><?php esc_html_e('implicit administrators', 'tasty-fonts'); ?></span>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
                                         <div id="tasty-fonts-admin-access-managed" data-admin-access-managed<?php echo $adminAccessCustomEnabled ? '' : ' hidden'; ?>>
                                         <div class="tasty-fonts-admin-access-grid tasty-fonts-admin-access-edit-grid">
                                             <section class="tasty-fonts-admin-access-field" aria-labelledby="tasty-fonts-admin-access-roles-label" data-admin-access-group="roles">
@@ -1432,9 +1452,7 @@
                                                         <div class="tasty-fonts-developer-tool-title-row">
                                                             <h4><?php esc_html_e('Dry Run Bundle', 'tasty-fonts'); ?></h4>
                                                         </div>
-                                                        <?php if ($showSettingsDescriptions): ?>
-                                                            <p class="tasty-fonts-site-transfer-intro-copy"><?php esc_html_e('Validate here first. Then use Import Bundle in the top-right corner to replace this site’s Tasty Fonts setup.', 'tasty-fonts'); ?></p>
-                                                        <?php endif; ?>
+                                                    <p class="tasty-fonts-site-transfer-intro-copy"><?php esc_html_e('Validate here first. Then use Import Bundle in the top-right corner to replace this site’s Tasty Fonts setup.', 'tasty-fonts'); ?></p>
                                                         <?php if (!$siteTransferAvailable && $siteTransferMessage !== ''): ?>
                                                             <p class="tasty-fonts-site-transfer-note tasty-fonts-site-transfer-note--muted"><?php echo esc_html($siteTransferMessage); ?></p>
                                                         <?php endif; ?>
