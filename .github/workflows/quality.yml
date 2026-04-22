@@ -42,4 +42,4 @@ jobs:
 
       - name: Run jscpd source duplication scan
         shell: bash
-        run: npx --yes jscpd --config .jscpd.json
+        run: bin/run-jscpd

@@ -13,7 +13,6 @@
     "bash"
   ],
   "ignore": [
-    "**/.air/**",
     "**/.playwright-cli/**",
     "**/build/**",
     "**/dist/**",

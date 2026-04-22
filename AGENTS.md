@@ -11,7 +11,7 @@ Use this file as the shared repo-level instruction guide for AI coding agents wo
 - Main PHP code: `includes/`
 - Admin UI: PHP templates in `includes/Admin/Renderer/templates/` plus vanilla JS in `assets/js/`
 - Tests: PHP harness via `tests/run.php`, JS contract tests via `tests/js/*.test.cjs`
-- Release helpers: `bin/release`, `bin/nightly-version`, `tests/bin/release-scripts.test.sh`
+- Quality and release helpers: `bin/run-jscpd`, `bin/setup-git-hooks`, `bin/release`, `bin/nightly-version`, `tests/bin/release-scripts.test.sh`
 
 ## Principles
 
@@ -37,7 +37,8 @@ Use this file as the shared repo-level instruction guide for AI coding agents wo
 3. For longer or multi-step work, create an optional note in `.agents/tasks/todo-(name).md`.
 4. Make the smallest practical change.
 5. Run the most targeted verification first, then broader checks if the change warrants it.
-6. Summarize behavior changes and verification before handing work back.
+6. Expect `jscpd` to run on commit through the shared pre-commit hook once `bin/setup-git-hooks` has been run in the clone.
+7. Summarize behavior changes and verification before handing work back.
 
 ## Verification
 
@@ -45,6 +46,7 @@ Use this file as the shared repo-level instruction guide for AI coding agents wo
 - Prefer the existing harnesses over inventing one-off scripts.
 - For broader or release-sensitive changes, run the full pre-release sequence.
 - For admin, runtime, provider, storage, or updater changes, verify behavior in WordPress terms, not just by static inspection.
+- For structural refactors or repeated code movement, run `bin/run-jscpd` explicitly even if the hook will also catch it on commit.
 
 Targeted checks:
 
@@ -52,13 +54,14 @@ Targeted checks:
 php tests/run.php
 node --test tests/js/*.test.cjs
 bash tests/bin/release-scripts.test.sh
+bin/run-jscpd
 find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
 ```
 
 Full pre-release sequence:
 
 ```bash
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs && bash tests/bin/release-scripts.test.sh
+find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs && bash tests/bin/release-scripts.test.sh && bin/run-jscpd
 ```
 
 ## Repo-Specific Hotspots
@@ -101,6 +104,13 @@ find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l && ph
 - JS contract tests use Node's built-in test runner. Keep shared helpers DOM-free when they are meant to run there.
 
 ## Commands
+
+Quality and hooks:
+
+```bash
+bin/run-jscpd
+bin/setup-git-hooks
+```
 
 Release helpers:
 

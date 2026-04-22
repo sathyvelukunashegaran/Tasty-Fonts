@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ "${TASTY_FONTS_SKIP_JSCPD_HOOK:-0}" == "1" ]]; then
+  exit 0
+fi
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+cd "$ROOT_DIR"
+
+echo "Running jscpd duplicate scan..."
+
+exec bin/run-jscpd
