@@ -155,7 +155,6 @@ final class AcssIntegrationService
         if (
             $url === ''
             && class_exists(\Automatic_CSS\Plugin::class)
-            && method_exists(\Automatic_CSS\Plugin::class, 'get_dynamic_css_url')
         ) {
             $baseUrl = trim((string) \Automatic_CSS\Plugin::get_dynamic_css_url());
 
@@ -216,12 +215,8 @@ final class AcssIntegrationService
             return 'waiting_for_sitewide_roles';
         }
 
-        if ($syncApplied && $synced) {
-            return 'synced';
-        }
-
-        if ($syncApplied && !$synced) {
-            return 'out_of_sync';
+        if ($syncApplied) {
+            return $synced ? 'synced' : 'out_of_sync';
         }
 
         return 'ready';
@@ -254,18 +249,16 @@ final class AcssIntegrationService
         if (function_exists('wp_styles')) {
             $styles = wp_styles();
 
-            if (is_object($styles) && is_array($styles->registered ?? null)) {
-                $registered = [];
+            $registered = [];
 
-                foreach ($styles->registered as $handle => $style) {
-                    $registered[(string) $handle] = [
-                        'src' => is_object($style) ? (string) ($style->src ?? '') : '',
-                        'ver' => is_object($style) ? (string) ($style->ver ?? '') : '',
-                    ];
-                }
-
-                return $registered;
+            foreach ($styles->registered as $handle => $style) {
+                $registered[(string) $handle] = [
+                    'src' => $style->src !== false ? (string) $style->src : '',
+                    'ver' => (string) $style->ver,
+                ];
             }
+
+            return $registered;
         }
 
         $registered = [];

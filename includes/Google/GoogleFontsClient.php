@@ -223,7 +223,7 @@ final class GoogleFontsClient
 
         $body = wp_remote_retrieve_body($response);
 
-        if (!is_string($body) || trim($body) === '') {
+        if (trim($body) === '') {
             return new WP_Error(
                 'tasty_fonts_google_css_empty',
                 __('Google Fonts returned an empty CSS response.', 'tasty-fonts')
@@ -426,7 +426,7 @@ final class GoogleFontsClient
 
         $scheduled = wp_schedule_single_event(time(), self::ACTION_REVALIDATE_API_KEY);
 
-        if ($scheduled === false || is_wp_error($scheduled)) {
+        if ($scheduled === false) {
             delete_transient(TransientKey::forSite(self::TRANSIENT_API_KEY_REVALIDATION_QUEUED));
         }
     }
@@ -733,7 +733,7 @@ final class GoogleFontsClient
         $axesByTag = [];
 
         foreach ($rows as $row) {
-            foreach ((array) ($row['axes'] ?? []) as $tag => $definition) {
+            foreach ($row['axes'] as $tag => $definition) {
                 $axesByTag[$tag] = FontUtils::normalizeAxesMap([$tag => $definition])[$tag] ?? null;
             }
         }
@@ -760,21 +760,19 @@ final class GoogleFontsClient
             }
 
             foreach ($axisTags as $tag) {
-                $definition = (array) (($row['axes'] ?? [])[$tag] ?? $axesByTag[$tag] ?? []);
+                $definition = (array) ($row['axes'][$tag] ?? $axesByTag[$tag] ?? []);
                 $values[] = $this->buildVariableAxisValue($definition);
             }
 
             $serializedRows[] = implode(',', $values);
         }
 
-        $serializedRows = array_values(array_unique(array_filter($serializedRows, 'strlen')));
+        $serializedRows = array_values(array_unique($serializedRows));
 
-        return $serializedRows === []
-            ? null
-            : [
-                'axis_list' => implode(',', $axisList),
-                'rows' => $serializedRows,
-            ];
+        return [
+            'axis_list' => implode(',', $axisList),
+            'rows' => $serializedRows,
+        ];
     }
 
     private function buildVariableAxisValue(array $definition): string

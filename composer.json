@@ -1,0 +1,20 @@
+{
+  "name": "tastywp/tasty-fonts",
+  "description": "Dev tooling for the Tasty Custom Fonts WordPress plugin.",
+  "license": "GPL-2.0-or-later",
+  "type": "project",
+  "require-dev": {
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.1",
+    "szepeviktor/phpstan-wordpress": "^2.0"
+  },
+  "scripts": {
+    "phpstan": "php -d memory_limit=1G vendor/bin/phpstan analyse -c phpstan.neon.dist --no-progress"
+  },
+  "config": {
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    },
+    "sort-packages": true
+  }
+}

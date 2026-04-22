@@ -589,7 +589,7 @@ final class SiteTransferService
 
             $checksum = hash_file('sha256', $absolutePath);
 
-            if (!is_string($checksum) || $checksum === '') {
+            if ($checksum === false) {
                 continue;
             }
 
@@ -602,7 +602,7 @@ final class SiteTransferService
 
         usort(
             $files,
-            static fn (array $left, array $right): int => strcmp((string) ($left['relative_path'] ?? ''), (string) ($right['relative_path'] ?? ''))
+            static fn (array $left, array $right): int => strcmp($left['relative_path'], $right['relative_path'])
         );
 
         return $files;
@@ -835,7 +835,7 @@ final class SiteTransferService
     {
         $path = tempnam($this->temporaryBaseDirectory(), self::TEMP_ZIP_PREFIX);
 
-        if (!is_string($path) || $path === '') {
+        if ($path === false) {
             return $this->error(
                 'tasty_fonts_transfer_temp_file_failed',
                 __('A temporary zip file could not be created for the transfer bundle.', 'tasty-fonts')
@@ -869,7 +869,7 @@ final class SiteTransferService
     {
         $baseDirectory = function_exists('sys_get_temp_dir') ? sys_get_temp_dir() : '';
 
-        if (!is_string($baseDirectory) || trim($baseDirectory) === '') {
+        if (trim($baseDirectory) === '') {
             $baseDirectory = ABSPATH;
         }
 
@@ -928,7 +928,7 @@ final class SiteTransferService
             return false;
         }
 
-        $segments = array_filter(explode('/', $relativePath), 'strlen');
+        $segments = array_filter(explode('/', $relativePath), static fn (string $segment): bool => $segment !== '');
 
         foreach ($segments as $segment) {
             if ($segment === '.' || $segment === '..') {

@@ -68,7 +68,7 @@ final class RuntimeService
 
         $css = implode('', array_values(array_unique(array_filter(
             $this->bricksIntegration->getManagedFrontendStyles(),
-            'strlen'
+            static fn (string $style): bool => $style !== ''
         ))));
 
         if ($css === '') {
@@ -135,7 +135,7 @@ final class RuntimeService
         }
 
         foreach ($preloadUrls as $url) {
-            if (!is_string($url) || trim($url) === '') {
+            if (trim($url) === '') {
                 continue;
             }
 
@@ -257,7 +257,7 @@ final class RuntimeService
             $styles = array_merge($styles, $this->oxygenIntegration->getEditorStyles($runtimeFamilies));
         }
 
-        $styles = array_values(array_unique(array_filter($styles, 'strlen')));
+        $styles = array_values(array_unique(array_filter($styles, static fn (string $style): bool => $style !== '')));
 
         if ($styles === []) {
             return $editorSettings;
@@ -310,7 +310,7 @@ final class RuntimeService
         $headers = [];
 
         foreach ($preloadUrls as $url) {
-            if (!is_string($url) || trim($url) === '') {
+            if (trim($url) === '') {
                 continue;
             }
 
@@ -559,7 +559,7 @@ JS;
     {
         $encodedFamilies = wp_json_encode(array_values($familyNames), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        if (!is_string($encodedFamilies) || $encodedFamilies === '') {
+        if ($encodedFamilies === false) {
             return '';
         }
 
@@ -717,7 +717,7 @@ JS;
             $urls[] = $acssStylesheet['url'];
         }
 
-        return array_values(array_unique(array_filter($urls, 'strlen')));
+        return array_values(array_unique(array_filter($urls, static fn (string $url): bool => $url !== '')));
     }
 
     private function getCanvasInlineCss(): array
@@ -726,7 +726,7 @@ JS;
             return [];
         }
 
-        return array_values(array_unique(array_filter($this->acssIntegration->getManagedEditorStyles(), 'strlen')));
+        return array_values(array_unique(array_filter($this->acssIntegration->getManagedEditorStyles(), static fn (string $style): bool => $style !== '')));
     }
 
     /**

@@ -19,6 +19,10 @@ jobs:
         with:
           php-version: '8.2'
 
+      - name: Install Composer dependencies
+        shell: bash
+        run: composer install --no-interaction --no-progress --prefer-dist
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -26,7 +30,11 @@ jobs:
 
       - name: Lint PHP sources
         shell: bash
-        run: find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
+        run: find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Run PHPStan
+        shell: bash
+        run: composer phpstan
 
       - name: Run PHP test suite
         shell: bash

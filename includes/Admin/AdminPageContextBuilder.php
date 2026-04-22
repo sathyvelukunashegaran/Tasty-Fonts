@@ -999,10 +999,7 @@ final class AdminPageContextBuilder
 
     private function buildAdminAccessRoleOptions(): array
     {
-        $roleObjects = wp_roles();
-        $roles = $roleObjects instanceof \WP_Roles && is_array($roleObjects->roles)
-            ? $roleObjects->roles
-            : [];
+        $roles = wp_roles()->roles;
         $userCountsByRole = $this->countUsersByRole();
         $options = [];
 
@@ -1030,7 +1027,7 @@ final class AdminPageContextBuilder
 
         usort(
             $options,
-            static fn (array $left, array $right): int => strnatcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''))
+            static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label'])
         );
 
         return $options;
@@ -1079,7 +1076,7 @@ final class AdminPageContextBuilder
 
         usort(
             $options,
-            static fn (array $left, array $right): int => strnatcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''))
+            static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label'])
         );
 
         return $options;
@@ -1302,10 +1299,7 @@ final class AdminPageContextBuilder
 
     private function roleLabelsBySlug(): array
     {
-        $roleObjects = wp_roles();
-        $roles = $roleObjects instanceof \WP_Roles && is_array($roleObjects->roles)
-            ? $roleObjects->roles
-            : [];
+        $roles = wp_roles()->roles;
         $labels = [];
 
         foreach ($roles as $roleSlug => $roleConfig) {
@@ -1675,23 +1669,6 @@ final class AdminPageContextBuilder
         return $category;
     }
 
-    private function roleComparisonKeys(array $settings): array
-    {
-        $keys = [];
-
-        foreach ($this->effectiveRoleKeys($settings) as $roleKey) {
-            $keys[] = $roleKey;
-            $keys[] = $roleKey . '_fallback';
-            $keys[] = $roleKey . '_weight';
-
-            if (!empty($settings['variable_fonts_enabled'])) {
-                $keys[] = $roleKey . '_axes';
-            }
-        }
-
-        return $keys;
-    }
-
     private function effectiveRoleKeys(?array $settings = null): array
     {
         $settings = $settings ?? $this->settings->getSettings();
@@ -1732,18 +1709,6 @@ final class AdminPageContextBuilder
                 'tf_page' => AdminController::PAGE_DIAGNOSTICS,
                 self::DOWNLOAD_ACTION => '1',
                 '_wpnonce' => wp_create_nonce(self::DOWNLOAD_ACTION),
-            ],
-            admin_url('admin.php')
-        );
-    }
-
-    private function buildPluginBehaviorUrl(): string
-    {
-        return add_query_arg(
-            [
-                'page' => AdminController::MENU_SLUG,
-                'tf_page' => AdminController::PAGE_SETTINGS,
-                'tf_studio' => 'plugin-behavior',
             ],
             admin_url('admin.php')
         );

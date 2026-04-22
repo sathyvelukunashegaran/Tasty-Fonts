@@ -579,10 +579,6 @@ final class LibraryService
     private function findFamilyBySlug(string $familySlug): ?array
     {
         foreach ($this->catalog->getCatalog() as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $slug = is_string($family['slug'] ?? null) ? $family['slug'] : '';
 
             if ($slug === $familySlug) {
@@ -616,7 +612,7 @@ final class LibraryService
             $paths = array_merge($paths, $this->collectProfileRelativePaths($profile));
         }
 
-        return array_values(array_unique(array_filter($paths, 'strlen')));
+        return array_values(array_unique(array_filter($paths, static fn (string $path): bool => $path !== '')));
     }
 
     private function collectProfileRelativePaths(array $profile): array
@@ -631,7 +627,7 @@ final class LibraryService
             $paths = array_merge($paths, $this->collectFaceRelativePaths($face));
         }
 
-        return array_values(array_unique(array_filter($paths, 'strlen')));
+        return array_values(array_unique(array_filter($paths, static fn (string $path): bool => $path !== '')));
     }
 
     private function collectFaceRelativePaths(array $face): array
@@ -808,19 +804,6 @@ final class LibraryService
         }
 
         return array_values(array_unique($roleLabels));
-    }
-
-    private function translateRoleLabels(array $roleLabels): array
-    {
-        return array_map(
-            static fn (string $label): string => match ($label) {
-                'heading' => __('heading', 'tasty-fonts'),
-                'body' => __('body', 'tasty-fonts'),
-                'monospace' => __('monospace', 'tasty-fonts'),
-                default => $label,
-            },
-            $roleLabels
-        );
     }
 
     private function buildDeleteFamilyBlockedMessage(string $familyName, array $roleLabels): string

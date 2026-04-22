@@ -34,7 +34,7 @@ final class FontFilenameParser
 
         if (preg_match('/[ \-]?(italic|oblique)/i', $result['family'], $matches) === 1) {
             $result['family'] = (string) preg_replace('/[ \-]?(italic|oblique)/i', '', $result['family']);
-            $result['style'] = strtolower((string) ($matches[1] ?? 'italic')) === 'oblique' ? 'oblique' : 'italic';
+            $result['style'] = strtolower((string) $matches[1]) === 'oblique' ? 'oblique' : 'italic';
         }
 
         foreach (self::WEIGHT_PATTERNS as $weight => $pattern) {

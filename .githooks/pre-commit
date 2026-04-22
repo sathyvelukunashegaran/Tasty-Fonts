@@ -2,13 +2,22 @@
 
 set -euo pipefail
 
-if [[ "${TASTY_FONTS_SKIP_JSCPD_HOOK:-0}" == "1" ]]; then
-  exit 0
-fi
-
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 
 cd "$ROOT_DIR"
+
+if [[ ! -x vendor/bin/phpstan ]]; then
+  echo "PHPStan is required for commits. Run 'composer install' to install the repo dev tooling." >&2
+  exit 1
+fi
+
+echo "Running PHPStan..."
+
+composer phpstan
+
+if [[ "${TASTY_FONTS_SKIP_JSCPD_HOOK:-0}" == "1" ]]; then
+  exit 0
+fi
 
 echo "Running jscpd duplicate scan..."
 

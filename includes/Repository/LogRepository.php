@@ -87,7 +87,11 @@ final class LogRepository
 
         $user = wp_get_current_user();
 
-        if (!$user instanceof \WP_User || !$user->exists()) {
+        try {
+            if (!$user->exists()) {
+                return __('System', 'tasty-fonts');
+            }
+        } catch (\Throwable) {
             return __('System', 'tasty-fonts');
         }
 

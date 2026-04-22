@@ -55,13 +55,7 @@ final class AdobeCssParser
         }
         unset($family);
 
-        uasort(
-            $families,
-            static fn (array $left, array $right): int => strcasecmp(
-                (string) ($left['family'] ?? ''),
-                (string) ($right['family'] ?? '')
-            )
-        );
+        uasort($families, static fn (array $left, array $right): int => strcasecmp($left['family'], $right['family']));
 
         return array_values($families);
     }

@@ -358,7 +358,7 @@ php tests/run.php
 node --test tests/js/*.test.cjs
 
 # PHP syntax sweep:
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
+find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 ```
 
 See [Testing](Testing) for details on adding new tests.

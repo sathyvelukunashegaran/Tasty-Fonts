@@ -180,7 +180,7 @@ final class Storage
         }
 
         $segments = explode('/', $this->normalizeRelativePath($relativePath));
-        $encodedSegments = array_map('rawurlencode', array_filter($segments, 'strlen'));
+        $encodedSegments = array_map('rawurlencode', array_filter($segments, static fn (string $segment): bool => $segment !== ''));
 
         return untrailingslashit($rootUrl) . '/' . implode('/', $encodedSegments);
     }
@@ -256,7 +256,7 @@ final class Storage
             array_unique(
                 array_filter(
                     array_map([$this, 'normalizeRelativePath'], $relativePaths),
-                    'strlen'
+                    static fn (string $path): bool => $path !== ''
                 )
             )
         );
@@ -522,7 +522,7 @@ final class Storage
                         static fn (string $directory): string => wp_normalize_path($directory),
                         $directories
                     ),
-                    'strlen'
+                    static fn (string $directory): bool => $directory !== ''
                 )
             )
         );
@@ -546,7 +546,7 @@ final class Storage
                     break;
                 }
 
-                if (is_dir($current) && is_writable($current)) {
+                if (is_writable($current)) {
                     rmdir($current);
                 }
 

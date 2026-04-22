@@ -193,7 +193,7 @@ final class AdobeProjectClient
 
         $css = wp_remote_retrieve_body($response);
 
-        if (!is_string($css) || trim($css) === '') {
+        if (trim($css) === '') {
             return new WP_Error(
                 'tasty_fonts_adobe_project_invalid',
                 __('Adobe Fonts returned an empty stylesheet for that project.', 'tasty-fonts')

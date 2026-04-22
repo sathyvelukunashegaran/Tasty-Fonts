@@ -83,7 +83,7 @@ The intended release lane is:
 
 GitHub Actions now uses four workflows:
 
-- `.github/workflows/quality.yml` runs the shared PHP lint, PHP tests, and JS contract tests
+- `.github/workflows/quality.yml` runs the shared PHP lint, PHPStan check, PHP tests, and JS contract tests
 - `.github/workflows/release-stable.yml` publishes stable GitHub releases from `X.Y.Z` tags
 - `.github/workflows/release-beta.yml` publishes GitHub prereleases from `X.Y.Z-beta.N` tags
 - `.github/workflows/release-nightly.yml` publishes a prerelease on every push to `main`

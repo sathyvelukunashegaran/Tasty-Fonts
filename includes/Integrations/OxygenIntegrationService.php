@@ -70,11 +70,6 @@ PHP);
         }
 
         $settings = ct_get_global_settings();
-
-        if (!is_array($settings)) {
-            return [];
-        }
-
         $styles = [];
         $bodyFamily = $this->managedFamilyName($settings['fonts']['Text'] ?? '', $runtimeLookup);
 

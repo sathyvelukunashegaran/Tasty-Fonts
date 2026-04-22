@@ -43,19 +43,6 @@ final class Plugin
     private const REPOSITORY_URL = 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts';
     private const SUPPORT_URL = self::REPOSITORY_URL . '/issues';
     private const RELEASES_URL = self::REPOSITORY_URL . '/releases';
-    private const TRANSIENT_KEYS = [
-        CatalogService::TRANSIENT_CATALOG,
-        AssetService::TRANSIENT_CSS,
-        AssetService::TRANSIENT_HASH,
-        AssetService::TRANSIENT_REGENERATE_CSS_QUEUED,
-        GoogleFontsClient::TRANSIENT_CATALOG,
-        GoogleFontsClient::LEGACY_TRANSIENT_CATALOG,
-        GoogleFontsClient::TRANSIENT_METADATA,
-        BunnyFontsClient::TRANSIENT_CATALOG,
-        'tasty_fonts_github_release_v1',
-        'tasty_fonts_github_release_manifest_v1',
-        'tasty_fonts_github_release_version_v1',
-    ];
 
     private static ?self $instance = null;
 
@@ -374,10 +361,6 @@ final class Plugin
 
     private function isCronExecutionContext(): bool
     {
-        if (function_exists('wp_doing_cron')) {
-            return wp_doing_cron();
-        }
-
-        return defined('DOING_CRON') && DOING_CRON;
+        return wp_doing_cron();
     }
 }

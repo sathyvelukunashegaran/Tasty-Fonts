@@ -6,7 +6,7 @@ Use this file as the shared repo-level instruction guide for AI coding agents wo
 
 - Single WordPress plugin
 - PHP 8.1+, Node.js 22+, WordPress 6.5+
-- No Composer install, no npm install, no build step
+- No build step, no npm install. `composer install` is only for dev tooling and CI.
 - Entry point: `plugin.php`
 - Main PHP code: `includes/`
 - Admin UI: PHP templates in `includes/Admin/Renderer/templates/` plus vanilla JS in `assets/js/`
@@ -37,7 +37,7 @@ Use this file as the shared repo-level instruction guide for AI coding agents wo
 3. For longer or multi-step work, create an optional note in `.agents/tasks/todo-(name).md`.
 4. Make the smallest practical change.
 5. Run the most targeted verification first, then broader checks if the change warrants it.
-6. Expect `jscpd` to run on commit through the shared pre-commit hook once `bin/setup-git-hooks` has been run in the clone.
+6. Expect `composer phpstan` and `jscpd` to run on commit through the shared pre-commit hook once `bin/setup-git-hooks` has been run in the clone.
 7. Summarize behavior changes and verification before handing work back.
 
 ## Verification
@@ -51,17 +51,19 @@ Use this file as the shared repo-level instruction guide for AI coding agents wo
 Targeted checks:
 
 ```bash
+composer install
+composer phpstan
 php tests/run.php
 node --test tests/js/*.test.cjs
 bash tests/bin/release-scripts.test.sh
 bin/run-jscpd
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
+find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 ```
 
 Full pre-release sequence:
 
 ```bash
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs && bash tests/bin/release-scripts.test.sh && bin/run-jscpd
+composer install && composer phpstan && find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs && bash tests/bin/release-scripts.test.sh && bin/run-jscpd
 ```
 
 ## Repo-Specific Hotspots
@@ -108,6 +110,8 @@ find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l && ph
 Quality and hooks:
 
 ```bash
+composer install
+composer phpstan
 bin/run-jscpd
 bin/setup-git-hooks
 ```

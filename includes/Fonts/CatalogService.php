@@ -235,7 +235,7 @@ final class CatalogService
             array_unique(
                 array_filter(
                     array_map(static fn (array $profile): string => strtolower(trim((string) ($profile['provider'] ?? ''))), $availableDeliveries),
-                    'strlen'
+                    static fn (string $source): bool => $source !== ''
                 )
             )
         );
@@ -831,7 +831,7 @@ final class CatalogService
             $tokens[] = 'adobe-hosted';
         }
 
-        return array_values(array_unique(array_filter($tokens, 'strlen')));
+        return array_values(array_unique($tokens));
     }
 
     private function resolveFamilyCategory(array $family, array $activeDelivery, array $availableDeliveries): string
@@ -928,7 +928,7 @@ final class CatalogService
             $tokens[] = 'variable';
         }
 
-        return array_values(array_unique(array_filter($tokens, 'strlen')));
+        return array_values(array_unique($tokens));
     }
 
     private function countFamilyFiles(array $family): int

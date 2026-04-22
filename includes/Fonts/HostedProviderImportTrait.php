@@ -566,7 +566,7 @@ trait HostedProviderImportTrait
 
         $body = wp_remote_retrieve_body($response);
 
-        if (!is_string($body) || $body === '') {
+        if ($body === '') {
             return $this->error(
                 (string) $config['empty_file_code'],
                 (string) $config['empty_file_message']

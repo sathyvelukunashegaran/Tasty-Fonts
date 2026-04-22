@@ -107,7 +107,7 @@ final class SettingsSaveFields
                 static fn (array $definition): string => (string) $definition['name'],
                 array_filter(
                     self::definitions(),
-                    static fn (array $definition): bool => in_array((string) ($definition['kind'] ?? ''), $kinds, true)
+                    static fn (array $definition): bool => in_array($definition['kind'], $kinds, true)
                 )
             )
         );

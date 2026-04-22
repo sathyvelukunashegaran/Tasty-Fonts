@@ -332,7 +332,7 @@ final class BlockEditorFontLibraryService
             $sources[] = $this->normalizeFaceSourceUrl($value);
         }
 
-        return array_values(array_filter($sources, 'strlen'));
+        return array_values(array_filter($sources, static fn (string $source): bool => $source !== ''));
     }
 
     private function normalizeFaceSourceUrl(string $value): string
@@ -354,7 +354,7 @@ final class BlockEditorFontLibraryService
         }
 
         $segments = explode('/', trim($value, '/'));
-        $encodedSegments = array_map('rawurlencode', array_filter($segments, 'strlen'));
+        $encodedSegments = array_map('rawurlencode', array_filter($segments, static fn (string $segment): bool => $segment !== ''));
 
         return untrailingslashit($rootUrl) . '/' . implode('/', $encodedSegments);
     }
@@ -402,7 +402,7 @@ final class BlockEditorFontLibraryService
             return null;
         }
 
-        if (!is_array($decoded) || !isset($decoded[0]) || !is_array($decoded[0])) {
+        if (!isset($decoded[0]) || !is_array($decoded[0])) {
             return null;
         }
 

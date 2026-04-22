@@ -27,7 +27,12 @@ final class RoleUsageMessageFormatter
 
     public static function formatRoleLabelList(array $labels): string
     {
-        $labels = array_values(array_filter($labels, 'strlen'));
+        $labels = array_values(
+            array_filter(
+                array_map(static fn (mixed $label): string => is_string($label) ? $label : '', $labels),
+                static fn (string $label): bool => $label !== ''
+            )
+        );
 
         if ($labels === []) {
             return '';

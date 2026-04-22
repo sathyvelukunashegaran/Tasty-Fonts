@@ -305,8 +305,8 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
         if (preg_match('/^(\s*)(@[\w-]+)(\s+[^{};]+)?(\s*\{?\s*;?\s*)$/', $line, $matches) === 1) {
             return esc_html($matches[1])
                 . '<span class="tasty-fonts-syntax-at-rule">' . esc_html($matches[2]) . '</span>'
-                . $this->highlightSnippetValue((string) ($matches[3] ?? ''))
-                . '<span class="tasty-fonts-syntax-punctuation">' . esc_html((string) ($matches[4] ?? '')) . '</span>';
+                . $this->highlightSnippetValue((string) $matches[3])
+                . '<span class="tasty-fonts-syntax-punctuation">' . esc_html((string) $matches[4]) . '</span>';
         }
 
         if (preg_match('/^(\s*)([^{}]+)(\s*\{\s*)$/', $line, $matches) === 1) {

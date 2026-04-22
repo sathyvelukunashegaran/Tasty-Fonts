@@ -2,7 +2,9 @@
 
 Thanks for contributing to Tasty Custom Fonts.
 
-This project keeps its contributor workflow intentionally lightweight: there is no Composer install step, no npm install step, and the core verification commands run directly from the repository.
+This project keeps its contributor workflow intentionally lightweight: there is no build step and no npm install step. Run `composer install` when you want the repo's dev tooling locally or want to match CI exactly.
+
+If you run `bin/setup-git-hooks`, the shared pre-commit hook will validate commits with `composer phpstan` and `bin/run-jscpd`.
 
 ## Prerequisites
 
@@ -29,13 +31,16 @@ See [Local Setup](Local-Setup) for examples, manual install notes, and common lo
 Run these before you open a pull request:
 
 ```bash
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
+composer install
+composer phpstan
+find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 php tests/run.php
 node --test tests/js/*.test.cjs
 ```
 
 What each command covers:
 
+- `composer phpstan` runs PHPStan with the repo's WordPress-aware static-analysis config.
 - `php -l` catches PHP syntax errors across the repository.
 - `php tests/run.php` runs the self-contained PHP harness for repository, import, runtime, admin, and updater behavior.
 - `node --test tests/js/*.test.cjs` runs the JavaScript contract tests for shared admin and canvas helpers.

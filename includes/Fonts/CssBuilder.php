@@ -188,7 +188,7 @@ final class CssBuilder
             );
         }
 
-        return implode("\n\n", array_filter($blocks, 'strlen'));
+        return implode("\n\n", array_filter($blocks, static fn (string $block): bool => $block !== ''));
     }
 
     public function buildFamilyClassSnippet(array $families, array $settings = []): string
@@ -241,7 +241,7 @@ final class CssBuilder
                         static fn (array $block): string => (string) ($block['css'] ?? ''),
                         $blocks
                     ),
-                    'strlen'
+                    static fn (string $css): bool => $css !== ''
                 )
             )
         );
@@ -613,14 +613,9 @@ final class CssBuilder
 
         return implode(
             "\n\n",
-            array_values(
-                array_filter(
-                    array_map(
-                        static fn (array $block): string => implode("\n", (array) ($block['lines'] ?? [])),
-                        $blocks
-                    ),
-                    'strlen'
-                )
+            array_map(
+                static fn (array $block): string => implode("\n", $block['lines']),
+                $blocks
             )
         );
     }
@@ -1125,7 +1120,7 @@ final class CssBuilder
             $blocks[] = $this->buildClassRule('.font-code', $monospaceFamily, $monospaceFallback);
         }
 
-        return implode("\n\n", array_filter($blocks, 'strlen'));
+        return implode("\n\n", array_filter($blocks, static fn (string $block): bool => $block !== ''));
     }
 
     private function familyClassSelector(string $family): string

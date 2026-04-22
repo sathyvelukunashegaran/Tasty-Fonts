@@ -931,10 +931,6 @@ final class BricksIntegrationService
         $styles = $this->getThemeStyles();
         $targetStyleId = $this->normalizeThemeStyleTargetId($targetStyleId);
 
-        if (!is_array($styles)) {
-            return [];
-        }
-
         return is_array($styles[$targetStyleId]['settings'] ?? null)
             ? $styles[$targetStyleId]['settings']
             : [];

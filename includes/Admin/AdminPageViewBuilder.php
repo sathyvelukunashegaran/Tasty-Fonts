@@ -18,12 +18,15 @@ final class AdminPageViewBuilder
     use SharedRenderHelpers;
     use LibraryRenderValueHelpers;
 
+    private bool $trainingWheelsOff = false;
+
     public function __construct(private readonly Storage $storage)
     {
     }
 
     public function build(array $context): array
     {
+        $this->trainingWheelsOff = !empty($context['training_wheels_off']);
         $storage = is_array($context['storage'] ?? null) ? $context['storage'] : null;
         $currentPage = (string) ($context['current_page'] ?? AdminController::PAGE_ROLES);
         $currentPageSlug = (string) ($context['current_page_slug'] ?? '');
@@ -152,7 +155,7 @@ final class AdminPageViewBuilder
         $adminAccessSummary = is_array($context['admin_access_summary'] ?? null) ? $context['admin_access_summary'] : [];
         $developerToolStatuses = is_array($context['developer_tool_statuses'] ?? null) ? $context['developer_tool_statuses'] : [];
         $blockEditorFontLibrarySyncEnabled = !empty($context['block_editor_font_library_sync_enabled']);
-        $trainingWheelsOff = !empty($context['training_wheels_off']);
+        $trainingWheelsOff = $this->trainingWheelsOff;
         $variableFontsEnabled = !empty($context['variable_fonts_enabled']);
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
         $diagnosticItems = is_array($context['diagnostic_items'] ?? null) ? $context['diagnostic_items'] : [];

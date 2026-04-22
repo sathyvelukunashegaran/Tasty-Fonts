@@ -20,8 +20,8 @@ final class AdminAccessService
     public function canCurrentUserAccess(): bool
     {
         $user = wp_get_current_user();
-        $userId = absint($user->ID ?? 0);
-        $roleSlugs = is_array($user->roles ?? null) ? $user->roles : [];
+        $userId = absint($user->ID);
+        $roleSlugs = $user->roles;
 
         return $this->canUserAccess($userId, $roleSlugs);
     }
@@ -40,7 +40,7 @@ final class AdminAccessService
                         $roleSlugs
                     )
                 ),
-                'strlen'
+                static fn (string $role): bool => $role !== ''
             )
         );
 

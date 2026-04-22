@@ -108,7 +108,7 @@ final class BunnyFontsClient
 
         $body = wp_remote_retrieve_body($response);
 
-        if (!is_string($body) || trim($body) === '') {
+        if (trim($body) === '') {
             return new WP_Error(
                 'tasty_fonts_bunny_css_empty',
                 __('Bunny Fonts returned an empty CSS response.', 'tasty-fonts')
@@ -222,10 +222,6 @@ final class BunnyFontsClient
 
         preg_match_all('~<loc>\s*https://fonts\.bunny\.net/family/([^<\s]+)\s*</loc>~i', $xml, $matches);
 
-        if (!isset($matches[1]) || !is_array($matches[1])) {
-            return [];
-        }
-
         $entries = [];
 
         foreach ($matches[1] as $match) {
@@ -264,7 +260,7 @@ final class BunnyFontsClient
         $styleCount = 0;
 
         if (preg_match('~<div class="styles">\s*(\d+)\s+styles?</div>~i', $html, $matches) === 1) {
-            $styleCount = max(0, (int) ($matches[1] ?? 0));
+            $styleCount = max(0, (int) $matches[1]);
         }
 
         $variants = $this->extractFamilyVariants($html, $slug);
@@ -306,10 +302,6 @@ final class BunnyFontsClient
     private function extractFamilyVariants(string $html, string $slug): array
     {
         preg_match_all('~https://fonts\.bunny\.net/css\?family=([^"\']+)~i', $html, $matches);
-
-        if (!isset($matches[1]) || !is_array($matches[1])) {
-            return ['regular'];
-        }
 
         foreach ($matches[1] as $familyQuery) {
             $decodedQuery = html_entity_decode((string) $familyQuery, ENT_QUOTES, 'UTF-8');
@@ -433,71 +425,6 @@ final class BunnyFontsClient
         ];
     }
 
-    private function extractVariableAxisTags(string $html): array
-    {
-        preg_match_all('/\[((?:[A-Za-z0-9]{4},?)+)\]\.(?:ttf|otf|woff2?|ttc)/i', $html, $matches);
-
-        if (!isset($matches[1]) || !is_array($matches[1])) {
-            return [];
-        }
-
-        $tags = [];
-
-        foreach ($matches[1] as $group) {
-            foreach (explode(',', (string) $group) as $tag) {
-                $normalizedTag = FontUtils::normalizeAxisTag($tag);
-
-                if ($normalizedTag === '') {
-                    continue;
-                }
-
-                $tags[$normalizedTag] = $normalizedTag;
-            }
-        }
-
-        ksort($tags, SORT_STRING);
-
-        return array_values($tags);
-    }
-
-    private function buildVariableAxesFromVariants(array $variants, array $axisTags): array
-    {
-        if ($axisTags === []) {
-            return [];
-        }
-
-        $weights = [];
-
-        foreach ($variants as $variant) {
-            $axis = FontUtils::googleVariantToAxis((string) $variant);
-
-            if ($axis === null) {
-                continue;
-            }
-
-            $weight = FontUtils::normalizeWeight((string) ($axis['weight'] ?? '400'));
-
-            if (preg_match('/^\d+$/', $weight) === 1) {
-                $weights[] = (int) $weight;
-            }
-        }
-
-        $axes = [];
-
-        foreach ($axisTags as $tag) {
-            if ($tag === 'WGHT' && $weights !== []) {
-                sort($weights, SORT_NUMERIC);
-                $axes[$tag] = [
-                    'min' => (string) $weights[0],
-                    'default' => in_array(400, $weights, true) ? '400' : (string) $weights[0],
-                    'max' => (string) $weights[count($weights) - 1],
-                ];
-            }
-        }
-
-        return FontUtils::normalizeAxesMap($axes);
-    }
-
     private function isCachedFamilyRecord(mixed $cached): bool
     {
         if (!is_array($cached)) {
@@ -542,7 +469,7 @@ final class BunnyFontsClient
             static function (string $word): string {
                 return preg_match('/^\d+$/', $word) === 1 ? $word : ucfirst($word);
             },
-            array_filter($words, 'strlen')
+            array_filter($words, static fn (string $word): bool => $word !== '')
         );
 
         return $words !== [] ? implode(' ', $words) : 'Bunny Font';

@@ -4,10 +4,15 @@
 /.DS_Store export-ignore
 /.github export-ignore
 /.gitignore export-ignore
+/.phpstan export-ignore
 /.playwright-cli export-ignore
 /CHANGELOG.md export-ignore
 /CODE_OF_CONDUCT.md export-ignore
+/composer.json export-ignore
+/composer.lock export-ignore
 /CONTRIBUTING.md export-ignore
+/phpstan-bootstrap.php export-ignore
+/phpstan.neon.dist export-ignore
 /README.md export-ignore
 /SECURITY.md export-ignore
 /docs export-ignore
@@ -15,5 +20,6 @@
 /output export-ignore
 /readme.txt export-ignore
 /screenshots export-ignore
+/stubs export-ignore
 /tests export-ignore
 /languages/*.pot export-ignore

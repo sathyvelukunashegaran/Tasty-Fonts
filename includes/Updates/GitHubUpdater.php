@@ -154,7 +154,7 @@ final class GitHubUpdater
             'installed_version' => $installedVersion,
             'latest_available' => $latestRelease,
             'state' => $state,
-            'can_reinstall' => $state === 'rollback' && is_array($latestRelease),
+            'can_reinstall' => $state === 'rollback',
         ];
     }
 
@@ -198,7 +198,7 @@ final class GitHubUpdater
         $skin = class_exists('Automatic_Upgrader_Skin') ? new \Automatic_Upgrader_Skin() : null;
         $upgrader = class_exists('Plugin_Upgrader') ? new \Plugin_Upgrader($skin) : null;
 
-        if ($upgrader === null || !method_exists($upgrader, 'install')) {
+        if ($upgrader === null) {
             return new WP_Error(
                 'tasty_fonts_upgrader_unavailable',
                 __('The WordPress plugin upgrader is unavailable on this site.', 'tasty-fonts')
@@ -307,12 +307,12 @@ final class GitHubUpdater
             return $downloadedPackage;
         }
 
-        $actualChecksum = is_string($downloadedPackage) && is_readable($downloadedPackage)
+        $actualChecksum = is_readable($downloadedPackage)
             ? strtolower((string) hash_file('sha256', $downloadedPackage))
             : '';
 
         if ($actualChecksum !== $expectedChecksum) {
-            if (is_string($downloadedPackage) && $downloadedPackage !== '' && file_exists($downloadedPackage)) {
+            if ($downloadedPackage !== '' && file_exists($downloadedPackage)) {
                 unlink($downloadedPackage);
             }
 
@@ -419,7 +419,7 @@ final class GitHubUpdater
             );
         }
 
-        $latestByType = is_array($manifest['latest_by_type'] ?? null) ? $manifest['latest_by_type'] : [];
+        $latestByType = $manifest['latest_by_type'];
         $stable = is_array($latestByType[self::CHANNEL_STABLE] ?? null) ? $latestByType[self::CHANNEL_STABLE] : null;
         $beta = is_array($latestByType[self::CHANNEL_BETA] ?? null) ? $latestByType[self::CHANNEL_BETA] : null;
         $nightly = is_array($latestByType[self::CHANNEL_NIGHTLY] ?? null) ? $latestByType[self::CHANNEL_NIGHTLY] : null;
@@ -534,7 +534,7 @@ final class GitHubUpdater
             return '';
         }
 
-        return strtolower((string) ($matches[1] ?? ''));
+        return strtolower((string) $matches[1]);
     }
 
     private function hasNewerVersion(string $version): bool
@@ -754,7 +754,7 @@ final class GitHubUpdater
                 ABSPATH . 'wp-admin/includes/class-wp-upgrader.php',
             ] as $path
         ) {
-            if (is_string($path) && $path !== '' && is_readable($path)) {
+            if (is_readable($path)) {
                 require_once $path;
             }
         }

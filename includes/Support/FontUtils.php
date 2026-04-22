@@ -658,7 +658,7 @@ final class FontUtils
 
     public static function compactRelativePath(string $path): string
     {
-        $segments = array_filter(explode('/', trim($path, '/')), 'strlen');
+        $segments = array_filter(explode('/', trim($path, '/')), static fn (string $segment): bool => $segment !== '');
         $segments = array_map('rawurldecode', $segments);
 
         return implode('/', $segments);

@@ -146,7 +146,7 @@ All integrations are opt-in and activate automatically when the companion tool i
 
 ## No Lock-In. No Bloat.
 
-Tasty Custom Fonts has zero PHP dependencies. There is no Composer install, no npm install, and no build step — ever.
+Tasty Custom Fonts has zero runtime PHP dependencies. There is no build step and no npm install. `composer install` is only used for repository dev tooling like PHPStan and for CI.
 
 Output is plain CSS and standard WordPress enqueues. Nothing proprietary, nothing that breaks if you deactivate the plugin.
 
@@ -287,12 +287,14 @@ Full documentation on the **[GitHub Wiki](https://github.com/sathyvelukunashegar
 
 ## Development
 
-There is no build step, no Composer install, and no npm install.
+There is no build step and no npm install. Run `composer install` once if you want the repo's dev tooling locally.
 
 ```bash
+composer install
+composer phpstan
 php tests/run.php
 node --test tests/js/*.test.cjs
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
+find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 ```
 
 ### AI Usage

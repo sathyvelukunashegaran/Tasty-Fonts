@@ -1,0 +1,14 @@
+parameters:
+    level: 5
+    phpVersion: 80100
+    paths:
+        - plugin.php
+        - includes
+    excludePaths:
+        analyse:
+            - includes/Admin/Renderer/templates/*
+    bootstrapFiles:
+        - phpstan-bootstrap.php
+    scanFiles:
+        - stubs/phpstan/optional-integrations.php
+    tmpDir: tmp/phpstan

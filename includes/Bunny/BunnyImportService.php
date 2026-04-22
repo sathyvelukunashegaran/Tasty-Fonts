@@ -27,10 +27,11 @@ final class BunnyImportService
         private readonly ImportRepository $imports,
         private readonly BunnyFontsClient $client,
         private readonly BunnyCssParser $parser,
-        private readonly CatalogService $catalog,
+        CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly LogRepository $log
     ) {
+        unset($catalog);
     }
 
     /**

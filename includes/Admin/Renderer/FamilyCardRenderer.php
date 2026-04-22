@@ -172,8 +172,14 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         );
         $isRoleFamily = $assignedRoleKeys !== [];
         $fontTypeDescriptor = $this->buildFontTypeDescriptor($family);
-        $sourceTokens = array_values(array_unique(array_filter((array) ($family['delivery_filter_tokens'] ?? []), 'strlen')));
-        $categoryTokens = array_values(array_unique(array_filter((array) ($family['font_category_tokens'] ?? []), 'strlen')));
+        $sourceTokens = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $token): string => is_scalar($token) ? (string) $token : '', (array) ($family['delivery_filter_tokens'] ?? [])),
+            static fn (string $token): bool => $token !== ''
+        )));
+        $categoryTokens = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $token): string => is_scalar($token) ? (string) $token : '', (array) ($family['font_category_tokens'] ?? [])),
+            static fn (string $token): bool => $token !== ''
+        )));
         if (!empty($fontTypeDescriptor['has_variable'])) {
             $categoryTokens[] = 'variable';
         }
@@ -250,7 +256,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $variants = array_values(
             array_filter(
                 array_map(static fn (mixed $variant): string => is_scalar($variant) ? trim((string) $variant) : '', (array) ($profile['variants'] ?? [])),
-                'strlen'
+                static fn (string $variant): bool => $variant !== ''
             )
         );
         ?>

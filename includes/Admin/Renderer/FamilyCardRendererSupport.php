@@ -421,21 +421,21 @@ trait FamilyCardRendererSupport
         usort(
             $items,
             static function (array $left, array $right): int {
-                $weightComparison = ($left['weight_sort'] ?? 0) <=> ($right['weight_sort'] ?? 0);
+                $weightComparison = $left['weight_sort'] <=> $right['weight_sort'];
 
                 if ($weightComparison !== 0) {
                     return $weightComparison;
                 }
 
-                if (($left['style'] ?? 'normal') === ($right['style'] ?? 'normal')) {
+                if ($left['style'] === $right['style']) {
                     return 0;
                 }
 
-                return ($left['style'] ?? 'normal') === 'normal' ? -1 : 1;
+                return $left['style'] === 'normal' ? -1 : 1;
             }
         );
 
-        return array_values(array_map(static fn (array $item): string => (string) ($item['label'] ?? ''), $items));
+        return array_map(static fn (array $item): string => $item['label'], $items);
     }
 
     protected function buildVariationAxisSummaryLabels(array $faces): array
@@ -554,7 +554,7 @@ trait FamilyCardRendererSupport
                 static fn (mixed $path): string => is_string($path) ? trim($path) : '',
                 (array) ($face['paths'] ?? [])
             ),
-            'strlen'
+            static fn (string $path): bool => $path !== ''
         );
 
         $fileCount = count($relativePaths);

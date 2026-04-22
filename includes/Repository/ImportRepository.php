@@ -490,7 +490,7 @@ final class ImportRepository
                 $normalized[$key] = array_values(
                     array_filter(
                         array_map(static fn (mixed $item): string => is_string($item) ? sanitize_text_field($item) : '', $value),
-                        'strlen'
+                        static fn (string $item): bool => $item !== ''
                     )
                 );
                 continue;

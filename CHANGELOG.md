@@ -9,12 +9,13 @@ All notable changes to this project will be documented in this file.
 - Added `jscpd` duplicate-code scanning to the quality workflow alongside a committed `.jscpd.json` baseline.
 - Added a `tasty-canvas` JavaScript contract test plus shared agent-instruction files (`AGENTS.md`, `CLAUDE.md`, and `.agents/`) for repository-local Codex and Claude guidance.
 - Added a shared `bin/run-jscpd` runner, a tracked `.githooks/pre-commit` hook, and a `bin/setup-git-hooks` installer so local clones can run the duplication scan automatically on commit.
+- Added root Composer PHPStan tooling plus a WordPress-aware config/bootstrap so the repo can enforce static analysis consistently in CI and local hooks.
 
 ### Changed
 
 - Refactored duplicated hosted-provider import logic into a shared trait used by the Google Fonts and Bunny Fonts import services, while consolidating related utility helpers across library, runtime, transfer, and updater code paths.
 - Consolidated repeated admin renderer and messaging logic into shared helpers so the library and studio views reuse the same formatting and render support paths.
-- Updated the shared quality workflow and agent instructions to use the repo-local `bin/run-jscpd` entrypoint and documented the local git-hook setup.
+- Updated the shared quality workflow and local pre-commit hook to run PHPStan alongside the repo-local `bin/run-jscpd` entrypoint, and documented the local git-hook setup.
 
 ## [1.13.0-beta.2] - 2026-04-17
 

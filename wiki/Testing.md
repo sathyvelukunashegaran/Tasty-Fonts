@@ -33,18 +33,27 @@ These tests cover shared browser/Node-compatible admin and canvas helper contrac
 ### 3. Run The PHP Syntax Sweep
 
 ```bash
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l
+find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 ```
 
 This catches syntax errors across every PHP file in the repository. Run this as a quick sanity check before opening a pull request.
 
-### 4. Run All Checks Together
+### 4. Run PHPStan
 
 ```bash
-find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs
+composer install
+composer phpstan
 ```
 
-This is the same verification sequence the release helper runs before tagging.
+This runs the repo's WordPress-aware static analysis against `plugin.php` and `includes/`. The initial config excludes `includes/Admin/Renderer/templates/*`, which are treated as injected-scope view templates.
+
+### 5. Run All Checks Together
+
+```bash
+composer install && composer phpstan && find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs
+```
+
+This is the same verification sequence the shared CI workflow runs before the broader release workflows continue.
 
 ---
 
@@ -152,8 +161,9 @@ The test runner discovers all `*.test.cjs` files automatically via the glob patt
 
 ## Notes
 
-- There is no Composer install step and no npm install step for the current repo workflow.
-- The shared release quality workflow runs the PHP syntax sweep, the PHP suite, and the JS contract tests before any stable, beta, or nightly package is published.
+- There is no build step and no npm install step for the current repo workflow.
+- Run `composer install` when you want the repo's dev tooling locally, including PHPStan.
+- The shared release quality workflow runs the PHP syntax sweep, PHPStan, the PHP suite, and the JS contract tests before any stable, beta, or nightly package is published.
 
 ## Related Docs
 

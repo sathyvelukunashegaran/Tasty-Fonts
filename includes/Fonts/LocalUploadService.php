@@ -206,7 +206,7 @@ final class LocalUploadService
                 'skipped' => $skippedCount,
                 'errors' => $errorCount,
             ],
-            'families' => array_values(array_keys($importedFamilies)),
+            'families' => array_keys($importedFamilies),
         ];
     }
 

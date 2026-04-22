@@ -27,10 +27,11 @@ final class GoogleImportService
         private readonly ImportRepository $imports,
         private readonly GoogleFontsClient $client,
         private readonly GoogleCssParser $parser,
-        private readonly CatalogService $catalog,
+        CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly LogRepository $log
     ) {
+        unset($catalog);
     }
 
     /**

@@ -460,7 +460,7 @@ final class AssetService
 
         $scheduled = wp_schedule_single_event(time(), self::ACTION_REGENERATE_CSS);
 
-        if ($scheduled === false || is_wp_error($scheduled)) {
+        if ($scheduled === false) {
             delete_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED));
         }
     }

@@ -339,7 +339,7 @@ final class AdminController
         return $this->resolveRateLimitedSearch(
             'google',
             $query,
-            fn (string $resolvedQuery): array|WP_Error => $this->searchGoogleResults($resolvedQuery)
+            fn (string $resolvedQuery): array => ['items' => $this->googleClient->searchFamilies(sanitize_text_field($resolvedQuery), 20)]
         );
     }
 
@@ -348,7 +348,7 @@ final class AdminController
         return $this->resolveRateLimitedSearch(
             'bunny',
             $query,
-            fn (string $resolvedQuery): array|WP_Error => $this->searchBunnyResults($resolvedQuery)
+            fn (string $resolvedQuery): array => $this->searchBunnyResults($resolvedQuery)
         );
     }
 
@@ -793,7 +793,7 @@ final class AdminController
         return ['message' => $message];
     }
 
-    public function resetIntegrationDetectionState(): array|WP_Error
+    public function resetIntegrationDetectionState(): array
     {
         $settings = $this->developerTools->resetIntegrationDetectionState();
         $message = __('Integration detection state reset.', 'tasty-fonts');
@@ -1180,12 +1180,7 @@ final class AdminController
         check_admin_referer('tasty_fonts_reset_integration_detection_state');
 
         $result = $this->resetIntegrationDetectionState();
-
-        if (is_wp_error($result)) {
-            $this->redirectWithError($result->get_error_message());
-        }
-
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Integration detection state reset.', 'tasty-fonts')));
+        $this->redirectWithSuccess($result['message']);
     }
 
     private function handleResetSuppressedNoticesAction(): bool
@@ -1353,9 +1348,9 @@ final class AdminController
 
         $message = sprintf(
             __('Variant deleted: %1$s %2$s %3$s.', 'tasty-fonts'),
-            (string) ($result['family'] ?? __('Font', 'tasty-fonts')),
-            (string) ($result['weight'] ?? '400'),
-            (string) ($result['style'] ?? 'normal')
+            $result['family'],
+            $result['weight'],
+            $result['style']
         );
 
         $this->redirectWithSuccess($message);
@@ -1498,12 +1493,13 @@ final class AdminController
 
         $download = $this->buildGeneratedCssDownloadData($this->settings->getSettings());
 
-        if (empty($download['downloadable']) || !is_string($download['content'] ?? null) || trim((string) ($download['content'] ?? '')) === '') {
+        $content = (string) $download['content'];
+
+        if (empty($download['downloadable']) || trim($content) === '') {
             $this->redirectWithError(__('Generated CSS is unavailable until sitewide delivery is on.', 'tasty-fonts'));
         }
 
         $filename = sanitize_file_name((string) ($download['filename'] ?? 'tasty-fonts.css'));
-        $content = (string) $download['content'];
 
         header('Content-Type: text/css; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -1591,16 +1587,6 @@ final class AdminController
         );
     }
 
-    private function buildDiagnosticItems(array $assetStatus, ?array $storage, array $settings, array $counts): array
-    {
-        return $this->pageContextBuilder->buildDiagnosticItems($assetStatus, $storage, $settings, $counts);
-    }
-
-    private function buildOverviewMetrics(array $counts): array
-    {
-        return $this->pageContextBuilder->buildOverviewMetrics($counts);
-    }
-
     private function buildOutputPanels(
         array $roles,
         array $settings,
@@ -1631,16 +1617,6 @@ final class AdminController
     private function buildGeneratedCssDownloadData(array $settings): array
     {
         return $this->pageContextBuilder->buildGeneratedCssDownloadData($settings);
-    }
-
-    private function buildPreviewPanels(): array
-    {
-        return $this->pageContextBuilder->buildPreviewPanels();
-    }
-
-    private function buildNoticeToasts(): array
-    {
-        return $this->pageContextBuilder->buildNoticeToasts();
     }
 
     private function buildSiteTransferContext(array $logs = []): array
@@ -1924,29 +1900,11 @@ final class AdminController
         return false;
     }
 
-    private function buildFontDisplayOptions(): array
-    {
-        if (!isset($this->pageContextBuilder)) {
-            return [
-                ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
-                ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
-                ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
-                ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
-                ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
-            ];
-        }
-
-        return $this->pageContextBuilder->buildFontDisplayOptions();
-    }
-
-    private function buildCssDeliveryModeOptions(): array
-    {
-        return $this->pageContextBuilder->buildCssDeliveryModeOptions();
-    }
-
     private function formatUnicodeRangeModeLabel(string $mode): string
     {
-        if (!isset($this->pageContextBuilder)) {
+        $pageContextBuilder = $this->pageContextBuilderOrNull();
+
+        if ($pageContextBuilder === null) {
             return match (FontUtils::normalizeUnicodeRangeMode($mode)) {
                 FontUtils::UNICODE_RANGE_MODE_LATIN_BASIC => __('Basic Latin', 'tasty-fonts'),
                 FontUtils::UNICODE_RANGE_MODE_LATIN_EXTENDED => __('Latin Extended', 'tasty-fonts'),
@@ -1956,12 +1914,31 @@ final class AdminController
             };
         }
 
-        return $this->pageContextBuilder->formatUnicodeRangeModeLabel($mode);
+        return $pageContextBuilder->formatUnicodeRangeModeLabel($mode);
     }
 
-    private function buildFamilyFontDisplayOptions(string $globalDisplay): array
+    protected function buildFontDisplayOptions(): array
     {
-        if (!isset($this->pageContextBuilder)) {
+        $pageContextBuilder = $this->pageContextBuilderOrNull();
+
+        if ($pageContextBuilder === null) {
+            return [
+                ['value' => 'swap', 'label' => $this->formatFontDisplayLabel('swap')],
+                ['value' => 'fallback', 'label' => $this->formatFontDisplayLabel('fallback')],
+                ['value' => 'block', 'label' => $this->formatFontDisplayLabel('block')],
+                ['value' => 'auto', 'label' => $this->formatFontDisplayLabel('auto')],
+                ['value' => 'optional', 'label' => $this->formatFontDisplayLabel('optional')],
+            ];
+        }
+
+        return $pageContextBuilder->buildFontDisplayOptions();
+    }
+
+    protected function buildFamilyFontDisplayOptions(string $globalDisplay): array
+    {
+        $pageContextBuilder = $this->pageContextBuilderOrNull();
+
+        if ($pageContextBuilder === null) {
             return [
                 [
                     'value' => 'inherit',
@@ -1978,12 +1955,14 @@ final class AdminController
             ];
         }
 
-        return $this->pageContextBuilder->buildFamilyFontDisplayOptions($globalDisplay);
+        return $pageContextBuilder->buildFamilyFontDisplayOptions($globalDisplay);
     }
 
     private function formatFontDisplayLabel(string $display): string
     {
-        if (!isset($this->pageContextBuilder)) {
+        $pageContextBuilder = $this->pageContextBuilderOrNull();
+
+        if ($pageContextBuilder === null) {
             return match ($display) {
                 'auto' => __('Auto', 'tasty-fonts'),
                 'block' => __('Block', 'tasty-fonts'),
@@ -1993,32 +1972,36 @@ final class AdminController
             };
         }
 
-        return $this->pageContextBuilder->formatFontDisplayLabel($display);
+        return $pageContextBuilder->formatFontDisplayLabel($display);
     }
 
     private function formatCssDeliveryModeLabel(string $mode): string
     {
-        if (!isset($this->pageContextBuilder)) {
+        $pageContextBuilder = $this->pageContextBuilderOrNull();
+
+        if ($pageContextBuilder === null) {
             return match ($mode) {
                 'inline' => __('inline CSS', 'tasty-fonts'),
                 default => __('generated file', 'tasty-fonts'),
             };
         }
 
-        return $this->pageContextBuilder->formatCssDeliveryModeLabel($mode);
+        return $pageContextBuilder->formatCssDeliveryModeLabel($mode);
     }
 
     private function formatUpdateChannelLabel(string $channel): string
     {
-        if (isset($this->pageContextBuilder)) {
-            return $this->pageContextBuilder->formatUpdateChannelLabel($channel);
+        $pageContextBuilder = $this->pageContextBuilderOrNull();
+
+        if ($pageContextBuilder === null) {
+            return match ($channel) {
+                SettingsRepository::UPDATE_CHANNEL_BETA => __('Beta', 'tasty-fonts'),
+                SettingsRepository::UPDATE_CHANNEL_NIGHTLY => __('Nightly', 'tasty-fonts'),
+                default => __('Stable', 'tasty-fonts'),
+            };
         }
 
-        return match ($channel) {
-            SettingsRepository::UPDATE_CHANNEL_BETA => __('Beta', 'tasty-fonts'),
-            SettingsRepository::UPDATE_CHANNEL_NIGHTLY => __('Nightly', 'tasty-fonts'),
-            default => __('Stable', 'tasty-fonts'),
-        };
+        return $pageContextBuilder->formatUpdateChannelLabel($channel);
     }
 
     private function validateUnicodeRangeSettingsInput(array &$settingsInput, array $previousSettings): ?WP_Error
@@ -2133,7 +2116,7 @@ final class AdminController
             $modifiedAt = is_readable($assetPath) ? filemtime($assetPath) : false;
             $contentHash = is_readable($assetPath) ? md5_file($assetPath) : false;
 
-            if (is_int($modifiedAt) && $modifiedAt > 0 && is_string($contentHash) && $contentHash !== '') {
+            if (is_int($modifiedAt) && $modifiedAt > 0 && is_string($contentHash)) {
                 return TASTY_FONTS_VERSION . '.' . $modifiedAt . '.' . substr($contentHash, 0, 12);
             }
 
@@ -2150,9 +2133,19 @@ final class AdminController
         return $this->pageContextBuilder->buildRoleDeploymentContext($draftRoles, $appliedRoles, $applyEverywhere, $settings);
     }
 
-    private function roleSetsMatch(array $left, array $right, ?array $settings = null): bool
+    protected function buildOverviewMetrics(array $counts): array
     {
-        return $this->pageContextBuilder->roleSetsMatch($left, $right, $settings);
+        return $this->pageContextBuilder->buildOverviewMetrics($counts);
+    }
+
+    protected function buildPreviewPanels(): array
+    {
+        return $this->pageContextBuilder->buildPreviewPanels();
+    }
+
+    protected function buildNoticeToasts(): array
+    {
+        return $this->pageContextBuilder->buildNoticeToasts();
     }
 
     private function buildRolesSavedMessage(string $actionType, array $roles, array $appliedRoles, bool $wasAppliedSitewide): string
@@ -2182,9 +2175,35 @@ final class AdminController
         };
     }
 
-    private function buildActivityActorOptions(array $logs): array
+    private function pageContextBuilderOrNull(): ?AdminPageContextBuilder
     {
-        if (!isset($this->pageContextBuilder)) {
+        static $property = null;
+
+        if (!$property instanceof \ReflectionProperty) {
+            $property = new \ReflectionProperty(self::class, 'pageContextBuilder');
+        }
+
+        if (!$property->isInitialized($this)) {
+            return null;
+        }
+
+        return $property->getValue($this);
+    }
+
+    private function buildSearchDisabledMessage(array $googleApiStatus): string
+    {
+        return match ((string) ($googleApiStatus['state'] ?? 'empty')) {
+            'invalid' => __('Search is disabled because the saved Google Fonts API key is invalid. Replace it above to re-enable catalog search.', 'tasty-fonts'),
+            'unknown' => __('Search is unavailable until the saved Google Fonts API key is validated. Re-save or replace the key above to continue.', 'tasty-fonts'),
+            default => __('Add a Google Fonts API key above to enable search, or use manual import below.', 'tasty-fonts'),
+        };
+    }
+
+    protected function buildActivityActorOptions(array $logs): array
+    {
+        $pageContextBuilder = $this->pageContextBuilderOrNull();
+
+        if ($pageContextBuilder === null) {
             $actors = [];
 
             foreach ($logs as $entry) {
@@ -2202,19 +2221,10 @@ final class AdminController
             return array_values($actors);
         }
 
-        return $this->pageContextBuilder->buildActivityActorOptions($logs);
+        return $pageContextBuilder->buildActivityActorOptions($logs);
     }
 
-    private function buildSearchDisabledMessage(array $googleApiStatus): string
-    {
-        return match ((string) ($googleApiStatus['state'] ?? 'empty')) {
-            'invalid' => __('Search is disabled because the saved Google Fonts API key is invalid. Replace it above to re-enable catalog search.', 'tasty-fonts'),
-            'unknown' => __('Search is unavailable until the saved Google Fonts API key is validated. Re-save or replace the key above to continue.', 'tasty-fonts'),
-            default => __('Add a Google Fonts API key above to enable search, or use manual import below.', 'tasty-fonts'),
-        };
-    }
-
-    private function buildLocalEnvironmentNotice(array $settings): array
+    protected function buildLocalEnvironmentNotice(array $settings): array
     {
         return $this->pageContextBuilder->buildLocalEnvironmentNotice($settings);
     }
@@ -2249,26 +2259,6 @@ final class AdminController
         return __('Local environment reminder hidden permanently for this account.', 'tasty-fonts');
     }
 
-    private function getLocalEnvironmentNoticePreference(): array
-    {
-        $preferences = get_option(self::LOCAL_ENV_NOTICE_OPTION, []);
-        $userId = max(0, (int) get_current_user_id());
-
-        if ($userId <= 0 || !is_array($preferences)) {
-            return [
-                'hidden_until' => 0,
-                'dismissed_forever' => false,
-            ];
-        }
-
-        $preference = is_array($preferences[$userId] ?? null) ? $preferences[$userId] : [];
-
-        return [
-            'hidden_until' => max(0, (int) ($preference['hidden_until'] ?? 0)),
-            'dismissed_forever' => !empty($preference['dismissed_forever']),
-        ];
-    }
-
     private function saveLocalEnvironmentNoticePreference(array $preference): void
     {
         $userId = max(0, (int) get_current_user_id());
@@ -2293,29 +2283,9 @@ final class AdminController
         update_option(self::LOCAL_ENV_NOTICE_OPTION, $preferences, false);
     }
 
-    private function buildPreviewContext(array $settings): array
-    {
-        return $this->pageContextBuilder->buildPreviewContext($settings);
-    }
-
-    private function buildAdobeAccessContext(): array
-    {
-        return $this->pageContextBuilder->buildAdobeAccessContext();
-    }
-
-    private function buildGoogleAccessContext(): array
-    {
-        return $this->pageContextBuilder->buildGoogleAccessContext();
-    }
-
     private function buildSelectableFamilyNames(array $catalog): array
     {
         return $this->pageContextBuilder->buildSelectableFamilyNames($catalog);
-    }
-
-    private function buildRoleDeliverySummary(array $roles, ?array $settings = null): string
-    {
-        return $this->pageContextBuilder->buildRoleDeliverySummary($roles, $settings);
     }
 
     private function buildRoleTextSummary(array $roles, ?array $settings = null): string
@@ -2540,7 +2510,7 @@ final class AdminController
                     static fn (mixed $token): string => sanitize_text_field((string) $token),
                     $variantTokens
                 ),
-                'strlen'
+                static fn (string $token): bool => $token !== ''
             )
         );
     }
@@ -2614,8 +2584,8 @@ final class AdminController
         $settingsInput = [];
 
         foreach (SettingsSaveFields::definitions() as $definition) {
-            $field = (string) ($definition['name'] ?? '');
-            $kind = (string) ($definition['kind'] ?? '');
+            $field = $definition['name'];
+            $kind = $definition['kind'];
 
             if ($field === '' || !array_key_exists($field, $submittedValues)) {
                 continue;
@@ -2656,8 +2626,8 @@ final class AdminController
         $submittedValues = [];
 
         foreach (SettingsSaveFields::definitions() as $definition) {
-            $field = (string) ($definition['name'] ?? '');
-            $kind = (string) ($definition['kind'] ?? '');
+            $field = $definition['name'];
+            $kind = $definition['kind'];
 
             if ($field === '' || !array_key_exists($field, $_POST)) {
                 continue;
@@ -2726,7 +2696,7 @@ final class AdminController
             $flattened[] = $item;
         }
 
-        return array_values($flattened);
+        return $flattened;
     }
 
     private function preserveUnavailableIntegrationSettings(array $settingsInput): array
@@ -2769,9 +2739,9 @@ final class AdminController
             $normalized[$index] = [
                 'name' => is_string($name) ? $name : '',
                 'type' => is_array($rawFiles['type'] ?? null) ? (string) ($rawFiles['type'][$index] ?? '') : '',
-                'tmp_name' => is_array($rawFiles['tmp_name'] ?? null) ? (string) ($rawFiles['tmp_name'][$index] ?? '') : '',
-                'error' => is_array($rawFiles['error'] ?? null) ? (int) ($rawFiles['error'][$index] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE,
-                'size' => is_array($rawFiles['size'] ?? null) ? (int) ($rawFiles['size'][$index] ?? 0) : 0,
+                'tmp_name' => is_array($rawFiles['tmp_name']) ? (string) ($rawFiles['tmp_name'][$index] ?? '') : '',
+                'error' => is_array($rawFiles['error']) ? (int) ($rawFiles['error'][$index] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE,
+                'size' => is_array($rawFiles['size']) ? (int) ($rawFiles['size'][$index] ?? 0) : 0,
             ];
         }
 
@@ -3466,7 +3436,7 @@ final class AdminController
             $messages[] = __('Bricks Google fonts are now disabled so Bricks font pickers show only Tasty-supplied fonts.', 'tasty-fonts');
         }
 
-        return implode(' ', array_values(array_unique(array_filter($messages, 'strlen'))));
+        return implode(' ', array_values(array_unique(array_filter($messages, static fn (string $message): bool => $message !== ''))));
     }
 
     private function syncAcssIntegrationForRuntimeState(array $settings, bool $clearBackupWhenDisabled = false): string|WP_Error

@@ -114,10 +114,8 @@ final class RestController
 
     public function saveSettings(WP_REST_Request $request): mixed
     {
-        $params = $request->get_params();
-
         return $this->restResult(
-            $this->admin->saveSettingsValues(is_array($params) ? $params : [])
+            $this->admin->saveSettingsValues($request->get_params())
         );
     }
 
@@ -348,8 +346,8 @@ final class RestController
         $args = [];
 
         foreach (SettingsSaveFields::definitions() as $definition) {
-            $name = (string) ($definition['name'] ?? '');
-            $kind = (string) ($definition['kind'] ?? '');
+            $name = $definition['name'];
+            $kind = $definition['kind'];
 
             if ($name === '') {
                 continue;
@@ -498,7 +496,7 @@ final class RestController
                     fn (mixed $item): string => $this->sanitizeTextArg($item),
                     $value
                 ),
-                'strlen'
+                static fn (string $item): bool => $item !== ''
             )
         );
     }

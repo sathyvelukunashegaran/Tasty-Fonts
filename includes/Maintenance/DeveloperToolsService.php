@@ -42,11 +42,12 @@ HTACCESS;
         private readonly Storage $storage,
         private readonly SettingsRepository $settings,
         private readonly ImportRepository $imports,
-        private readonly CatalogService $catalog,
+        CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
         private readonly GoogleFontsClient $googleClient
     ) {
+        unset($catalog);
     }
 
     public function ensureStorageScaffolding(): bool

@@ -1202,10 +1202,6 @@ final class SettingsRepository
             ]
         );
 
-        if (!is_array($existingUsers)) {
-            return [];
-        }
-
         $normalized = [];
 
         foreach ($existingUsers as $user) {
@@ -1213,8 +1209,8 @@ final class SettingsRepository
                 continue;
             }
 
-            $userId = absint($user->ID ?? 0);
-            $userRoles = is_array($user->roles ?? null) ? array_values(array_map('sanitize_key', $user->roles)) : [];
+            $userId = absint($user->ID);
+            $userRoles = array_values(array_map('sanitize_key', $user->roles));
 
             if ($userId <= 0 || in_array('administrator', $userRoles, true)) {
                 continue;
@@ -1233,18 +1229,15 @@ final class SettingsRepository
      */
     private function registeredRoleSlugs(): array
     {
-        $roles = wp_roles();
-        $registeredRoleSlugs = is_object($roles) && is_array($roles->roles ?? null)
-            ? array_keys($roles->roles)
-            : [];
+        $registeredRoleSlugs = array_keys(wp_roles()->roles);
 
         $registeredRoleSlugs = array_values(
             array_filter(
                 array_map(
-                    static fn (mixed $roleSlug): string => sanitize_key(is_scalar($roleSlug) ? (string) $roleSlug : ''),
+                    static fn (int|string $roleSlug): string => sanitize_key((string) $roleSlug),
                     $registeredRoleSlugs
                 ),
-                'strlen'
+                static fn (string $roleSlug): bool => $roleSlug !== ''
             )
         );
 
@@ -1266,37 +1259,6 @@ final class SettingsRepository
             ],
             true
         ) ? $channel : self::UPDATE_CHANNEL_STABLE;
-    }
-
-    private function extractFamilyNames(array $catalog): array
-    {
-        if ($catalog === []) {
-            return [];
-        }
-
-        if (!array_is_list($catalog)) {
-            return array_values(
-                array_filter(
-                    array_map(static fn (mixed $name): string => is_string($name) ? trim($name) : '', array_keys($catalog)),
-                    'strlen'
-                )
-            );
-        }
-
-        $families = [];
-
-        foreach ($catalog as $item) {
-            if (is_string($item) && trim($item) !== '') {
-                $families[] = trim($item);
-                continue;
-            }
-
-            if (is_array($item) && is_string($item['family'] ?? null) && trim((string) $item['family']) !== '') {
-                $families[] = trim((string) $item['family']);
-            }
-        }
-
-        return array_values(array_unique($families));
     }
 
     private function persistSettings(array $settings): array
@@ -1536,10 +1498,7 @@ final class SettingsRepository
 
         $normalizedGoogleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
 
-        if (
-            is_array($googleApiKeyData)
-            && $this->buildStoredGoogleApiKeyData($normalizedGoogleApiKeyData) !== $googleApiKeyData
-        ) {
+        if ($this->buildStoredGoogleApiKeyData($normalizedGoogleApiKeyData) !== $googleApiKeyData) {
             $normalizedGoogleApiKeyData = $this->persistGoogleApiKeyData($normalizedGoogleApiKeyData);
         }
 
@@ -1613,7 +1572,7 @@ final class SettingsRepository
         unset($googleApiKeyData[self::GOOGLE_API_KEY_ENCRYPTED_FIELD]);
         $googleApiKeyData['google_api_key_status'] = $this->normalizeGoogleApiKeyStatus(
             (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
-            (string) ($googleApiKeyData['google_api_key'] ?? '')
+            $googleApiKeyData['google_api_key']
         );
         $googleApiKeyData['google_api_key_status_message'] = $this->sanitizeStatusMessage($googleApiKeyData['google_api_key_status_message'] ?? '');
         $googleApiKeyData['google_api_key_checked_at'] = $this->normalizeTimestamp($googleApiKeyData['google_api_key_checked_at'] ?? 0);
@@ -1713,7 +1672,7 @@ final class SettingsRepository
             foreach (['auth', 'secure_auth', 'logged_in', 'nonce'] as $scheme) {
                 $salt = wp_salt($scheme);
 
-                if (is_string($salt) && $salt !== '') {
+                if ($salt !== '') {
                     $saltMaterial[] = $salt;
                 }
             }

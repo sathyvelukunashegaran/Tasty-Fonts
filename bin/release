@@ -125,7 +125,11 @@ tag_exists_anywhere() {
 }
 
 run_quality_gates() {
-  find . -name '*.php' -not -path './output/*' -print0 | xargs -0 -n1 php -l >/dev/null
+  if [[ -f composer.json && -x vendor/bin/phpstan ]]; then
+    composer phpstan
+  fi
+
+  find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
   php tests/run.php
   node --test tests/js/*.test.cjs
   bash tests/bin/release-scripts.test.sh
