@@ -39,3 +39,7 @@ jobs:
       - name: Run bin script tests
         shell: bash
         run: bash tests/bin/release-scripts.test.sh
+
+      - name: Run jscpd source duplication scan
+        shell: bash
+        run: npx --yes jscpd --config .jscpd.json

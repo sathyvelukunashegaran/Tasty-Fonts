@@ -456,38 +456,21 @@ final class GitHubUpdater
 
     private function findPackageUrl(string $version, mixed $assets): string
     {
-        if (!is_array($assets)) {
-            return '';
-        }
-
-        $expectedName = strtolower(sprintf(self::PACKAGE_NAME_PATTERN, $version));
-
-        foreach ($assets as $asset) {
-            if (!is_array($asset)) {
-                continue;
-            }
-
-            $name = strtolower((string) ($asset['name'] ?? ''));
-            $url = trim((string) ($asset['browser_download_url'] ?? ''));
-            $state = strtolower((string) ($asset['state'] ?? 'uploaded'));
-
-            if ($name !== $expectedName || $url === '' || $state !== 'uploaded') {
-                continue;
-            }
-
-            return $url;
-        }
-
-        return '';
+        return $this->findAssetDownloadUrlByName($assets, sprintf(self::PACKAGE_NAME_PATTERN, $version));
     }
 
     private function findChecksumUrl(string $version, mixed $assets): string
+    {
+        return $this->findAssetDownloadUrlByName($assets, sprintf(self::PACKAGE_CHECKSUM_NAME_PATTERN, $version));
+    }
+
+    private function findAssetDownloadUrlByName(mixed $assets, string $expectedName): string
     {
         if (!is_array($assets)) {
             return '';
         }
 
-        $expectedName = strtolower(sprintf(self::PACKAGE_CHECKSUM_NAME_PATTERN, $version));
+        $expectedName = strtolower($expectedName);
 
         foreach ($assets as $asset) {
             if (!is_array($asset)) {

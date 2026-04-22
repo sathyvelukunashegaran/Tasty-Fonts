@@ -6,6 +6,7 @@ use TastyFonts\Admin\FontTypeHelper;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\RoleUsageMessageFormatter;
 
 // ---------------------------------------------------------------------------
 // FontUtils – slugify
@@ -641,4 +642,56 @@ $tests['font_type_helper_build_selector_option_label_uses_bunny_context_for_sour
     $label = FontTypeHelper::buildSelectorOptionLabel('Raleway', $entry, 'bunny');
 
     assertContainsValue('Variable Source', $label, 'buildSelectorOptionLabel() should reflect the bunny source-only label in the bunny context.');
+};
+
+// ---------------------------------------------------------------------------
+// FontUtils – hosted import helpers
+// ---------------------------------------------------------------------------
+
+$tests['font_utils_build_hosted_css_axes_normalizes_unique_google_css_axis_pairs'] = static function (): void {
+    assertSameValue(
+        ['0,400', '1,700'],
+        FontUtils::buildHostedCssAxes(['regular', '700italic', 'regular']),
+        'buildHostedCssAxes() should normalize variant tokens into unique Google/Bunny CSS axis pairs.'
+    );
+};
+
+$tests['font_utils_sanitize_hosted_css_display_rejects_unknown_values'] = static function (): void {
+    assertSameValue('optional', FontUtils::sanitizeHostedCssDisplay('OPTIONAL'), 'sanitizeHostedCssDisplay() should accept supported display values case-insensitively.');
+    assertSameValue('swap', FontUtils::sanitizeHostedCssDisplay('unsupported'), 'sanitizeHostedCssDisplay() should fall back to swap for unsupported values.');
+};
+
+$tests['font_utils_weight_range_helpers_normalize_variable_face_ranges'] = static function (): void {
+    assertSameValue(
+        [100, 900],
+        FontUtils::weightRangeFromFace([
+            'weight' => '400',
+            'axes' => ['wght' => ['min' => '100', 'default' => '400', 'max' => '900']],
+        ]),
+        'weightRangeFromFace() should prefer the WGHT axis range when present on a face.'
+    );
+    assertSameValue(
+        true,
+        FontUtils::requestedWeightMatchesRange('300', 100, 900),
+        'requestedWeightMatchesRange() should match a static requested weight inside the declared range.'
+    );
+    assertSameValue(
+        '100 900',
+        FontUtils::blockEditorFontWeightValue('400', ['wght' => ['min' => '100', 'default' => '400', 'max' => '900']]),
+        'blockEditorFontWeightValue() should emit a min/max string for variable weight ranges.'
+    );
+};
+
+// ---------------------------------------------------------------------------
+// RoleUsageMessageFormatter
+// ---------------------------------------------------------------------------
+
+$tests['role_usage_message_formatter_builds_family_delete_messages_from_shared_role_labels'] = static function (): void {
+    $labels = RoleUsageMessageFormatter::translateRoleLabels(['heading', 'body', 'custom']);
+    $familyMessage = RoleUsageMessageFormatter::buildDeleteBlockedMessage('Inter', ['heading', 'body']);
+    $variantMessage = RoleUsageMessageFormatter::buildDeleteLastVariantBlockedMessage('Inter Bold', ['body']);
+
+    assertSameValue(['heading', 'body', 'custom'], $labels, 'translateRoleLabels() should reuse the shared translated role labels and leave unknown labels unchanged.');
+    assertContainsValue('heading and body', $familyMessage, 'buildDeleteBlockedMessage() should reuse the shared human-readable role label list.');
+    assertContainsValue('Inter Bold is currently assigned to body, and this is the last saved variant.', $variantMessage, 'buildDeleteLastVariantBlockedMessage() should reuse the shared family/variant copy.');
 };

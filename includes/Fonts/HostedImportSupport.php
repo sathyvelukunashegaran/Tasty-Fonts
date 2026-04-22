@@ -189,40 +189,12 @@ final class HostedImportSupport
             return false;
         }
 
-        $weightRange = self::weightRangeFromFace($face);
+        $weightRange = FontUtils::weightRangeFromFace($face);
 
         if ($weightRange !== null) {
-            return self::requestedWeightMatchesRange($requestedWeight, $weightRange[0], $weightRange[1]);
+            return FontUtils::requestedWeightMatchesRange($requestedWeight, $weightRange[0], $weightRange[1]);
         }
 
         return FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')) === $requestedWeight;
-    }
-
-    private static function weightRangeFromFace(array $face): ?array
-    {
-        $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
-
-        if (isset($axes['WGHT']['min'], $axes['WGHT']['max'])) {
-            return [(int) $axes['WGHT']['min'], (int) $axes['WGHT']['max']];
-        }
-
-        $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-
-        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $weight, $matches) === 1) {
-            return [(int) $matches[1], (int) $matches[2]];
-        }
-
-        return null;
-    }
-
-    private static function requestedWeightMatchesRange(string $requestedWeight, int $start, int $end): bool
-    {
-        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $requestedWeight, $matches) === 1) {
-            return $start <= (int) $matches[1] && $end >= (int) $matches[2];
-        }
-
-        $requestedValue = FontUtils::weightSortValue($requestedWeight);
-
-        return $requestedValue >= $start && $requestedValue <= $end;
     }
 }

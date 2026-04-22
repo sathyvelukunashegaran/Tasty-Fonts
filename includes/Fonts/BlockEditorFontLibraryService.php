@@ -313,19 +313,7 @@ final class BlockEditorFontLibraryService
 
     private function blockEditorFontWeight(string $weight, array $axes = []): string
     {
-        $normalizedAxes = FontUtils::normalizeAxesMap($axes);
-
-        if (isset($normalizedAxes['WGHT']['min'], $normalizedAxes['WGHT']['max'])) {
-            return (string) $normalizedAxes['WGHT']['min'] . ' ' . (string) $normalizedAxes['WGHT']['max'];
-        }
-
-        $normalizedWeight = FontUtils::normalizeWeight($weight);
-
-        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $normalizedWeight, $matches) === 1) {
-            return $matches[1] . ' ' . $matches[2];
-        }
-
-        return $normalizedWeight;
+        return FontUtils::blockEditorFontWeightValue($weight, $axes);
     }
 
     private function buildFaceSources(array $face): array

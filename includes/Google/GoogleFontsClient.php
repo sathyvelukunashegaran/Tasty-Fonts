@@ -319,21 +319,7 @@ final class GoogleFontsClient
     {
         $item = $this->enrichCatalogItemWithMetadata($item);
         $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
-        $formats = [
-            'static' => [
-                'label' => 'Static',
-                'available' => true,
-                'source_only' => false,
-            ],
-        ];
-
-        if ($axes !== []) {
-            $formats['variable'] = [
-                'label' => 'Variable',
-                'available' => true,
-                'source_only' => false,
-            ];
-        }
+        $formats = $this->buildImportOptions($axes);
 
         return [
             'family' => (string) ($item['family'] ?? ''),
@@ -353,32 +339,18 @@ final class GoogleFontsClient
     {
         $item = $this->enrichCatalogItemWithMetadata($item);
         $axes = FontUtils::normalizeAxesMap((array) ($item['axes'] ?? []));
-        $formats = [
-            'static' => [
-                'label' => 'Static',
-                'available' => true,
-                'source_only' => false,
-            ],
-        ];
-
-        if ($axes !== []) {
-            $formats['variable'] = [
-                'label' => 'Variable',
-                'available' => true,
-                'source_only' => false,
-            ];
-        }
+        $formats = $this->buildImportOptions($axes);
 
         return [
-                'family' => (string) ($item['family'] ?? ''),
-                'slug' => $slug,
-                'category' => (string) ($item['category'] ?? ''),
-                'variants_count' => max(0, (int) ($item['variants_count'] ?? 0)),
-                'variants' => FontUtils::normalizeVariantTokens((array) ($item['variants'] ?? [])),
-                'is_variable' => $axes !== [] || !empty($item['is_variable']),
-                'axes' => $axes,
-                'formats' => $formats,
-                'import_options' => $formats,
+            'family' => (string) ($item['family'] ?? ''),
+            'slug' => $slug,
+            'category' => (string) ($item['category'] ?? ''),
+            'variants_count' => max(0, (int) ($item['variants_count'] ?? 0)),
+            'variants' => FontUtils::normalizeVariantTokens((array) ($item['variants'] ?? [])),
+            'is_variable' => $axes !== [] || !empty($item['is_variable']),
+            'axes' => $axes,
+            'formats' => $formats,
+            'import_options' => $formats,
         ];
     }
 
@@ -396,28 +368,33 @@ final class GoogleFontsClient
 
     private function buildCssAxes(array $variants): array
     {
-        $axes = [];
-
-        foreach (FontUtils::normalizeVariantTokens($variants) as $token) {
-            $axis = FontUtils::googleVariantToAxis($token);
-
-            if ($axis === null) {
-                continue;
-            }
-
-            $axes[] = ($axis['style'] === 'italic' ? '1' : '0') . ',' . $axis['weight'];
-        }
-
-        return array_values(array_unique($axes));
+        return FontUtils::buildHostedCssAxes($variants);
     }
 
     private function sanitizeDisplay(string $display): string
     {
-        $display = strtolower(trim($display));
+        return FontUtils::sanitizeHostedCssDisplay($display);
+    }
 
-        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true)
-            ? $display
-            : 'swap';
+    private function buildImportOptions(array $axes): array
+    {
+        $formats = [
+            'static' => [
+                'label' => 'Static',
+                'available' => true,
+                'source_only' => false,
+            ],
+        ];
+
+        if ($axes !== []) {
+            $formats['variable'] = [
+                'label' => 'Variable',
+                'available' => true,
+                'source_only' => false,
+            ];
+        }
+
+        return $formats;
     }
 
     private function getApiKey(): string

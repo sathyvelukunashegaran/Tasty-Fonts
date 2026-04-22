@@ -554,7 +554,7 @@ final class RuntimeAssetPlanner
     private function preloadFaceScore(array $face, int $targetWeight): array
     {
         $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-        $weightRange = $this->weightRangeForFace($face);
+        $weightRange = FontUtils::weightRangeFromFace($face);
         $isVariable = $weightRange !== null;
         $distance = $weightRange !== null
             ? $this->weightDistanceFromRange($weightRange[0], $weightRange[1], $targetWeight)
@@ -609,23 +609,6 @@ final class RuntimeAssetPlanner
         }
 
         return FontUtils::weightSortValue($weight);
-    }
-
-    private function weightRangeForFace(array $face): ?array
-    {
-        $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
-
-        if (isset($axes['WGHT']['min'], $axes['WGHT']['max'])) {
-            return [(int) $axes['WGHT']['min'], (int) $axes['WGHT']['max']];
-        }
-
-        $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-
-        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $weight, $matches) === 1) {
-            return [(int) $matches[1], (int) $matches[2]];
-        }
-
-        return null;
     }
 
     private function weightDistanceFromRange(int $start, int $end, int $targetWeight): int

@@ -231,209 +231,72 @@
                                     </div>
                                 </div>
                                 <div class="tasty-fonts-studio-card-grid tasty-fonts-role-grid<?php echo $monospaceRoleEnabled ? ' is-three-columns' : ''; ?>">
-                                    <section class="tasty-fonts-studio-card tasty-fonts-role-box">
-                                        <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
-                                            <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
-                                                <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Heading', 'tasty-fonts'); ?></span>
-                                                <h4><?php esc_html_e('Heading Font', 'tasty-fonts'); ?></h4>
-                                            </div>
-                                            <div class="tasty-fonts-role-box-meta">
-                                                <span class="tasty-fonts-role-box-meta-label"><?php esc_html_e('Current Value', 'tasty-fonts'); ?></span>
-                                                <button
-                                                    type="button"
-                                                    class="tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy tasty-fonts-role-box-copy"
-                                                    data-role-family-variable-copy="heading"
-                                                    data-copy-text="<?php echo esc_attr($headingFamilyVariable); ?>"
-                                                    data-copy-success="<?php esc_attr_e('Heading family variable copied.', 'tasty-fonts'); ?>"
-                                                    data-copy-static-label="1"
-                                                    aria-label="<?php echo esc_attr($headingFamily !== '' ? sprintf(__('Heading family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $headingFamilyVariable, $headingVariable, $headingStack) : sprintf(__('Heading uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $headingStack, $headingVariable)); ?>"
-                                                    title="<?php echo esc_attr($headingFamily !== '' ? sprintf(__('Heading family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $headingFamilyVariable, $headingVariable, $headingStack) : sprintf(__('Heading uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $headingStack, $headingVariable)); ?>"
-                                                >
-                                                    <span class="tasty-fonts-role-box-copy-label"><?php echo esc_html($headingFamilyVariable); ?></span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p class="tasty-fonts-studio-card-copy tasty-fonts-role-box-description"><?php esc_html_e('Choose the saved family used for headings. Configure its fallback in the Font Library.', 'tasty-fonts'); ?></p>
-                                        <div class="tasty-fonts-role-fields">
-                                            <label class="tasty-fonts-stack-field">
-                                                <?php $this->renderFieldLabel(__('Family', 'tasty-fonts')); ?>
-                                                <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                                                    <select name="tasty_fonts_heading_font" id="tasty_fonts_heading_font" form="<?php echo esc_attr($roleFormId); ?>">
-                                                        <option value="" <?php selected($roles['heading'] ?? '', ''); ?>><?php esc_html_e('Use Fallback Only', 'tasty-fonts'); ?></option>
-                                                        <?php foreach ($availableFamilyOptions as $option): ?>
-                                                            <?php if (!is_array($option)) { continue; } ?>
-                                                            <?php $familyName = (string) ($option['value'] ?? ''); ?>
-                                                            <?php $familyLabel = (string) ($option['label'] ?? $familyName); ?>
-                                                            <option value="<?php echo esc_attr($familyName); ?>" <?php selected($roles['heading'] ?? '', $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                    <?php $this->renderClearSelectButton(__('Clear Heading Family', 'tasty-fonts'), 'tasty_fonts_heading_font'); ?>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="heading" hidden>
-                                            <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Role Weight', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-muted" data-role-weight-summary="heading"><?php esc_html_e('Choose a saved static weight when the selected family offers more than one.', 'tasty-fonts'); ?></span>
-                                            </div>
-                                            <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
-                                                <span class="screen-reader-text"><?php esc_html_e('Heading weight', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                                                    <select
-                                                        name="tasty_fonts_heading_weight"
-                                                        id="tasty_fonts_heading_weight"
-                                                        data-role-weight-select="heading"
-                                                        form="<?php echo esc_attr($roleFormId); ?>"
-                                                    ></select>
-                                                    <?php $this->renderClearSelectButton(__('Reset Heading Weight', 'tasty-fonts'), 'tasty_fonts_heading_weight'); ?>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="heading" hidden>
-                                            <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text" data-role-axis-heading="heading"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-muted" data-role-axis-summary="heading"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
-                                            </div>
-                                            <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="heading"></div>
-                                        </div>
-                                    </section>
+                                    <?php
+                                    $roleCards = [
+                                        [
+                                            'role_key' => 'heading',
+                                            'kicker' => __('Heading', 'tasty-fonts'),
+                                            'title' => __('Heading Font', 'tasty-fonts'),
+                                            'family_variable' => $headingFamilyVariable,
+                                            'copy_success' => __('Heading family variable copied.', 'tasty-fonts'),
+                                            'copy_label' => $headingFamily !== ''
+                                                ? sprintf(__('Heading family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $headingFamilyVariable, $headingVariable, $headingStack)
+                                                : sprintf(__('Heading uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $headingStack, $headingVariable),
+                                            'description' => __('Choose the saved family used for headings. Configure its fallback in the Font Library.', 'tasty-fonts'),
+                                            'family_input_name' => 'tasty_fonts_heading_font',
+                                            'family_select_id' => 'tasty_fonts_heading_font',
+                                            'clear_family_label' => __('Clear Heading Family', 'tasty-fonts'),
+                                            'weight_input_name' => 'tasty_fonts_heading_weight',
+                                            'weight_select_id' => 'tasty_fonts_heading_weight',
+                                            'clear_weight_label' => __('Reset Heading Weight', 'tasty-fonts'),
+                                            'weight_screen_reader_label' => __('Heading weight', 'tasty-fonts'),
+                                        ],
+                                        [
+                                            'role_key' => 'body',
+                                            'kicker' => __('Body', 'tasty-fonts'),
+                                            'title' => __('Body Font', 'tasty-fonts'),
+                                            'family_variable' => $bodyFamilyVariable,
+                                            'copy_success' => __('Body family variable copied.', 'tasty-fonts'),
+                                            'copy_label' => $bodyFamily !== ''
+                                                ? sprintf(__('Body family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $bodyFamilyVariable, $bodyVariable, $bodyStack)
+                                                : sprintf(__('Body uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $bodyStack, $bodyVariable),
+                                            'description' => __('Choose the saved family used for body copy. Configure its fallback in the Font Library.', 'tasty-fonts'),
+                                            'family_input_name' => 'tasty_fonts_body_font',
+                                            'family_select_id' => 'tasty_fonts_body_font',
+                                            'clear_family_label' => __('Clear Body Family', 'tasty-fonts'),
+                                            'weight_input_name' => 'tasty_fonts_body_weight',
+                                            'weight_select_id' => 'tasty_fonts_body_weight',
+                                            'clear_weight_label' => __('Reset Body Weight', 'tasty-fonts'),
+                                            'weight_screen_reader_label' => __('Body weight', 'tasty-fonts'),
+                                        ],
+                                    ];
 
-                                    <section class="tasty-fonts-studio-card tasty-fonts-role-box">
-                                        <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
-                                            <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
-                                                <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Body', 'tasty-fonts'); ?></span>
-                                                <h4><?php esc_html_e('Body Font', 'tasty-fonts'); ?></h4>
-                                            </div>
-                                            <div class="tasty-fonts-role-box-meta">
-                                                <span class="tasty-fonts-role-box-meta-label"><?php esc_html_e('Current Value', 'tasty-fonts'); ?></span>
-                                                <button
-                                                    type="button"
-                                                    class="tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy tasty-fonts-role-box-copy"
-                                                    data-role-family-variable-copy="body"
-                                                    data-copy-text="<?php echo esc_attr($bodyFamilyVariable); ?>"
-                                                    data-copy-success="<?php esc_attr_e('Body family variable copied.', 'tasty-fonts'); ?>"
-                                                    data-copy-static-label="1"
-                                                    aria-label="<?php echo esc_attr($bodyFamily !== '' ? sprintf(__('Body family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $bodyFamilyVariable, $bodyVariable, $bodyStack) : sprintf(__('Body uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $bodyStack, $bodyVariable)); ?>"
-                                                    title="<?php echo esc_attr($bodyFamily !== '' ? sprintf(__('Body family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $bodyFamilyVariable, $bodyVariable, $bodyStack) : sprintf(__('Body uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $bodyStack, $bodyVariable)); ?>"
-                                                >
-                                                    <span class="tasty-fonts-role-box-copy-label"><?php echo esc_html($bodyFamilyVariable); ?></span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p class="tasty-fonts-studio-card-copy tasty-fonts-role-box-description"><?php esc_html_e('Choose the saved family used for body copy. Configure its fallback in the Font Library.', 'tasty-fonts'); ?></p>
-                                        <div class="tasty-fonts-role-fields">
-                                            <label class="tasty-fonts-stack-field">
-                                                <?php $this->renderFieldLabel(__('Family', 'tasty-fonts')); ?>
-                                                <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                                                    <select name="tasty_fonts_body_font" id="tasty_fonts_body_font" form="<?php echo esc_attr($roleFormId); ?>">
-                                                        <option value="" <?php selected($roles['body'] ?? '', ''); ?>><?php esc_html_e('Use Fallback Only', 'tasty-fonts'); ?></option>
-                                                        <?php foreach ($availableFamilyOptions as $option): ?>
-                                                            <?php if (!is_array($option)) { continue; } ?>
-                                                            <?php $familyName = (string) ($option['value'] ?? ''); ?>
-                                                            <?php $familyLabel = (string) ($option['label'] ?? $familyName); ?>
-                                                            <option value="<?php echo esc_attr($familyName); ?>" <?php selected($roles['body'] ?? '', $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                    <?php $this->renderClearSelectButton(__('Clear Body Family', 'tasty-fonts'), 'tasty_fonts_body_font'); ?>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="body" hidden>
-                                            <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Role Weight', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-muted" data-role-weight-summary="body"><?php esc_html_e('Choose a saved static weight when the selected family offers more than one.', 'tasty-fonts'); ?></span>
-                                            </div>
-                                            <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
-                                                <span class="screen-reader-text"><?php esc_html_e('Body weight', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                                                    <select
-                                                        name="tasty_fonts_body_weight"
-                                                        id="tasty_fonts_body_weight"
-                                                        data-role-weight-select="body"
-                                                        form="<?php echo esc_attr($roleFormId); ?>"
-                                                    ></select>
-                                                    <?php $this->renderClearSelectButton(__('Reset Body Weight', 'tasty-fonts'), 'tasty_fonts_body_weight'); ?>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="body" hidden>
-                                            <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text" data-role-axis-heading="body"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-muted" data-role-axis-summary="body"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
-                                            </div>
-                                            <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="body"></div>
-                                        </div>
-                                    </section>
+                                    if ($monospaceRoleEnabled) {
+                                        $roleCards[] = [
+                                            'role_key' => 'monospace',
+                                            'kicker' => __('Monospace', 'tasty-fonts'),
+                                            'title' => __('Monospace Font', 'tasty-fonts'),
+                                            'family_variable' => $monospaceFamilyVariable,
+                                            'copy_success' => __('Monospace value copied.', 'tasty-fonts'),
+                                            'copy_label' => $monospaceFamily !== ''
+                                                ? sprintf(__('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $monospaceFamilyVariable, $monospaceVariable, $monospaceStack)
+                                                : sprintf(__('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $monospaceStack, $monospaceVariable),
+                                            'description' => __('Choose the saved family used for monospace text. Configure its fallback in the Font Library.', 'tasty-fonts'),
+                                            'family_input_name' => 'tasty_fonts_monospace_font',
+                                            'family_select_id' => 'tasty_fonts_monospace_font',
+                                            'clear_family_label' => __('Clear Monospace Family', 'tasty-fonts'),
+                                            'weight_input_name' => 'tasty_fonts_monospace_weight',
+                                            'weight_select_id' => 'tasty_fonts_monospace_weight',
+                                            'clear_weight_label' => __('Reset Monospace Weight', 'tasty-fonts'),
+                                            'weight_screen_reader_label' => __('Monospace weight', 'tasty-fonts'),
+                                        ];
+                                    }
 
-                                <?php if ($monospaceRoleEnabled): ?>
-                                    <section class="tasty-fonts-studio-card tasty-fonts-role-box">
-                                        <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
-                                            <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
-                                                <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Monospace', 'tasty-fonts'); ?></span>
-                                                <h4><?php esc_html_e('Monospace Font', 'tasty-fonts'); ?></h4>
-                                            </div>
-                                            <div class="tasty-fonts-role-box-meta">
-                                                <span class="tasty-fonts-role-box-meta-label"><?php esc_html_e('Current Value', 'tasty-fonts'); ?></span>
-                                                <button
-                                                    type="button"
-                                                    class="tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy tasty-fonts-role-box-copy"
-                                                    data-role-family-variable-copy="monospace"
-                                                    data-copy-text="<?php echo esc_attr($monospaceFamilyVariable); ?>"
-                                                    data-copy-success="<?php esc_attr_e('Monospace value copied.', 'tasty-fonts'); ?>"
-                                                    data-copy-static-label="1"
-                                                    aria-label="<?php echo esc_attr($monospaceFamily !== '' ? sprintf(__('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $monospaceFamilyVariable, $monospaceVariable, $monospaceStack) : sprintf(__('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $monospaceStack, $monospaceVariable)); ?>"
-                                                    title="<?php echo esc_attr($monospaceFamily !== '' ? sprintf(__('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $monospaceFamilyVariable, $monospaceVariable, $monospaceStack) : sprintf(__('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $monospaceStack, $monospaceVariable)); ?>"
-                                                >
-                                                    <span class="tasty-fonts-role-box-copy-label"><?php echo esc_html($monospaceFamilyVariable); ?></span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p class="tasty-fonts-studio-card-copy tasty-fonts-role-box-description"><?php esc_html_e('Choose the saved family used for monospace text. Configure its fallback in the Font Library.', 'tasty-fonts'); ?></p>
-                                        <div class="tasty-fonts-role-fields">
-                                            <label class="tasty-fonts-stack-field">
-                                                <?php $this->renderFieldLabel(__('Family', 'tasty-fonts')); ?>
-                                                <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                                                    <select name="tasty_fonts_monospace_font" id="tasty_fonts_monospace_font" form="<?php echo esc_attr($roleFormId); ?>">
-                                                        <option value="" <?php selected($roles['monospace'] ?? '', ''); ?>><?php esc_html_e('Use Fallback Only', 'tasty-fonts'); ?></option>
-                                                        <?php foreach ($availableFamilyOptions as $option): ?>
-                                                            <?php if (!is_array($option)) { continue; } ?>
-                                                            <?php $familyName = (string) ($option['value'] ?? ''); ?>
-                                                            <?php $familyLabel = (string) ($option['label'] ?? $familyName); ?>
-                                                            <option value="<?php echo esc_attr($familyName); ?>" <?php selected($roles['monospace'] ?? '', $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                    <?php $this->renderClearSelectButton(__('Clear Monospace Family', 'tasty-fonts'), 'tasty_fonts_monospace_font'); ?>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="monospace" hidden>
-                                            <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Role Weight', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-muted" data-role-weight-summary="monospace"><?php esc_html_e('Choose a saved static weight when the selected family offers more than one.', 'tasty-fonts'); ?></span>
-                                            </div>
-                                            <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
-                                                <span class="screen-reader-text"><?php esc_html_e('Monospace weight', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                                                    <select
-                                                        name="tasty_fonts_monospace_weight"
-                                                        id="tasty_fonts_monospace_weight"
-                                                        data-role-weight-select="monospace"
-                                                        form="<?php echo esc_attr($roleFormId); ?>"
-                                                    ></select>
-                                                    <?php $this->renderClearSelectButton(__('Reset Monospace Weight', 'tasty-fonts'), 'tasty_fonts_monospace_weight'); ?>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="monospace" hidden>
-                                            <div class="tasty-fonts-role-axis-head">
-                                                <span class="tasty-fonts-field-label-text" data-role-axis-heading="monospace"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-muted" data-role-axis-summary="monospace"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
-                                            </div>
-                                            <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="monospace"></div>
-                                        </div>
-                                    </section>
-                                <?php endif; ?>
-                            </div>
+                                    foreach ($roleCards as $roleCard) {
+                                        $this->renderRoleSelectionCard($roleCard, $roles, $availableFamilyOptions, $roleFormId);
+                                    }
+                                    ?>
+                                </div>
                             </div>
                             <?php if ($localEnvironmentNotice !== []): ?>
                                 <div class="tasty-fonts-role-command-notice">

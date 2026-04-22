@@ -7,6 +7,7 @@ namespace TastyFonts\Admin\Renderer;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\RoleUsageMessageFormatter;
 
 trait FamilyCardRendererSupport
 {
@@ -14,78 +15,22 @@ trait FamilyCardRendererSupport
 
     protected function buildDeleteBlockedMessage(string $familyName, array $roleLabels): string
     {
-        $translatedLabels = $this->translateRoleLabels($roleLabels);
-
-        if ($translatedLabels === []) {
-            return '';
-        }
-
-        if (count($translatedLabels) === 1) {
-            return sprintf(
-                __('%1$s is currently assigned as the %2$s font. Choose a different %2$s font before deleting it.', 'tasty-fonts'),
-                $familyName,
-                $translatedLabels[0]
-            );
-        }
-
-        return sprintf(
-            __('%1$s is currently assigned to %2$s. Choose different role fonts before deleting it.', 'tasty-fonts'),
-            $familyName,
-            $this->formatRoleLabelList($translatedLabels)
-        );
+        return RoleUsageMessageFormatter::buildDeleteBlockedMessage($familyName, $roleLabels);
     }
 
     protected function buildDeleteLastVariantBlockedMessage(string $familyName, array $roleLabels): string
     {
-        $translatedLabels = $this->translateRoleLabels($roleLabels);
-
-        if ($translatedLabels === []) {
-            return '';
-        }
-
-        if (count($translatedLabels) === 1) {
-            return sprintf(
-                __('%1$s is currently assigned to %2$s, and this is the last saved variant. Choose a different %2$s font before deleting it.', 'tasty-fonts'),
-                $familyName,
-                $translatedLabels[0]
-            );
-        }
-
-        return sprintf(
-            __('%1$s is currently assigned to %2$s, and this is the last saved variant. Choose different role fonts before deleting it.', 'tasty-fonts'),
-            $familyName,
-            $this->formatRoleLabelList($translatedLabels)
-        );
+        return RoleUsageMessageFormatter::buildDeleteLastVariantBlockedMessage($familyName, $roleLabels);
     }
 
     protected function translateRoleLabels(array $roleLabels): array
     {
-        return array_map(
-            static fn (string $label): string => match ($label) {
-                'heading' => __('heading', 'tasty-fonts'),
-                'body' => __('body', 'tasty-fonts'),
-                'monospace' => __('monospace', 'tasty-fonts'),
-                default => $label,
-            },
-            $roleLabels
-        );
+        return RoleUsageMessageFormatter::translateRoleLabels($roleLabels);
     }
 
     protected function formatRoleLabelList(array $labels): string
     {
-        $labels = array_values(array_filter($labels, 'strlen'));
-
-        if ($labels === []) {
-            return '';
-        }
-
-        if (count($labels) === 1) {
-            return $labels[0];
-        }
-
-        $lastLabel = array_pop($labels);
-
-        return implode(', ', $labels) . __(' and ', 'tasty-fonts') . $lastLabel;
+        return RoleUsageMessageFormatter::formatRoleLabelList($labels);
     }
 
     protected function buildRoleSelectionKey(array $roleKeys): string

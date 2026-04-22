@@ -4433,6 +4433,67 @@ $tests['admin_page_renderer_renders_monospace_role_ui_when_enabled'] = static fu
     assertContainsValue('var(--font-monospace)', $output, 'Enabled monospace support should expose the monospace role variable in the role UI.');
 };
 
+$tests['admin_page_renderer_keeps_hosted_import_and_upload_builder_ids_after_dedupe'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    try {
+        $renderer->renderPage([
+            'storage' => ['root' => '/tmp/uploads/fonts'],
+            'catalog' => [],
+            'available_families' => ['Inter', 'JetBrains Mono'],
+            'roles' => [
+                'heading' => 'Inter',
+                'body' => 'Inter',
+                'monospace' => 'JetBrains Mono',
+                'heading_fallback' => 'sans-serif',
+                'body_fallback' => 'sans-serif',
+                'monospace_fallback' => 'monospace',
+            ],
+            'logs' => [],
+            'activity_actor_options' => [],
+            'family_fallbacks' => [],
+            'family_font_displays' => [],
+            'family_font_display_options' => [],
+            'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+            'preview_size' => 32,
+            'font_display' => 'optional',
+            'font_display_options' => [],
+            'minify_css_output' => true,
+            'preload_primary_fonts' => true,
+            'remote_connection_hints' => true,
+            'training_wheels_off' => false,
+            'monospace_role_enabled' => true,
+            'variable_fonts_enabled' => true,
+            'delete_uploaded_files_on_uninstall' => false,
+            'diagnostic_items' => [],
+            'overview_metrics' => [],
+            'output_panels' => [],
+            'generated_css_panel' => [],
+            'preview_panels' => [['key' => 'editorial', 'label' => 'Specimen', 'active' => true]],
+            'toasts' => [],
+            'apply_everywhere' => false,
+            'role_deployment' => [],
+            'google_catalog_link' => 'https://fonts.google.com/',
+            'bunny_catalog_link' => 'https://fonts.bunny.net/',
+        ]);
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('id="tasty-fonts-google-search"', $output, 'The Google hosted import panel should keep its search field id after the renderer dedupe.');
+    assertContainsValue('id="tasty-fonts-bunny-search"', $output, 'The Bunny hosted import panel should keep its search field id after the renderer dedupe.');
+    assertContainsValue('id="tasty-fonts-upload-group-template"', $output, 'The upload builder should keep its group template id after the shared markup extraction.');
+    assertContainsValue('id="tasty-fonts-upload-row-template"', $output, 'The upload builder should keep its row template id after the shared markup extraction.');
+    assertContainsValue('data-role-weight-editor="heading"', $output, 'The heading role card should still render its weight editor target after the studio role-card dedupe.');
+    assertContainsValue('data-role-weight-editor="body"', $output, 'The body role card should still render its weight editor target after the studio role-card dedupe.');
+    assertContainsValue('data-role-weight-editor="monospace"', $output, 'The monospace role card should still render its weight editor target after the studio role-card dedupe.');
+};
+
 $tests['admin_page_renderer_allows_fallback_only_heading_and_body_roles'] = static function (): void {
     resetTestState();
 

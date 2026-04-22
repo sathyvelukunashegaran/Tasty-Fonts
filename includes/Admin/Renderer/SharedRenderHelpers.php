@@ -232,6 +232,19 @@ trait SharedRenderHelpers
         <?php
     }
 
+    public function renderSourceSetupCopy(string $title, string $summary): void
+    {
+        ?>
+        <div class="tasty-fonts-source-status-copy">
+            <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source Setup', 'tasty-fonts'); ?></span>
+            <div class="tasty-fonts-source-status-title-row">
+                <h4><?php echo esc_html($title); ?></h4>
+            </div>
+            <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($summary); ?></p>
+        </div>
+        <?php
+    }
+
     public function renderFieldLabel(string $label): void
     {
         ?>
@@ -377,5 +390,357 @@ trait SharedRenderHelpers
             <?php endforeach; ?>
         </datalist>
         <?php
+    }
+
+    public function renderHostedImportWorkflow(array $config): void
+    {
+        $providerKey = (string) ($config['provider_key'] ?? '');
+        ?>
+        <div class="<?php echo esc_attr((string) ($config['workflow_class'] ?? 'tasty-fonts-google-workflow')); ?>">
+            <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-search-shell tasty-fonts-workflow-step tasty-fonts-workflow-step--search">
+                <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 1', 'tasty-fonts'); ?></span>
+                    <h4><?php esc_html_e('Find a Family', 'tasty-fonts'); ?></h4>
+                </div>
+
+                <label class="tasty-fonts-stack-field">
+                    <span class="screen-reader-text"><?php echo esc_html((string) ($config['search_label'] ?? '')); ?></span>
+                    <input
+                        type="search"
+                        id="<?php echo esc_attr((string) ($config['search_input_id'] ?? '')); ?>"
+                        class="regular-text tasty-fonts-text-control"
+                        placeholder="<?php echo esc_attr((string) ($config['search_placeholder'] ?? '')); ?>"
+                        <?php if (!empty($config['search_note_id']) && !empty($config['search_disabled'])): ?>
+                            aria-describedby="<?php echo esc_attr((string) $config['search_note_id']); ?>"
+                        <?php endif; ?>
+                        <?php disabled(!empty($config['search_disabled'])); ?>
+                    >
+                </label>
+                <?php if (!empty($config['search_note_id']) && !empty($config['search_disabled'])): ?>
+                    <p id="<?php echo esc_attr((string) $config['search_note_id']); ?>" class="tasty-fonts-inline-note tasty-fonts-inline-note--warning">
+                        <strong><?php esc_html_e('Search disabled.', 'tasty-fonts'); ?></strong>
+                        <span><?php echo esc_html((string) ($config['search_disabled_copy'] ?? '')); ?></span>
+                    </p>
+                <?php endif; ?>
+                <div id="<?php echo esc_attr((string) ($config['results_id'] ?? '')); ?>" class="tasty-fonts-search-results" aria-live="polite"></div>
+            </section>
+
+            <section class="<?php echo esc_attr((string) ($config['import_panel_class'] ?? 'tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-workflow-step tasty-fonts-workflow-step--import')); ?>">
+                <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 2', 'tasty-fonts'); ?></span>
+                    <h4 id="<?php echo esc_attr((string) ($config['import_step_title_id'] ?? '')); ?>"><?php esc_html_e('Choose Variants and Delivery', 'tasty-fonts'); ?></h4>
+                </div>
+
+                <div class="tasty-fonts-import-manual-grid">
+                    <label class="tasty-fonts-stack-field">
+                        <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
+                        <input type="text" id="<?php echo esc_attr((string) ($config['manual_family_id'] ?? '')); ?>" class="regular-text tasty-fonts-text-control" placeholder="<?php echo esc_attr((string) ($config['manual_family_placeholder'] ?? '')); ?>">
+                    </label>
+                    <label class="tasty-fonts-stack-field">
+                        <span id="<?php echo esc_attr((string) ($config['manual_variants_label_id'] ?? '')); ?>" class="tasty-fonts-field-label"><?php esc_html_e('Manual Variants', 'tasty-fonts'); ?></span>
+                        <input type="text" id="<?php echo esc_attr((string) ($config['manual_variants_id'] ?? '')); ?>" class="regular-text tasty-fonts-text-control" placeholder="<?php echo esc_attr((string) ($config['manual_variants_placeholder'] ?? '')); ?>">
+                    </label>
+                </div>
+
+                <div class="tasty-fonts-import-choice-grid">
+                    <fieldset class="tasty-fonts-source-delivery-choice tasty-fonts-import-choice-fieldset tasty-fonts-import-choice-fieldset--format" id="<?php echo esc_attr((string) ($config['format_fieldset_id'] ?? '')); ?>">
+                        <legend class="screen-reader-text"><?php esc_html_e('Format', 'tasty-fonts'); ?></legend>
+                        <span class="tasty-fonts-field-label tasty-fonts-import-choice-label"><?php esc_html_e('Format', 'tasty-fonts'); ?></span>
+                        <div id="<?php echo esc_attr((string) ($config['format_choice_id'] ?? '')); ?>" class="tasty-fonts-output-quick-options tasty-fonts-import-choice-options tasty-fonts-import-choice-options--segmented" hidden></div>
+                        <p class="tasty-fonts-muted tasty-fonts-import-choice-note" data-import-format-note="<?php echo esc_attr($providerKey); ?>" hidden></p>
+                    </fieldset>
+
+                    <fieldset class="tasty-fonts-source-delivery-choice tasty-fonts-import-choice-fieldset tasty-fonts-import-choice-fieldset--delivery">
+                        <legend class="screen-reader-text"><?php esc_html_e('Delivery', 'tasty-fonts'); ?></legend>
+                        <span class="tasty-fonts-field-label tasty-fonts-import-choice-label"><?php esc_html_e('Delivery', 'tasty-fonts'); ?></span>
+                        <div class="tasty-fonts-output-quick-options tasty-fonts-import-choice-options tasty-fonts-import-choice-options--segmented" data-import-delivery-choice="<?php echo esc_attr($providerKey); ?>">
+                            <?php foreach ((array) ($config['delivery_options'] ?? []) as $index => $option): ?>
+                                <label class="tasty-fonts-output-quick-option<?php echo $index === 0 ? ' is-active' : ''; ?>" data-pill-option>
+                                    <input type="radio" name="<?php echo esc_attr((string) ($config['delivery_input_name'] ?? '')); ?>" value="<?php echo esc_attr((string) ($option['value'] ?? '')); ?>" <?php checked($index, 0); ?> data-pill-option-input>
+                                    <span><?php echo esc_html((string) ($option['label'] ?? '')); ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <div class="tasty-fonts-selected-wrap tasty-fonts-selected-wrap--import">
+                    <div class="tasty-fonts-selected-card tasty-fonts-selected-card--import-family">
+                        <div class="tasty-fonts-import-card-head">
+                            <div class="tasty-fonts-import-card-copy">
+                                <?php $this->renderFieldLabel(__('Selected Family', 'tasty-fonts')); ?>
+                                <div id="<?php echo esc_attr((string) ($config['selected_family_id'] ?? '')); ?>" class="tasty-fonts-import-selected-name"><?php echo esc_html((string) ($config['selected_family_default'] ?? '')); ?></div>
+                                <div id="<?php echo esc_attr((string) ($config['selected_family_meta_id'] ?? '')); ?>" class="tasty-fonts-import-selected-meta" hidden></div>
+                                <p id="<?php echo esc_attr((string) ($config['selected_family_note_id'] ?? '')); ?>" class="tasty-fonts-import-selected-note tasty-fonts-muted" hidden></p>
+                            </div>
+                        </div>
+                        <div class="tasty-fonts-import-preview-shell">
+                            <span class="tasty-fonts-import-preview-label"><?php esc_html_e('Live Preview', 'tasty-fonts'); ?></span>
+                            <div id="<?php echo esc_attr((string) ($config['selected_preview_id'] ?? '')); ?>" class="tasty-fonts-import-selected-preview is-placeholder"><?php echo esc_html((string) ($config['selected_preview_default'] ?? '')); ?></div>
+                        </div>
+                    </div>
+
+                    <div class="tasty-fonts-selected-card tasty-fonts-selected-card--import-variants">
+                        <div class="tasty-fonts-import-card-head">
+                            <div class="tasty-fonts-import-card-copy">
+                                <span id="<?php echo esc_attr((string) ($config['selected_variants_label_id'] ?? '')); ?>" class="tasty-fonts-field-label"><?php esc_html_e('Variants to Import', 'tasty-fonts'); ?></span>
+                                <p id="<?php echo esc_attr((string) ($config['selected_variants_note_id'] ?? '')); ?>" class="tasty-fonts-import-variant-note tasty-fonts-muted"><?php echo esc_html((string) ($config['selected_variants_note'] ?? '')); ?></p>
+                            </div>
+                            <div class="tasty-fonts-import-card-meta">
+                                <div id="<?php echo esc_attr((string) ($config['selection_summary_id'] ?? '')); ?>" class="tasty-fonts-import-selection-summary"><?php esc_html_e('0 Variants Selected', 'tasty-fonts'); ?></div>
+                            </div>
+                        </div>
+                        <div class="tasty-fonts-import-variant-toolbar">
+                            <div class="tasty-fonts-import-variant-actions">
+                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-<?php echo esc_attr($providerKey); ?>-variant-select="all"><?php esc_html_e('All', 'tasty-fonts'); ?></button>
+                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-<?php echo esc_attr($providerKey); ?>-variant-select="normal"><?php esc_html_e('Normal', 'tasty-fonts'); ?></button>
+                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-<?php echo esc_attr($providerKey); ?>-variant-select="italic"><?php esc_html_e('Italic', 'tasty-fonts'); ?></button>
+                                <button type="button" class="button tasty-fonts-filter-pill tasty-fonts-filter-pill--small tasty-fonts-variant-filter" data-<?php echo esc_attr($providerKey); ?>-variant-select="clear"><?php esc_html_e('Clear', 'tasty-fonts'); ?></button>
+                            </div>
+                        </div>
+                        <div id="<?php echo esc_attr((string) ($config['variant_list_id'] ?? '')); ?>" class="tasty-fonts-variant-list"></div>
+                    </div>
+                </div>
+
+                <div class="tasty-fonts-import-footer">
+                    <div id="<?php echo esc_attr((string) ($config['import_status_id'] ?? '')); ?>" class="tasty-fonts-import-status" aria-live="polite" aria-atomic="true"></div>
+
+                    <div class="tasty-fonts-actions tasty-fonts-actions--import">
+                        <button
+                            type="button"
+                            id="<?php echo esc_attr((string) ($config['size_estimate_id'] ?? '')); ?>"
+                            class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help is-role"
+                            <?php $this->renderPassiveHelpAttributes(__('The estimated transfer size only varies by family and subset.', 'tasty-fonts')); ?>
+                            aria-label="<?php esc_attr_e('Estimated transfer size information', 'tasty-fonts'); ?>"
+                        ><?php esc_html_e('Approx. +0 KB WOFF2', 'tasty-fonts'); ?></button>
+                        <button type="button" class="button button-primary" id="<?php echo esc_attr((string) ($config['submit_id'] ?? '')); ?>"><?php esc_html_e('Add to Library', 'tasty-fonts'); ?></button>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <?php
+    }
+
+    public function renderUploadBuilderGroup(bool $showUploadVariableControls): void
+    {
+        ?>
+        <section class="tasty-fonts-upload-group" data-upload-group>
+            <div class="tasty-fonts-upload-group-head">
+                <div class="tasty-fonts-upload-group-fields">
+                    <label class="tasty-fonts-stack-field" data-upload-group-label="family">
+                        <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
+                        <input
+                            type="text"
+                            class="regular-text tasty-fonts-text-control"
+                            data-upload-group-field="family"
+                            placeholder="<?php esc_attr_e('Example: Satoshi', 'tasty-fonts'); ?>"
+                        >
+                    </label>
+
+                    <label class="tasty-fonts-stack-field" data-upload-group-label="fallback">
+                        <?php $this->renderFieldLabel(__('Fallback', 'tasty-fonts')); ?>
+                        <?php
+                        $this->renderFallbackInput(
+                            '',
+                            'sans-serif',
+                            [
+                                'data-upload-group-field' => 'fallback',
+                                'placeholder' => __('Example: system-ui, sans-serif', 'tasty-fonts'),
+                            ]
+                        );
+                        ?>
+                    </label>
+                </div>
+
+                <button
+                    type="button"
+                    class="button tasty-fonts-button-danger tasty-fonts-upload-group-remove"
+                    data-upload-remove-group
+                >
+                    <?php esc_html_e('Remove Family', 'tasty-fonts'); ?>
+                </button>
+            </div>
+
+            <div class="tasty-fonts-upload-face-shell<?php echo $showUploadVariableControls ? '' : ' tasty-fonts-upload-face-shell--static-only'; ?>">
+                <div class="tasty-fonts-upload-face-headings">
+                    <span data-upload-heading="file"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
+                    <span data-upload-heading="weight"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
+                    <span data-upload-heading="style"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
+                    <?php if ($showUploadVariableControls): ?>
+                        <span data-upload-heading="variable"><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
+                    <?php endif; ?>
+                    <span data-upload-heading="action"><?php esc_html_e('Action', 'tasty-fonts'); ?></span>
+                </div>
+
+                <div class="tasty-fonts-upload-face-list" data-upload-face-list>
+                    <?php $this->renderUploadBuilderRow($showUploadVariableControls); ?>
+                </div>
+            </div>
+
+            <div class="tasty-fonts-upload-group-actions">
+                <button type="button" class="button" data-upload-add-face><?php esc_html_e('Add Face', 'tasty-fonts'); ?></button>
+            </div>
+        </section>
+        <?php
+    }
+
+    public function renderUploadBuilderRow(bool $showUploadVariableControls): void
+    {
+        ?>
+        <div class="tasty-fonts-upload-face-row" data-upload-row role="group">
+            <span class="screen-reader-text" data-upload-row-label></span>
+            <div class="tasty-fonts-upload-face-grid">
+                <label class="tasty-fonts-stack-field tasty-fonts-upload-file-field" data-upload-field-label="file">
+                    <span class="screen-reader-text"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-upload-file-picker">
+                        <input
+                            type="file"
+                            class="tasty-fonts-upload-native-file"
+                            data-upload-field="file"
+                            accept=".woff2,.woff,.ttf,.otf"
+                        >
+                        <span class="tasty-fonts-upload-file-button"><?php esc_html_e('Select Font', 'tasty-fonts'); ?></span>
+                        <span class="tasty-fonts-upload-file-name" data-upload-file-name><?php esc_html_e('No file chosen', 'tasty-fonts'); ?></span>
+                    </span>
+                </label>
+
+                <label class="tasty-fonts-stack-field" data-upload-field-label="weight">
+                    <span class="screen-reader-text"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-select-field">
+                        <select data-upload-field="weight">
+                            <?php foreach (range(100, 900, 100) as $weight): ?>
+                                <option value="<?php echo esc_attr((string) $weight); ?>" <?php selected((string) $weight, '400'); ?>><?php echo esc_html((string) $weight); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </span>
+                </label>
+
+                <label class="tasty-fonts-stack-field" data-upload-field-label="style">
+                    <span class="screen-reader-text"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-select-field">
+                        <select data-upload-field="style">
+                            <option value="normal"><?php esc_html_e('Normal', 'tasty-fonts'); ?></option>
+                            <option value="italic"><?php esc_html_e('Italic', 'tasty-fonts'); ?></option>
+                            <option value="oblique"><?php esc_html_e('Oblique', 'tasty-fonts'); ?></option>
+                        </select>
+                    </span>
+                </label>
+
+                <?php if ($showUploadVariableControls): ?>
+                    <label class="tasty-fonts-stack-field tasty-fonts-upload-variable-field" data-upload-field-label="variable">
+                        <span class="screen-reader-text"><?php esc_html_e('Variable Font', 'tasty-fonts'); ?></span>
+                        <span class="tasty-fonts-upload-variable-toggle">
+                            <input type="checkbox" data-upload-field="is-variable">
+                            <span><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
+                        </span>
+                    </label>
+                <?php endif; ?>
+
+                <button
+                    type="button"
+                    class="button tasty-fonts-button-danger tasty-fonts-upload-row-remove"
+                    data-upload-remove
+                    aria-label="<?php esc_attr_e('Remove row', 'tasty-fonts'); ?>"
+                >
+                    <?php esc_html_e('Remove', 'tasty-fonts'); ?>
+                </button>
+            </div>
+
+            <div class="tasty-fonts-upload-row-foot">
+                <button type="button" class="button tasty-fonts-upload-detected" data-upload-detected-apply hidden></button>
+                <div class="tasty-fonts-upload-row-status" data-upload-row-status></div>
+            </div>
+
+            <div class="tasty-fonts-upload-axis-shell" data-upload-axis-shell hidden>
+                <div class="tasty-fonts-upload-axis-list" data-upload-axis-list></div>
+                <div class="tasty-fonts-upload-axis-actions">
+                    <button type="button" class="button button-small" data-upload-add-axis><?php esc_html_e('Add Axis', 'tasty-fonts'); ?></button>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    public function renderRoleSelectionCard(array $config, array $roles, array $availableFamilyOptions, string $roleFormId): void
+    {
+        $roleKey = (string) ($config['role_key'] ?? '');
+        ?>
+        <section class="tasty-fonts-studio-card tasty-fonts-role-box">
+            <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
+                <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                    <span class="tasty-fonts-panel-kicker"><?php echo esc_html((string) ($config['kicker'] ?? '')); ?></span>
+                    <h4><?php echo esc_html((string) ($config['title'] ?? '')); ?></h4>
+                </div>
+                <div class="tasty-fonts-role-box-meta">
+                    <span class="tasty-fonts-role-box-meta-label"><?php esc_html_e('Current Value', 'tasty-fonts'); ?></span>
+                    <button
+                        type="button"
+                        class="tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy tasty-fonts-role-box-copy"
+                        data-role-family-variable-copy="<?php echo esc_attr($roleKey); ?>"
+                        data-copy-text="<?php echo esc_attr((string) ($config['family_variable'] ?? '')); ?>"
+                        data-copy-success="<?php echo esc_attr((string) ($config['copy_success'] ?? '')); ?>"
+                        data-copy-static-label="1"
+                        aria-label="<?php echo esc_attr((string) ($config['copy_label'] ?? '')); ?>"
+                        title="<?php echo esc_attr((string) ($config['copy_label'] ?? '')); ?>"
+                    >
+                        <span class="tasty-fonts-role-box-copy-label"><?php echo esc_html((string) ($config['family_variable'] ?? '')); ?></span>
+                    </button>
+                </div>
+            </div>
+            <p class="tasty-fonts-studio-card-copy tasty-fonts-role-box-description"><?php echo esc_html((string) ($config['description'] ?? '')); ?></p>
+            <div class="tasty-fonts-role-fields">
+                <label class="tasty-fonts-stack-field">
+                    <?php $this->renderFieldLabel(__('Family', 'tasty-fonts')); ?>
+                    <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
+                        <select name="<?php echo esc_attr((string) ($config['family_input_name'] ?? '')); ?>" id="<?php echo esc_attr((string) ($config['family_select_id'] ?? '')); ?>" form="<?php echo esc_attr($roleFormId); ?>">
+                            <option value="" <?php selected($roles[$roleKey] ?? '', ''); ?>><?php esc_html_e('Use Fallback Only', 'tasty-fonts'); ?></option>
+                            <?php $this->renderRoleFamilyOptions($availableFamilyOptions, (string) ($roles[$roleKey] ?? '')); ?>
+                        </select>
+                        <?php $this->renderClearSelectButton((string) ($config['clear_family_label'] ?? ''), (string) ($config['family_select_id'] ?? '')); ?>
+                    </span>
+                </label>
+            </div>
+            <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="<?php echo esc_attr($roleKey); ?>" hidden>
+                <div class="tasty-fonts-role-axis-head">
+                    <span class="tasty-fonts-field-label-text"><?php esc_html_e('Role Weight', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-muted" data-role-weight-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Choose a saved static weight when the selected family offers more than one.', 'tasty-fonts'); ?></span>
+                </div>
+                <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
+                    <span class="screen-reader-text"><?php echo esc_html((string) ($config['weight_screen_reader_label'] ?? '')); ?></span>
+                    <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
+                        <select
+                            name="<?php echo esc_attr((string) ($config['weight_input_name'] ?? '')); ?>"
+                            id="<?php echo esc_attr((string) ($config['weight_select_id'] ?? '')); ?>"
+                            data-role-weight-select="<?php echo esc_attr($roleKey); ?>"
+                            form="<?php echo esc_attr($roleFormId); ?>"
+                        ></select>
+                        <?php $this->renderClearSelectButton((string) ($config['clear_weight_label'] ?? ''), (string) ($config['weight_select_id'] ?? '')); ?>
+                    </span>
+                </label>
+            </div>
+            <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="<?php echo esc_attr($roleKey); ?>" hidden>
+                <div class="tasty-fonts-role-axis-head">
+                    <span class="tasty-fonts-field-label-text" data-role-axis-heading="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-muted" data-role-axis-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
+                </div>
+                <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="<?php echo esc_attr($roleKey); ?>"></div>
+            </div>
+        </section>
+        <?php
+    }
+
+    private function renderRoleFamilyOptions(array $availableFamilyOptions, string $selectedFamily): void
+    {
+        foreach ($availableFamilyOptions as $option) {
+            if (!is_array($option)) {
+                continue;
+            }
+
+            $familyName = (string) ($option['value'] ?? '');
+            $familyLabel = (string) ($option['label'] ?? $familyName);
+            ?>
+            <option value="<?php echo esc_attr($familyName); ?>" <?php selected($selectedFamily, $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
+            <?php
+        }
     }
 }

@@ -567,6 +567,81 @@ final class FontUtils
         return 400;
     }
 
+    public static function weightRangeFromWeightAndAxes(string|int $weight, mixed $axes = []): ?array
+    {
+        $normalizedAxes = self::normalizeAxesMap($axes);
+
+        if (isset($normalizedAxes['WGHT']['min'], $normalizedAxes['WGHT']['max'])) {
+            return [(int) $normalizedAxes['WGHT']['min'], (int) $normalizedAxes['WGHT']['max']];
+        }
+
+        $normalizedWeight = self::normalizeWeight($weight);
+
+        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $normalizedWeight, $matches) === 1) {
+            return [(int) $matches[1], (int) $matches[2]];
+        }
+
+        return null;
+    }
+
+    public static function weightRangeFromFace(array $face): ?array
+    {
+        return self::weightRangeFromWeightAndAxes(
+            (string) ($face['weight'] ?? '400'),
+            $face['axes'] ?? []
+        );
+    }
+
+    public static function requestedWeightMatchesRange(string|int $requestedWeight, int $start, int $end): bool
+    {
+        $normalizedWeight = self::normalizeWeight($requestedWeight);
+
+        if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $normalizedWeight, $matches) === 1) {
+            return $start <= (int) $matches[1] && $end >= (int) $matches[2];
+        }
+
+        $requestedValue = self::weightSortValue($normalizedWeight);
+
+        return $requestedValue >= $start && $requestedValue <= $end;
+    }
+
+    public static function blockEditorFontWeightValue(string|int $weight, mixed $axes = []): string
+    {
+        $weightRange = self::weightRangeFromWeightAndAxes($weight, $axes);
+
+        if ($weightRange !== null) {
+            return (string) $weightRange[0] . ' ' . (string) $weightRange[1];
+        }
+
+        return self::normalizeWeight($weight);
+    }
+
+    public static function buildHostedCssAxes(array $variants): array
+    {
+        $axes = [];
+
+        foreach (self::normalizeVariantTokens($variants) as $token) {
+            $axis = self::googleVariantToAxis($token);
+
+            if ($axis === null) {
+                continue;
+            }
+
+            $axes[] = ($axis['style'] === 'italic' ? '1' : '0') . ',' . $axis['weight'];
+        }
+
+        return array_values(array_unique($axes));
+    }
+
+    public static function sanitizeHostedCssDisplay(string $display): string
+    {
+        $display = strtolower(trim($display));
+
+        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true)
+            ? $display
+            : 'swap';
+    }
+
     public static function compareFacesByWeightAndStyle(array $left, array $right): int
     {
         $weightCompare = self::weightSortValue($left['weight'] ?? '400') <=> self::weightSortValue($right['weight'] ?? '400');

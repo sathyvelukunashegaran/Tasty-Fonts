@@ -10,6 +10,7 @@ use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\RoleUsageMessageFormatter;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
@@ -121,25 +122,16 @@ final class LibraryService
      */
     public function deleteDeliveryProfile(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $familySlug = FontUtils::slugify($familySlug);
-        $deliveryId = FontUtils::slugify($deliveryId);
-        $family = $this->findFamilyBySlug($familySlug);
+        $selection = $this->resolveFamilyDeliverySelection($familySlug, $deliveryId);
 
-        if ($family === null) {
-            return $this->error(
-                'tasty_fonts_family_not_found',
-                __('That font family could not be found in the library.', 'tasty-fonts')
-            );
+        if (is_wp_error($selection)) {
+            return $selection;
         }
 
-        $profile = $this->findDeliveryProfile($family, $deliveryId);
-
-        if ($profile === null) {
-            return $this->error(
-                'tasty_fonts_delivery_not_found',
-                __('That delivery profile could not be found for the selected family.', 'tasty-fonts')
-            );
-        }
+        $familySlug = (string) $selection['family_slug'];
+        $deliveryId = (string) $selection['delivery_id'];
+        $family = (array) $selection['family'];
+        $profile = (array) $selection['profile'];
 
         $familyName = (string) ($family['family'] ?? $familySlug);
         $isActiveDelivery = (string) ($family['active_delivery_id'] ?? '') === $deliveryId;
@@ -230,25 +222,16 @@ final class LibraryService
      */
     public function saveFamilyDelivery(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $familySlug = FontUtils::slugify($familySlug);
-        $deliveryId = FontUtils::slugify($deliveryId);
-        $family = $this->findFamilyBySlug($familySlug);
+        $selection = $this->resolveFamilyDeliverySelection($familySlug, $deliveryId);
 
-        if ($family === null) {
-            return $this->error(
-                'tasty_fonts_family_not_found',
-                __('That font family could not be found in the library.', 'tasty-fonts')
-            );
+        if (is_wp_error($selection)) {
+            return $selection;
         }
 
-        $profile = $this->findDeliveryProfile($family, $deliveryId);
-
-        if ($profile === null) {
-            return $this->error(
-                'tasty_fonts_delivery_not_found',
-                __('That delivery profile could not be found for the selected family.', 'tasty-fonts')
-            );
-        }
+        $familySlug = (string) $selection['family_slug'];
+        $deliveryId = (string) $selection['delivery_id'];
+        $family = (array) $selection['family'];
+        $profile = (array) $selection['profile'];
 
         $this->persistProfile($family, $profile, false);
 
@@ -277,6 +260,44 @@ final class LibraryService
             'delivery_id' => $deliveryId,
             'delivery_label' => (string) ($profile['label'] ?? ''),
             'message' => $message,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     family_slug: string,
+     *     delivery_id: string,
+     *     family: array<string, mixed>,
+     *     profile: array<string, mixed>
+     * }|WP_Error
+     */
+    private function resolveFamilyDeliverySelection(string $familySlug, string $deliveryId): array|WP_Error
+    {
+        $familySlug = FontUtils::slugify($familySlug);
+        $deliveryId = FontUtils::slugify($deliveryId);
+        $family = $this->findFamilyBySlug($familySlug);
+
+        if ($family === null) {
+            return $this->error(
+                'tasty_fonts_family_not_found',
+                __('That font family could not be found in the library.', 'tasty-fonts')
+            );
+        }
+
+        $profile = $this->findDeliveryProfile($family, $deliveryId);
+
+        if ($profile === null) {
+            return $this->error(
+                'tasty_fonts_delivery_not_found',
+                __('That delivery profile could not be found for the selected family.', 'tasty-fonts')
+            );
+        }
+
+        return [
+            'family_slug' => $familySlug,
+            'delivery_id' => $deliveryId,
+            'family' => $family,
+            'profile' => $profile,
         ];
     }
 
@@ -804,65 +825,12 @@ final class LibraryService
 
     private function buildDeleteFamilyBlockedMessage(string $familyName, array $roleLabels): string
     {
-        $translatedLabels = $this->translateRoleLabels($roleLabels);
-
-        if ($translatedLabels === []) {
-            return '';
-        }
-
-        if (count($translatedLabels) === 1) {
-            return sprintf(
-                __('%1$s is currently assigned as the %2$s font. Choose a different %2$s font before deleting it.', 'tasty-fonts'),
-                $familyName,
-                $translatedLabels[0]
-            );
-        }
-
-        return sprintf(
-            __('%1$s is currently assigned to %2$s. Choose different role fonts before deleting it.', 'tasty-fonts'),
-            $familyName,
-            $this->formatRoleLabelList($translatedLabels)
-        );
+        return RoleUsageMessageFormatter::buildDeleteBlockedMessage($familyName, $roleLabels);
     }
 
     private function buildDeleteLastVariantBlockedMessage(string $familyName, array $roleLabels): string
     {
-        $translatedLabels = $this->translateRoleLabels($roleLabels);
-
-        if ($translatedLabels === []) {
-            return '';
-        }
-
-        if (count($translatedLabels) === 1) {
-            return sprintf(
-                __('%1$s is currently assigned to %2$s, and this is the last saved variant. Choose a different %2$s font before deleting it.', 'tasty-fonts'),
-                $familyName,
-                $translatedLabels[0]
-            );
-        }
-
-        return sprintf(
-            __('%1$s is currently assigned to %2$s, and this is the last saved variant. Choose different role fonts before deleting it.', 'tasty-fonts'),
-            $familyName,
-            $this->formatRoleLabelList($translatedLabels)
-        );
-    }
-
-    private function formatRoleLabelList(array $labels): string
-    {
-        $labels = array_values(array_filter($labels, 'strlen'));
-
-        if ($labels === []) {
-            return '';
-        }
-
-        if (count($labels) === 1) {
-            return $labels[0];
-        }
-
-        $lastLabel = array_pop($labels);
-
-        return implode(', ', $labels) . __(' and ', 'tasty-fonts') . $lastLabel;
+        return RoleUsageMessageFormatter::buildDeleteLastVariantBlockedMessage($familyName, $roleLabels);
     }
 
     private function liveRoleKeys(): array

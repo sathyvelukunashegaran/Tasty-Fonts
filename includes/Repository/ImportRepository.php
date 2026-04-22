@@ -173,83 +173,47 @@ final class ImportRepository
 
     public function deleteProfile(string $familySlug, string $deliveryId): ?array
     {
-        $familySlug = FontUtils::slugify($familySlug);
-        $deliveryId = $this->normalizeDeliveryId($deliveryId);
+        return $this->mutateFamilyDelivery(
+            $familySlug,
+            $deliveryId,
+            function (array &$library, string $normalizedFamilySlug, array &$family, array &$profiles, string $normalizedDeliveryId): ?array {
+                unset($profiles[$normalizedDeliveryId]);
 
-        if ($familySlug === '' || $deliveryId === '') {
-            return null;
-        }
+                if ($profiles === []) {
+                    unset($library[$normalizedFamilySlug]);
+                    return null;
+                }
 
-        $library = $this->getLibrary();
-        $family = $library[$familySlug] ?? null;
+                $family['delivery_profiles'] = $profiles;
 
-        if (!is_array($family)) {
-            return null;
-        }
+                if ((string) ($family['active_delivery_id'] ?? '') === $normalizedDeliveryId) {
+                    $family['active_delivery_id'] = (string) array_key_first($profiles);
+                }
 
-        $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
-
-        if (!isset($profiles[$deliveryId])) {
-            return null;
-        }
-
-        unset($profiles[$deliveryId]);
-
-        if ($profiles === []) {
-            unset($library[$familySlug]);
-            $this->persistLibrary($library);
-
-            return null;
-        }
-
-        $family['delivery_profiles'] = $profiles;
-
-        if ((string) ($family['active_delivery_id'] ?? '') === $deliveryId) {
-            $family['active_delivery_id'] = (string) array_key_first($profiles);
-        }
-
-        $library[$familySlug] = $this->normalizeFamilyRecord($family, $family);
-        $this->persistLibrary($library);
-
-        return $library[$familySlug];
+                return $family;
+            }
+        );
     }
 
     public function setActiveDelivery(string $familySlug, string $deliveryId, ?string $publishState = null): ?array
     {
-        $familySlug = FontUtils::slugify($familySlug);
-        $deliveryId = $this->normalizeDeliveryId($deliveryId);
+        return $this->mutateFamilyDelivery(
+            $familySlug,
+            $deliveryId,
+            static function (array &$library, string $normalizedFamilySlug, array &$family, array &$profiles, string $normalizedDeliveryId) use ($publishState): array {
+                $family['active_delivery_id'] = $normalizedDeliveryId;
 
-        if ($familySlug === '' || $deliveryId === '') {
-            return null;
-        }
+                if ($publishState !== null) {
+                    $family['publish_state'] = $publishState;
 
-        $library = $this->getLibrary();
-        $family = $library[$familySlug] ?? null;
+                    if ($publishState !== 'role_active') {
+                        $family['manual_publish_state'] = $publishState;
+                    }
+                }
 
-        if (!is_array($family)) {
-            return null;
-        }
-
-        $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
-
-        if (!isset($profiles[$deliveryId])) {
-            return null;
-        }
-
-        $family['active_delivery_id'] = $deliveryId;
-
-        if ($publishState !== null) {
-            $family['publish_state'] = $publishState;
-
-            if ($publishState !== 'role_active') {
-                $family['manual_publish_state'] = $publishState;
+                return $family;
             }
-        }
-
-        $library[$familySlug] = $this->normalizeFamilyRecord($family, $family);
-        $this->persistLibrary($library);
-
-        return $library[$familySlug];
+        );
     }
 
     public function setPublishState(string $familySlug, string $publishState): ?array
@@ -274,6 +238,41 @@ final class ImportRepository
         }
 
         $library[$familySlug] = $this->normalizeFamilyRecord($family, $family);
+        $this->persistLibrary($library);
+
+        return $library[$familySlug];
+    }
+
+    private function mutateFamilyDelivery(string $familySlug, string $deliveryId, callable $mutator): ?array
+    {
+        $familySlug = FontUtils::slugify($familySlug);
+        $deliveryId = $this->normalizeDeliveryId($deliveryId);
+
+        if ($familySlug === '' || $deliveryId === '') {
+            return null;
+        }
+
+        $library = $this->getLibrary();
+        $family = $library[$familySlug] ?? null;
+
+        if (!is_array($family)) {
+            return null;
+        }
+
+        $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
+
+        if (!isset($profiles[$deliveryId])) {
+            return null;
+        }
+
+        $mutatedFamily = $mutator($library, $familySlug, $family, $profiles, $deliveryId);
+
+        if ($mutatedFamily === null) {
+            $this->persistLibrary($library);
+            return null;
+        }
+
+        $library[$familySlug] = $this->normalizeFamilyRecord($mutatedFamily, $mutatedFamily);
         $this->persistLibrary($library);
 
         return $library[$familySlug];

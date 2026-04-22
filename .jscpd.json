@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/jscpd.json",
+  "path": [
+    "plugin.php",
+    "uninstall.php",
+    "includes",
+    "assets/js",
+    "bin"
+  ],
+  "format": [
+    "php",
+    "javascript",
+    "bash"
+  ],
+  "ignore": [
+    "**/.air/**",
+    "**/.playwright-cli/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/languages/**",
+    "**/node_modules/**",
+    "**/output/**",
+    "**/prompt-exports/**",
+    "**/screenshots/**",
+    "**/tests/**",
+    "**/tmp/**",
+    "**/vendor/**",
+    "**/wiki/**"
+  ],
+  "reporters": [
+    "ai",
+    "json"
+  ],
+  "gitignore": true,
+  "minLines": 5,
+  "minTokens": 80,
+  "absolute": true
+}

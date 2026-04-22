@@ -375,28 +375,15 @@ final class SiteTransferService
 
             $this->clearStagedImportBundle();
 
+            $summary = $this->buildStagedBundleSummary($preparedUpload, $manifest, $files);
+
             set_transient(
                 $this->getStagedImportTransientKey(),
-                [
-                    'token' => $stageToken,
-                    'path' => (string) ($preparedUpload['path'] ?? ''),
-                    'bundle_name' => (string) ($preparedUpload['name'] ?? ''),
-                    'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
-                    'exported_at' => (string) ($manifest['exported_at'] ?? ''),
-                    'families' => count(is_array($manifest['library'] ?? null) ? $manifest['library'] : []),
-                    'files' => count($files),
-                ],
+                ['token' => $stageToken, 'path' => (string) ($preparedUpload['path'] ?? '')] + $summary,
                 self::STAGED_IMPORT_TTL
             );
 
-            return [
-                'stage_token' => $stageToken,
-                'bundle_name' => (string) ($preparedUpload['name'] ?? ''),
-                'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
-                'exported_at' => (string) ($manifest['exported_at'] ?? ''),
-                'families' => count(is_array($manifest['library'] ?? null) ? $manifest['library'] : []),
-                'files' => count($files),
-            ];
+            return ['stage_token' => $stageToken] + $summary;
         } finally {
             $this->deleteDirectory((string) ($validation['extract_dir'] ?? ''));
         }
@@ -530,6 +517,17 @@ final class SiteTransferService
                 ],
             ],
             'files' => $this->collectManagedFiles(),
+        ];
+    }
+
+    private function buildStagedBundleSummary(array $preparedUpload, array $manifest, array $files): array
+    {
+        return [
+            'bundle_name' => (string) ($preparedUpload['name'] ?? ''),
+            'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
+            'exported_at' => (string) ($manifest['exported_at'] ?? ''),
+            'families' => count(is_array($manifest['library'] ?? null) ? $manifest['library'] : []),
+            'files' => count($files),
         ];
     }
 

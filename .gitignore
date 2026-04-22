@@ -49,15 +49,14 @@ tmp/
 cache/
 
 # AI agent context files
-AGENTS.md
+jscpd-report.json
+report/
+.agents/tasks/todo-*.md
 
 # Optional local build/release artifacts
 dist/
 build/
 *.zip
-
-# Air artifacts
-.air/
 
 # Local AI planning exports
 prompt-exports/

@@ -122,39 +122,13 @@ final class BunnyFontsClient
     {
         $familyQuery = str_replace('%20', '+', rawurlencode($familyName));
         $url = 'https://fonts.bunny.net/css2?family=' . $familyQuery;
-        $axes = $this->buildCssAxes($variants);
+        $axes = FontUtils::buildHostedCssAxes($variants);
 
         if ($axes !== []) {
             $url .= ':ital,wght@' . implode(';', $axes);
         }
 
-        return $url . '&display=' . rawurlencode($this->sanitizeDisplay($display));
-    }
-
-    private function buildCssAxes(array $variants): array
-    {
-        $axes = [];
-
-        foreach (FontUtils::normalizeVariantTokens($variants) as $token) {
-            $axis = FontUtils::googleVariantToAxis($token);
-
-            if ($axis === null) {
-                continue;
-            }
-
-            $axes[] = ($axis['style'] === 'italic' ? '1' : '0') . ',' . $axis['weight'];
-        }
-
-        return array_values(array_unique($axes));
-    }
-
-    private function sanitizeDisplay(string $display): string
-    {
-        $display = strtolower(trim($display));
-
-        return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true)
-            ? $display
-            : 'swap';
+        return $url . '&display=' . rawurlencode(FontUtils::sanitizeHostedCssDisplay($display));
     }
 
     private function fetchCatalogEntries(): array
