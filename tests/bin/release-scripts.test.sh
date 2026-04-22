@@ -160,7 +160,9 @@ seed_archive_repo() {
         "${repo}/languages" \
         "${repo}/screenshots" \
         "${repo}/tests" \
-        "${repo}/.github/workflows"
+        "${repo}/.github/workflows" \
+        "${repo}/.agents/tasks" \
+        "${repo}/.githooks"
 
     cp "${repo_root}/.gitattributes" "${repo}/.gitattributes"
 
@@ -200,9 +202,30 @@ MD
 # Contributing
 MD
 
+    cat > "${repo}/AGENTS.md" <<'MD'
+# Agent Guide
+MD
+
+    cat > "${repo}/CLAUDE.md" <<'MD'
+# Claude Guide
+MD
+
     cat > "${repo}/.editorconfig" <<'TXT'
 root = true
 TXT
+
+    cat > "${repo}/.jscpd.json" <<'JSON'
+{}
+JSON
+
+    cat > "${repo}/.githooks/pre-commit" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+
+    cat > "${repo}/.agents/tasks/README.md" <<'MD'
+# Tasks
+MD
 
     cat > "${repo}/assets/js/admin.js" <<'JS'
 console.log('runtime');
@@ -563,12 +586,17 @@ if [[ "${archive_entries}" != *"README.md"* \
     && "${archive_entries}" != *"CHANGELOG.md"* \
     && "${archive_entries}" != *"SECURITY.md"* \
     && "${archive_entries}" != *"CONTRIBUTING.md"* \
+    && "${archive_entries}" != *"AGENTS.md"* \
+    && "${archive_entries}" != *"CLAUDE.md"* \
     && "${archive_entries}" != *"CODE_OF_CONDUCT.md"* \
     && "${archive_entries}" != *"readme.txt"* \
     && "${archive_entries}" != *"wiki/guide.md"* \
     && "${archive_entries}" != *"screenshots/.gitkeep"* \
     && "${archive_entries}" != *"languages/tasty-fonts.pot"* \
     && "${archive_entries}" != *".github/workflows/ci.yml"* \
+    && "${archive_entries}" != *".agents/tasks/README.md"* \
+    && "${archive_entries}" != *".githooks/pre-commit"* \
+    && "${archive_entries}" != *".jscpd.json"* \
     && "${archive_entries}" != *"tests/run.php"* ]]; then
     _pass "git archive excludes repository-only files from the distributable"
 else
