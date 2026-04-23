@@ -11,6 +11,21 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 use TastyFonts\Support\TransientKey;
 
+/**
+ * @phpstan-type GeneratedStylesheetState array{
+ *     path: string,
+ *     url: string,
+ *     exists: bool,
+ *     size: int,
+ *     last_modified: int,
+ *     expected_hash: string,
+ *     expected_version: string,
+ *     current_hash: string,
+ *     is_current: bool,
+ *     write_path: string,
+ *     needs_migration: bool
+ * }
+ */
 final class AssetService
 {
     public const ACTION_REGENERATE_CSS = 'tasty_fonts_regenerate_css';
@@ -465,6 +480,9 @@ final class AssetService
         }
     }
 
+    /**
+     * @return GeneratedStylesheetState
+     */
     private function getGeneratedStylesheetState(): array
     {
         $path = $this->storage->getGeneratedCssPath() ?? '';
@@ -502,9 +520,12 @@ final class AssetService
         ];
     }
 
+    /**
+     * @param GeneratedStylesheetState $state
+     */
     private function writeGeneratedCssFile(array $state, bool $logWriteResult = true): bool
     {
-        $path = (string) ($state['write_path'] ?? $state['path'] ?? '');
+        $path = $state['write_path'];
 
         if ($path === '' || (!empty($state['is_current']) && empty($state['needs_migration']))) {
             return $path !== '' && !empty($state['is_current']);
@@ -523,6 +544,9 @@ final class AssetService
         return $written;
     }
 
+    /**
+     * @return array{path: string, url: string, exists: bool, size: int, last_modified: int, current_hash: string}
+     */
     private function buildStylesheetStateForPath(string $path, string $url): array
     {
         if ($path !== '') {

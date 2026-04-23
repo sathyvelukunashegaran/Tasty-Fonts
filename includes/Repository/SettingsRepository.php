@@ -9,6 +9,18 @@ defined('ABSPATH') || exit;
 use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-type RoleAxes array<string, string>
+ * @phpstan-type RoleSet array<string, mixed>
+ * @phpstan-type GoogleApiKeyData array<string, mixed>
+ * @phpstan-type AdobeProjectStatus array{state: string, message: string, checked_at: int}
+ * @phpstan-type FamilyFallbackMap array<string, string>
+ * @phpstan-type FamilyFontDisplayMap array<string, string>
+ * @phpstan-type AdminAccessRoleSlugList list<string>
+ * @phpstan-type AdminAccessUserIdList list<int>
+ * @phpstan-type SettingsInput array<string, mixed>
+ * @phpstan-type NormalizedSettings array<string, mixed>
+ */
 final class SettingsRepository
 {
     public const UPDATE_CHANNEL_STABLE = 'stable';
@@ -133,8 +145,12 @@ final class SettingsRepository
     ];
     private const ROLE_WEIGHT_KEYS = ['heading_weight', 'body_weight', 'monospace_weight'];
     private const ROLE_AXIS_KEYS = ['heading_axes', 'body_axes', 'monospace_axes'];
+    /** @var NormalizedSettings|null */
     private ?array $settingsCache = null;
 
+    /**
+     * @return NormalizedSettings
+     */
     public function getSettings(): array
     {
         if ($this->settingsCache !== null) {
@@ -217,6 +233,10 @@ final class SettingsRepository
         return $this->cacheSettings($settings);
     }
 
+    /**
+     * @param SettingsInput $input
+     * @return NormalizedSettings
+     */
     public function saveSettings(array $input): array
     {
         $settings = $this->getSettings();
@@ -451,6 +471,10 @@ final class SettingsRepository
         );
     }
 
+    /**
+     * @param array<int|string, mixed> $catalog
+     * @return RoleSet
+     */
     public function getRoles(array $catalog): array
     {
         return $this->normalizeRoleSet(
@@ -464,6 +488,11 @@ final class SettingsRepository
         return (string) ($this->getSettings()['update_channel'] ?? self::UPDATE_CHANNEL_STABLE);
     }
 
+    /**
+     * @param SettingsInput $input
+     * @param array<int|string, mixed> $catalog
+     * @return RoleSet
+     */
     public function saveRoles(array $input, array $catalog): array
     {
         $storedRoles = $this->normalizeRoleSet(
@@ -514,6 +543,10 @@ final class SettingsRepository
         return $roles;
     }
 
+    /**
+     * @param array<int|string, mixed> $catalog
+     * @return RoleSet
+     */
     public function getAppliedRoles(array $catalog): array
     {
         $settings = $this->getSettings();
@@ -528,6 +561,10 @@ final class SettingsRepository
         return $this->normalizeRoleSet($storedAppliedRoles, $catalog);
     }
 
+    /**
+     * @param array<int|string, mixed> $catalog
+     * @return RoleSet
+     */
     public function ensureAppliedRolesInitialized(array $catalog): array
     {
         $settings = $this->getSettings();
@@ -546,6 +583,11 @@ final class SettingsRepository
         return $currentRoles;
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param array<int|string, mixed> $catalog
+     * @return RoleSet
+     */
     public function saveAppliedRoles(array $roles, array $catalog): array
     {
         $settings = $this->getSettings();
@@ -559,6 +601,9 @@ final class SettingsRepository
         return $normalizedRoles;
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function setAutoApplyRoles(bool $enabled): array
     {
         $settings = $this->getSettings();
@@ -584,6 +629,9 @@ final class SettingsRepository
         return !empty($this->getSettings()['block_editor_font_library_sync_enabled']);
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function saveAcssFontRoleSyncState(
         ?bool $enabled,
         bool $applied,
@@ -604,6 +652,9 @@ final class SettingsRepository
         return $this->persistSettings($settings);
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function resetStoredSettingsToDefaults(): array
     {
         delete_option(self::OPTION_SETTINGS);
@@ -622,11 +673,19 @@ final class SettingsRepository
         $this->settingsCache = null;
     }
 
+    /**
+     * @param SettingsInput $settings
+     * @return NormalizedSettings
+     */
     public function previewImportedSettings(array $settings): array
     {
         return $this->normalizeImportedSettings($settings);
     }
 
+    /**
+     * @param SettingsInput $settings
+     * @return NormalizedSettings
+     */
     public function replaceImportedSettings(array $settings): array
     {
         $normalized = $this->normalizeImportedSettings($settings);
@@ -637,11 +696,19 @@ final class SettingsRepository
         return $this->cacheSettings($normalized);
     }
 
+    /**
+     * @param SettingsInput $roles
+     * @return RoleSet
+     */
     public function previewImportedRoles(array $roles): array
     {
         return $this->normalizeImportedRoles($roles);
     }
 
+    /**
+     * @param SettingsInput $roles
+     * @return RoleSet
+     */
     public function replaceImportedRoles(array $roles): array
     {
         $normalized = $this->normalizeImportedRoles($roles);
@@ -650,6 +717,9 @@ final class SettingsRepository
         return $normalized;
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function resetLibraryStateAfterWipe(): array
     {
         $settings = $this->getSettings();
@@ -669,6 +739,9 @@ final class SettingsRepository
         return $this->persistSettings($settings);
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function resetIntegrationDetectionState(): array
     {
         $settings = $this->getSettings();
@@ -696,6 +769,9 @@ final class SettingsRepository
         return trim((string) ($this->getSettings()['adobe_project_id'] ?? ''));
     }
 
+    /**
+     * @return AdobeProjectStatus
+     */
     public function getAdobeProjectStatus(): array
     {
         $settings = $this->getSettings();
@@ -707,6 +783,9 @@ final class SettingsRepository
         ];
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function saveAdobeProject(string $projectId, bool $enabled): array
     {
         $settings = $this->getSettings();
@@ -719,6 +798,9 @@ final class SettingsRepository
         return $this->persistSettings($settings);
     }
 
+    /**
+     * @return AdobeProjectStatus
+     */
     public function saveAdobeProjectStatus(string $state, string $message = ''): array
     {
         $settings = $this->getSettings();
@@ -735,6 +817,9 @@ final class SettingsRepository
         return $this->getAdobeProjectStatus();
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function clearAdobeProject(): array
     {
         $settings = $this->getSettings();
@@ -747,6 +832,9 @@ final class SettingsRepository
         return $this->persistSettings($settings);
     }
 
+    /**
+     * @return AdobeProjectStatus
+     */
     public function getGoogleApiKeyStatus(): array
     {
         $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
@@ -758,6 +846,9 @@ final class SettingsRepository
         ];
     }
 
+    /**
+     * @return GoogleApiKeyData
+     */
     public function saveGoogleApiKeyStatus(string $state, string $message = ''): array
     {
         $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
@@ -788,6 +879,9 @@ final class SettingsRepository
         return FontUtils::sanitizeFallback((string) ($fallbacks[$family] ?? $default));
     }
 
+    /**
+     * @return FamilyFallbackMap
+     */
     public function saveFamilyFallback(string $family, string $fallback): array
     {
         $family = sanitize_text_field($family);
@@ -822,6 +916,9 @@ final class SettingsRepository
         return $this->normalizeFontDisplay((string) $displays[$family]);
     }
 
+    /**
+     * @return FamilyFontDisplayMap
+     */
     public function saveFamilyFontDisplay(string $family, string $display): array
     {
         $family = sanitize_text_field($family);
@@ -850,6 +947,10 @@ final class SettingsRepository
         return $displays;
     }
 
+    /**
+     * @param array<int|string, mixed> $catalog
+     * @return RoleSet
+     */
     private function getDefaultRoles(array $catalog): array
     {
         return self::DEFAULT_ROLE_FALLBACKS + [
@@ -868,6 +969,9 @@ final class SettingsRepository
         ];
     }
 
+    /**
+     * @return SettingsInput
+     */
     private function getOptionArray(string $option, ?string $legacyOption = null): array
     {
         $value = get_option($option, null);
@@ -887,6 +991,10 @@ final class SettingsRepository
         return $legacyValue;
     }
 
+    /**
+     * @param SettingsInput $settings
+     * @return NormalizedSettings
+     */
     private function normalizeImportedSettings(array $settings): array
     {
         $settings = $this->withoutGoogleApiKeyData($settings);
@@ -988,11 +1096,20 @@ final class SettingsRepository
         return $this->withoutGoogleApiKeyData($settings);
     }
 
+    /**
+     * @param SettingsInput $roles
+     * @return RoleSet
+     */
     private function normalizeImportedRoles(array $roles): array
     {
         return $this->normalizeRoleSet($roles, []);
     }
 
+    /**
+     * @param SettingsInput|RoleSet $roles
+     * @param array<int|string, mixed> $catalog
+     * @return RoleSet
+     */
     private function normalizeRoleSet(array $roles, array $catalog): array
     {
         $defaults = $this->getDefaultRoles($catalog);
@@ -1016,6 +1133,9 @@ final class SettingsRepository
         return $normalizedRoles;
     }
 
+    /**
+     * @return RoleAxes
+     */
     private function normalizeRoleAxes(mixed $axes): array
     {
         if (is_string($axes) && trim($axes) !== '') {
@@ -1026,7 +1146,13 @@ final class SettingsRepository
             }
         }
 
-        return FontUtils::normalizeVariationDefaults(is_array($axes) ? $axes : []);
+        $normalizedAxes = [];
+
+        foreach (FontUtils::normalizeVariationDefaults(is_array($axes) ? $axes : []) as $tag => $value) {
+            $normalizedAxes[$tag] = is_string($value) ? $value : (string) $value;
+        }
+
+        return $normalizedAxes;
     }
 
     private function normalizeRoleWeight(mixed $weight): string
@@ -1122,6 +1248,9 @@ final class SettingsRepository
         return !empty($value);
     }
 
+    /**
+     * @param SettingsInput|NormalizedSettings $settings
+     */
     private function normalizeAdminAccessCustomEnabled(mixed $value, array $settings = []): bool
     {
         if ($value !== null) {
@@ -1138,6 +1267,9 @@ final class SettingsRepository
         return $roleSlugs !== [] || $userIds !== [];
     }
 
+    /**
+     * @return AdminAccessRoleSlugList
+     */
     private function normalizeAdminAccessRoleSlugs(mixed $value): array
     {
         if (!is_array($value)) {
@@ -1170,6 +1302,9 @@ final class SettingsRepository
         return array_values($normalized);
     }
 
+    /**
+     * @return AdminAccessUserIdList
+     */
     private function normalizeAdminAccessUserIds(mixed $value): array
     {
         if (!is_array($value)) {
@@ -1205,7 +1340,7 @@ final class SettingsRepository
         $normalized = [];
 
         foreach ($existingUsers as $user) {
-            if (!is_object($user)) {
+            if (!is_object($user) || !isset($user->ID) || !isset($user->roles) || !is_array($user->roles)) {
                 continue;
             }
 
@@ -1261,6 +1396,10 @@ final class SettingsRepository
         ) ? $channel : self::UPDATE_CHANNEL_STABLE;
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
     private function persistSettings(array $settings): array
     {
         $googleApiKeyData = $this->extractGoogleApiKeyData($settings);
@@ -1291,6 +1430,10 @@ final class SettingsRepository
         return $this->cacheSettings($this->mergeGoogleApiKeyDataIntoSettings($settings, $googleApiKeyData));
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
     private function normalizeMinimalOutputPresetSettings(array $settings): array
     {
         if (empty($settings['minimal_output_preset_enabled'])) {
@@ -1305,6 +1448,10 @@ final class SettingsRepository
         return $settings;
     }
 
+    /**
+     * @param SettingsInput $storedSettings
+     * @param NormalizedSettings $settings
+     */
     private function resolveOutputQuickModePreference(array $storedSettings, array $settings): string
     {
         $preference = array_key_exists('output_quick_mode_preference', $storedSettings)
@@ -1314,6 +1461,9 @@ final class SettingsRepository
         return $this->normalizeOutputQuickModePreference($preference, $settings);
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function normalizeOutputQuickModePreference(string $preference, array $settings): string
     {
         $preference = $this->sanitizeOutputQuickModePreference($preference);
@@ -1332,6 +1482,9 @@ final class SettingsRepository
             : self::OUTPUT_QUICK_MODE_CUSTOM;
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function deriveExactOutputQuickMode(array $settings): string
     {
         if (!empty($settings['minimal_output_preset_enabled'])) {
@@ -1359,6 +1512,9 @@ final class SettingsRepository
         return self::OUTPUT_QUICK_MODE_CUSTOM;
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function allVariableSubgroupsEnabled(array $settings): bool
     {
         $fields = [
@@ -1382,6 +1538,9 @@ final class SettingsRepository
         return true;
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function allClassSubgroupsEnabled(array $settings): bool
     {
         $fields = [
@@ -1420,6 +1579,9 @@ final class SettingsRepository
             : '';
     }
 
+    /**
+     * @param SettingsInput $input
+     */
     private function hasExplicitNonMinimalOutputInput(array $input): bool
     {
         if ($this->hasClassOutputInput($input)) {
@@ -1446,6 +1608,10 @@ final class SettingsRepository
         return false;
     }
 
+    /**
+     * @param SettingsInput $storedSettings
+     * @param NormalizedSettings $settings
+     */
     private function resolveMinimalOutputPresetEnabled(array $storedSettings, array $settings): bool
     {
         if (array_key_exists('minimal_output_preset_enabled', $storedSettings)) {
@@ -1484,6 +1650,10 @@ final class SettingsRepository
         return true;
     }
 
+    /**
+     * @param SettingsInput|NormalizedSettings $settings
+     * @return GoogleApiKeyData
+     */
     private function getGoogleApiKeyDataFromOptions(array $settings = []): array
     {
         $googleApiKeyData = get_option(self::OPTION_GOOGLE_API_KEY_DATA, null);
@@ -1505,6 +1675,10 @@ final class SettingsRepository
         return $normalizedGoogleApiKeyData;
     }
 
+    /**
+     * @param GoogleApiKeyData $googleApiKeyData
+     * @return GoogleApiKeyData
+     */
     private function persistGoogleApiKeyData(array $googleApiKeyData): array
     {
         $googleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
@@ -1515,6 +1689,10 @@ final class SettingsRepository
         return $googleApiKeyData;
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
     private function cacheSettings(array $settings): array
     {
         $this->settingsCache = $settings;
@@ -1522,6 +1700,11 @@ final class SettingsRepository
         return $this->settingsCache;
     }
 
+    /**
+     * @param SettingsInput|NormalizedSettings $settings
+     * @param GoogleApiKeyData $googleApiKeyData
+     * @return NormalizedSettings
+     */
     private function mergeGoogleApiKeyDataIntoSettings(array $settings, array $googleApiKeyData): array
     {
         foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
@@ -1531,6 +1714,10 @@ final class SettingsRepository
         return $settings;
     }
 
+    /**
+     * @param SettingsInput|NormalizedSettings $settings
+     * @return GoogleApiKeyData
+     */
     private function extractGoogleApiKeyData(array $settings): array
     {
         $googleApiKeyData = [];
@@ -1546,6 +1733,10 @@ final class SettingsRepository
         return $googleApiKeyData;
     }
 
+    /**
+     * @param SettingsInput|NormalizedSettings $settings
+     * @return SettingsInput|NormalizedSettings
+     */
     private function withoutGoogleApiKeyData(array $settings): array
     {
         foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
@@ -1557,6 +1748,9 @@ final class SettingsRepository
         return $settings;
     }
 
+    /**
+     * @return GoogleApiKeyData
+     */
     private function normalizeGoogleApiKeyData(mixed $value): array
     {
         $googleApiKeyData = is_array($value) ? $value : [];
@@ -1580,6 +1774,10 @@ final class SettingsRepository
         return $googleApiKeyData;
     }
 
+    /**
+     * @param GoogleApiKeyData $googleApiKeyData
+     * @return GoogleApiKeyData
+     */
     private function buildStoredGoogleApiKeyData(array $googleApiKeyData): array
     {
         $storedGoogleApiKeyData = [
@@ -1724,6 +1922,9 @@ final class SettingsRepository
         return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true);
     }
 
+    /**
+     * @param SettingsInput $input
+     */
     private function hasClassOutputInput(array $input): bool
     {
         if (array_key_exists('class_output_mode', $input)) {
@@ -1739,6 +1940,11 @@ final class SettingsRepository
         return false;
     }
 
+    /**
+     * @param SettingsInput|NormalizedSettings $input
+     * @param SettingsInput|NormalizedSettings|null $fallback
+     * @return array<string, bool>
+     */
     private function normalizeClassOutputSettings(array $input, ?array $fallback = null): array
     {
         $defaults = [];
@@ -1772,6 +1978,11 @@ final class SettingsRepository
         return $normalized;
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @param SettingsInput $input
+     * @return NormalizedSettings
+     */
     private function restoreMonospaceClassOutputsOnFirstEnable(array $settings, array $input, bool $monospaceRoleWasEnabled): array
     {
         if ($monospaceRoleWasEnabled || empty($settings['monospace_role_enabled'])) {
@@ -1789,6 +2000,9 @@ final class SettingsRepository
         return $settings;
     }
 
+    /**
+     * @return array<string, bool>
+     */
     private function classOutputSettingsFromLegacyMode(string $mode): array
     {
         $mode = in_array($mode, ['off', 'roles', 'families', 'all'], true)
@@ -1868,6 +2082,9 @@ final class SettingsRepository
         return in_array($state, ['valid', 'invalid', 'unknown'], true) ? $state : 'unknown';
     }
 
+    /**
+     * @return FamilyFallbackMap
+     */
     private function normalizeFamilyFallbacks(mixed $value): array
     {
         if (!is_array($value)) {
@@ -1889,6 +2106,9 @@ final class SettingsRepository
         return $normalized;
     }
 
+    /**
+     * @return FamilyFontDisplayMap
+     */
     private function normalizeFamilyFontDisplays(mixed $value): array
     {
         if (!is_array($value)) {
@@ -1922,6 +2142,10 @@ final class SettingsRepository
         return in_array($state, ['unknown', 'valid', 'invalid'], true) ? $state : 'unknown';
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
     private function normalizeBricksBaselineSettings(array $settings): array
     {
         $bricksEnabled = ($settings['bricks_integration_enabled'] ?? null) !== false;

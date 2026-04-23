@@ -8,12 +8,20 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-type HostedFileMap array<string, string>
+ * @phpstan-type ParsedFace array<string, mixed>
+ * @phpstan-type ParsedFaceList list<ParsedFace>
+ */
 final class HostedCssParser
 {
     public function __construct(private readonly string $source)
     {
     }
 
+    /**
+     * @return ParsedFaceList
+     */
     public function parse(string $css, string $expectedFamily = ''): array
     {
         $matchCount = preg_match_all('/@font-face\s*\{(.*?)\}/si', $css, $matches);
@@ -44,6 +52,9 @@ final class HostedCssParser
         return trim($matches[1]);
     }
 
+    /**
+     * @return HostedFileMap
+     */
     private function extractFiles(string $src): array
     {
         $files = [];
@@ -70,6 +81,9 @@ final class HostedCssParser
         return $files;
     }
 
+    /**
+     * @return ParsedFace|null
+     */
     private function buildFace(string $block, string $expectedFamily): ?array
     {
         $family = $this->trimCssString($this->propertyValue($block, 'font-family'));

@@ -8,8 +8,20 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-type IntegrationState array{
+ *     available: bool,
+ *     enabled: bool,
+ *     configured: bool,
+ *     status: string
+ * }
+ * @phpstan-type RuntimeFamilyList list<CatalogFamily>
+ * @phpstan-type RuntimeLookup array<string, true>
+ */
 final class OxygenIntegrationService
 {
+    /** @var list<string> */
     private static array $compatibilityFamilies = [];
 
     public function isAvailable(): bool
@@ -23,6 +35,9 @@ final class OxygenIntegrationService
         return $available;
     }
 
+    /**
+     * @return IntegrationState
+     */
     public function readState(?bool $enabled): array
     {
         $available = $this->isAvailable();
@@ -36,6 +51,9 @@ final class OxygenIntegrationService
         ];
     }
 
+    /**
+     * @param RuntimeFamilyList $runtimeFamilies
+     */
     public function registerCompatibilityShim(array $runtimeFamilies): void
     {
         self::$compatibilityFamilies = $this->runtimeFamilyNames($runtimeFamilies);
@@ -57,6 +75,10 @@ PHP);
         $GLOBALS['ECF_Plugin'] = new \ECF_Plugin();
     }
 
+    /**
+     * @param RuntimeFamilyList $runtimeFamilies
+     * @return list<string>
+     */
     public function getEditorStyles(array $runtimeFamilies): array
     {
         if (!function_exists('ct_get_global_settings')) {
@@ -86,6 +108,9 @@ PHP);
         return array_values(array_unique($styles));
     }
 
+    /**
+     * @return list<string>
+     */
     public static function compatibilityFamilies(): array
     {
         return self::$compatibilityFamilies;
@@ -96,6 +121,10 @@ PHP);
         return $selector . '{font-family:' . FontUtils::buildFontStack($familyName) . ';}';
     }
 
+    /**
+     * @param RuntimeFamilyList $runtimeFamilies
+     * @return list<string>
+     */
     private function runtimeFamilyNames(array $runtimeFamilies): array
     {
         $names = array_keys($this->runtimeFamilyLookup($runtimeFamilies));
@@ -104,18 +133,16 @@ PHP);
         return array_values($names);
     }
 
+    /**
+     * @param RuntimeFamilyList $runtimeFamilies
+     * @return RuntimeLookup
+     */
     private function runtimeFamilyLookup(array $runtimeFamilies): array
     {
         $lookup = [];
 
         foreach ($runtimeFamilies as $family) {
-            $name = '';
-
-            if (is_string($family)) {
-                $name = trim($family);
-            } elseif (is_array($family)) {
-                $name = trim((string) ($family['family'] ?? ''));
-            }
+            $name = trim((string) ($family['family'] ?? ''));
 
             if ($name === '') {
                 continue;
@@ -127,6 +154,9 @@ PHP);
         return $lookup;
     }
 
+    /**
+     * @param RuntimeLookup $runtimeLookup
+     */
     private function managedFamilyName(mixed $value, array $runtimeLookup): string
     {
         $familyName = is_scalar($value) ? trim((string) $value) : '';

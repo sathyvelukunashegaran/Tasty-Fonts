@@ -9,30 +9,54 @@ defined('ABSPATH') || exit;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\RoleUsageMessageFormatter;
 
+/**
+ * @phpstan-import-type CatalogFace from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type DeliveryProfile from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-type CategoryAliasOwners array<string, string>
+ * @phpstan-type RendererFlagOptions array<string, mixed>
+ * @phpstan-type SnippetMap array<string, string>
+ */
 trait FamilyCardRendererSupport
 {
     use LibraryRenderValueHelpers;
 
+    /**
+     * @param list<string> $roleLabels
+     */
     protected function buildDeleteBlockedMessage(string $familyName, array $roleLabels): string
     {
         return RoleUsageMessageFormatter::buildDeleteBlockedMessage($familyName, $roleLabels);
     }
 
+    /**
+     * @param list<string> $roleLabels
+     */
     protected function buildDeleteLastVariantBlockedMessage(string $familyName, array $roleLabels): string
     {
         return RoleUsageMessageFormatter::buildDeleteLastVariantBlockedMessage($familyName, $roleLabels);
     }
 
+    /**
+     * @param list<string> $roleLabels
+     * @return list<string>
+     */
     protected function translateRoleLabels(array $roleLabels): array
     {
         return RoleUsageMessageFormatter::translateRoleLabels($roleLabels);
     }
 
+    /**
+     * @param list<string> $labels
+     */
     protected function formatRoleLabelList(array $labels): string
     {
         return RoleUsageMessageFormatter::formatRoleLabelList($labels);
     }
 
+    /**
+     * @param list<string> $roleKeys
+     */
     protected function buildRoleSelectionKey(array $roleKeys): string
     {
         $orderedKeys = [];
@@ -46,6 +70,10 @@ trait FamilyCardRendererSupport
         return implode('-', $orderedKeys);
     }
 
+    /**
+     * @param RendererFlagOptions $extendedVariableOptions
+     * @return SnippetMap
+     */
     protected function buildFaceCssCopySnippets(string $familyName, string $weight, string $style, array $extendedVariableOptions = []): array
     {
         $familyReference = $this->buildFontVariableReference($familyName);
@@ -72,6 +100,13 @@ trait FamilyCardRendererSupport
         return $snippets;
     }
 
+    /**
+     * @param list<string> $assignedRoleKeys
+     * @param RoleSet $roles
+     * @param CategoryAliasOwners $categoryAliasOwners
+     * @param RendererFlagOptions $extendedVariableOptions
+     * @return SnippetMap
+     */
     protected function buildFamilyCssVariableSnippets(
         string $familyName,
         string $defaultStack,
@@ -124,6 +159,12 @@ trait FamilyCardRendererSupport
         return $snippets;
     }
 
+    /**
+     * @param list<string> $assignedRoleKeys
+     * @param CategoryAliasOwners $categoryAliasOwners
+     * @param RendererFlagOptions $classOutputOptions
+     * @return SnippetMap
+     */
     protected function buildFamilyCssClassSnippets(
         string $familyName,
         array $assignedRoleKeys,
@@ -185,6 +226,9 @@ trait FamilyCardRendererSupport
         return $snippets;
     }
 
+    /**
+     * @param RendererFlagOptions $extendedVariableOptions
+     */
     protected function buildWeightReference(string $weight, array $extendedVariableOptions = []): string
     {
         if ($this->extendedVariableWeightTokensEnabled($extendedVariableOptions)) {
@@ -202,23 +246,35 @@ trait FamilyCardRendererSupport
             : '';
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function extendedVariableOutputEnabled(array $options): bool
     {
         return !array_key_exists('enabled', $options) || !empty($options['enabled']);
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function extendedVariableWeightTokensEnabled(array $options): bool
     {
         return $this->extendedVariableOutputEnabled($options)
             && (!array_key_exists('weight_tokens', $options) || !empty($options['weight_tokens']));
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function extendedVariableRoleAliasesEnabled(array $options): bool
     {
         return $this->extendedVariableOutputEnabled($options)
             && (!array_key_exists('role_aliases', $options) || !empty($options['role_aliases']));
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function extendedVariableCategoryAliasEnabled(array $options, string $categoryAliasProperty): bool
     {
         if (!$this->extendedVariableOutputEnabled($options)) {
@@ -253,17 +309,26 @@ trait FamilyCardRendererSupport
         };
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function classOutputEnabled(array $options): bool
     {
         return !empty($options['enabled']);
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function classOutputFamiliesEnabled(array $options): bool
     {
         return $this->classOutputEnabled($options)
             && (!array_key_exists('families', $options) || !empty($options['families']));
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function classOutputRoleEnabled(array $options, string $roleKey): bool
     {
         if (!$this->classOutputEnabled($options)) {
@@ -281,6 +346,9 @@ trait FamilyCardRendererSupport
             && (!array_key_exists($field, $options) || !empty($options[$field]));
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function classOutputRoleAliasEnabled(array $options, string $aliasKey): bool
     {
         if (!$this->classOutputEnabled($options)) {
@@ -298,6 +366,9 @@ trait FamilyCardRendererSupport
             && (!array_key_exists($field, $options) || !empty($options[$field]));
     }
 
+    /**
+     * @param RendererFlagOptions $options
+     */
     protected function classOutputCategoryAliasEnabled(array $options, string $categoryAliasProperty): bool
     {
         if (!$this->classOutputEnabled($options)) {
@@ -315,6 +386,10 @@ trait FamilyCardRendererSupport
             && (!array_key_exists($field, $options) || !empty($options[$field]));
     }
 
+    /**
+     * @param list<string> $sources
+     * @return list<string>
+     */
     protected function buildFamilySourceTokens(array $sources, bool $isRoleFamily = false): array
     {
         $tokens = [];
@@ -370,6 +445,9 @@ trait FamilyCardRendererSupport
         };
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     */
     protected function buildProfileRequestSummary(array $profile): string
     {
         $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
@@ -383,6 +461,9 @@ trait FamilyCardRendererSupport
         };
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     */
     protected function isMigratableCdnProfile(array $profile): bool
     {
         $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
@@ -391,6 +472,10 @@ trait FamilyCardRendererSupport
         return $type === 'cdn' && in_array($provider, ['google', 'bunny'], true);
     }
 
+    /**
+     * @param list<CatalogFace> $faces
+     * @return list<string>
+     */
     protected function buildFamilyFaceSummaryLabels(array $faces): array
     {
         $items = [];
@@ -438,15 +523,15 @@ trait FamilyCardRendererSupport
         return array_map(static fn (array $item): string => $item['label'], $items);
     }
 
+    /**
+     * @param list<CatalogFace> $faces
+     * @return list<string>
+     */
     protected function buildVariationAxisSummaryLabels(array $faces): array
     {
         $labels = [];
 
         foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             foreach (FontUtils::normalizeAxesMap($face['axes'] ?? []) as $tag => $definition) {
                 $min = (string) ($definition['min'] ?? '');
                 $max = (string) ($definition['max'] ?? '');
@@ -489,6 +574,9 @@ trait FamilyCardRendererSupport
         );
     }
 
+    /**
+     * @param DeliveryProfile $activeDelivery
+     */
     protected function canDeleteFaceVariant(array $activeDelivery): bool
     {
         $provider = strtolower(trim((string) ($activeDelivery['provider'] ?? '')));
@@ -547,6 +635,9 @@ trait FamilyCardRendererSupport
         return sprintf('const font = "%s";', $literal);
     }
 
+    /**
+     * @param CatalogFace $face
+     */
     protected function buildFaceStorageSummary(array $face): string
     {
         $relativePaths = array_filter(

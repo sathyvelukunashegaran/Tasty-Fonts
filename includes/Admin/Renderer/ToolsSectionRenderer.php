@@ -6,13 +6,26 @@ namespace TastyFonts\Admin\Renderer;
 
 defined('ABSPATH') || exit;
 
+/**
+ * @phpstan-type ToolsView array<string, mixed>
+ * @phpstan-type CodePanel array<string, mixed>
+ * @phpstan-type CodeEditorOptions array<string, mixed>
+ * @phpstan-type CssLineList list<string>
+ */
 final class ToolsSectionRenderer extends AbstractSectionRenderer
 {
+    /**
+     * @param ToolsView $view
+     */
     public function render(array $view): void
     {
         $this->renderTemplate('tools-section.php', $view);
     }
 
+    /**
+     * @param CodePanel $panel
+     * @param CodeEditorOptions $options
+     */
     public function renderCodeEditor(array $panel, array $options = []): void
     {
         $label = (string) ($panel['label'] ?? '');
@@ -260,6 +273,9 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
         return implode("\n", $lines);
     }
 
+    /**
+     * @param CssLineList $lines
+     */
     public function appendFormattedCssLine(array &$lines, string $line, int $indentLevel): void
     {
         $trimmed = trim($line);

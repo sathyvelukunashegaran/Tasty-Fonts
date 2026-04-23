@@ -6,6 +6,15 @@ namespace TastyFonts\Support;
 
 defined('ABSPATH') || exit;
 
+/**
+ * @phpstan-type VariantVariableNames array{family: string, numeric: string, named: string}
+ * @phpstan-type VariationDefaults array<string, int|float|string>
+ * @phpstan-type AxisDefinition array<string, int|float|string>
+ * @phpstan-type AxesMap array<string, AxisDefinition>
+ * @phpstan-type FormatAvailability array<string, array{label: string, available: bool, source_only: bool}>
+ * @phpstan-type WeightRange array{0: int, 1: int}
+ * @phpstan-type HostedAxis array<string, int|float|string>
+ */
 final class FontUtils
 {
     public const UNICODE_RANGE_MODE_PRESERVE = 'preserve';
@@ -123,6 +132,9 @@ final class FontUtils
         return $property !== '' ? 'var(' . $property . ')' : '';
     }
 
+    /**
+     * @return VariantVariableNames
+     */
     public static function variantVariableNames(string $family, string|int $weight, string $style): array
     {
         $familyVariable = self::fontVariableName($family);
@@ -234,6 +246,10 @@ final class FontUtils
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $face
+     * @param array<string, mixed> $settings
+     */
     public static function resolveFaceUnicodeRange(array $face, array $settings): string
     {
         $mode = self::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? self::UNICODE_RANGE_MODE_OFF));
@@ -275,6 +291,9 @@ final class FontUtils
         return preg_match('/^-?\d+(?:\.\d+)?$/', $value) === 1 ? $value : '';
     }
 
+    /**
+     * @return AxesMap
+     */
     public static function normalizeAxesMap(mixed $axes): array
     {
         if (!is_array($axes)) {
@@ -334,6 +353,10 @@ final class FontUtils
         return $normalized;
     }
 
+    /**
+     * @param AxesMap $axes
+     * @return VariationDefaults
+     */
     public static function normalizeVariationDefaults(mixed $defaults, array $axes = []): array
     {
         if (!is_array($defaults)) {
@@ -364,6 +387,9 @@ final class FontUtils
         return $normalized;
     }
 
+    /**
+     * @param VariationDefaults $settings
+     */
     public static function buildFontVariationSettings(array $settings): string
     {
         $normalized = self::normalizeVariationDefaults($settings);
@@ -381,6 +407,10 @@ final class FontUtils
         return implode(', ', $parts);
     }
 
+    /**
+     * @param AxesMap $axes
+     * @return VariationDefaults
+     */
     public static function faceLevelVariationDefaults(mixed $defaults, array $axes = []): array
     {
         $normalized = self::normalizeVariationDefaults($defaults, $axes);
@@ -406,6 +436,9 @@ final class FontUtils
         };
     }
 
+    /**
+     * @param array<string, mixed> $face
+     */
     public static function faceIsVariable(array $face): bool
     {
         if (!empty($face['is_variable'])) {
@@ -415,10 +448,13 @@ final class FontUtils
         return self::normalizeAxesMap($face['axes'] ?? []) !== [];
     }
 
+    /**
+     * @param list<array<string, mixed>> $faces
+     */
     public static function facesHaveVariableMetadata(array $faces): bool
     {
         foreach ($faces as $face) {
-            if (is_array($face) && self::faceIsVariable($face)) {
+            if (self::faceIsVariable($face)) {
                 return true;
             }
         }
@@ -426,10 +462,13 @@ final class FontUtils
         return false;
     }
 
+    /**
+     * @param list<array<string, mixed>> $faces
+     */
     public static function facesHaveStaticMetadata(array $faces): bool
     {
         foreach ($faces as $face) {
-            if (!is_array($face) || self::faceIsVariable($face)) {
+            if (self::faceIsVariable($face)) {
                 continue;
             }
 
@@ -439,6 +478,9 @@ final class FontUtils
         return false;
     }
 
+    /**
+     * @param array<string, mixed> $profile
+     */
     public static function resolveProfileFormat(array $profile): string
     {
         $format = strtolower(trim((string) ($profile['format'] ?? '')));
@@ -447,9 +489,13 @@ final class FontUtils
             return $format;
         }
 
-        return self::facesHaveVariableMetadata((array) ($profile['faces'] ?? [])) ? 'variable' : 'static';
+        return self::facesHaveVariableMetadata(self::normalizeFaceList($profile['faces'] ?? [])) ? 'variable' : 'static';
     }
 
+    /**
+     * @param array<string, mixed> $entry
+     * @return FormatAvailability
+     */
     public static function resolveFormatAvailability(array $entry): array
     {
         $formats = [];
@@ -476,7 +522,7 @@ final class FontUtils
             return $formats;
         }
 
-        if (self::facesHaveStaticMetadata((array) ($entry['faces'] ?? []))) {
+        if (self::facesHaveStaticMetadata(self::normalizeFaceList($entry['faces'] ?? []))) {
             $formats['static'] = [
                 'label' => 'Static',
                 'available' => true,
@@ -489,7 +535,7 @@ final class FontUtils
             || !empty($entry['is_variable'])
             || self::normalizeAxesMap($entry['variation_axes'] ?? []) !== []
             || self::normalizeAxesMap($entry['axes'] ?? []) !== []
-            || self::facesHaveVariableMetadata((array) ($entry['faces'] ?? []))
+            || self::facesHaveVariableMetadata(self::normalizeFaceList($entry['faces'] ?? []))
         ) {
             $formats['variable'] = [
                 'label' => 'Variable',
@@ -507,6 +553,29 @@ final class FontUtils
         }
 
         return $formats;
+    }
+
+    /**
+     * @param mixed $faces
+     * @return list<array<string, mixed>>
+     */
+    private static function normalizeFaceList(mixed $faces): array
+    {
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
     }
 
     public static function weightNameSlug(string|int $weight): string
@@ -567,6 +636,9 @@ final class FontUtils
         return 400;
     }
 
+    /**
+     * @return WeightRange|null
+     */
     public static function weightRangeFromWeightAndAxes(string|int $weight, mixed $axes = []): ?array
     {
         $normalizedAxes = self::normalizeAxesMap($axes);
@@ -584,6 +656,10 @@ final class FontUtils
         return null;
     }
 
+    /**
+     * @param array<string, mixed> $face
+     * @return WeightRange|null
+     */
     public static function weightRangeFromFace(array $face): ?array
     {
         return self::weightRangeFromWeightAndAxes(
@@ -616,6 +692,10 @@ final class FontUtils
         return self::normalizeWeight($weight);
     }
 
+    /**
+     * @param list<string> $variants
+     * @return list<string>
+     */
     public static function buildHostedCssAxes(array $variants): array
     {
         $axes = [];
@@ -642,6 +722,10 @@ final class FontUtils
             : 'swap';
     }
 
+    /**
+     * @param array<string, mixed> $left
+     * @param array<string, mixed> $right
+     */
     public static function compareFacesByWeightAndStyle(array $left, array $right): int
     {
         $weightCompare = self::weightSortValue($left['weight'] ?? '400') <=> self::weightSortValue($right['weight'] ?? '400');
@@ -711,6 +795,9 @@ final class FontUtils
         return implode('-', $segments) . '.' . strtolower(trim($extension));
     }
 
+    /**
+     * @return array{style: string, weight: string}|null
+     */
     public static function googleVariantToAxis(string $variant): ?array
     {
         $variant = self::canonicalVariantToken($variant);
@@ -820,15 +907,15 @@ final class FontUtils
         );
     }
 
+    /**
+     * @param list<array<string, mixed>> $axes
+     * @return AxesMap
+     */
     public static function normalizeHostedAxisList(array $axes): array
     {
         $normalized = [];
 
         foreach ($axes as $axis) {
-            if (!is_array($axis)) {
-                continue;
-            }
-
             $tag = self::normalizeAxisTag((string) ($axis['tag'] ?? ''));
             $min = self::normalizeAxisValue($axis['start'] ?? $axis['min'] ?? '');
             $max = self::normalizeAxisValue($axis['end'] ?? $axis['max'] ?? '');
@@ -878,15 +965,15 @@ final class FontUtils
         return $max;
     }
 
+    /**
+     * @param list<string> $variants
+     * @return list<string>
+     */
     public static function normalizeVariantTokens(array $variants): array
     {
         $normalized = [];
 
         foreach ($variants as $variant) {
-            if (!is_string($variant)) {
-                continue;
-            }
-
             $parts = array_map('trim', explode(',', $variant));
 
             foreach ($parts as $part) {

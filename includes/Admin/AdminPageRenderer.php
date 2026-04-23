@@ -17,6 +17,15 @@ use TastyFonts\Admin\Renderer\StudioSectionRenderer;
 use TastyFonts\Admin\Renderer\ToolsSectionRenderer;
 use TastyFonts\Support\Storage;
 
+/**
+ * @phpstan-import-type PageContext from AdminPageContextBuilder
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFace from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type DeliveryProfile from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFontDisplayMap from \TastyFonts\Repository\SettingsRepository
+ */
 final class AdminPageRenderer extends AbstractSectionRenderer
 {
     private readonly AdminPageViewBuilder $viewBuilder;
@@ -53,17 +62,23 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         $this->activityRenderer = $activityRenderer ?? new ActivitySectionRenderer($storage);
     }
 
+    /**
+     * @param array<string, mixed> $view
+     */
     public function render(array $view): void
     {
         $this->renderPage($view);
     }
 
+    /**
+     * @param PageContext $context
+     */
     public function renderPage(array $context): void
     {
         $view = $this->viewBuilder->build($context);
         $this->trainingWheelsOff = !empty($view['trainingWheelsOff']);
         $storage = $view['storage'] ?? null;
-        $toasts = is_array($view['toasts'] ?? null) ? $view['toasts'] : [];
+        $toasts = $this->normalizeToastList($view['toasts'] ?? []);
         $trainingWheelsOff = !empty($view['trainingWheelsOff']);
         $storageErrorMessage = (string) ($view['storageErrorMessage'] ?? '');
         $currentPage = (string) ($view['currentPage'] ?? AdminController::PAGE_ROLES);
@@ -140,8 +155,8 @@ final class AdminPageRenderer extends AbstractSectionRenderer
                                         </div>
                                     <?php endif; ?>
                                 </div>
-                                <h1 class="tasty-fonts-header-title" data-page-header-title><?php echo esc_html((string) ($pageHeader['label'] ?? '')); ?></h1>
-                                <p class="tasty-fonts-page-header-summary" data-page-header-summary><?php echo esc_html((string) ($pageHeader['summary'] ?? '')); ?></p>
+                                <h1 class="tasty-fonts-header-title" data-page-header-title><?php echo esc_html($pageHeader['label']); ?></h1>
+                                <p class="tasty-fonts-page-header-summary" data-page-header-summary><?php echo esc_html($pageHeader['summary']); ?></p>
                             </div>
                         </div>
 
@@ -155,14 +170,14 @@ final class AdminPageRenderer extends AbstractSectionRenderer
                                         id="tasty-fonts-page-tab-<?php echo esc_attr($pageKey); ?>"
                                         data-tab-group="page"
                                         data-tab-target="<?php echo esc_attr($pageKey); ?>"
-                                        data-page-label="<?php echo esc_attr((string) ($pageConfig['label'] ?? '')); ?>"
-                                        data-page-summary="<?php echo esc_attr((string) ($pageConfig['summary'] ?? '')); ?>"
+                                        data-page-label="<?php echo esc_attr($pageConfig['label']); ?>"
+                                        data-page-summary="<?php echo esc_attr($pageConfig['summary']); ?>"
                                         aria-selected="<?php echo $isActive ? 'true' : 'false'; ?>"
                                         tabindex="<?php echo $isActive ? '0' : '-1'; ?>"
                                         aria-controls="tasty-fonts-page-panel-<?php echo esc_attr($pageKey); ?>"
                                         role="tab"
                                     >
-                                        <?php echo esc_html((string) ($pageConfig['label'] ?? '')); ?>
+                                        <?php echo esc_html($pageConfig['label']); ?>
                                     </button>
                                 <?php endforeach; ?>
                             </div>
@@ -188,6 +203,16 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         <?php
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param RoleSet $roles
+     * @param FamilyFallbackMap $familyFallbacks
+     * @param FamilyFontDisplayMap $familyFontDisplays
+     * @param list<array<string, mixed>> $familyFontDisplayOptions
+     * @param array<string, string> $categoryAliasOwners
+     * @param array<string, mixed> $extendedVariableOptions
+     * @param array<string, mixed> $classOutputOptions
+     */
     protected function renderFamilyRow(
         array $family,
         array $roles,
@@ -215,6 +240,36 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         );
     }
 
+    /**
+     * @param mixed $value
+     * @return list<array<string, mixed>>
+     */
+    private function normalizeToastList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $toast) {
+            if (!is_array($toast)) {
+                continue;
+            }
+
+            $normalized[] = $toast;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param list<string> $assignedRoleKeys
+     * @param array<string, string> $categoryAliasOwners
+     * @param array<string, mixed> $extendedVariableOptions
+     * @param DeliveryProfile $activeDelivery
+     * @param CatalogFace $face
+     */
     protected function renderFaceDetailCard(
         string $familyName,
         string $familySlug,
@@ -246,12 +301,20 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         );
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param array<string, string> $familyLabels
+     */
     protected function renderCodePreviewScene(string $previewText, array $roles, bool $monospaceRoleEnabled, array $familyLabels = []): void
     {
         $this->syncRendererState($this->previewRenderer);
         $this->previewRenderer->renderCodePreviewScene($previewText, $roles, $monospaceRoleEnabled, $familyLabels);
     }
 
+    /**
+     * @param array<string, mixed> $panel
+     * @param array<string, mixed> $options
+     */
     protected function renderCodeEditor(array $panel, array $options = []): void
     {
         $this->syncRendererState($this->toolsRenderer);
@@ -263,6 +326,9 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         $renderer->setTrainingWheelsOff($this->trainingWheelsOff);
     }
 
+    /**
+     * @return array<string, array{label: string, summary: string}>
+     */
     private static function pageTabs(): array
     {
         return [

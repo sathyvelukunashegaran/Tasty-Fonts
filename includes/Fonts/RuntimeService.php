@@ -13,6 +13,14 @@ use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Repository\SettingsRepository;
 use WP_Theme_JSON_Data;
 
+/**
+ * @phpstan-import-type CatalogFamily from CatalogService
+ * @phpstan-import-type RuntimeFamilyList from RuntimeAssetPlanner
+ * @phpstan-import-type StylesheetDescriptor from RuntimeAssetPlanner
+ * @phpstan-type EditorSettings array<string, mixed>
+ * @phpstan-type StylesheetList list<StylesheetDescriptor>
+ * @phpstan-type CssLineList list<string>
+ */
 final class RuntimeService
 {
     /**
@@ -112,7 +120,7 @@ final class RuntimeService
         }
 
         foreach ($this->planner->getPreconnectOrigins() as $origin) {
-            if (!is_string($origin) || trim($origin) === '') {
+            if (trim($origin) === '') {
                 continue;
             }
 
@@ -238,6 +246,10 @@ final class RuntimeService
         return $themeJson->update_with($themeJsonUpdate);
     }
 
+    /**
+     * @param EditorSettings $editorSettings
+     * @return EditorSettings
+     */
     public function filterBlockEditorSettings(array $editorSettings, mixed $editorContext = null): array
     {
         $styles = [];
@@ -269,6 +281,10 @@ final class RuntimeService
         return $editorSettings;
     }
 
+    /**
+     * @param list<string> $fonts
+     * @return list<string>
+     */
     public function filterBricksStandardFonts(array $fonts): array
     {
         if (!$this->bricksSelectorEnabled() || !$this->bricksIntegration->isAvailable()) {
@@ -302,7 +318,7 @@ final class RuntimeService
      * @since 1.10.0
      *
      * @param array<int, string>|null $preloadUrls Optional preload URLs to convert into Link header values.
-     * @return array<int, string> Link header values for the configured preload assets.
+     * @return list<string> Link header values for the configured preload assets.
      */
     public function getPreloadLinkHeaderValues(?array $preloadUrls = null): array
     {
@@ -359,6 +375,9 @@ final class RuntimeService
         );
     }
 
+    /**
+     * @param RuntimeFamilyList $runtimeFamilies
+     */
     private function enqueueBricksBuilderSelectorGroupingScript(array $runtimeFamilies): void
     {
         $familyNames = $this->bricksIntegration->getSelectorFamilyNames($runtimeFamilies);
@@ -555,9 +574,12 @@ final class RuntimeService
 JS;
     }
 
+    /**
+     * @param list<string> $familyNames
+     */
     private function buildBricksBuilderSelectorGroupingScript(array $familyNames): string
     {
-        $encodedFamilies = wp_json_encode(array_values($familyNames), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $encodedFamilies = wp_json_encode($familyNames, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         if ($encodedFamilies === false) {
             return '';
@@ -654,13 +676,12 @@ JS;
 JS;
     }
 
+    /**
+     * @param StylesheetList $stylesheets
+     */
     private function enqueueExternalStylesheets(array $stylesheets, string $handleSuffix = ''): void
     {
         foreach ($stylesheets as $stylesheet) {
-            if (!is_array($stylesheet)) {
-                continue;
-            }
-
             $handle = $this->stylesheetHandle($stylesheet, $handleSuffix);
             $url = (string) ($stylesheet['url'] ?? '');
 
@@ -690,6 +711,9 @@ JS;
         wp_enqueue_style($handle, $stylesheet['url'], [], $stylesheet['ver'] !== '' ? $stylesheet['ver'] : false);
     }
 
+    /**
+     * @return list<string>
+     */
     private function getCanvasStylesheetUrls(): array
     {
         $urls = [];
@@ -700,10 +724,6 @@ JS;
         }
 
         foreach ($this->planner->getExternalStylesheets() as $stylesheet) {
-            if (!is_array($stylesheet)) {
-                continue;
-            }
-
             $url = (string) ($stylesheet['url'] ?? '');
 
             if ($url !== '') {
@@ -720,6 +740,9 @@ JS;
         return array_values(array_unique(array_filter($urls, static fn (string $url): bool => $url !== '')));
     }
 
+    /**
+     * @return CssLineList
+     */
     private function getCanvasInlineCss(): array
     {
         if (!$this->hasManagedAcssRuntimeMapping()) {
@@ -755,6 +778,9 @@ JS;
             && $this->acssIntegration->isAvailable();
     }
 
+    /**
+     * @param StylesheetDescriptor $stylesheet
+     */
     private function stylesheetVersion(array $stylesheet): string
     {
         $provider = strtolower(trim((string) ($stylesheet['provider'] ?? '')));
@@ -764,6 +790,9 @@ JS;
             : TASTY_FONTS_VERSION;
     }
 
+    /**
+     * @param StylesheetDescriptor $stylesheet
+     */
     private function stylesheetHandle(array $stylesheet, string $handleSuffix = ''): string
     {
         $handle = trim((string) ($stylesheet['handle'] ?? ''));
@@ -852,6 +881,9 @@ JS;
         return in_array($mode, ['html', 'headers', 'both'], true) ? $mode : 'html';
     }
 
+    /**
+     * @param list<string> $headers
+     */
     private function sendPreloadLinkHeaders(array $headers): void
     {
         if ($headers === [] || headers_sent()) {

@@ -295,6 +295,10 @@ final class Plugin
         add_action('rest_api_init', [$this->rest, 'registerRoutes']);
     }
 
+    /**
+     * @param list<string> $links
+     * @return list<string>
+     */
     public static function filterPluginActionLinks(array $links): array
     {
         array_unshift(
@@ -309,6 +313,10 @@ final class Plugin
         return $links;
     }
 
+    /**
+     * @param list<string> $links
+     * @return list<string>
+     */
     public static function filterPluginRowMeta(array $links, string $file): array
     {
         if ($file !== plugin_basename(TASTY_FONTS_FILE)) {

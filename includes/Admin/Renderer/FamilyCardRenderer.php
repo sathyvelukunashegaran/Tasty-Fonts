@@ -9,15 +9,33 @@ defined('ABSPATH') || exit;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFace from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type DeliveryProfile from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFontDisplayMap from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-type FamilyCardView array<string, mixed>
+ * @phpstan-type FamilyFontDisplayOptions list<array<string, mixed>>
+ * @phpstan-type CategoryAliasOwners array<string, string>
+ * @phpstan-type RendererFlagOptions array<string, mixed>
+ */
 final class FamilyCardRenderer extends AbstractSectionRenderer
 {
     use FamilyCardRendererSupport;
 
+    /**
+     * @param FamilyCardView $view
+     */
     public function render(array $view): void
     {
         $this->renderTemplate('family-card.php', $view);
     }
 
+    /**
+     * @param CatalogFamily $family
+     */
     public function renderAdobeFamilyCard(array $family): void
     {
         $familyName = (string) ($family['family'] ?? '');
@@ -26,8 +44,9 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             return;
         }
 
-        $faceSummaryLabels = $this->buildFamilyFaceSummaryLabels((array) ($family['faces'] ?? []));
-        $axisSummaryLabels = $this->buildVariationAxisSummaryLabels((array) ($family['faces'] ?? []));
+        $faces = $this->normalizeFaceList($family['faces'] ?? []);
+        $faceSummaryLabels = $this->buildFamilyFaceSummaryLabels($faces);
+        $axisSummaryLabels = $this->buildVariationAxisSummaryLabels($faces);
         $fontTypeDescriptor = $this->buildFontTypeDescriptor($family);
         ?>
         <article class="tasty-fonts-adobe-family-card">
@@ -56,6 +75,16 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         <?php
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param RoleSet $roles
+     * @param FamilyFallbackMap $familyFallbacks
+     * @param FamilyFontDisplayMap $familyFontDisplays
+     * @param FamilyFontDisplayOptions $familyFontDisplayOptions
+     * @param CategoryAliasOwners $categoryAliasOwners
+     * @param RendererFlagOptions $extendedVariableOptions
+     * @param RendererFlagOptions $classOutputOptions
+     */
     public function renderFamilyCardDetails(
         array $family,
         array $roles,
@@ -84,6 +113,16 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $this->renderTemplate('family-card-details.php', $view);
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param RoleSet $roles
+     * @param FamilyFallbackMap $familyFallbacks
+     * @param FamilyFontDisplayMap $familyFontDisplays
+     * @param FamilyFontDisplayOptions $familyFontDisplayOptions
+     * @param CategoryAliasOwners $categoryAliasOwners
+     * @param RendererFlagOptions $extendedVariableOptions
+     * @param RendererFlagOptions $classOutputOptions
+     */
     public function renderFamilySummaryRow(
         array $family,
         array $roles,
@@ -114,6 +153,16 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $this->render($view);
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param RoleSet $roles
+     * @param FamilyFallbackMap $familyFallbacks
+     * @param FamilyFontDisplayMap $familyFontDisplays
+     * @param FamilyFontDisplayOptions $familyFontDisplayOptions
+     * @param CategoryAliasOwners $categoryAliasOwners
+     * @param RendererFlagOptions $extendedVariableOptions
+     * @param RendererFlagOptions $classOutputOptions
+     */
     public function renderFamilyRow(
         array $family,
         array $roles,
@@ -144,6 +193,17 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $this->render($templateView);
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param RoleSet $roles
+     * @param FamilyFallbackMap $familyFallbacks
+     * @param FamilyFontDisplayMap $familyFontDisplays
+     * @param FamilyFontDisplayOptions $familyFontDisplayOptions
+     * @param CategoryAliasOwners $categoryAliasOwners
+     * @param RendererFlagOptions $extendedVariableOptions
+     * @param RendererFlagOptions $classOutputOptions
+     * @return FamilyCardView
+     */
     private function buildFamilyTemplateView(
         array $family,
         array $roles,
@@ -221,11 +281,12 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $previewLabel = $isMonospace ? __('Code Preview', 'tasty-fonts') : __('Preview', 'tasty-fonts');
         $inlinePreviewText = $this->buildFacePreviewText($previewText, $familyName, $isMonospace, false);
         $facePreviewText = $this->buildFacePreviewText($previewText, $familyName, $isMonospace, true);
-        $faceSummaryLabels = $this->buildFamilyFaceSummaryLabels((array) ($family['faces'] ?? []));
+        $familyFaces = $this->normalizeFaceList($family['faces'] ?? []);
+        $faceSummaryLabels = $this->buildFamilyFaceSummaryLabels($familyFaces);
         $visibleFaceSummaryLabels = array_slice($faceSummaryLabels, 0, 4);
         $hiddenFaceSummaryCount = max(0, count($faceSummaryLabels) - count($visibleFaceSummaryLabels));
-        $faceCount = count((array) ($family['faces'] ?? []));
-        $activeFaces = is_array($family['faces'] ?? null) ? (array) $family['faces'] : [];
+        $faceCount = count($familyFaces);
+        $activeFaces = $familyFaces;
         $familyCssVariableSnippets = $this->buildFamilyCssVariableSnippets(
             $familyName,
             $defaultStack,
@@ -250,6 +311,9 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         return $templateView;
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     */
     public function renderMigrateDeliveryButton(string $familyName, array $profile, string $className = 'button'): void
     {
         $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
@@ -274,6 +338,9 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         <?php
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     */
     public function renderDeliveryProfileCard(
         string $familyName,
         string $familySlug,
@@ -349,9 +416,12 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         <?php
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     */
     private function countProfileVariants(array $profile): int
     {
-        $faces = is_array($profile['faces'] ?? null) ? (array) $profile['faces'] : [];
+        $faces = $this->normalizeFaceList($profile['faces'] ?? []);
 
         if ($faces !== []) {
             return count(HostedImportSupport::variantsFromFaces($faces));
@@ -360,6 +430,36 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         return count((array) ($profile['variants'] ?? []));
     }
 
+    /**
+     * @param mixed $faces
+     * @return list<CatalogFace>
+     */
+    private function normalizeFaceList(mixed $faces): array
+    {
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param list<string> $assignedRoleKeys
+     * @param CategoryAliasOwners $categoryAliasOwners
+     * @param RendererFlagOptions $extendedVariableOptions
+     * @param DeliveryProfile $activeDelivery
+     * @param CatalogFace $face
+     */
     public function renderFaceDetailCard(
         string $familyName,
         string $familySlug,

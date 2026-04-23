@@ -32,6 +32,21 @@ use TastyFonts\Support\TransientKey;
 use TastyFonts\Updates\GitHubUpdater;
 use WP_Error;
 
+/**
+ * @phpstan-import-type PageContext from AdminPageContextBuilder
+ * @phpstan-import-type OutputPanel from AdminPageContextBuilder
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type PayloadList list<array<string, mixed>>
+ * @phpstan-type UploadRow array<string, mixed>
+ * @phpstan-type UploadRowList list<UploadRow>
+ * @phpstan-type SettingsInput array<string, mixed>
+ * @phpstan-type SiteTransferStatus array<string, mixed>
+ */
 final class AdminController
 {
     public const MENU_SLUG = 'tasty-custom-fonts';
@@ -334,6 +349,9 @@ final class AdminController
         $this->handleSaveRolesAction();
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function searchGoogle(string $query): array|WP_Error
     {
         return $this->resolveRateLimitedSearch(
@@ -343,6 +361,9 @@ final class AdminController
         );
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function searchBunny(string $query): array|WP_Error
     {
         return $this->resolveRateLimitedSearch(
@@ -352,6 +373,9 @@ final class AdminController
         );
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function searchGoogleResults(string $query): array|WP_Error
     {
         if (!$this->googleClient->canSearch()) {
@@ -364,11 +388,17 @@ final class AdminController
         return ['items' => $this->googleClient->searchFamilies(sanitize_text_field($query), 20)];
     }
 
+    /**
+     * @return Payload
+     */
     public function searchBunnyResults(string $query): array
     {
         return ['items' => $this->bunnyClient->searchFamilies(sanitize_text_field($query), 12)];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function fetchGoogleFamily(string $familyName): array|WP_Error
     {
         $familyName = sanitize_text_field($familyName);
@@ -404,6 +434,9 @@ final class AdminController
         );
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function fetchBunnyFamily(string $familyName): array|WP_Error
     {
         $familyName = sanitize_text_field($familyName);
@@ -432,6 +465,10 @@ final class AdminController
         );
     }
 
+    /**
+     * @param list<string> $variantTokens
+     * @return Payload|WP_Error
+     */
     public function importGoogleFamily(
         string $familyName,
         array $variantTokens,
@@ -455,6 +492,10 @@ final class AdminController
         );
     }
 
+    /**
+     * @param list<string> $variantTokens
+     * @return Payload|WP_Error
+     */
     public function importBunnyFamily(
         string $familyName,
         array $variantTokens,
@@ -475,6 +516,11 @@ final class AdminController
         );
     }
 
+    /**
+     * @param array<int|string, array<string, mixed>> $postedRows
+     * @param array<string, mixed> $rawFiles
+     * @return UploadRowList
+     */
     public function prepareUploadRows(array $postedRows, array $rawFiles): array
     {
         $uploadedFiles = $this->normalizeUploadedFiles($rawFiles);
@@ -498,6 +544,10 @@ final class AdminController
         return $rows;
     }
 
+    /**
+     * @param UploadRowList $rows
+     * @return Payload|WP_Error
+     */
     public function uploadLocalFontRows(array $rows): array|WP_Error
     {
         if ($rows === []) {
@@ -513,6 +563,9 @@ final class AdminController
         );
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function saveFamilyFallbackValue(string $family, string $fallback): array|WP_Error
     {
         $family = sanitize_text_field($family);
@@ -540,6 +593,9 @@ final class AdminController
         ];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function saveFamilyFontDisplayValue(string $family, string $display): array|WP_Error
     {
         $family = sanitize_text_field($family);
@@ -561,6 +617,10 @@ final class AdminController
         ];
     }
 
+    /**
+     * @param SettingsInput $roleValues
+     * @return Payload
+     */
     public function saveRoleDraftValues(array $roleValues): array
     {
         $catalog = $this->catalog->getCatalog();
@@ -594,6 +654,10 @@ final class AdminController
         ];
     }
 
+    /**
+     * @param SettingsInput $submittedValues
+     * @return Payload|WP_Error
+     */
     public function saveSettingsValues(array $submittedValues): array|WP_Error
     {
         $previousSettings = $this->settings->getSettings();
@@ -729,6 +793,9 @@ final class AdminController
         ];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function resetPluginSettingsToDefaults(): array|WP_Error
     {
         $settings = $this->developerTools->resetPluginSettings();
@@ -746,6 +813,9 @@ final class AdminController
         ];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function wipeManagedFontLibrary(): array|WP_Error
     {
         $settings = $this->developerTools->wipeManagedFontLibrary();
@@ -763,6 +833,9 @@ final class AdminController
         ];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function clearPluginCachesAndRegenerateAssets(): array|WP_Error
     {
         if (!$this->developerTools->clearPluginCachesAndRegenerateAssets()) {
@@ -778,6 +851,9 @@ final class AdminController
         return ['message' => $message];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function regenerateCss(): array|WP_Error
     {
         if (!$this->developerTools->regenerateCss()) {
@@ -793,6 +869,9 @@ final class AdminController
         return ['message' => $message];
     }
 
+    /**
+     * @return Payload
+     */
     public function resetIntegrationDetectionState(): array
     {
         $settings = $this->developerTools->resetIntegrationDetectionState();
@@ -805,6 +884,9 @@ final class AdminController
         ];
     }
 
+    /**
+     * @return Payload
+     */
     public function resetSuppressedNotices(): array
     {
         $this->developerTools->resetSuppressedNotices();
@@ -814,6 +896,9 @@ final class AdminController
         return ['message' => $message];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function reinstallSelectedUpdateChannelRelease(): array|WP_Error
     {
         if (!$this->updater instanceof GitHubUpdater) {
@@ -829,8 +914,8 @@ final class AdminController
             return $result;
         }
 
-        $channel = (string) ($result['channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE);
-        $version = (string) ($result['version'] ?? '');
+        $channel = $result['channel'];
+        $version = $result['version'];
         $message = sprintf(
             __('Reinstalled the %1$s channel release (%2$s).', 'tasty-fonts'),
             $this->formatUpdateChannelLabel($channel),
@@ -845,11 +930,18 @@ final class AdminController
         ];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function exportSiteTransferBundle(): array|WP_Error
     {
         return $this->siteTransfer->buildExportBundle();
     }
 
+    /**
+     * @param array<string, mixed> $uploadedFile
+     * @return Payload|WP_Error
+     */
     public function stageSiteTransferBundle(array $uploadedFile): array|WP_Error
     {
         $result = $this->siteTransfer->stageImportBundle($uploadedFile);
@@ -858,8 +950,8 @@ final class AdminController
             return $result;
         }
 
-        $familyCount = (int) ($result['families'] ?? 0);
-        $fileCount = (int) ($result['files'] ?? 0);
+        $familyCount = $result['families'];
+        $fileCount = $result['files'];
         $message = sprintf(
             __('Dry run succeeded. Ready to import %1$d famil%2$s and %3$d file%4$s. Use Import Bundle in the top-right corner to continue.', 'tasty-fonts'),
             $familyCount,
@@ -871,15 +963,18 @@ final class AdminController
         return [
             'status' => 'validated',
             'message' => $message,
-            'stage_token' => (string) ($result['stage_token'] ?? ''),
-            'bundle_name' => (string) ($result['bundle_name'] ?? ''),
-            'plugin_version' => (string) ($result['plugin_version'] ?? ''),
-            'exported_at' => (string) ($result['exported_at'] ?? ''),
+            'stage_token' => $result['stage_token'],
+            'bundle_name' => $result['bundle_name'],
+            'plugin_version' => $result['plugin_version'],
+            'exported_at' => $result['exported_at'],
             'families' => $familyCount,
             'files' => $fileCount,
         ];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function importStagedSiteTransferBundle(string $stageToken, string $freshGoogleApiKey = ''): array|WP_Error
     {
         return $this->finalizeImportedSiteTransferResult(
@@ -887,6 +982,10 @@ final class AdminController
         );
     }
 
+    /**
+     * @param array<string, mixed> $uploadedFile
+     * @return Payload|WP_Error
+     */
     public function importSiteTransferBundle(array $uploadedFile, string $freshGoogleApiKey = ''): array|WP_Error
     {
         return $this->finalizeImportedSiteTransferResult(
@@ -894,6 +993,10 @@ final class AdminController
         );
     }
 
+    /**
+     * @param Payload|WP_Error $result
+     * @return Payload|WP_Error
+     */
     private function finalizeImportedSiteTransferResult(array|WP_Error $result): array|WP_Error
     {
         if (is_wp_error($result)) {
@@ -949,21 +1052,33 @@ final class AdminController
         ];
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function saveFamilyDeliveryValue(string $familySlug, string $deliveryId): array|WP_Error
     {
         return $this->library->saveFamilyDelivery($familySlug, $deliveryId);
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function saveFamilyPublishStateValue(string $familySlug, string $publishState): array|WP_Error
     {
         return $this->library->saveFamilyPublishState($familySlug, $publishState);
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function deleteDeliveryProfileValue(string $familySlug, string $deliveryId): array|WP_Error
     {
         return $this->library->deleteDeliveryProfile($familySlug, $deliveryId);
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     public function renderFamilyCardFragment(string $familySlug): array|WP_Error
     {
         $familySlug = FontUtils::slugify($familySlug);
@@ -1012,7 +1127,7 @@ final class AdminController
             is_array($view['roles'] ?? null) ? $view['roles'] : [],
             is_array($view['familyFallbacks'] ?? null) ? $view['familyFallbacks'] : [],
             is_array($view['familyFontDisplays'] ?? null) ? $view['familyFontDisplays'] : [],
-            is_array($view['familyFontDisplayOptions'] ?? null) ? $view['familyFontDisplayOptions'] : [],
+            $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
             (string) ($view['previewText'] ?? ''),
             is_array($view['categoryAliasOwners'] ?? null) ? $view['categoryAliasOwners'] : [],
             is_array($view['extendedVariableOptions'] ?? null) ? $view['extendedVariableOptions'] : [],
@@ -1306,7 +1421,7 @@ final class AdminController
 
         $result = $this->saveFamilyFontDisplaySelection($family, $display);
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Font display saved.', 'tasty-fonts')));
+        $this->redirectWithSuccess($result['message']);
     }
 
     private function handleDeleteFamilyAction(): bool
@@ -1549,11 +1664,14 @@ final class AdminController
         exit;
     }
 
+    /**
+     * @return PageContext
+     */
     private function buildPageContext(): array
     {
         $pageType = $this->resolveRequestedPageType();
         $baseContext = $this->pageContextBuilder->build();
-        $logs = is_array($baseContext['logs'] ?? null) ? $baseContext['logs'] : [];
+        $logs = $this->normalizePayloadList($baseContext['logs'] ?? []);
 
         return array_merge(
             $baseContext,
@@ -1587,6 +1705,13 @@ final class AdminController
         );
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param NormalizedSettings $settings
+     * @param CatalogMap $catalog
+     * @param RoleSet $appliedRoles
+     * @return list<OutputPanel>
+     */
     private function buildOutputPanels(
         array $roles,
         array $settings,
@@ -1597,11 +1722,19 @@ final class AdminController
         return $this->pageContextBuilder->buildOutputPanels($roles, $settings, $catalog, $appliedRoles);
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, mixed>
+     */
     private function buildGeneratedCssPanel(array $settings): array
     {
         return $this->pageContextBuilder->buildGeneratedCssPanel($settings);
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, mixed>
+     */
     private function buildGeneratedCssPanelPayload(array $settings): array
     {
         $panel = $this->buildGeneratedCssPanel($settings);
@@ -1614,11 +1747,19 @@ final class AdminController
         return $panel;
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, bool|string>
+     */
     private function buildGeneratedCssDownloadData(array $settings): array
     {
         return $this->pageContextBuilder->buildGeneratedCssDownloadData($settings);
     }
 
+    /**
+     * @param PayloadList $logs
+     * @return array<string, mixed>
+     */
     private function buildSiteTransferContext(array $logs = []): array
     {
         $capability = $this->siteTransfer->getCapabilityStatus();
@@ -1627,7 +1768,7 @@ final class AdminController
 
         return [
             'available' => !empty($capability['available']),
-            'message' => (string) ($capability['message'] ?? ''),
+            'message' => $capability['message'],
             'export_url' => $this->buildSiteTransferDownloadUrl(),
             'import_file_field' => self::IMPORT_SITE_TRANSFER_FILE_FIELD,
             'import_stage_token_field' => self::IMPORT_SITE_TRANSFER_STAGE_TOKEN_FIELD,
@@ -1641,6 +1782,10 @@ final class AdminController
         ];
     }
 
+    /**
+     * @param NormalizedSettings $before
+     * @param NormalizedSettings $after
+     */
     private function buildSettingsSavedMessage(array $before, array $after): string
     {
         $changes = [];
@@ -1821,6 +1966,10 @@ final class AdminController
         return $message;
     }
 
+    /**
+     * @param NormalizedSettings $before
+     * @param NormalizedSettings $after
+     */
     private function settingsChangeRequiresAssetRefresh(array $before, array $after): bool
     {
         return ($before['css_delivery_mode'] ?? 'file') !== ($after['css_delivery_mode'] ?? 'file')
@@ -1838,6 +1987,10 @@ final class AdminController
             || !empty($before['variable_fonts_enabled']) !== !empty($after['variable_fonts_enabled']);
     }
 
+    /**
+     * @param NormalizedSettings $before
+     * @param NormalizedSettings $after
+     */
     private function settingsChangeRequiresReload(array $before, array $after): bool
     {
         return !empty($before['training_wheels_off']) !== !empty($after['training_wheels_off'])
@@ -1856,6 +2009,10 @@ final class AdminController
             || !empty($before['acss_font_role_sync_applied']) !== !empty($after['acss_font_role_sync_applied']);
     }
 
+    /**
+     * @param NormalizedSettings $before
+     * @param NormalizedSettings $after
+     */
     private function classOutputSubsettingsDiffer(array $before, array $after): bool
     {
         foreach (
@@ -1880,6 +2037,10 @@ final class AdminController
         return false;
     }
 
+    /**
+     * @param NormalizedSettings $before
+     * @param NormalizedSettings $after
+     */
     private function extendedVariableSubsettingsDiffer(array $before, array $after): bool
     {
         foreach (
@@ -1917,6 +2078,9 @@ final class AdminController
         return $pageContextBuilder->formatUnicodeRangeModeLabel($mode);
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
     protected function buildFontDisplayOptions(): array
     {
         $pageContextBuilder = $this->pageContextBuilderOrNull();
@@ -1934,6 +2098,9 @@ final class AdminController
         return $pageContextBuilder->buildFontDisplayOptions();
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
     protected function buildFamilyFontDisplayOptions(string $globalDisplay): array
     {
         $pageContextBuilder = $this->pageContextBuilderOrNull();
@@ -2004,6 +2171,10 @@ final class AdminController
         return $pageContextBuilder->formatUpdateChannelLabel($channel);
     }
 
+    /**
+     * @param SettingsInput $settingsInput
+     * @param NormalizedSettings $previousSettings
+     */
     private function validateUnicodeRangeSettingsInput(array &$settingsInput, array $previousSettings): ?WP_Error
     {
         $nextMode = array_key_exists('unicode_range_mode', $settingsInput)
@@ -2039,6 +2210,10 @@ final class AdminController
         return null;
     }
 
+    /**
+     * @param SettingsInput $settingsInput
+     * @param NormalizedSettings $previousSettings
+     */
     private function validateOutputSettingsInput(array $settingsInput, array $previousSettings): ?WP_Error
     {
         $nextSettings = $previousSettings;
@@ -2076,6 +2251,9 @@ final class AdminController
         );
     }
 
+    /**
+     * @param SettingsInput $settingsInput
+     */
     private function hasExplicitNonMinimalOutputInput(array $settingsInput): bool
     {
         foreach (
@@ -2128,26 +2306,46 @@ final class AdminController
         return TASTY_FONTS_VERSION;
     }
 
+    /**
+     * @param RoleSet $draftRoles
+     * @param RoleSet $appliedRoles
+     * @param NormalizedSettings|null $settings
+     * @return array<string, mixed>
+     */
     private function buildRoleDeploymentContext(array $draftRoles, array $appliedRoles, bool $applyEverywhere, ?array $settings = null): array
     {
         return $this->pageContextBuilder->buildRoleDeploymentContext($draftRoles, $appliedRoles, $applyEverywhere, $settings);
     }
 
+    /**
+     * @param CatalogCounts $counts
+     * @return list<array<string, mixed>>
+     */
     protected function buildOverviewMetrics(array $counts): array
     {
         return $this->pageContextBuilder->buildOverviewMetrics($counts);
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     protected function buildPreviewPanels(): array
     {
         return $this->pageContextBuilder->buildPreviewPanels();
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     protected function buildNoticeToasts(): array
     {
         return $this->pageContextBuilder->buildNoticeToasts();
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param RoleSet $appliedRoles
+     */
     private function buildRolesSavedMessage(string $actionType, array $roles, array $appliedRoles, bool $wasAppliedSitewide): string
     {
         $settings = $this->settings->getSettings();
@@ -2190,6 +2388,9 @@ final class AdminController
         return $property->getValue($this);
     }
 
+    /**
+     * @param array<string, mixed> $googleApiStatus
+     */
     private function buildSearchDisabledMessage(array $googleApiStatus): string
     {
         return match ((string) ($googleApiStatus['state'] ?? 'empty')) {
@@ -2199,6 +2400,10 @@ final class AdminController
         };
     }
 
+    /**
+     * @param PayloadList $logs
+     * @return list<string>
+     */
     protected function buildActivityActorOptions(array $logs): array
     {
         $pageContextBuilder = $this->pageContextBuilderOrNull();
@@ -2224,6 +2429,10 @@ final class AdminController
         return $pageContextBuilder->buildActivityActorOptions($logs);
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, mixed>
+     */
     protected function buildLocalEnvironmentNotice(array $settings): array
     {
         return $this->pageContextBuilder->buildLocalEnvironmentNotice($settings);
@@ -2259,6 +2468,9 @@ final class AdminController
         return __('Local environment reminder hidden permanently for this account.', 'tasty-fonts');
     }
 
+    /**
+     * @param array<string, mixed> $preference
+     */
     private function saveLocalEnvironmentNoticePreference(array $preference): void
     {
         $userId = max(0, (int) get_current_user_id());
@@ -2283,16 +2495,29 @@ final class AdminController
         update_option(self::LOCAL_ENV_NOTICE_OPTION, $preferences, false);
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return list<string>
+     */
     private function buildSelectableFamilyNames(array $catalog): array
     {
         return $this->pageContextBuilder->buildSelectableFamilyNames($catalog);
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param NormalizedSettings|null $settings
+     */
     private function buildRoleTextSummary(array $roles, ?array $settings = null): string
     {
         return $this->pageContextBuilder->buildRoleTextSummary($roles, $settings);
     }
 
+    /**
+     * @param SettingsInput $roleValues
+     * @param CatalogMap|null $catalog
+     * @return RoleSet
+     */
     private function sanitizeRoleValues(array $roleValues, ?array $catalog = null): array
     {
         $sanitized = [];
@@ -2353,6 +2578,10 @@ final class AdminController
         return $sanitized;
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return array<string, mixed>
+     */
     private function roleProfileForFamily(string $familyName, array $catalog): array
     {
         $familyName = trim($familyName);
@@ -2418,17 +2647,14 @@ final class AdminController
         $validation = $this->adobe->validateProject($projectId);
 
         $this->settings->saveAdobeProjectStatus(
-            (string) ($validation['state'] ?? 'unknown'),
-            (string) ($validation['message'] ?? '')
+            $validation['state'],
+            $validation['message']
         );
 
-        if (($validation['state'] ?? 'unknown') !== 'valid') {
+        if ($validation['state'] !== 'valid') {
             $this->log->add(__('Adobe Fonts project validation failed.', 'tasty-fonts'));
             $this->redirectWithError(
-                (string) (
-                    $validation['message']
-                    ?? __('Adobe Fonts project could not be validated.', 'tasty-fonts')
-                )
+                $validation['message']
             );
         }
 
@@ -2438,6 +2664,9 @@ final class AdminController
         $this->redirectWithNoticeKey($isResync ? 'adobe_project_resynced' : 'adobe_project_saved');
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     private function resolveRateLimitedSearch(string $provider, string $query, callable $resolver): array|WP_Error
     {
         $provider = strtolower(trim($provider));
@@ -2469,6 +2698,9 @@ final class AdminController
         return $result;
     }
 
+    /**
+     * @return Payload|WP_Error
+     */
     private function runRateLimitedAction(string $action, callable $resolver): array|WP_Error
     {
         $cooldownError = $this->startRateLimitedActionCooldown($action);
@@ -2480,6 +2712,9 @@ final class AdminController
         return $resolver();
     }
 
+    /**
+     * @return array{font_display: string, effective_font_display: string, message: string}
+     */
     private function saveFamilyFontDisplaySelection(string $family, string $display): array
     {
         $this->settings->saveFamilyFontDisplay($family, $display);
@@ -2502,6 +2737,10 @@ final class AdminController
         ];
     }
 
+    /**
+     * @param list<string> $variantTokens
+     * @return list<string>
+     */
     private function sanitizeVariantTokens(array $variantTokens): array
     {
         return array_values(
@@ -2579,6 +2818,10 @@ final class AdminController
         return $this->normalizeFamilyFontDisplay($this->getPostedText($key, $default));
     }
 
+    /**
+     * @param SettingsInput $submittedValues
+     * @return SettingsInput
+     */
     private function buildSettingsSaveInput(array $submittedValues): array
     {
         $settingsInput = [];
@@ -2621,6 +2864,9 @@ final class AdminController
         return $settingsInput;
     }
 
+    /**
+     * @return SettingsInput
+     */
     private function collectPostedSettingsSubmission(): array
     {
         $submittedValues = [];
@@ -2665,6 +2911,10 @@ final class AdminController
         return $submittedValues;
     }
 
+    /**
+     * @param NormalizedSettings $before
+     * @param NormalizedSettings $after
+     */
     private function adminAccessSettingsDiffer(array $before, array $after): bool
     {
         return !empty($before['admin_access_custom_enabled']) !== !empty($after['admin_access_custom_enabled'])
@@ -2674,6 +2924,9 @@ final class AdminController
 
     /**
      * @return array<int, scalar|null>
+     */
+    /**
+     * @return list<scalar|null>
      */
     private function flattenSubmittedArrayLeaves(mixed $value): array
     {
@@ -2699,6 +2952,10 @@ final class AdminController
         return $flattened;
     }
 
+    /**
+     * @param SettingsInput $settingsInput
+     * @return SettingsInput
+     */
     private function preserveUnavailableIntegrationSettings(array $settingsInput): array
     {
         if (!$this->bricksIntegration->isAvailable()) {
@@ -2723,6 +2980,9 @@ final class AdminController
         return $settingsInput;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function normalizeUploadedFiles(mixed $rawFiles): array
     {
         if (
@@ -2748,6 +3008,9 @@ final class AdminController
         return $normalized;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getPostedArray(string $key): array
     {
         if (!isset($_POST[$key]) || !is_array($_POST[$key])) {
@@ -2757,6 +3020,9 @@ final class AdminController
         return wp_unslash($_POST[$key]);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function normalizeUploadAxesInput(mixed $rawAxes): array
     {
         if (!is_array($rawAxes)) {
@@ -2784,6 +3050,10 @@ final class AdminController
         return FontUtils::normalizeAxesMap($axes);
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return array<string, int|float|string>
+     */
     private function sanitizeRoleAxisValues(mixed $rawValues, string $familyName, array $catalog): array
     {
         if (!is_array($rawValues) || trim($familyName) === '') {
@@ -2824,6 +3094,10 @@ final class AdminController
         return $filtered;
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return array<string, mixed>
+     */
     private function buildRoleFamilyCatalog(array $catalog): array
     {
         $map = [];
@@ -2831,10 +3105,6 @@ final class AdminController
         $familyFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
 
         foreach ($catalog as $familyName => $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
             $deliveryId = sanitize_text_field((string) ($activeDelivery['id'] ?? ''));
 
@@ -2862,6 +3132,9 @@ final class AdminController
         return $map;
     }
 
+    /**
+     * @param CatalogMap $catalog
+     */
     private function sanitizeRoleWeightValue(mixed $weightValue, string $familyName, array $catalog): string
     {
         $weight = $this->resolveConcreteRoleWeight((string) $weightValue);
@@ -2878,7 +3151,7 @@ final class AdminController
         }
 
         foreach ($this->buildRoleWeightOptionsForProfile($profile) as $option) {
-            if (is_array($option) && (string) ($option['value'] ?? '') === $weight) {
+            if ((string) ($option['value'] ?? '') === $weight) {
                 return $weight;
             }
         }
@@ -2886,6 +3159,10 @@ final class AdminController
         return '';
     }
 
+    /**
+     * @param array<string, mixed> $profile
+     * @return list<array<string, string>>
+     */
     private function buildRoleWeightOptionsForProfile(array $profile): array
     {
         $weights = [];
@@ -2915,6 +3192,10 @@ final class AdminController
         return array_values($weights);
     }
 
+    /**
+     * @param array<string, mixed> $profile
+     * @return array<string, mixed>
+     */
     private function profileVariationAxes(array $profile): array
     {
         $axes = [];
@@ -2940,6 +3221,9 @@ final class AdminController
         return $axes;
     }
 
+    /**
+     * @param array<string, mixed> $profile
+     */
     private function profileHasWeightAxis(array $profile): bool
     {
         $axes = $this->profileVariationAxes($profile);
@@ -3066,6 +3350,10 @@ final class AdminController
         $this->log->add($logMessage);
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @param NormalizedSettings $current
+     */
     private function shouldRecoverLegacyAcssDetectionState(array $settings, array $current): bool
     {
         return ($settings['acss_font_role_sync_enabled'] ?? null) === false
@@ -3146,6 +3434,11 @@ final class AdminController
         }
     }
 
+    /**
+     * @param NormalizedSettings $previousSettings
+     * @param NormalizedSettings $savedSettings
+     * @param SettingsInput $settingsInput
+     */
     private function syncAcssIntegrationAfterSettingsSave(array $previousSettings, array $savedSettings, array $settingsInput): string|WP_Error
     {
         if (!array_key_exists('acss_font_role_sync_enabled', $settingsInput)) {
@@ -3162,6 +3455,11 @@ final class AdminController
         return $this->syncAcssIntegrationForRuntimeState($savedSettings, true);
     }
 
+    /**
+     * @param SettingsInput $settingsInput
+     * @param SettingsInput $submittedValues
+     * @return array<string, mixed>
+     */
     private function applyBricksThemeStyleActions(array $settingsInput, array $submittedValues): array
     {
         $hasThemeStyleTargetSubmission = !empty($submittedValues['bricks_create_theme_style'])
@@ -3209,6 +3507,11 @@ final class AdminController
         return $settingsInput;
     }
 
+    /**
+     * @param NormalizedSettings $previousSettings
+     * @param SettingsInput $settingsInput
+     * @return Payload|WP_Error
+     */
     private function deleteManagedBricksThemeStyle(array $previousSettings, array $settingsInput): array|WP_Error
     {
         $deleted = $this->bricksIntegration->deleteManagedThemeStyle();
@@ -3262,6 +3565,11 @@ final class AdminController
         ];
     }
 
+    /**
+     * @param NormalizedSettings $previousSettings
+     * @param SettingsInput $settingsInput
+     * @return Payload|WP_Error
+     */
     private function resetBricksIntegration(array $previousSettings, array $settingsInput): array|WP_Error
     {
         $settingsInput['bricks_integration_enabled'] = false;
@@ -3343,6 +3651,11 @@ final class AdminController
         return implode(' ', $messages);
     }
 
+    /**
+     * @param NormalizedSettings $previousSettings
+     * @param NormalizedSettings $savedSettings
+     * @param SettingsInput $settingsInput
+     */
     private function syncBricksIntegrationAfterSettingsSave(array $previousSettings, array $savedSettings, array $settingsInput): string|WP_Error
     {
         foreach (
@@ -3363,6 +3676,9 @@ final class AdminController
         return '';
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function syncBricksIntegrationForRuntimeState(array $settings, bool $clearBackupWhenDisabled = false): string|WP_Error
     {
         if (!$this->bricksIntegration->isAvailable()) {
@@ -3439,6 +3755,9 @@ final class AdminController
         return implode(' ', array_values(array_unique(array_filter($messages, static fn (string $message): bool => $message !== ''))));
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function syncAcssIntegrationForRuntimeState(array $settings, bool $clearBackupWhenDisabled = false): string|WP_Error
     {
         $enabled = ($settings['acss_font_role_sync_enabled'] ?? null) === true;
@@ -3535,6 +3854,10 @@ final class AdminController
             : __('Automatic.css now uses Tasty Fonts role variables for heading and body typography.', 'tasty-fonts');
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, string>
+     */
     private function captureAcssIntegrationBackupValues(array $settings): array
     {
         $hasHeadingBackup = trim((string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? '')) !== '';
@@ -3558,6 +3881,10 @@ final class AdminController
         );
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return Payload|WP_Error
+     */
     private function restoreAcssIntegration(array $settings): array|WP_Error
     {
         return $this->acssIntegration->restoreFontSettings(
@@ -3605,6 +3932,9 @@ final class AdminController
         set_transient($transientKey, $toasts, self::NOTICE_TTL);
     }
 
+    /**
+     * @param SiteTransferStatus $status
+     */
     private function queueSiteTransferStatus(array $status): void
     {
         $tone = (string) ($status['tone'] ?? '') === 'success' ? 'success' : 'error';
@@ -3628,6 +3958,9 @@ final class AdminController
         );
     }
 
+    /**
+     * @return SiteTransferStatus
+     */
     private function consumeQueuedSiteTransferStatus(): array
     {
         $transientKey = $this->getSiteTransferStatusTransientKey();
@@ -3662,10 +3995,13 @@ final class AdminController
         delete_transient($this->getSiteTransferStatusTransientKey());
     }
 
+    /**
+     * @return SiteTransferStatus
+     */
     private function buildSiteTransferStatusPayload(\WP_Error $error, string $tone = 'error'): array
     {
         $errorMessage = sanitize_text_field($error->get_error_message());
-        $errorCode = $this->normalizeSiteTransferStatusCode($error->get_error_code());
+        $errorCode = $this->normalizeSiteTransferStatusCode($this->stringifySiteTransferStatusCode($error->get_error_code()));
 
         return [
             'tone' => $tone === 'success' ? 'success' : 'error',
@@ -3675,6 +4011,9 @@ final class AdminController
         ];
     }
 
+    /**
+     * @param SiteTransferStatus $status
+     */
     private function formatSiteTransferStatusForActivityLog(array $status): string
     {
         $message = sanitize_text_field((string) ($status['message'] ?? ''));
@@ -3704,6 +4043,34 @@ final class AdminController
         $normalized = preg_replace('/[^a-z0-9_-]+/', '_', $normalized) ?? '';
 
         return trim($normalized, '_');
+    }
+
+    private function stringifySiteTransferStatusCode(int|string $code): string
+    {
+        return (string) $code;
+    }
+
+    /**
+     * @param mixed $value
+     * @return PayloadList
+     */
+    private function normalizePayloadList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $normalized[] = $item;
+        }
+
+        return $normalized;
     }
 
     private function getPendingNoticeTransientKey(): string
@@ -3961,6 +4328,9 @@ final class AdminController
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function buildTransferLogContext(string $event): array
     {
         return [
@@ -3969,6 +4339,9 @@ final class AdminController
         ];
     }
 
+    /**
+     * @param array<string, scalar|null> $queryArgs
+     */
     private function buildPageUrl(string $pageType, array $queryArgs = []): string
     {
         return add_query_arg(
@@ -3992,6 +4365,9 @@ final class AdminController
         return is_scalar($rawValue) ? sanitize_text_field((string) $rawValue) : $default;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function buildTrackedUiQueryArgs(string $pageType): array
     {
         $args = $pageType === self::PAGE_ROLES ? [] : ['tf_page' => $pageType];
@@ -4163,6 +4539,9 @@ final class AdminController
 
     /**
      * @return string[]
+     */
+    /**
+     * @return list<string>
      */
     private static function pluginPageSlugs(): array
     {

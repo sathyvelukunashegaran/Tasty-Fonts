@@ -9,6 +9,30 @@ defined('ABSPATH') || exit;
 use TastyFonts\Support\FontUtils;
 use WP_Error;
 
+/**
+ * @phpstan-type HostedFamily array<string, mixed>
+ * @phpstan-type HostedProfile array<string, mixed>
+ * @phpstan-type HostedFace array<string, mixed>
+ * @phpstan-type HostedProviderMeta array<string, mixed>
+ * @phpstan-type HostedImportConfig array<string, string>
+ * @phpstan-type HostedVariantList list<string>
+ * @phpstan-type HostedVariantPlan array{import: HostedVariantList, skipped: HostedVariantList}
+ * @phpstan-type HostedManifestResult array{faces: list<HostedFace>, files: int}
+ * @phpstan-type HostedPersistResult array{family_record: array<string, mixed>, variants: HostedVariantList, faces: list<HostedFace>}
+ * @phpstan-type HostedImportResult array{
+ *     status: string,
+ *     message: string,
+ *     family: string,
+ *     delivery_type: string,
+ *     faces: int,
+ *     files: int,
+ *     variants: HostedVariantList,
+ *     imported_variants: HostedVariantList,
+ *     skipped_variants: HostedVariantList,
+ *     family_record?: array<string, mixed>,
+ *     delivery_id?: string
+ * }
+ */
 trait HostedProviderImportTrait
 {
     private function normalizeHostedDeliveryMode(string $deliveryMode): string
@@ -18,6 +42,10 @@ trait HostedProviderImportTrait
         return in_array($deliveryMode, ['self_hosted', 'cdn'], true) ? $deliveryMode : 'self_hosted';
     }
 
+    /**
+     * @param HostedFamily|null $family
+     * @return HostedProfile|null
+     */
     private function findHostedDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = ''): ?array
     {
         if (!is_array($family)) {
@@ -43,6 +71,11 @@ trait HostedProviderImportTrait
         return null;
     }
 
+    /**
+     * @param HostedVariantList $requestedVariants
+     * @param HostedProfile|null $existingProfile
+     * @return HostedVariantPlan
+     */
     private function buildHostedVariantPlan(array $requestedVariants, ?array $existingProfile, ?callable $normalizeRequested = null): array
     {
         $existingKeys = [];
@@ -82,6 +115,12 @@ trait HostedProviderImportTrait
         ];
     }
 
+    /**
+     * @param HostedVariantList $requestedVariants
+     * @param HostedVariantPlan $variantPlan
+     * @param array<string, string> $messages
+     * @return HostedImportResult
+     */
     private function buildHostedSkippedImportResult(
         string $familyName,
         string $deliveryMode,
@@ -108,6 +147,10 @@ trait HostedProviderImportTrait
         ];
     }
 
+    /**
+     * @param HostedVariantList $requestedVariants
+     * @return list<HostedFace>|WP_Error
+     */
     private function selectHostedImportFaces(
         string $familyName,
         string $css,
@@ -117,7 +160,7 @@ trait HostedProviderImportTrait
         string $emptyMessage
     ): array|WP_Error {
         $faces = HostedImportSupport::selectPreferredFaces(
-            (array) $parseFaces($css, $familyName),
+            $this->normalizeHostedFaceList($parseFaces($css, $familyName)),
             $requestedVariants
         );
 
@@ -128,6 +171,9 @@ trait HostedProviderImportTrait
         return $faces;
     }
 
+    /**
+     * @param HostedImportConfig $config
+     */
     private function resolveHostedImportTarget(string $familySlug, array $config): string|WP_Error
     {
         $root = $this->getHostedImportRootDirectory($config);
@@ -148,6 +194,9 @@ trait HostedProviderImportTrait
         return $familyDirectory;
     }
 
+    /**
+     * @param HostedImportConfig $config
+     */
     private function getHostedImportRootDirectory(array $config): string|WP_Error
     {
         if (!$this->storage->ensureRootDirectory()) {
@@ -169,6 +218,12 @@ trait HostedProviderImportTrait
         return $providerRoot;
     }
 
+    /**
+     * @param HostedFace $face
+     * @param HostedProviderMeta $provider
+     * @param HostedImportConfig $config
+     * @return array<string, mixed>|WP_Error|null
+     */
     private function buildHostedManifestFace(
         string $familyName,
         string $familySlug,
@@ -223,15 +278,16 @@ trait HostedProviderImportTrait
         ];
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param HostedProviderMeta $provider
+     * @return list<array<string, mixed>>
+     */
     private function buildHostedCdnFaces(string $familyName, string $familySlug, array $faces, array $provider, string $source): array
     {
         $cdnFaces = [];
 
         foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             $cdnFaces[] = [
                 'family' => $familyName,
                 'slug' => $familySlug,
@@ -250,6 +306,12 @@ trait HostedProviderImportTrait
         return $cdnFaces;
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param HostedProviderMeta $provider
+     * @param HostedImportConfig $config
+     * @return HostedManifestResult|WP_Error
+     */
     private function buildHostedManifestFaces(
         string $familyName,
         string $familySlug,
@@ -287,6 +349,13 @@ trait HostedProviderImportTrait
         ];
     }
 
+    /**
+     * @param HostedProfile $profile
+     * @param HostedFamily|null $existingFamily
+     * @param HostedProfile|null $existingProfile
+     * @param HostedVariantList $importedVariants
+     * @return HostedPersistResult
+     */
     private function persistHostedProfile(
         string $familyName,
         string $familySlug,
@@ -296,13 +365,13 @@ trait HostedProviderImportTrait
         array $importedVariants
     ): array {
         $profile['faces'] = HostedImportSupport::mergeManifestFaces(
-            is_array($existingProfile['faces'] ?? null) ? (array) $existingProfile['faces'] : [],
-            (array) ($profile['faces'] ?? [])
+            $this->normalizeHostedFaceList($existingProfile['faces'] ?? []),
+            $this->normalizeHostedFaceList($profile['faces'] ?? [])
         );
         $profile['variants'] = array_values(
             array_unique(
                 array_merge(
-                    is_array($existingProfile['variants'] ?? null) ? (array) $existingProfile['variants'] : [],
+                    $this->normalizeHostedVariantList($existingProfile['variants'] ?? []),
                     $importedVariants
                 )
             )
@@ -323,6 +392,15 @@ trait HostedProviderImportTrait
         ];
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param HostedVariantPlan $variantPlan
+     * @param HostedFamily|null $existingFamily
+     * @param HostedProfile|null $existingProfile
+     * @param HostedProfile $profile
+     * @param HostedImportConfig $config
+     * @return HostedImportResult|WP_Error
+     */
     private function saveHostedSelfHostedProfile(
         string $familyName,
         string $familySlug,
@@ -350,7 +428,7 @@ trait HostedProviderImportTrait
             return $manifest;
         }
 
-        $manifestFaces = (array) ($manifest['faces'] ?? []);
+        $manifestFaces = $manifest['faces'];
 
         if ($manifestFaces === []) {
             return $this->error($emptyManifestCode, $emptyManifestMessage);
@@ -366,7 +444,7 @@ trait HostedProviderImportTrait
         );
 
         $faceCount = count($manifestFaces);
-        $fileCount = (int) ($manifest['files'] ?? 0);
+        $fileCount = (int) $manifest['files'];
         $message = $this->buildHostedImportMessageWithFiles(
             $successTemplate,
             $familyName,
@@ -389,6 +467,15 @@ trait HostedProviderImportTrait
         );
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param HostedVariantPlan $variantPlan
+     * @param HostedFamily|null $existingFamily
+     * @param HostedProfile|null $existingProfile
+     * @param HostedProfile $profile
+     * @param HostedImportConfig $config
+     * @return HostedImportResult|WP_Error
+     */
     private function saveHostedCdnProfile(
         string $familyName,
         string $familySlug,
@@ -491,6 +578,12 @@ trait HostedProviderImportTrait
         return $message;
     }
 
+    /**
+     * @param array<string, mixed> $savedFamily
+     * @param HostedVariantList $variants
+     * @param HostedVariantPlan $variantPlan
+     * @return HostedImportResult
+     */
     private function finalizeHostedImportResult(
         string $status,
         string $message,
@@ -520,6 +613,10 @@ trait HostedProviderImportTrait
         ];
     }
 
+    /**
+     * @param HostedImportResult|WP_Error $result
+     * @return HostedImportResult|WP_Error
+     */
     private function completeHostedImport(array|WP_Error $result, string $provider): array|WP_Error
     {
         if (is_wp_error($result)) {
@@ -532,6 +629,9 @@ trait HostedProviderImportTrait
         return $result;
     }
 
+    /**
+     * @param HostedImportConfig $config
+     */
     private function downloadHostedFontFile(string $url, string $targetPath, array $config): bool|WP_Error
     {
         $validated = $this->validateHostedRemoteFontUrl($url, $config);
@@ -552,7 +652,7 @@ trait HostedProviderImportTrait
         );
 
         if (is_wp_error($response)) {
-            return $this->error($response->get_error_code(), $response->get_error_message());
+            return $this->error($this->normalizeHostedErrorCode($response->get_error_code()), $response->get_error_message());
         }
 
         $status = (int) wp_remote_retrieve_response_code($response);
@@ -580,7 +680,7 @@ trait HostedProviderImportTrait
             );
         }
 
-        $contentType = strtolower((string) wp_remote_retrieve_header($response, 'content-type'));
+        $contentType = strtolower($this->normalizeHostedHeaderValue(wp_remote_retrieve_header($response, 'content-type')));
 
         if (
             $contentType !== ''
@@ -604,6 +704,79 @@ trait HostedProviderImportTrait
         return true;
     }
 
+    /**
+     * @param mixed $faces
+     * @return list<HostedFace>
+     */
+    private function normalizeHostedFaceList(mixed $faces): array
+    {
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $variants
+     * @return HostedVariantList
+     */
+    private function normalizeHostedVariantList(mixed $variants): array
+    {
+        if (!is_array($variants)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($variants as $variant) {
+            if (!is_scalar($variant)) {
+                continue;
+            }
+
+            $normalized[] = (string) $variant;
+        }
+
+        return FontUtils::normalizeVariantTokens($normalized);
+    }
+
+    private function normalizeHostedErrorCode(int|string $code): string
+    {
+        return (string) $code;
+    }
+
+    private function normalizeHostedHeaderValue(mixed $value): string
+    {
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if (!is_array($value)) {
+            return '';
+        }
+
+        foreach ($value as $entry) {
+            if (is_scalar($entry)) {
+                return trim((string) $entry);
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param HostedImportConfig $config
+     */
     private function validateHostedRemoteFontUrl(string $url, array $config): bool|WP_Error
     {
         $parts = wp_parse_url($url);

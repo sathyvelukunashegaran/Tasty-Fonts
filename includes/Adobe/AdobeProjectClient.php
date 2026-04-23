@@ -11,6 +11,22 @@ use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
 
+/**
+ * @phpstan-import-type AdobeProjectStatus from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-type ProjectFamily array<string, mixed>
+ * @phpstan-type ProjectFamilyList list<ProjectFamily>
+ * @phpstan-type ProjectData array{
+ *     project_id: string,
+ *     stylesheet_url: string,
+ *     families: ProjectFamilyList,
+ *     fetched_at: int
+ * }
+ * @phpstan-type ValidationStatus array{
+ *     state: string,
+ *     message: string
+ * }
+ * @phpstan-type HttpArgs array<string, mixed>
+ */
 final class AdobeProjectClient
 {
     public const TRANSIENT_PREFIX = 'tasty_fonts_adobe_project_v1_';
@@ -37,7 +53,7 @@ final class AdobeProjectClient
     {
         $status = $this->getProjectStatus();
 
-        return $this->isEnabled() && $this->hasProjectId() && ($status['state'] ?? 'empty') === 'valid';
+        return $this->isEnabled() && $this->hasProjectId() && $status['state'] === 'valid';
     }
 
     public function getProjectId(): string
@@ -45,11 +61,17 @@ final class AdobeProjectClient
         return $this->settings->getAdobeProjectId();
     }
 
+    /**
+     * @return AdobeProjectStatus
+     */
     public function getProjectStatus(): array
     {
         return $this->settings->getAdobeProjectStatus();
     }
 
+    /**
+     * @return ValidationStatus
+     */
     public function validateProject(string $projectId): array
     {
         $projectId = $this->sanitizeProjectId($projectId);
@@ -70,7 +92,7 @@ final class AdobeProjectClient
             ];
         }
 
-        $familyCount = count((array) ($result['families'] ?? []));
+        $familyCount = count($result['families']);
 
         return [
             'state' => 'valid',
@@ -82,6 +104,9 @@ final class AdobeProjectClient
         ];
     }
 
+    /**
+     * @return ProjectFamilyList
+     */
     public function getProjectFamilies(string $projectId): array
     {
         $projectId = $this->sanitizeProjectId($projectId);
@@ -96,9 +121,12 @@ final class AdobeProjectClient
             return [];
         }
 
-        return is_array($result['families'] ?? null) ? array_values($result['families']) : [];
+        return $result['families'];
     }
 
+    /**
+     * @return ProjectFamilyList
+     */
     public function getConfiguredFamilies(): array
     {
         if (!$this->hasProjectId()) {
@@ -120,7 +148,7 @@ final class AdobeProjectClient
     public function getEnqueueVersion(): string
     {
         $status = $this->getProjectStatus();
-        $checkedAt = (int) ($status['checked_at'] ?? 0);
+        $checkedAt = $status['checked_at'];
 
         return hash(
             'crc32b',
@@ -139,6 +167,9 @@ final class AdobeProjectClient
         delete_transient($this->transientKey($projectId));
     }
 
+    /**
+     * @return ProjectData|WP_Error
+     */
     private function fetchProjectData(string $projectId, bool $forceRefresh = false): array|WP_Error
     {
         $projectId = $this->sanitizeProjectId($projectId);
@@ -153,8 +184,12 @@ final class AdobeProjectClient
         $cacheKey = $this->transientKey($projectId);
         $cached = !$forceRefresh ? get_transient($cacheKey) : false;
 
-        if (is_array($cached) && !empty($cached['families'])) {
-            return $cached;
+        if (is_array($cached)) {
+            $normalizedCached = $this->buildProjectData($projectId, $cached['families'] ?? [], $cached['stylesheet_url'] ?? '');
+
+            if ($normalizedCached !== null && $normalizedCached['families'] !== []) {
+                return $normalizedCached;
+            }
         }
 
         $response = $this->remoteGet(
@@ -209,16 +244,50 @@ final class AdobeProjectClient
             );
         }
 
-        $result = [
-            'project_id' => $projectId,
-            'stylesheet_url' => $this->getStylesheetUrl($projectId),
-            'families' => $families,
-            'fetched_at' => time(),
-        ];
+        $result = $this->buildProjectData($projectId, $families, $this->getStylesheetUrl($projectId));
+
+        if ($result === null) {
+            return new WP_Error(
+                'tasty_fonts_adobe_project_invalid',
+                __('No usable font families were detected in that Adobe Fonts project.', 'tasty-fonts')
+            );
+        }
 
         set_transient($cacheKey, $result, self::CACHE_TTL);
 
         return $result;
+    }
+
+    /**
+     * @param mixed $families
+     * @return ProjectData|null
+     */
+    private function buildProjectData(string $projectId, mixed $families, mixed $stylesheetUrl): ?array
+    {
+        if (!is_array($families)) {
+            return null;
+        }
+
+        $normalizedFamilies = [];
+
+        foreach ($families as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $normalizedFamilies[] = $family;
+        }
+
+        if ($normalizedFamilies === []) {
+            return null;
+        }
+
+        return [
+            'project_id' => $projectId,
+            'stylesheet_url' => (string) $stylesheetUrl,
+            'families' => $normalizedFamilies,
+            'fetched_at' => time(),
+        ];
     }
 
     private function sanitizeProjectId(string $projectId): string
@@ -229,6 +298,9 @@ final class AdobeProjectClient
         return trim($projectId);
     }
 
+    /**
+     * @param HttpArgs $args
+     */
     private function remoteGet(string $url, array $args = []): mixed
     {
         $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);

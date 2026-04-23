@@ -13,6 +13,18 @@ use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
+/**
+ * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
+ * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-type UploadRowInput array<string, mixed>
+ * @phpstan-type NormalizedUploadRow array<string, mixed>
+ * @phpstan-type FamilyLookup array<string, string>
+ * @phpstan-type ValidatedUploadFile array{tmp_name: string, extension: string, size: int}
+ * @phpstan-type WrittenUploadFile array{path: string, relative_path: string}
+ * @phpstan-type RowResult array{index: int, status: string, message: string}
+ * @phpstan-type UploadSummary array{imported: int, skipped: int, errors: int}
+ * @phpstan-type UploadResult array{message: string, rows: list<RowResult>, summary: UploadSummary, families: list<string>}
+ */
 final class LocalUploadService
 {
     private const ALLOWED_EXTENSIONS = ['woff2', 'woff', 'ttf', 'otf'];
@@ -47,13 +59,8 @@ final class LocalUploadService
      *
      * @since 1.4.0
      *
-     * @param array<int|string, array<string, mixed>> $rows Raw upload rows assembled from the admin request.
-     * @return array{
-     *     message: string,
-     *     rows: list<array{index: int, status: string, message: string}>,
-     *     summary: array{imported: int, skipped: int, errors: int},
-     *     families: list<string>
-     * }|WP_Error Import summary on success, or a WordPress error when validation fails before any row can be processed.
+     * @param array<int|string, UploadRowInput> $rows Raw upload rows assembled from the admin request.
+     * @return UploadResult|WP_Error Import summary on success, or a WordPress error when validation fails before any row can be processed.
      */
     public function uploadRows(array $rows): array|WP_Error
     {
@@ -155,10 +162,10 @@ final class LocalUploadService
                 'style' => $style,
                 'unicode_range' => '',
                 'files' => [
-                    $extension => (string) ($write['relative_path'] ?? ''),
+                    $extension => $write['relative_path'],
                 ],
                 'paths' => [
-                    $extension => (string) ($write['relative_path'] ?? ''),
+                    $extension => $write['relative_path'],
                 ],
                 'provider' => ['type' => 'local'],
                 'is_variable' => $isVariable,
@@ -210,6 +217,11 @@ final class LocalUploadService
         ];
     }
 
+    /**
+     * @param UploadRowInput $row
+     * @param FamilyLookup $familyLookup
+     * @return NormalizedUploadRow
+     */
     private function normalizeRow(array $row, int $index, array $familyLookup): array
     {
         $familyInput = preg_replace('/\s+/', ' ', trim(wp_strip_all_tags((string) ($row['family'] ?? '')))) ?? '';
@@ -250,6 +262,10 @@ final class LocalUploadService
         ];
     }
 
+    /**
+     * @param list<NormalizedUploadRow> $rows
+     * @return array<string, bool>
+     */
     private function detectFallbackConflicts(array $rows): array
     {
         $fallbacksByFamily = [];
@@ -280,6 +296,10 @@ final class LocalUploadService
         return $conflicted;
     }
 
+    /**
+     * @param array<string, mixed> $file
+     * @return ValidatedUploadFile|WP_Error
+     */
     private function validateUploadedFile(array $file): array|WP_Error
     {
         $name = trim((string) ($file['name'] ?? ''));
@@ -391,6 +411,10 @@ final class LocalUploadService
         return $this->uploadedFileValidator->isUploadedFile($tmpName);
     }
 
+    /**
+     * @param ValidatedUploadFile $validatedFile
+     * @return WrittenUploadFile|WP_Error
+     */
     private function writeUploadedFontFile(
         string $familyName,
         string $familySlug,
@@ -417,8 +441,8 @@ final class LocalUploadService
             );
         }
 
-        $extension = (string) ($validatedFile['extension'] ?? '');
-        $tmpName = (string) ($validatedFile['tmp_name'] ?? '');
+        $extension = $validatedFile['extension'];
+        $tmpName = $validatedFile['tmp_name'];
         $filename = $isVariable
             ? FontUtils::buildVariableFontFilename($familyName, $style, $extension)
             : FontUtils::buildStaticFontFilename($familyName, $weight, $style, $extension);
@@ -452,6 +476,9 @@ final class LocalUploadService
         ];
     }
 
+    /**
+     * @param AxesMap $axes
+     */
     private function variableWeightFromAxes(string $fallbackWeight, array $axes): string
     {
         $normalizedAxes = FontUtils::normalizeAxesMap($axes);
@@ -482,6 +509,9 @@ final class LocalUploadService
         return $message !== '' ? $message : $fallback;
     }
 
+    /**
+     * @return FamilyLookup
+     */
     private function buildFamilyLookup(): array
     {
         $lookup = [];
@@ -500,6 +530,9 @@ final class LocalUploadService
         return $lookup;
     }
 
+    /**
+     * @return array<string, bool>
+     */
     private function buildExistingVariantFormatKeys(): array
     {
         $keys = [];
@@ -539,6 +572,9 @@ final class LocalUploadService
         );
     }
 
+    /**
+     * @param list<string> $families
+     */
     private function buildSummaryMessage(int $importedCount, int $skippedCount, int $errorCount, array $families): string
     {
         $familySummary = $families !== []
@@ -557,6 +593,9 @@ final class LocalUploadService
         );
     }
 
+    /**
+     * @return RowResult
+     */
     private function buildRowResult(int $index, string $status, string $message): array
     {
         return [
@@ -571,6 +610,9 @@ final class LocalUploadService
         return new WP_Error($code, $message);
     }
 
+    /**
+     * @param list<CatalogFace> $newFaces
+     */
     private function saveLocalProfile(string $familyName, string $familySlug, array $newFaces): void
     {
         if ($newFaces === []) {
@@ -582,7 +624,7 @@ final class LocalUploadService
         $existingProfile = is_array($existingFamily['delivery_profiles'][$profileId] ?? null)
             ? (array) $existingFamily['delivery_profiles'][$profileId]
             : [];
-        $existingFaces = is_array($existingProfile['faces'] ?? null) ? (array) $existingProfile['faces'] : [];
+        $existingFaces = $this->normalizeCatalogFaceList($existingProfile['faces'] ?? []);
         $mergedFaces = HostedImportSupport::mergeManifestFaces($existingFaces, $newFaces);
 
         $this->imports->saveProfile(
@@ -603,5 +645,28 @@ final class LocalUploadService
             $existingFamily === null ? 'library_only' : (string) ($existingFamily['publish_state'] ?? 'published'),
             $existingFamily === null
         );
+    }
+
+    /**
+     * @param mixed $faces
+     * @return list<CatalogFace>
+     */
+    private function normalizeCatalogFaceList(mixed $faces): array
+    {
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
     }
 }

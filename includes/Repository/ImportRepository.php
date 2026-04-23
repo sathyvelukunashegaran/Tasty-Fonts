@@ -8,6 +8,12 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-type LibraryRecord array<string, mixed>
+ * @phpstan-type LibraryMap array<string, LibraryRecord>
+ * @phpstan-type DeliveryProfile array<string, mixed>
+ * @phpstan-type FaceRecord array<string, mixed>
+ */
 final class ImportRepository
 {
     public const OPTION_LIBRARY = 'tasty_fonts_library';
@@ -18,21 +24,33 @@ final class ImportRepository
     private const SUPPORTED_PROVIDERS = ['local', 'google', 'bunny', 'adobe'];
     private const SUPPORTED_FORMATS = ['static', 'variable'];
 
+    /**
+     * @return LibraryMap
+     */
     public function all(): array
     {
         return $this->allFamilies();
     }
 
+    /**
+     * @return LibraryMap
+     */
     public function allFamilies(): array
     {
         return $this->getLibrary();
     }
 
+    /**
+     * @return LibraryRecord|null
+     */
     public function get(string $slug): ?array
     {
         return $this->getFamily($slug);
     }
 
+    /**
+     * @return LibraryRecord|null
+     */
     public function getFamily(string $slug): ?array
     {
         $slug = FontUtils::slugify($slug);
@@ -47,11 +65,17 @@ final class ImportRepository
         return is_array($family) ? $family : null;
     }
 
+    /**
+     * @param LibraryRecord $family
+     */
     public function upsert(array $family): void
     {
         $this->saveFamily($family);
     }
 
+    /**
+     * @param LibraryRecord $family
+     */
     public function saveFamily(array $family): void
     {
         if (empty($family['slug']) || !is_string($family['slug'])) {
@@ -88,6 +112,9 @@ final class ImportRepository
         $this->persistLibrary($library);
     }
 
+    /**
+     * @return LibraryRecord
+     */
     public function ensureFamily(
         string $familyName,
         ?string $familySlug = null,
@@ -127,6 +154,10 @@ final class ImportRepository
         return $family;
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     * @return LibraryRecord
+     */
     public function saveProfile(
         string $familyName,
         string $familySlug,
@@ -171,6 +202,9 @@ final class ImportRepository
         return $library[$familySlug];
     }
 
+    /**
+     * @return LibraryRecord|null
+     */
     public function deleteProfile(string $familySlug, string $deliveryId): ?array
     {
         return $this->mutateFamilyDelivery(
@@ -195,6 +229,9 @@ final class ImportRepository
         );
     }
 
+    /**
+     * @return LibraryRecord|null
+     */
     public function setActiveDelivery(string $familySlug, string $deliveryId, ?string $publishState = null): ?array
     {
         return $this->mutateFamilyDelivery(
@@ -216,6 +253,9 @@ final class ImportRepository
         );
     }
 
+    /**
+     * @return LibraryRecord|null
+     */
     public function setPublishState(string $familySlug, string $publishState): ?array
     {
         $familySlug = FontUtils::slugify($familySlug);
@@ -243,6 +283,10 @@ final class ImportRepository
         return $library[$familySlug];
     }
 
+    /**
+     * @param callable(LibraryMap, string, LibraryRecord, array<string, DeliveryProfile>, string): (LibraryRecord|null) $mutator
+     * @return LibraryRecord|null
+     */
     private function mutateFamilyDelivery(string $familySlug, string $deliveryId, callable $mutator): ?array
     {
         $familySlug = FontUtils::slugify($familySlug);
@@ -285,6 +329,10 @@ final class ImportRepository
         delete_option(self::LEGACY_OPTION_IMPORTS);
     }
 
+    /**
+     * @param LibraryMap $library
+     * @return LibraryMap
+     */
     public function replaceLibrary(array $library): array
     {
         $normalized = $this->normalizeLibrary($library);
@@ -293,6 +341,9 @@ final class ImportRepository
         return $normalized;
     }
 
+    /**
+     * @return LibraryMap
+     */
     private function getLibrary(): array
     {
         $value = get_option(self::OPTION_LIBRARY, null);
@@ -317,20 +368,23 @@ final class ImportRepository
         return $library;
     }
 
+    /**
+     * @param LibraryMap $library
+     */
     private function persistLibrary(array $library): void
     {
         update_option(self::OPTION_LIBRARY, $this->normalizeLibrary($library), false);
     }
 
+    /**
+     * @param LibraryMap $library
+     * @return LibraryMap
+     */
     private function normalizeLibrary(array $library): array
     {
         $normalized = [];
 
         foreach ($library as $slug => $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $normalizedFamily = $this->normalizeFamilyRecord($family, null);
 
             if ($normalizedFamily === []) {
@@ -348,6 +402,11 @@ final class ImportRepository
         return $normalized;
     }
 
+    /**
+     * @param LibraryRecord $family
+     * @param LibraryRecord|null $existing
+     * @return LibraryRecord
+     */
     private function normalizeFamilyRecord(array $family, ?array $existing): array
     {
         $familyName = sanitize_text_field((string) ($family['family'] ?? ($existing['family'] ?? '')));
@@ -411,6 +470,10 @@ final class ImportRepository
         ];
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     * @return DeliveryProfile
+     */
     private function normalizeDeliveryProfile(array $profile): array
     {
         $provider = $this->normalizeProvider((string) ($profile['provider'] ?? ''));
@@ -429,23 +492,23 @@ final class ImportRepository
             'id' => $id,
             'provider' => $provider,
             'type' => $type,
-            'format' => $this->normalizeFormat((string) ($profile['format'] ?? ''), (array) ($profile['faces'] ?? [])),
+            'format' => $this->normalizeFormat((string) ($profile['format'] ?? ''), $this->normalizeFaceList($profile['faces'] ?? [])),
             'label' => sanitize_text_field((string) ($profile['label'] ?? $this->defaultProfileLabel($provider, $type))),
-            'variants' => FontUtils::normalizeVariantTokens((array) ($profile['variants'] ?? [])),
-            'faces' => $this->normalizeFaces((array) ($profile['faces'] ?? [])),
+            'variants' => $this->normalizeVariantTokenList($profile['variants'] ?? []),
+            'faces' => $this->normalizeFaces($this->normalizeFaceList($profile['faces'] ?? [])),
             'meta' => $this->normalizeMeta((array) ($profile['meta'] ?? [])),
         ];
     }
 
+    /**
+     * @param list<FaceRecord> $faces
+     * @return list<FaceRecord>
+     */
     private function normalizeFaces(array $faces): array
     {
         $normalized = [];
 
         foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             $files = is_array($face['files'] ?? null) ? $face['files'] : [];
             $paths = is_array($face['paths'] ?? null) ? $face['paths'] : [];
 
@@ -477,15 +540,15 @@ final class ImportRepository
         return array_values($normalized);
     }
 
+    /**
+     * @param array<string, mixed> $meta
+     * @return array<string, mixed>
+     */
     private function normalizeMeta(array $meta): array
     {
         $normalized = [];
 
         foreach ($meta as $key => $value) {
-            if (!is_string($key)) {
-                continue;
-            }
-
             if (is_array($value)) {
                 $normalized[$key] = array_values(
                     array_filter(
@@ -502,12 +565,16 @@ final class ImportRepository
         return $normalized;
     }
 
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, string>
+     */
     private function normalizeStringMap(array $values): array
     {
         $normalized = [];
 
         foreach ($values as $key => $value) {
-            if (!is_string($key) || !is_string($value)) {
+            if (!is_string($value)) {
                 continue;
             }
 
@@ -524,6 +591,9 @@ final class ImportRepository
         return in_array($state, self::SUPPORTED_PUBLISH_STATES, true) ? $state : 'published';
     }
 
+    /**
+     * @param LibraryRecord|null $existing
+     */
     private function normalizeManualPublishState(string $state, string $publishState = '', ?array $existing = null): string
     {
         $state = sanitize_text_field($state);
@@ -570,6 +640,55 @@ final class ImportRepository
         return FontUtils::slugify($deliveryId);
     }
 
+    /**
+     * @param mixed $variants
+     * @return list<string>
+     */
+    private function normalizeVariantTokenList(mixed $variants): array
+    {
+        if (!is_array($variants)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($variants as $variant) {
+            if (!is_scalar($variant)) {
+                continue;
+            }
+
+            $normalized[] = (string) $variant;
+        }
+
+        return FontUtils::normalizeVariantTokens($normalized);
+    }
+
+    /**
+     * @param mixed $faces
+     * @return list<FaceRecord>
+     */
+    private function normalizeFaceList(mixed $faces): array
+    {
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param list<FaceRecord> $faces
+     */
     private function normalizeFormat(string $format, array $faces): string
     {
         $normalized = strtolower(trim($format));
@@ -599,21 +718,21 @@ final class ImportRepository
         };
     }
 
+    /**
+     * @param LibraryMap $imports
+     * @return LibraryMap
+     */
     private function migrateLegacyImports(array $imports): array
     {
         $library = [];
 
         foreach ($imports as $slug => $import) {
-            if (!is_array($import)) {
-                continue;
-            }
-
             $familyName = sanitize_text_field((string) ($import['family'] ?? ''));
-            $familySlug = FontUtils::slugify(is_string($slug) ? $slug : (string) ($import['slug'] ?? $familyName));
+            $familySlug = FontUtils::slugify($slug !== '' ? $slug : (string) ($import['slug'] ?? $familyName));
             $provider = $this->normalizeProvider((string) ($import['provider'] ?? ''));
 
             if ($provider === '') {
-                $provider = $this->inferProviderFromFaces((array) ($import['faces'] ?? []));
+                $provider = $this->inferProviderFromFaces($this->normalizeFaceList($import['faces'] ?? []));
             }
 
             if ($familyName === '' || $familySlug === '' || $provider === '') {
@@ -651,13 +770,12 @@ final class ImportRepository
         return $library;
     }
 
+    /**
+     * @param list<FaceRecord> $faces
+     */
     private function inferProviderFromFaces(array $faces): string
     {
         foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             $provider = $this->normalizeProvider((string) ($face['source'] ?? ''));
 
             if ($provider !== '') {

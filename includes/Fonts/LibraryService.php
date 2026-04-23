@@ -14,6 +14,11 @@ use TastyFonts\Support\RoleUsageMessageFormatter;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
+/**
+ * @phpstan-import-type CatalogFamily from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-import-type DeliveryProfile from CatalogService
+ */
 final class LibraryService
 {
     private const MANAGED_IMPORT_SOURCES = ['google', 'bunny'];
@@ -403,10 +408,6 @@ final class LibraryService
         }
 
         foreach ($this->imports->allFamilies() as $storedFamily) {
-            if (!is_array($storedFamily)) {
-                continue;
-            }
-
             $familyName = trim((string) ($storedFamily['family'] ?? ''));
             $familySlug = FontUtils::slugify((string) ($storedFamily['slug'] ?? $familyName));
 
@@ -446,6 +447,9 @@ final class LibraryService
         $this->catalog->invalidate();
     }
 
+    /**
+     * @param CatalogFamily $family
+     */
     private function manualPublishStateForFamily(array $family): string
     {
         $manualState = strtolower(trim((string) ($family['manual_publish_state'] ?? '')));
@@ -494,7 +498,7 @@ final class LibraryService
         $normalizedStyle = FontUtils::normalizeStyle($style);
         $normalizedSource = trim($source) !== '' ? strtolower(trim($source)) : 'local';
         $normalizedUnicodeRange = $this->isManagedImportSource($normalizedSource) ? '' : trim($unicodeRange);
-        $faces = is_array($activeDelivery['faces'] ?? null) ? (array) $activeDelivery['faces'] : [];
+        $faces = $this->normalizeFaceList($activeDelivery['faces'] ?? []);
         $faceIndex = $this->findMatchingFaceIndex($faces, $normalizedWeight, $normalizedStyle, $normalizedSource, $normalizedUnicodeRange);
 
         if ($faceIndex === null) {
@@ -576,6 +580,9 @@ final class LibraryService
         ];
     }
 
+    /**
+     * @return CatalogFamily|null
+     */
     private function findFamilyBySlug(string $familySlug): ?array
     {
         foreach ($this->catalog->getCatalog() as $family) {
@@ -589,6 +596,10 @@ final class LibraryService
         return null;
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @return DeliveryProfile|null
+     */
     private function findDeliveryProfile(array $family, string $deliveryId): ?array
     {
         foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
@@ -600,6 +611,10 @@ final class LibraryService
         return null;
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @return list<string>
+     */
     private function collectFamilyRelativePaths(array $family): array
     {
         $paths = [];
@@ -615,6 +630,10 @@ final class LibraryService
         return array_values(array_unique(array_filter($paths, static fn (string $path): bool => $path !== '')));
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     * @return list<string>
+     */
     private function collectProfileRelativePaths(array $profile): array
     {
         $paths = [];
@@ -630,6 +649,10 @@ final class LibraryService
         return array_values(array_unique(array_filter($paths, static fn (string $path): bool => $path !== '')));
     }
 
+    /**
+     * @param CatalogFace $face
+     * @return list<string>
+     */
     private function collectFaceRelativePaths(array $face): array
     {
         $paths = [];
@@ -653,6 +676,9 @@ final class LibraryService
         return array_values(array_unique($paths));
     }
 
+    /**
+     * @param list<CatalogFace> $faces
+     */
     private function findMatchingFaceIndex(
         array $faces,
         string $weight,
@@ -661,18 +687,17 @@ final class LibraryService
         string $unicodeRange
     ): ?int {
         foreach ($faces as $index => $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             if ($this->faceMatches($face, $weight, $style, $source, $unicodeRange)) {
-                return is_int($index) ? $index : null;
+                return $index;
             }
         }
 
         return null;
     }
 
+    /**
+     * @param CatalogFace $face
+     */
     private function faceMatches(array $face, string $weight, string $style, string $source, string $unicodeRange): bool
     {
         $faceSource = strtolower(trim((string) ($face['source'] ?? 'local')));
@@ -684,11 +709,42 @@ final class LibraryService
             && $faceUnicodeRange === $unicodeRange;
     }
 
+    /**
+     * @param list<CatalogFace> $faces
+     * @return list<string>
+     */
     private function buildVariantsFromFaces(array $faces): array
     {
         return HostedImportSupport::variantsFromFaces($faces);
     }
 
+    /**
+     * @param mixed $faces
+     * @return list<CatalogFace>
+     */
+    private function normalizeFaceList(mixed $faces): array
+    {
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param CatalogFamily $family
+     * @return list<string>
+     */
     private function managedImportSourcesForFamily(array $family): array
     {
         $sources = [];
@@ -713,6 +769,9 @@ final class LibraryService
         return in_array(strtolower(trim($source)), self::MANAGED_IMPORT_SOURCES, true);
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     */
     private function isSelfHostedProfile(array $profile): bool
     {
         return strtolower(trim((string) ($profile['type'] ?? ''))) === 'self_hosted';
@@ -736,6 +795,10 @@ final class LibraryService
         return false;
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param DeliveryProfile $profile
+     */
     private function persistProfile(array $family, array $profile, bool $activate): void
     {
         $familyName = (string) ($family['family'] ?? '');
@@ -765,6 +828,10 @@ final class LibraryService
         );
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @return DeliveryProfile|null
+     */
     private function firstStoredAlternativeProfile(array $family, string $excludedDeliveryId): ?array
     {
         foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
@@ -784,6 +851,9 @@ final class LibraryService
         return null;
     }
 
+    /**
+     * @return list<string>
+     */
     private function getProtectedRoleLabels(string $familyName): array
     {
         $catalog = $this->catalog->getCatalog();
@@ -806,16 +876,25 @@ final class LibraryService
         return array_values(array_unique($roleLabels));
     }
 
+    /**
+     * @param list<string> $roleLabels
+     */
     private function buildDeleteFamilyBlockedMessage(string $familyName, array $roleLabels): string
     {
         return RoleUsageMessageFormatter::buildDeleteBlockedMessage($familyName, $roleLabels);
     }
 
+    /**
+     * @param list<string> $roleLabels
+     */
     private function buildDeleteLastVariantBlockedMessage(string $familyName, array $roleLabels): string
     {
         return RoleUsageMessageFormatter::buildDeleteLastVariantBlockedMessage($familyName, $roleLabels);
     }
 
+    /**
+     * @return list<string>
+     */
     private function liveRoleKeys(): array
     {
         $keys = ['heading', 'body'];

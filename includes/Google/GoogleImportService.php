@@ -16,6 +16,27 @@ use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
+/**
+ * @phpstan-type HostedFamily array<string, mixed>
+ * @phpstan-type HostedProfile array<string, mixed>
+ * @phpstan-type HostedFace array<string, mixed>
+ * @phpstan-type ProviderMetadata array<string, mixed>
+ * @phpstan-type VariantPlan array{import: list<string>, skipped: list<string>, format_mode: string}
+ * @phpstan-type ProviderConfig array<string, string>
+ * @phpstan-type ImportResult array{
+ *     status: string,
+ *     message: string,
+ *     family: string,
+ *     delivery_type: string,
+ *     faces: int,
+ *     files: int,
+ *     variants: list<string>,
+ *     imported_variants: list<string>,
+ *     skipped_variants: list<string>,
+ *     family_record?: array<string, mixed>,
+ *     delivery_id?: string
+ * }
+ */
 final class GoogleImportService
 {
     use HostedProviderImportTrait;
@@ -35,6 +56,7 @@ final class GoogleImportService
     }
 
     /**
+     * @param list<string> $variants
      * @return array{
      *     status: string,
      *     message: string,
@@ -92,7 +114,7 @@ final class GoogleImportService
         );
 
         if (is_wp_error($css)) {
-            return $this->error($css->get_error_code(), $css->get_error_message());
+            return $this->error($this->normalizeHostedErrorCode($css->get_error_code()), $css->get_error_message());
         }
 
         $faces = $this->selectHostedImportFaces(
@@ -115,6 +137,14 @@ final class GoogleImportService
         return $this->completeHostedImport($result, 'google');
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param ProviderMetadata|null $metadata
+     * @param VariantPlan $variantPlan
+     * @param HostedFamily|null $existingFamily
+     * @param HostedProfile|null $existingProfile
+     * @return ImportResult|WP_Error
+     */
     private function saveSelfHostedProfile(
         string $familyName,
         string $familySlug,
@@ -124,7 +154,7 @@ final class GoogleImportService
         ?array $existingFamily,
         ?array $existingProfile
     ): array|WP_Error {
-        $profileId = $this->resolveProfileId($existingFamily, 'self_hosted', (string) ($variantPlan['format_mode'] ?? 'static'));
+        $profileId = $this->resolveProfileId($existingFamily, 'self_hosted', $variantPlan['format_mode']);
         return $this->saveHostedSelfHostedProfile(
             $familyName,
             $familySlug,
@@ -137,7 +167,7 @@ final class GoogleImportService
                 'provider' => 'google',
                 'provider_face' => $this->buildProviderMetadata($metadata, $variantPlan['import']),
                 'type' => 'self_hosted',
-                'format' => (string) ($variantPlan['format_mode'] ?? 'static'),
+                'format' => $variantPlan['format_mode'],
                 'label' => __('Self-hosted (Google import)', 'tasty-fonts'),
                 'meta' => [
                     'category' => (string) ($metadata['category'] ?? ''),
@@ -153,6 +183,14 @@ final class GoogleImportService
         );
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param ProviderMetadata|null $metadata
+     * @param VariantPlan $variantPlan
+     * @param HostedFamily|null $existingFamily
+     * @param HostedProfile|null $existingProfile
+     * @return ImportResult|WP_Error
+     */
     private function saveCdnProfile(
         string $familyName,
         string $familySlug,
@@ -162,7 +200,7 @@ final class GoogleImportService
         ?array $existingFamily,
         ?array $existingProfile
     ): array|WP_Error {
-        $profileId = $this->resolveProfileId($existingFamily, 'cdn', (string) ($variantPlan['format_mode'] ?? 'static'));
+        $profileId = $this->resolveProfileId($existingFamily, 'cdn', $variantPlan['format_mode']);
         return $this->saveHostedCdnProfile(
             $familyName,
             $familySlug,
@@ -175,7 +213,7 @@ final class GoogleImportService
                 'provider' => 'google',
                 'provider_face' => $this->buildProviderMetadata($metadata, $variantPlan['import']),
                 'type' => 'cdn',
-                'format' => (string) ($variantPlan['format_mode'] ?? 'static'),
+                'format' => $variantPlan['format_mode'],
                 'label' => __('Google CDN', 'tasty-fonts'),
                 'meta' => [
                     'category' => (string) ($metadata['category'] ?? ''),
@@ -201,6 +239,10 @@ final class GoogleImportService
         return $formatMode === 'variable' ? 'variable' : 'static';
     }
 
+    /**
+     * @param HostedFamily|null $family
+     * @return HostedProfile|null
+     */
     private function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = 'static'): ?array
     {
         return $this->findHostedDeliveryProfile($family, $provider, $type, $formatMode);
@@ -211,6 +253,9 @@ final class GoogleImportService
         return FontUtils::slugify('google-' . $deliveryMode);
     }
 
+    /**
+     * @param HostedFamily|null $family
+     */
     private function resolveProfileId(?array $family, string $deliveryMode, string $formatMode): string
     {
         $existing = $this->findDeliveryProfile($family, 'google', $deliveryMode, $formatMode);
@@ -228,11 +273,19 @@ final class GoogleImportService
         return FontUtils::slugify($baseId . '-' . $formatMode);
     }
 
+    /**
+     * @param HostedFamily|null $family
+     */
     private function findLegacyProfileConflict(?array $family, string $provider, string $type): bool
     {
         return $this->findHostedDeliveryProfile($family, $provider, $type) !== null;
     }
 
+    /**
+     * @param ProviderMetadata|null $metadata
+     * @param list<string> $variants
+     * @return ProviderMetadata
+     */
     private function buildProviderMetadata(?array $metadata, array $variants): array
     {
         return [
@@ -244,6 +297,11 @@ final class GoogleImportService
         ];
     }
 
+    /**
+     * @param list<string> $requestedVariants
+     * @param HostedProfile|null $existingProfile
+     * @return VariantPlan
+     */
     private function buildVariantPlan(array $requestedVariants, ?array $existingProfile, string $formatMode = 'static'): array
     {
         $variantPlan = $this->buildHostedVariantPlan(
@@ -256,6 +314,10 @@ final class GoogleImportService
         return $variantPlan;
     }
 
+    /**
+     * @param list<string> $requestedVariants
+     * @return list<string>
+     */
     private function normalizeVariableRequestVariants(array $requestedVariants): array
     {
         $styles = [];
@@ -267,7 +329,7 @@ final class GoogleImportService
                 continue;
             }
 
-            $style = ($axis['style'] ?? 'normal') === 'italic' ? 'italic' : 'normal';
+            $style = $axis['style'] === 'italic' ? 'italic' : 'normal';
             $styles[$style] = $style === 'italic' ? 'italic' : 'regular';
         }
 
@@ -278,6 +340,9 @@ final class GoogleImportService
         return array_values($styles);
     }
 
+    /**
+     * @return ProviderConfig
+     */
     private function providerConfig(): array
     {
         return [

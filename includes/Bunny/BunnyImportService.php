@@ -16,6 +16,27 @@ use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
+/**
+ * @phpstan-type HostedFamily array<string, mixed>
+ * @phpstan-type HostedProfile array<string, mixed>
+ * @phpstan-type HostedFace array<string, mixed>
+ * @phpstan-type ProviderMetadata array<string, mixed>
+ * @phpstan-type VariantPlan array{import: list<string>, skipped: list<string>}
+ * @phpstan-type ProviderConfig array<string, string>
+ * @phpstan-type ImportResult array{
+ *     status: string,
+ *     message: string,
+ *     family: string,
+ *     delivery_type: string,
+ *     faces: int,
+ *     files: int,
+ *     variants: list<string>,
+ *     imported_variants: list<string>,
+ *     skipped_variants: list<string>,
+ *     family_record?: array<string, mixed>,
+ *     delivery_id?: string
+ * }
+ */
 final class BunnyImportService
 {
     use HostedProviderImportTrait;
@@ -35,6 +56,7 @@ final class BunnyImportService
     }
 
     /**
+     * @param list<string> $variants
      * @return array{
      *     status: string,
      *     message: string,
@@ -84,7 +106,7 @@ final class BunnyImportService
         $css = $this->client->fetchCss($familyName, $variantPlan['import']);
 
         if (is_wp_error($css)) {
-            return $this->error($css->get_error_code(), $css->get_error_message());
+            return $this->error($this->normalizeHostedErrorCode($css->get_error_code()), $css->get_error_message());
         }
 
         $faces = $this->selectHostedImportFaces(
@@ -107,6 +129,14 @@ final class BunnyImportService
         return $this->completeHostedImport($result, 'bunny');
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param ProviderMetadata|null $metadata
+     * @param VariantPlan $variantPlan
+     * @param HostedFamily|null $existingFamily
+     * @param HostedProfile|null $existingProfile
+     * @return ImportResult|WP_Error
+     */
     private function saveSelfHostedProfile(
         string $familyName,
         string $familySlug,
@@ -143,6 +173,14 @@ final class BunnyImportService
         );
     }
 
+    /**
+     * @param list<HostedFace> $faces
+     * @param ProviderMetadata|null $metadata
+     * @param VariantPlan $variantPlan
+     * @param HostedFamily|null $existingFamily
+     * @param HostedProfile|null $existingProfile
+     * @return ImportResult|WP_Error
+     */
     private function saveCdnProfile(
         string $familyName,
         string $familySlug,
@@ -182,11 +220,20 @@ final class BunnyImportService
         return $this->normalizeHostedDeliveryMode($deliveryMode);
     }
 
+    /**
+     * @param HostedFamily|null $family
+     * @return HostedProfile|null
+     */
     private function findDeliveryProfile(?array $family, string $provider, string $type): ?array
     {
         return $this->findHostedDeliveryProfile($family, $provider, $type);
     }
 
+    /**
+     * @param ProviderMetadata|null $metadata
+     * @param list<string> $variants
+     * @return ProviderMetadata
+     */
     private function buildProviderMetadata(?array $metadata, array $variants): array
     {
         return [
@@ -196,6 +243,11 @@ final class BunnyImportService
         ];
     }
 
+    /**
+     * @param list<string> $requestedVariants
+     * @param HostedProfile|null $existingProfile
+     * @return VariantPlan
+     */
     private function buildVariantPlan(array $requestedVariants, ?array $existingProfile): array
     {
         return $this->buildHostedVariantPlan($requestedVariants, $existingProfile);
@@ -206,6 +258,9 @@ final class BunnyImportService
         return FontUtils::slugify('bunny-' . $deliveryMode);
     }
 
+    /**
+     * @param HostedFamily|null $family
+     */
     private function resolveProfileId(?array $family, string $deliveryMode): string
     {
         $existing = $this->findDeliveryProfile($family, 'bunny', $deliveryMode);
@@ -217,6 +272,9 @@ final class BunnyImportService
         return $this->profileId($deliveryMode);
     }
 
+    /**
+     * @return ProviderConfig
+     */
     private function providerConfig(): array
     {
         return [

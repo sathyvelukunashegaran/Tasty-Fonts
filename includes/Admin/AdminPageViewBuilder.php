@@ -13,6 +13,9 @@ use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 
+/**
+ * @phpstan-import-type PageContext from AdminPageContextBuilder
+ */
 final class AdminPageViewBuilder
 {
     use SharedRenderHelpers;
@@ -24,6 +27,10 @@ final class AdminPageViewBuilder
     {
     }
 
+    /**
+     * @param PageContext $context
+     * @return array<string, mixed>
+     */
     public function build(array $context): array
     {
         $this->trainingWheelsOff = !empty($context['training_wheels_off']);
@@ -43,7 +50,7 @@ final class AdminPageViewBuilder
                 return [
                     'value' => $name,
                     'label' => FontTypeHelper::buildSelectorOptionLabel($name, $catalogEntry),
-                    'type' => is_array($descriptor) ? (string) ($descriptor['type'] ?? '') : '',
+                    'type' => $descriptor !== null ? $descriptor['type'] : '',
                 ];
             },
             $availableFamilies
@@ -291,6 +298,10 @@ final class AdminPageViewBuilder
         return $view;
     }
 
+    /**
+     * @param array<string, mixed> $integration
+     * @return array<string, mixed>
+     */
     private function buildBricksIntegrationView(array $integration): array
     {
         $featureDescriptions = is_array($integration['feature_descriptions'] ?? null)
@@ -319,6 +330,10 @@ final class AdminPageViewBuilder
         return $integration;
     }
 
+    /**
+     * @param array<string, mixed> $featureState
+     * @return array<string, mixed>
+     */
     private function buildBricksFeatureView(string $featureKey, array $featureState, string $description): array
     {
         $status = trim((string) ($featureState['status'] ?? 'disabled'));
@@ -333,6 +348,10 @@ final class AdminPageViewBuilder
         return $featureState;
     }
 
+    /**
+     * @param array<string, mixed> $themeStyles
+     * @return array<string, mixed>
+     */
     private function buildBricksThemeStyleTargetView(array $themeStyles): array
     {
         $summary = is_array($themeStyles['summary'] ?? null) ? $themeStyles['summary'] : [];
@@ -391,6 +410,9 @@ final class AdminPageViewBuilder
         ];
     }
 
+    /**
+     * @param array<string, mixed> $summary
+     */
     private function buildBricksThemeStyleTargetCopy(array $summary): string
     {
         $managedThemeStyleLabel = trim((string) ($summary['managed_style_label'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_LABEL));
@@ -423,6 +445,11 @@ final class AdminPageViewBuilder
         return __('Only updates font-family and font-weight.', 'tasty-fonts');
     }
 
+    /**
+     * @param array<string, mixed> $themeStyles
+     * @param array<string, mixed> $googleFonts
+     * @return array<string, mixed>
+     */
     private function buildBricksMappingDetailsView(array $themeStyles, array $googleFonts): array
     {
         $summary = is_array($themeStyles['summary'] ?? null) ? $themeStyles['summary'] : [];
@@ -550,6 +577,9 @@ final class AdminPageViewBuilder
         };
     }
 
+    /**
+     * @param array<string, mixed> $updateChannelStatus
+     */
     private function buildPluginVersionChannelLabel(string $pluginVersion, array $updateChannelStatus): string
     {
         $selectedChannelLabel = trim((string) ($updateChannelStatus['selected_channel_label'] ?? ''));
@@ -569,6 +599,9 @@ final class AdminPageViewBuilder
         return __('Stable', 'tasty-fonts');
     }
 
+    /**
+     * @param array<string, mixed> $updateChannelStatus
+     */
     private function buildPluginVersionStateLabel(array $updateChannelStatus): string
     {
         $state = $this->resolvePluginVersionState($updateChannelStatus);
@@ -581,6 +614,9 @@ final class AdminPageViewBuilder
         };
     }
 
+    /**
+     * @param array<string, mixed> $updateChannelStatus
+     */
     private function buildPluginVersionBadgeClass(array $updateChannelStatus): string
     {
         $state = $this->resolvePluginVersionState($updateChannelStatus);
@@ -592,6 +628,9 @@ final class AdminPageViewBuilder
         };
     }
 
+    /**
+     * @param array<string, mixed> $updateChannelStatus
+     */
     private function resolvePluginVersionState(array $updateChannelStatus): string
     {
         $state = trim((string) ($updateChannelStatus['state'] ?? ''));
@@ -679,6 +718,10 @@ final class AdminPageViewBuilder
         return implode('. ', $parts);
     }
 
+    /**
+     * @param array<string, bool> $classOutputOptions
+     * @param array<string, bool> $extendedVariableOptions
+     */
     private function deriveOutputQuickMode(
         string $preference,
         array $classOutputOptions,
@@ -702,6 +745,10 @@ final class AdminPageViewBuilder
             : 'custom';
     }
 
+    /**
+     * @param array<string, bool> $classOutputOptions
+     * @param array<string, bool> $extendedVariableOptions
+     */
     private function deriveExactOutputQuickMode(
         array $classOutputOptions,
         array $extendedVariableOptions,
@@ -732,6 +779,10 @@ final class AdminPageViewBuilder
         return 'custom';
     }
 
+    /**
+     * @param array<string, bool> $options
+     * @param list<string> $ignoredKeys
+     */
     private function allOutputFlagsEnabled(array $options, array $ignoredKeys = []): bool
     {
         foreach ($options as $key => $enabled) {

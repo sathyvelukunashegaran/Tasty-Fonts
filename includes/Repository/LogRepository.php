@@ -6,6 +6,11 @@ namespace TastyFonts\Repository;
 
 defined('ABSPATH') || exit;
 
+/**
+ * @phpstan-type LogContext array<string, mixed>
+ * @phpstan-type LogEntry array<string, string>
+ * @phpstan-type LogEntryList list<LogEntry>
+ */
 final class LogRepository
 {
     public const OPTION_LOG = 'tasty_fonts_log';
@@ -16,6 +21,9 @@ final class LogRepository
     public const EVENT_SITE_TRANSFER_IMPORT_FAILURE = 'site_transfer_import_failure';
     private const MAX_ENTRIES = 100;
 
+    /**
+     * @param LogContext $context
+     */
     public function add(string $message, array $context = []): void
     {
         $log = $this->all();
@@ -50,6 +58,9 @@ final class LogRepository
         update_option(self::OPTION_LOG, array_slice($log, 0, self::MAX_ENTRIES), false);
     }
 
+    /**
+     * @return LogEntryList
+     */
     public function all(): array
     {
         return $this->getOptionArray(self::OPTION_LOG);
@@ -60,12 +71,15 @@ final class LogRepository
         update_option(self::OPTION_LOG, [], false);
     }
 
+    /**
+     * @return LogEntryList
+     */
     private function getOptionArray(string $option): array
     {
         $value = get_option($option, null);
 
         if (is_array($value)) {
-            return $value;
+            return $this->normalizeLogEntryList($value);
         }
 
         $legacyValue = get_option(self::LEGACY_OPTION_LOG, null);
@@ -76,7 +90,42 @@ final class LogRepository
 
         update_option($option, $legacyValue, false);
 
-        return $legacyValue;
+        return $this->normalizeLogEntryList($legacyValue);
+    }
+
+    /**
+     * @param mixed $entries
+     * @return LogEntryList
+     */
+    private function normalizeLogEntryList(mixed $entries): array
+    {
+        if (!is_array($entries)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $normalizedEntry = [];
+
+            foreach ($entry as $key => $value) {
+                if (!is_string($key) || !is_scalar($value)) {
+                    continue;
+                }
+
+                $normalizedEntry[$key] = (string) $value;
+            }
+
+            if ($normalizedEntry !== []) {
+                $normalized[] = $normalizedEntry;
+            }
+        }
+
+        return $normalized;
     }
 
     private function getActorLabel(): string

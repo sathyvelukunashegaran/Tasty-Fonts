@@ -19,6 +19,12 @@ use TastyFonts\Support\Storage;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
 
+/**
+ * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type LibraryMap from \TastyFonts\Repository\ImportRepository
+ * @phpstan-type ScaffoldFileMap array<string, string>
+ * @phpstan-type TransientPrefixList list<string>
+ */
 final class DeveloperToolsService
 {
     private const STORAGE_INDEX_STUB = '<?php // Silence is golden.';
@@ -90,6 +96,9 @@ HTACCESS;
         return true;
     }
 
+    /**
+     * @return NormalizedSettings|WP_Error
+     */
     public function resetPluginSettings(): array|WP_Error
     {
         $previousSettings = $this->settings->getSettings();
@@ -110,6 +119,9 @@ HTACCESS;
         return $settings;
     }
 
+    /**
+     * @return NormalizedSettings|WP_Error
+     */
     public function wipeManagedFontLibrary(): array|WP_Error
     {
         $previousSettings = $this->settings->getSettings();
@@ -175,6 +187,9 @@ HTACCESS;
         return $success;
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     public function resetIntegrationDetectionState(): array
     {
         $previousSettings = $this->settings->getSettings();
@@ -210,6 +225,9 @@ HTACCESS;
         }
     }
 
+    /**
+     * @param NormalizedSettings $settingsContext
+     */
     private function clearPluginCachesAndRegenerateAssetsInternal(array $settingsContext): bool
     {
         $this->deleteFixedTransients();
@@ -253,6 +271,9 @@ HTACCESS;
         }
     }
 
+    /**
+     * @param TransientPrefixList $prefixes
+     */
     private function deleteWildcardTransients(array $prefixes): void
     {
         global $wpdb;
@@ -269,7 +290,7 @@ HTACCESS;
         }
 
         foreach ($prefixes as $prefix) {
-            if (!is_string($prefix) || $prefix === '') {
+            if ($prefix === '') {
                 continue;
             }
 
@@ -287,6 +308,9 @@ HTACCESS;
         }
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function deleteAdobeProjectTransient(array $settings): void
     {
         $projectId = strtolower(trim((string) ($settings['adobe_project_id'] ?? '')));
@@ -299,6 +323,9 @@ HTACCESS;
         delete_transient(TransientKey::forSite(AdobeProjectClient::TRANSIENT_PREFIX . md5($projectId)));
     }
 
+    /**
+     * @return ScaffoldFileMap
+     */
     private function scaffoldStorageFiles(string $root): array
     {
         $directories = [

@@ -8,6 +8,11 @@ defined('ABSPATH') || exit;
 
 use WP_Error;
 
+/**
+ * @phpstan-type FontSettings array<string, string>
+ * @phpstan-type IntegrationState array<string, bool|string|FontSettings>
+ * @phpstan-type EditorStyleList list<string>
+ */
 final class AcssIntegrationService
 {
     public const RUNTIME_STYLESHEET_HANDLE = 'automaticcss-core-css';
@@ -32,6 +37,9 @@ final class AcssIntegrationService
         return $available;
     }
 
+    /**
+     * @return IntegrationState
+     */
     public function readState(bool $sitewideRolesEnabled, bool $syncEnabled, bool $syncApplied): array
     {
         $available = $this->isAvailable();
@@ -57,6 +65,9 @@ final class AcssIntegrationService
         ];
     }
 
+    /**
+     * @return FontSettings|WP_Error
+     */
     public function applyRoleVariableSync(): array|WP_Error
     {
         if (!$this->isAvailable()) {
@@ -69,6 +80,9 @@ final class AcssIntegrationService
         return $this->updateSettings($this->desiredSettings());
     }
 
+    /**
+     * @return FontSettings|WP_Error
+     */
     public function restoreFontSettings(
         string $headingValue,
         string $bodyValue,
@@ -93,6 +107,9 @@ final class AcssIntegrationService
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function desiredSettings(): array
     {
         return [
@@ -103,6 +120,9 @@ final class AcssIntegrationService
         ];
     }
 
+    /**
+     * @return FontSettings
+     */
     public function getCurrentSettings(): array
     {
         if (!$this->isAvailable()) {
@@ -121,6 +141,9 @@ final class AcssIntegrationService
         }
     }
 
+    /**
+     * @return EditorStyleList
+     */
     public function getManagedEditorStyles(): array
     {
         return [
@@ -174,6 +197,10 @@ final class AcssIntegrationService
         ];
     }
 
+    /**
+     * @param array<string, string> $settings
+     * @return FontSettings|WP_Error
+     */
     private function updateSettings(array $settings): array|WP_Error
     {
         try {
@@ -227,6 +254,9 @@ final class AcssIntegrationService
         return is_scalar($value) ? trim((string) $value) : '';
     }
 
+    /**
+     * @return FontSettings
+     */
     private function emptySettings(): array
     {
         return [

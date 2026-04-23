@@ -8,8 +8,20 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
+ */
 trait LibraryRenderValueHelpers
 {
+    /**
+     * @param RoleSet $left
+     * @param RoleSet $right
+     * @param CatalogMap $catalog
+     * @param FamilyFallbackMap $familyFallbacks
+     */
     protected function roleSetsMatch(
         array $left,
         array $right,
@@ -56,6 +68,11 @@ trait LibraryRenderValueHelpers
         return true;
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param CatalogMap $catalog
+     * @param FamilyFallbackMap $familyFallbacks
+     */
     protected function resolveEffectiveRoleFallback(
         string $roleKey,
         array $roles,
@@ -87,6 +104,10 @@ trait LibraryRenderValueHelpers
         return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return CatalogFamily|null
+     */
     protected function findCatalogFamilyByName(string $familyName, array $catalog): ?array
     {
         if (is_array($catalog[$familyName] ?? null)) {
@@ -94,10 +115,6 @@ trait LibraryRenderValueHelpers
         }
 
         foreach ($catalog as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             if (trim((string) ($family['family'] ?? '')) === $familyName) {
                 return $family;
             }
@@ -111,6 +128,11 @@ trait LibraryRenderValueHelpers
         return FontUtils::fontVariableReference($familyName);
     }
 
+    /**
+     * @param CatalogMap $families
+     * @param RoleSet $roles
+     * @return array<string, string>
+     */
     protected function buildCategoryAliasOwners(array $families, array $roles, bool $includeMonospace): array
     {
         $owners = [];
@@ -131,7 +153,7 @@ trait LibraryRenderValueHelpers
             }
 
             foreach ($families as $familyKey => $family) {
-                if (!is_array($family) || isset($usedKeys[$familyKey])) {
+                if (isset($usedKeys[$familyKey])) {
                     continue;
                 }
 
@@ -146,7 +168,7 @@ trait LibraryRenderValueHelpers
         }
 
         foreach ($families as $familyKey => $family) {
-            if (!is_array($family) || isset($usedKeys[$familyKey])) {
+            if (isset($usedKeys[$familyKey])) {
                 continue;
             }
 
@@ -172,6 +194,9 @@ trait LibraryRenderValueHelpers
         return $owners;
     }
 
+    /**
+     * @param CatalogFamily $family
+     */
     protected function resolveFamilyCategory(array $family): string
     {
         $category = trim((string) ($family['font_category'] ?? ''));

@@ -8,8 +8,23 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-type FontEntry array<string, mixed>
+ * @phpstan-type FontTypeDescriptor array{
+ *     type: string,
+ *     label: string,
+ *     badge_class: string,
+ *     has_variable: bool,
+ *     has_static: bool,
+ *     is_source_only: bool
+ * }
+ */
 final class FontTypeHelper
 {
+    /**
+     * @param FontEntry $entry
+     * @return FontTypeDescriptor
+     */
     public static function describeEntry(array $entry, string $context = 'library'): array
     {
         $formats = FontUtils::resolveFormatAvailability($entry);
@@ -19,6 +34,9 @@ final class FontTypeHelper
         return self::describe($hasVariable, $context, $hasStatic);
     }
 
+    /**
+     * @return FontTypeDescriptor
+     */
     public static function describe(bool $hasVariableMetadata, string $context = 'library', bool $hasStaticMetadata = true): array
     {
         $normalizedContext = strtolower(trim($context));
@@ -66,6 +84,9 @@ final class FontTypeHelper
         ];
     }
 
+    /**
+     * @param FontEntry $entry
+     */
     public static function entryHasVariableMetadata(array $entry): bool
     {
         if (!empty($entry['has_variable_faces'])) {
@@ -97,6 +118,9 @@ final class FontTypeHelper
         return false;
     }
 
+    /**
+     * @param FontEntry|null $entry
+     */
     public static function buildSelectorOptionLabel(string $familyName, ?array $entry = null, string $context = 'library'): string
     {
         $trimmedFamilyName = trim($familyName);
@@ -107,6 +131,6 @@ final class FontTypeHelper
 
         $descriptor = self::describeEntry($entry, $context);
 
-        return $trimmedFamilyName . ' · ' . (string) ($descriptor['label'] ?? '');
+        return $trimmedFamilyName . ' · ' . $descriptor['label'];
     }
 }

@@ -12,6 +12,16 @@ use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-import-type CatalogFamily from CatalogService
+ * @phpstan-import-type CatalogMap from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-type RuntimeFamilyList list<CatalogFamily>
+ * @phpstan-type PreloadFaceScore array{0: int, 1: int, 2: int}
+ * @phpstan-type StylesheetDescriptor array<string, mixed>
+ */
 final class RuntimeAssetPlanner
 {
     public function __construct(
@@ -23,46 +33,73 @@ final class RuntimeAssetPlanner
     ) {
     }
 
+    /**
+     * @return RuntimeFamilyList
+     */
     public function getRuntimeFamilies(): array
     {
         return $this->filterFamiliesByPublishState($this->catalog->getCatalog(), false);
     }
 
+    /**
+     * @return CatalogMap
+     */
     public function getPreviewFamilies(): array
     {
         return $this->catalog->getCatalog();
     }
 
+    /**
+     * @return CatalogMap
+     */
     public function getLocalRuntimeCatalog(): array
     {
         return $this->buildFontFaceCatalog($this->getRuntimeFamilies());
     }
 
+    /**
+     * @return RuntimeFamilyList
+     */
     public function getRuntimeVariableFamilies(): array
     {
         return $this->getRuntimeFamilies();
     }
 
+    /**
+     * @return CatalogMap
+     */
     public function getLocalPreviewCatalog(): array
     {
         return $this->buildFontFaceCatalog($this->getPreviewFamilies());
     }
 
+    /**
+     * @return CatalogMap
+     */
     public function getPreviewVariableFamilies(): array
     {
         return $this->getPreviewFamilies();
     }
 
+    /**
+     * @return list<StylesheetDescriptor>
+     */
     public function getExternalStylesheets(): array
     {
         return $this->buildExternalStylesheets($this->getRuntimeFamilies());
     }
 
+    /**
+     * @return list<StylesheetDescriptor>
+     */
     public function getAdminPreviewStylesheets(): array
     {
         return $this->buildExternalStylesheets($this->getPreviewFamilies(), 'swap');
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function getEditorFontFamilies(): array
     {
         $fontFamilies = [];
@@ -95,6 +132,9 @@ final class RuntimeAssetPlanner
         return array_values($fontFamilies);
     }
 
+    /**
+     * @return list<string>
+     */
     public function getPrimaryFontPreloadUrls(): array
     {
         $settings = $this->settings->getSettings();
@@ -141,6 +181,9 @@ final class RuntimeAssetPlanner
         return array_values($urls);
     }
 
+    /**
+     * @return list<string>
+     */
     public function getPreconnectOrigins(): array
     {
         $settings = $this->settings->getSettings();
@@ -175,6 +218,9 @@ final class RuntimeAssetPlanner
         return array_values($origins);
     }
 
+    /**
+     * @param CatalogFamily $family
+     */
     private function resolveFamilyFallback(array $family): string
     {
         $familyName = trim((string) ($family['family'] ?? ''));
@@ -193,15 +239,15 @@ final class RuntimeAssetPlanner
         return FontUtils::defaultFallbackForCategory((string) ($family['font_category'] ?? ''));
     }
 
+    /**
+     * @param CatalogMap $families
+     * @return RuntimeFamilyList
+     */
     private function filterFamiliesByPublishState(array $families, bool $includeLibraryOnly): array
     {
         $filtered = [];
 
         foreach ($families as $key => $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $publishState = (string) ($family['publish_state'] ?? 'published');
 
             if (!$includeLibraryOnly && $publishState === 'library_only') {
@@ -211,9 +257,13 @@ final class RuntimeAssetPlanner
             $filtered[$key] = $family;
         }
 
-        return $filtered;
+        return array_values($filtered);
     }
 
+    /**
+     * @param RuntimeFamilyList|CatalogMap $families
+     * @return CatalogMap
+     */
     private function buildFontFaceCatalog(array $families): array
     {
         $catalog = [];
@@ -221,10 +271,6 @@ final class RuntimeAssetPlanner
         $variableFontsEnabled = !empty($settings['variable_fonts_enabled']);
 
         foreach ($families as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $delivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
             $provider = strtolower(trim((string) ($delivery['provider'] ?? '')));
             $type = strtolower(trim((string) ($delivery['type'] ?? '')));
@@ -257,15 +303,15 @@ final class RuntimeAssetPlanner
         return $catalog;
     }
 
+    /**
+     * @param RuntimeFamilyList|CatalogMap $families
+     * @return list<StylesheetDescriptor>
+     */
     private function buildExternalStylesheets(array $families, string $displayOverride = ''): array
     {
         $stylesheets = [];
 
         foreach ($families as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
             $stylesheet = $this->buildStylesheetDescriptor(
                 (string) ($family['family'] ?? ''),
@@ -284,6 +330,10 @@ final class RuntimeAssetPlanner
         return array_values($stylesheets);
     }
 
+    /**
+     * @param array<string, mixed> $delivery
+     * @return StylesheetDescriptor|null
+     */
     private function buildStylesheetDescriptor(string $familyName, string $familySlug, array $delivery, string $displayOverride = ''): ?array
     {
         $provider = strtolower(trim((string) ($delivery['provider'] ?? '')));
@@ -294,15 +344,16 @@ final class RuntimeAssetPlanner
         }
 
         $display = $this->runtimeStylesheetDisplay($familyName, $provider, $type, $displayOverride);
+        $variants = $this->normalizeVariantTokenList($delivery['variants'] ?? []);
 
         $url = match ($provider . ':' . $type) {
             'google:cdn' => $this->google->buildCssUrl(
                 $familyName,
-                (array) ($delivery['variants'] ?? []),
+                $variants,
                 $display,
                 ['faces' => (array) ($delivery['faces'] ?? [])]
             ),
-            'bunny:cdn' => $this->bunny->buildCssUrl($familyName, (array) ($delivery['variants'] ?? []), $display),
+            'bunny:cdn' => $this->bunny->buildCssUrl($familyName, $variants, $display),
             'adobe:adobe_hosted' => $this->adobeStylesheetUrl($delivery),
             default => '',
         };
@@ -319,11 +370,37 @@ final class RuntimeAssetPlanner
         ];
     }
 
+    /**
+     * @param array<string, mixed> $delivery
+     */
     private function adobeStylesheetUrl(array $delivery): string
     {
         $projectId = sanitize_text_field((string) (($delivery['meta']['project_id'] ?? '') ?: $this->adobe->getProjectId()));
 
         return $projectId === '' ? '' : $this->adobe->getStylesheetUrl($projectId);
+    }
+
+    /**
+     * @param mixed $variants
+     * @return list<string>
+     */
+    private function normalizeVariantTokenList(mixed $variants): array
+    {
+        if (!is_array($variants)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($variants as $variant) {
+            if (!is_scalar($variant)) {
+                continue;
+            }
+
+            $normalized[] = (string) $variant;
+        }
+
+        return FontUtils::normalizeVariantTokens($normalized);
     }
 
     private function effectiveFontDisplay(string $familyName, string $displayOverride = ''): string
@@ -351,11 +428,18 @@ final class RuntimeAssetPlanner
             : $display;
     }
 
+    /**
+     * @param array<string, mixed> $delivery
+     */
     private function isSelfHostedDelivery(array $delivery): bool
     {
         return strtolower(trim((string) ($delivery['type'] ?? ''))) === 'self_hosted';
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @return list<array<string, mixed>>
+     */
     private function buildEditorFontFaceList(array $family, bool $variableFontsEnabled): array
     {
         $delivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
@@ -411,6 +495,10 @@ final class RuntimeAssetPlanner
         return $faces;
     }
 
+    /**
+     * @param CatalogFace $face
+     * @return list<string>
+     */
     private function editorFontFaceSources(array $face): array
     {
         $sources = [];
@@ -429,6 +517,9 @@ final class RuntimeAssetPlanner
         return $sources;
     }
 
+    /**
+     * @param array<string, mixed> $axes
+     */
     private function editorFontFaceWeight(string $weight, array $axes = []): string
     {
         $normalizedAxes = FontUtils::normalizeAxesMap($axes);
@@ -446,6 +537,10 @@ final class RuntimeAssetPlanner
         return $normalizedWeight;
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return CatalogFace|null
+     */
     private function findBestPreloadFace(array $catalog, string $familyName, int $targetWeight): ?array
     {
         $family = $this->findCatalogFamily($catalog, $familyName);
@@ -480,6 +575,10 @@ final class RuntimeAssetPlanner
         return $bestFace;
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return CatalogFamily|null
+     */
     private function findCatalogFamily(array $catalog, string $familyName): ?array
     {
         if ($familyName === '') {
@@ -487,10 +586,7 @@ final class RuntimeAssetPlanner
         }
 
         foreach ($catalog as $family) {
-            if (
-                !is_array($family)
-                || ($family['family'] ?? '') !== $familyName
-            ) {
+            if (($family['family'] ?? '') !== $familyName) {
                 continue;
             }
 
@@ -500,6 +596,9 @@ final class RuntimeAssetPlanner
         return null;
     }
 
+    /**
+     * @param CatalogFace $face
+     */
     private function getSameOriginWoff2Url(array $face): string
     {
         $url = trim((string) ($face['files']['woff2'] ?? ''));
@@ -511,6 +610,9 @@ final class RuntimeAssetPlanner
         return $url;
     }
 
+    /**
+     * @param RoleSet $roles
+     */
     private function resolvePrimaryRoleWeight(array $roles, string $roleKey, int $default): int
     {
         $axes = FontUtils::normalizeVariationDefaults($roles[$roleKey . '_axes'] ?? []);
@@ -551,6 +653,10 @@ final class RuntimeAssetPlanner
         return strtolower($host) === strtolower($uploadHost);
     }
 
+    /**
+     * @param CatalogFace $face
+     * @return PreloadFaceScore
+     */
     private function preloadFaceScore(array $face, int $targetWeight): array
     {
         $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
@@ -566,10 +672,14 @@ final class RuntimeAssetPlanner
         return [$distance, $isVariable ? 1 : 0, $referenceWeight];
     }
 
+    /**
+     * @param PreloadFaceScore $left
+     * @param PreloadFaceScore $right
+     */
     private function comparePreloadFaceScores(array $left, array $right): int
     {
         foreach ([0, 1, 2] as $index) {
-            $comparison = ((int) ($left[$index] ?? 0)) <=> ((int) ($right[$index] ?? 0));
+            $comparison = $left[$index] <=> $right[$index];
 
             if ($comparison !== 0) {
                 return $comparison;

@@ -10,6 +10,9 @@ use TastyFonts\Fonts\HostedCssParser;
 
 final class GoogleCssParser
 {
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function parse(string $css, string $expectedFamily = ''): array
     {
         return (new HostedCssParser('google'))->parse($css, $expectedFamily);

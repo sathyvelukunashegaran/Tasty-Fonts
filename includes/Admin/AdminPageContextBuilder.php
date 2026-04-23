@@ -23,6 +23,30 @@ use TastyFonts\Support\Storage;
 use TastyFonts\Support\TransientKey;
 use TastyFonts\Updates\GitHubUpdater;
 
+/**
+ * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type AdminAccessRoleSlugList from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type AdminAccessUserIdList from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFontDisplayMap from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-type PageContext array<string, mixed>
+ * @phpstan-type DiagnosticItem array<string, mixed>
+ * @phpstan-type UpdateChannelOption array<string, string>
+ * @phpstan-type UpdateChannelStatus array<string, mixed>
+ * @phpstan-type OverviewMetric array<string, mixed>
+ * @phpstan-type OutputPanel array<string, mixed>
+ * @phpstan-type GeneratedCssPanel array<string, mixed>
+ * @phpstan-type PreviewPanel array<string, mixed>
+ * @phpstan-type NoticeToast array<string, mixed>
+ * @phpstan-type ActivityLogEntry array<string, mixed>
+ * @phpstan-type StorageState array<string, mixed>
+ * @phpstan-type AssetStatus array<string, mixed>
+ * @phpstan-type IntegrationContext array<string, mixed>
+ */
 final class AdminPageContextBuilder
 {
     private const BASE_ROLE_KEYS = ['heading', 'body'];
@@ -44,6 +68,9 @@ final class AdminPageContextBuilder
     ) {
     }
 
+    /**
+     * @return PageContext
+     */
     public function build(): array
     {
         $storage = $this->storage->get();
@@ -72,8 +99,8 @@ final class AdminPageContextBuilder
         $updateChannel = (string) ($settings['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE);
         $updateChannelStatus = $this->buildUpdateChannelStatus($updateChannel);
         $adminAccessCustomEnabled = !empty($settings['admin_access_custom_enabled']);
-        $adminAccessRoleSlugs = is_array($settings['admin_access_role_slugs'] ?? null) ? $settings['admin_access_role_slugs'] : [];
-        $adminAccessUserIds = is_array($settings['admin_access_user_ids'] ?? null) ? $settings['admin_access_user_ids'] : [];
+        $adminAccessRoleSlugs = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
+        $adminAccessUserIds = $this->normalizeAdminAccessUserIds($settings['admin_access_user_ids'] ?? []);
         $adminAccessRoleOptions = $this->buildAdminAccessRoleOptions();
         $adminAccessUserOptions = $this->buildAdminAccessUserOptions();
         $adminAccessImplicitAdminLabels = $this->buildAdminAccessImplicitAdminLabels();
@@ -182,6 +209,13 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @param AssetStatus $assetStatus
+     * @param StorageState|null $storage
+     * @param NormalizedSettings $settings
+     * @param CatalogCounts $counts
+     * @return list<DiagnosticItem>
+     */
     public function buildDiagnosticItems(array $assetStatus, ?array $storage, array $settings, array $counts): array
     {
         $cssPath = (string) ($assetStatus['path'] ?? '');
@@ -257,8 +291,8 @@ final class AdminPageContextBuilder
                 'label' => __('Library Inventory', 'tasty-fonts'),
                 'value' => sprintf(
                     __('%1$d families / %2$d files', 'tasty-fonts'),
-                    (int) ($counts['families'] ?? 0),
-                    (int) ($counts['files'] ?? 0)
+                    $this->catalogCount($counts, 'families'),
+                    $this->catalogCount($counts, 'files')
                 ),
                 'code' => false,
             ],
@@ -275,6 +309,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return list<UpdateChannelOption>
+     */
     public function buildUpdateChannelOptions(): array
     {
         return [
@@ -293,6 +330,9 @@ final class AdminPageContextBuilder
         };
     }
 
+    /**
+     * @return UpdateChannelStatus
+     */
     private function buildUpdateChannelStatus(string $selectedChannel): array
     {
         $installedVersion = defined('TASTY_FONTS_VERSION')
@@ -303,9 +343,9 @@ final class AdminPageContextBuilder
 
         if ($this->updater instanceof GitHubUpdater) {
             $overview = $this->updater->getChannelOverview($selectedChannel);
-            $installedVersion = (string) ($overview['installed_version'] ?? $installedVersion);
-            $latestAvailable = is_array($overview['latest_available'] ?? null) ? $overview['latest_available'] : null;
-            $state = (string) ($overview['state'] ?? $state);
+            $installedVersion = $overview['installed_version'];
+            $latestAvailable = $overview['latest_available'];
+            $state = $overview['state'];
         }
 
         $stateLabel = match ($state) {
@@ -331,41 +371,52 @@ final class AdminPageContextBuilder
             'selected_channel' => $selectedChannel,
             'selected_channel_label' => $this->formatUpdateChannelLabel($selectedChannel),
             'installed_version' => $installedVersion,
-            'latest_version' => is_array($latestAvailable) ? (string) ($latestAvailable['version'] ?? '') : '',
-            'latest_channel' => is_array($latestAvailable) ? (string) ($latestAvailable['channel'] ?? '') : '',
-            'latest_channel_label' => is_array($latestAvailable)
-                ? $this->formatUpdateChannelLabel((string) ($latestAvailable['channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE))
+            'latest_version' => $latestAvailable !== null ? $latestAvailable['version'] : '',
+            'latest_channel' => $latestAvailable !== null ? $latestAvailable['channel'] : '',
+            'latest_channel_label' => $latestAvailable !== null
+                ? $this->formatUpdateChannelLabel($latestAvailable['channel'])
                 : '',
             'state' => $state,
             'state_label' => $stateLabel,
             'state_class' => $stateClass,
             'state_copy' => $stateCopy,
-            'can_reinstall' => $state === 'rollback' && is_array($latestAvailable),
+            'can_reinstall' => $state === 'rollback' && $latestAvailable !== null,
         ];
     }
 
+    /**
+     * @param CatalogCounts $counts
+     * @return list<OverviewMetric>
+     */
     public function buildOverviewMetrics(array $counts): array
     {
         return [
             [
                 'label' => __('Families', 'tasty-fonts'),
-                'value' => (string) ($counts['families'] ?? 0),
+                'value' => (string) $this->catalogCount($counts, 'families'),
             ],
             [
                 'label' => __('Published', 'tasty-fonts'),
-                'value' => (string) ($counts['published_families'] ?? 0),
+                'value' => (string) $counts['published_families'],
             ],
             [
                 'label' => __('In Library Only', 'tasty-fonts'),
-                'value' => (string) ($counts['library_only_families'] ?? 0),
+                'value' => (string) $counts['library_only_families'],
             ],
             [
                 'label' => __('Self-hosted', 'tasty-fonts'),
-                'value' => (string) ($counts['local_families'] ?? 0),
+                'value' => (string) $counts['local_families'],
             ],
         ];
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param NormalizedSettings $settings
+     * @param CatalogMap $catalog
+     * @param RoleSet $appliedRoles
+     * @return list<OutputPanel>
+     */
     public function buildOutputPanels(
         array $roles,
         array $settings,
@@ -433,6 +484,10 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return GeneratedCssPanel
+     */
     public function buildGeneratedCssPanel(array $settings): array
     {
         $download = $this->buildGeneratedCssDownloadData($settings);
@@ -450,6 +505,10 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, bool|string>
+     */
     public function buildGeneratedCssDownloadData(array $settings): array
     {
         $filename = basename((string) ($this->storage->getGeneratedCssPath() ?? 'tasty-fonts.css'));
@@ -482,6 +541,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return list<PreviewPanel>
+     */
     public function buildPreviewPanels(): array
     {
         return [
@@ -513,6 +575,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return list<NoticeToast>
+     */
     public function buildNoticeToasts(): array
     {
         $transientKey = $this->getPendingNoticeTransientKey();
@@ -554,6 +619,9 @@ final class AdminPageContextBuilder
         return $toasts;
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
     public function buildFontDisplayOptions(): array
     {
         return [
@@ -565,6 +633,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
     public function buildCssDeliveryModeOptions(): array
     {
         return [
@@ -573,6 +644,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
     public function buildUnicodeRangeModeOptions(): array
     {
         return [
@@ -584,6 +658,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
     public function buildFamilyFontDisplayOptions(string $globalDisplay): array
     {
         return [
@@ -632,6 +709,12 @@ final class AdminPageContextBuilder
         };
     }
 
+    /**
+     * @param RoleSet $draftRoles
+     * @param RoleSet $appliedRoles
+     * @param NormalizedSettings|null $settings
+     * @return array<string, mixed>
+     */
     public function buildRoleDeploymentContext(array $draftRoles, array $appliedRoles, bool $applyEverywhere, ?array $settings = null): array
     {
         $settings = $settings ?? $this->settings->getSettings();
@@ -669,6 +752,12 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @param RoleSet $left
+     * @param RoleSet $right
+     * @param NormalizedSettings|null $settings
+     * @param CatalogMap|null $catalog
+     */
     public function roleSetsMatch(array $left, array $right, ?array $settings = null, ?array $catalog = null): bool
     {
         $settings = $settings ?? $this->settings->getSettings();
@@ -702,6 +791,10 @@ final class AdminPageContextBuilder
         return true;
     }
 
+    /**
+     * @param list<ActivityLogEntry> $logs
+     * @return list<string>
+     */
     public function buildActivityActorOptions(array $logs): array
     {
         $actors = [];
@@ -721,12 +814,16 @@ final class AdminPageContextBuilder
         return array_values($actors);
     }
 
+    /**
+     * @param list<ActivityLogEntry> $logs
+     * @return list<ActivityLogEntry>
+     */
     public function buildTransferLogEntries(array $logs): array
     {
         $entries = [];
 
         foreach ($logs as $entry) {
-            if (!is_array($entry) || !$this->isTransferLogEntry($entry)) {
+            if (!$this->isTransferLogEntry($entry)) {
                 continue;
             }
 
@@ -736,6 +833,9 @@ final class AdminPageContextBuilder
         return $entries;
     }
 
+    /**
+     * @param ActivityLogEntry $entry
+     */
     private function isTransferLogEntry(array $entry): bool
     {
         $category = strtolower(trim((string) ($entry['category'] ?? '')));
@@ -756,6 +856,10 @@ final class AdminPageContextBuilder
             || str_starts_with($message, 'exported a site transfer bundle');
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, mixed>
+     */
     public function buildLocalEnvironmentNotice(array $settings): array
     {
         if (!$this->shouldShowLocalEnvironmentNotice()) {
@@ -775,6 +879,10 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return IntegrationContext
+     */
     public function buildGutenbergIntegrationContext(array $settings): array
     {
         $enabled = !empty($settings['block_editor_font_library_sync_enabled']);
@@ -798,6 +906,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return IntegrationContext
+     */
     public function buildEtchIntegrationContext(): array
     {
         $available = class_exists(\Etch\Services\StylesheetService::class);
@@ -816,6 +927,10 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return IntegrationContext
+     */
     public function buildAcssIntegrationContext(array $settings): array
     {
         $enabled = ($settings['acss_font_role_sync_enabled'] ?? null) === true;
@@ -823,7 +938,7 @@ final class AdminPageContextBuilder
         $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
         $state = $this->acssIntegration->readState($sitewideRolesEnabled, $enabled, $applied);
 
-        $status = (string) ($state['status'] ?? 'disabled');
+        $status = is_string($state['status'] ?? null) ? $state['status'] : 'disabled';
 
         return array_merge(
             $state,
@@ -843,6 +958,10 @@ final class AdminPageContextBuilder
         );
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return IntegrationContext
+     */
     public function buildBricksIntegrationContext(array $settings): array
     {
         $state = $this->bricksIntegration->readState($settings);
@@ -870,11 +989,15 @@ final class AdminPageContextBuilder
         );
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return IntegrationContext
+     */
     public function buildOxygenIntegrationContext(array $settings): array
     {
         $state = $this->oxygenIntegration->readState($settings['oxygen_integration_enabled'] ?? null);
 
-        $status = (string) ($state['status'] ?? 'disabled');
+        $status = $state['status'];
 
         return array_merge(
             $state,
@@ -891,6 +1014,10 @@ final class AdminPageContextBuilder
         );
     }
 
+    /**
+     * @param NormalizedSettings $settings
+     * @return array<string, mixed>
+     */
     public function buildPreviewContext(array $settings): array
     {
         $previewText = isset($_GET['preview_text'])
@@ -907,14 +1034,17 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function buildAdobeAccessContext(): array
     {
         $projectId = $this->adobe->getProjectId();
         $projectSaved = $projectId !== '';
         $projectEnabled = $this->adobe->isEnabled();
         $projectStatus = $this->adobe->getProjectStatus();
-        $projectState = (string) ($projectStatus['state'] ?? 'empty');
-        $projectStatusMessage = (string) ($projectStatus['message'] ?? '');
+        $projectState = $projectStatus['state'];
+        $projectStatusMessage = $projectStatus['message'];
         $detectedFamilies = $projectSaved && in_array($projectState, ['valid', 'unknown'], true)
             ? $this->adobe->getProjectFamilies($projectId)
             : [];
@@ -933,6 +1063,9 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function buildGoogleAccessContext(): array
     {
         $googleApiEnabled = $this->googleClient->canSearch();
@@ -953,6 +1086,10 @@ final class AdminPageContextBuilder
         ];
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return list<string>
+     */
     public function buildSelectableFamilyNames(array $catalog): array
     {
         $families = array_keys($catalog);
@@ -972,6 +1109,11 @@ final class AdminPageContextBuilder
         return array_values($families);
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @param list<string>|null $availableFamilies
+     * @return list<array{value: string, label: string}>
+     */
     public function buildSelectableFamilyOptions(array $catalog, ?array $availableFamilies = null): array
     {
         $families = is_array($availableFamilies) ? $availableFamilies : $this->buildSelectableFamilyNames($catalog);
@@ -990,13 +1132,16 @@ final class AdminPageContextBuilder
             $options[] = [
                 'value' => $name,
                 'label' => FontTypeHelper::buildSelectorOptionLabel($name, $catalogEntry),
-                'type' => is_array($descriptor) ? (string) ($descriptor['type'] ?? '') : '',
+                'type' => $descriptor !== null ? $descriptor['type'] : '',
             ];
         }
 
         return $options;
     }
 
+    /**
+     * @return list<array{value: string, label: string, count: int, disabled: bool, meta: string}>
+     */
     private function buildAdminAccessRoleOptions(): array
     {
         $roles = wp_roles()->roles;
@@ -1033,6 +1178,9 @@ final class AdminPageContextBuilder
         return $options;
     }
 
+    /**
+     * @return list<array{value: string, label: string, meta: string, disabled: bool, search_text: string}>
+     */
     private function buildAdminAccessUserOptions(): array
     {
         $options = [];
@@ -1082,6 +1230,9 @@ final class AdminPageContextBuilder
         return $options;
     }
 
+    /**
+     * @return list<string>
+     */
     private function buildAdminAccessImplicitAdminLabels(): array
     {
         $labels = [];
@@ -1132,6 +1283,13 @@ final class AdminPageContextBuilder
         return $label;
     }
 
+    /**
+     * @param list<string> $roleSlugs
+     * @param list<int> $userIds
+     * @param list<array{value: string, label: string, count: int, disabled: bool, meta: string}> $roleOptions
+     * @param list<string> $implicitAdminLabels
+     * @return array<string, mixed>
+     */
     private function buildAdminAccessSummary(array $roleSlugs, array $userIds, array $roleOptions, array $implicitAdminLabels): array
     {
         $selectedRoleSlugs = array_values(array_filter(array_map('sanitize_key', $roleSlugs)));
@@ -1139,17 +1297,13 @@ final class AdminPageContextBuilder
         $roleImpact = 0;
 
         foreach ($roleOptions as $option) {
-            if (!is_array($option)) {
-                continue;
-            }
-
-            $roleSlug = sanitize_key((string) ($option['value'] ?? ''));
+            $roleSlug = sanitize_key($option['value']);
 
             if ($roleSlug === '' || !in_array($roleSlug, $selectedRoleSlugs, true)) {
                 continue;
             }
 
-            $roleImpact += max(0, (int) ($option['count'] ?? 0));
+            $roleImpact += max(0, $option['count']);
         }
 
         return [
@@ -1158,13 +1312,65 @@ final class AdminPageContextBuilder
             'role_user_impact' => $roleImpact,
             'user_count' => count($selectedUserIds),
             'implicit_admin_count' => count($implicitAdminLabels),
-            'implicit_admin_labels' => array_values($implicitAdminLabels),
+            'implicit_admin_labels' => $implicitAdminLabels,
         ];
     }
 
+    /**
+     * @param mixed $value
+     * @return AdminAccessRoleSlugList
+     */
+    private function normalizeAdminAccessRoleSlugs(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        return array_values(
+            array_filter(
+                array_unique(
+                    array_map(
+                        static fn (mixed $roleSlug): string => sanitize_key(is_scalar($roleSlug) ? (string) $roleSlug : ''),
+                        $value
+                    )
+                ),
+                static fn (string $roleSlug): bool => $roleSlug !== ''
+            )
+        );
+    }
+
+    /**
+     * @param mixed $value
+     * @return AdminAccessUserIdList
+     */
+    private function normalizeAdminAccessUserIds(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        return array_values(
+            array_filter(
+                array_unique(
+                    array_map(
+                        static fn (mixed $userId): int => absint($userId),
+                        $value
+                    )
+                ),
+                static fn (int $userId): bool => $userId > 0
+            )
+        );
+    }
+
+    /**
+     * @param list<ActivityLogEntry> $logs
+     * @param AssetStatus $assetStatus
+     * @param CatalogCounts $counts
+     * @return array<string, mixed>
+     */
     private function buildDeveloperToolStatuses(array $logs, array $assetStatus, array $counts): array
     {
-        $libraryCount = max(0, (int) ($counts['families'] ?? $counts['total'] ?? 0));
+        $libraryCount = max(0, $this->catalogCount($counts, 'families'));
         $cssReady = !empty($assetStatus['exists']) && !empty($assetStatus['url']);
         $statuses = [
             'clear_plugin_caches' => [
@@ -1221,13 +1427,20 @@ final class AdminPageContextBuilder
         return $statuses;
     }
 
+    /**
+     * @param array<string, mixed> $counts
+     */
+    private function catalogCount(array $counts, string $key): int
+    {
+        return isset($counts[$key]) ? max(0, (int) $counts[$key]) : 0;
+    }
+
+    /**
+     * @param list<ActivityLogEntry> $logs
+     */
     private function buildDeveloperToolLastRunCopy(array $logs, string $message): string
     {
         foreach ($logs as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-
             if (trim((string) ($entry['message'] ?? '')) !== $message) {
                 continue;
             }
@@ -1273,6 +1486,9 @@ final class AdminPageContextBuilder
         return gmdate('M j, Y g:i a', $unix) . ' UTC';
     }
 
+    /**
+     * @return array<string, int>
+     */
     private function countUsersByRole(): array
     {
         $counts = [];
@@ -1297,6 +1513,9 @@ final class AdminPageContextBuilder
         return $counts;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function roleLabelsBySlug(): array
     {
         $roles = wp_roles()->roles;
@@ -1316,6 +1535,10 @@ final class AdminPageContextBuilder
         return $labels;
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param NormalizedSettings|null $settings
+     */
     public function buildRoleDeliverySummary(array $roles, ?array $settings = null): string
     {
         $parts = [];
@@ -1348,6 +1571,10 @@ final class AdminPageContextBuilder
         return $parts === [] ? __('No roles selected yet.', 'tasty-fonts') : implode('; ', $parts) . '.';
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param NormalizedSettings|null $settings
+     */
     public function buildRoleTextSummary(array $roles, ?array $settings = null): string
     {
         $settings = $settings ?? $this->settings->getSettings();
@@ -1369,6 +1596,11 @@ final class AdminPageContextBuilder
         return implode('; ', $parts);
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param NormalizedSettings $settings
+     * @param CatalogMap $runtimeFamilies
+     */
     private function buildClassOutputPanelContent(
         array $roles,
         array $settings,
@@ -1394,12 +1626,16 @@ final class AdminPageContextBuilder
         return __('No font classes are available for the current class output settings.', 'tasty-fonts');
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return CatalogMap
+     */
     private function filterRuntimeVisibleFamilies(array $catalog): array
     {
         $families = [];
 
         foreach ($catalog as $key => $family) {
-            if (!is_array($family) || (string) ($family['publish_state'] ?? 'published') === 'library_only') {
+            if ((string) ($family['publish_state'] ?? 'published') === 'library_only') {
                 continue;
             }
 
@@ -1431,6 +1667,9 @@ final class AdminPageContextBuilder
         };
     }
 
+    /**
+     * @param array<string, mixed> $state
+     */
     private function buildAcssIntegrationStatusCopy(string $status, array $state): string
     {
         $current = is_array($state['current'] ?? null) ? $state['current'] : ['heading' => '', 'body' => ''];
@@ -1572,6 +1811,9 @@ final class AdminPageContextBuilder
         return (int) ($preference['hidden_until'] ?? 0) <= time();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getLocalEnvironmentNoticePreference(): array
     {
         $preferences = get_option(AdminController::LOCAL_ENV_NOTICE_OPTION, []);
@@ -1611,6 +1853,11 @@ final class AdminPageContextBuilder
         return sprintf(__('%1$s via %2$s', 'tasty-fonts'), $familyName, $label);
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param CatalogMap $catalog
+     * @param NormalizedSettings $settings
+     */
     private function resolveEffectiveRoleFallback(string $roleKey, array $roles, array $catalog, array $settings): string
     {
         $default = $this->defaultRoleFallback($roleKey);
@@ -1639,6 +1886,10 @@ final class AdminPageContextBuilder
         return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
     }
 
+    /**
+     * @param CatalogMap $catalog
+     * @return CatalogFamily|null
+     */
     private function findCatalogFamilyByName(string $familyName, array $catalog): ?array
     {
         if (is_array($catalog[$familyName] ?? null)) {
@@ -1646,10 +1897,6 @@ final class AdminPageContextBuilder
         }
 
         foreach ($catalog as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             if (trim((string) ($family['family'] ?? '')) === $familyName) {
                 return $family;
             }
@@ -1658,6 +1905,9 @@ final class AdminPageContextBuilder
         return null;
     }
 
+    /**
+     * @param CatalogFamily $family
+     */
     private function resolveFamilyCategory(array $family): string
     {
         $category = trim((string) ($family['font_category'] ?? ''));
@@ -1669,6 +1919,10 @@ final class AdminPageContextBuilder
         return $category;
     }
 
+    /**
+     * @param NormalizedSettings|null $settings
+     * @return list<string>
+     */
     private function effectiveRoleKeys(?array $settings = null): array
     {
         $settings = $settings ?? $this->settings->getSettings();

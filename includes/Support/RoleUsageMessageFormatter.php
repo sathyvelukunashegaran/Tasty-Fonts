@@ -6,12 +6,19 @@ namespace TastyFonts\Support;
 
 defined('ABSPATH') || exit;
 
+/**
+ * @phpstan-type RoleLabelList list<string>
+ */
 final class RoleUsageMessageFormatter
 {
     private function __construct()
     {
     }
 
+    /**
+     * @param RoleLabelList $roleLabels
+     * @return RoleLabelList
+     */
     public static function translateRoleLabels(array $roleLabels): array
     {
         return array_map(
@@ -25,11 +32,14 @@ final class RoleUsageMessageFormatter
         );
     }
 
+    /**
+     * @param RoleLabelList $labels
+     */
     public static function formatRoleLabelList(array $labels): string
     {
         $labels = array_values(
             array_filter(
-                array_map(static fn (mixed $label): string => is_string($label) ? $label : '', $labels),
+                $labels,
                 static fn (string $label): bool => $label !== ''
             )
         );
@@ -47,6 +57,9 @@ final class RoleUsageMessageFormatter
         return implode(', ', $labels) . __(' and ', 'tasty-fonts') . $lastLabel;
     }
 
+    /**
+     * @param RoleLabelList $roleLabels
+     */
     public static function buildDeleteBlockedMessage(string $familyName, array $roleLabels): string
     {
         $translatedLabels = self::translateRoleLabels($roleLabels);
@@ -70,6 +83,9 @@ final class RoleUsageMessageFormatter
         );
     }
 
+    /**
+     * @param RoleLabelList $roleLabels
+     */
     public static function buildDeleteLastVariantBlockedMessage(string $familyName, array $roleLabels): string
     {
         $translatedLabels = self::translateRoleLabels($roleLabels);

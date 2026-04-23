@@ -9,8 +9,15 @@ defined('ABSPATH') || exit;
 use TastyFonts\Fonts\HostedCssParser;
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-type ParsedFamily array<string, mixed>
+ * @phpstan-type ParsedFamilyList list<ParsedFamily>
+ */
 final class AdobeCssParser
 {
+    /**
+     * @return ParsedFamilyList
+     */
     public function parseFamilies(string $css): array
     {
         $faces = (new HostedCssParser('adobe'))->parse($css);

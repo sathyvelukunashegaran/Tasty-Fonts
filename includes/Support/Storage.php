@@ -6,8 +6,14 @@ namespace TastyFonts\Support;
 
 defined('ABSPATH') || exit;
 
+/**
+ * @phpstan-type StorageState array<string, string>
+ * @phpstan-type RelativePathList list<string>
+ * @phpstan-type DirectoryList list<string>
+ */
 final class Storage
 {
+    /** @var StorageState|null */
     private ?array $storage = null;
     private string $lastFilesystemErrorMessage = '';
 
@@ -21,6 +27,9 @@ final class Storage
         return $this->lastFilesystemErrorMessage;
     }
 
+    /**
+     * @return StorageState|null
+     */
     public function get(): ?array
     {
         if ($this->storage !== null) {
@@ -250,6 +259,9 @@ final class Storage
         return true;
     }
 
+    /**
+     * @param RelativePathList $relativePaths
+     */
     public function deleteRelativeFiles(array $relativePaths): bool
     {
         $paths = array_values(
@@ -506,6 +518,9 @@ final class Storage
         $this->lastFilesystemErrorMessage = trim($message);
     }
 
+    /**
+     * @param DirectoryList $directories
+     */
     private function cleanupEmptyDirectories(array $directories): void
     {
         $root = $this->getRoot();

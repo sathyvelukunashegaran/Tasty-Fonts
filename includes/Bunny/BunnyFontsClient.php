@@ -10,6 +10,14 @@ use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
 
+/**
+ * @phpstan-type CatalogEntry array{slug: string, family: string}
+ * @phpstan-type CatalogEntryList list<CatalogEntry>
+ * @phpstan-type FamilyRecord array<string, mixed>
+ * @phpstan-type FamilySearchResultList list<FamilyRecord>
+ * @phpstan-type VariantTokenList list<string>
+ * @phpstan-type HttpArgs array<string, mixed>
+ */
 final class BunnyFontsClient
 {
     public const TRANSIENT_CATALOG = 'tasty_fonts_bunny_catalog_v1';
@@ -20,6 +28,9 @@ final class BunnyFontsClient
     private const FAMILY_URL = 'https://fonts.bunny.net/family/';
     private const REQUEST_TIMEOUT = 20;
 
+    /**
+     * @return FamilySearchResultList
+     */
     public function searchFamilies(string $query, int $limit = 20): array
     {
         $query = strtolower(trim($query));
@@ -41,10 +52,10 @@ final class BunnyFontsClient
         usort(
             $results,
             static function (array $left, array $right) use ($query): int {
-                $leftFamily = strtolower((string) ($left['family'] ?? ''));
-                $rightFamily = strtolower((string) ($right['family'] ?? ''));
-                $leftSlug = strtolower((string) ($left['slug'] ?? ''));
-                $rightSlug = strtolower((string) ($right['slug'] ?? ''));
+                $leftFamily = strtolower($left['family']);
+                $rightFamily = strtolower($right['family']);
+                $leftSlug = strtolower($left['slug']);
+                $rightSlug = strtolower($right['slug']);
                 $leftStarts = str_starts_with($leftFamily, $query) || str_starts_with($leftSlug, $query);
                 $rightStarts = str_starts_with($rightFamily, $query) || str_starts_with($rightSlug, $query);
 
@@ -52,21 +63,24 @@ final class BunnyFontsClient
                     return $leftStarts ? -1 : 1;
                 }
 
-                return strcmp((string) ($left['family'] ?? ''), (string) ($right['family'] ?? ''));
+                return strcmp($left['family'], $right['family']);
             }
         );
 
         $items = [];
 
         foreach (array_slice($results, 0, $limit) as $item) {
-            $slug = (string) ($item['slug'] ?? '');
+            $slug = $item['slug'];
             $family = $slug !== '' ? $this->fetchFamilyBySlug($slug) : null;
-            $items[] = $family ?? $this->buildFallbackFamilyRecord($slug, (string) ($item['family'] ?? ''));
+            $items[] = $family ?? $this->buildFallbackFamilyRecord($slug, $item['family']);
         }
 
         return $items;
     }
 
+    /**
+     * @return FamilyRecord|null
+     */
     public function getFamily(string $familyName): ?array
     {
         $familyName = trim($familyName);
@@ -78,6 +92,9 @@ final class BunnyFontsClient
         return $this->fetchFamilyBySlug(FontUtils::slugify($familyName));
     }
 
+    /**
+     * @param VariantTokenList $variants
+     */
     public function fetchCss(string $familyName, array $variants, string $display = 'swap'): string|WP_Error
     {
         $url = $this->buildCssUrl($familyName, $variants, $display);
@@ -118,6 +135,9 @@ final class BunnyFontsClient
         return $body;
     }
 
+    /**
+     * @param VariantTokenList $variants
+     */
     public function buildCssUrl(string $familyName, array $variants, string $display = 'swap'): string
     {
         $familyQuery = str_replace('%20', '+', rawurlencode($familyName));
@@ -131,12 +151,15 @@ final class BunnyFontsClient
         return $url . '&display=' . rawurlencode(FontUtils::sanitizeHostedCssDisplay($display));
     }
 
+    /**
+     * @return CatalogEntryList
+     */
     private function fetchCatalogEntries(): array
     {
         $cached = get_transient(TransientKey::forSite(self::TRANSIENT_CATALOG));
 
         if (is_array($cached)) {
-            return $cached;
+            return $this->normalizeCatalogEntries($cached);
         }
 
         $response = $this->request(self::CATALOG_URL, 'application/xml,text/xml,*/*;q=0.1');
@@ -151,9 +174,45 @@ final class BunnyFontsClient
             set_transient(TransientKey::forSite(self::TRANSIENT_CATALOG), $items, self::CATALOG_TTL);
         }
 
-        return $items;
+        return $this->normalizeCatalogEntries($items);
     }
 
+    /**
+     * @param mixed $entries
+     * @return CatalogEntryList
+     */
+    private function normalizeCatalogEntries(mixed $entries): array
+    {
+        if (!is_array($entries)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $slug = trim((string) ($entry['slug'] ?? ''));
+            $family = trim((string) ($entry['family'] ?? ''));
+
+            if ($slug === '' || $family === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'slug' => $slug,
+                'family' => $family,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return FamilyRecord|null
+     */
     private function fetchFamilyBySlug(string $slug): ?array
     {
         $slug = FontUtils::slugify($slug);
@@ -193,6 +252,9 @@ final class BunnyFontsClient
         return $family;
     }
 
+    /**
+     * @return array<string, mixed>|WP_Error
+     */
     private function request(string $url, string $accept): array|WP_Error
     {
         return $this->remoteGet(
@@ -207,6 +269,9 @@ final class BunnyFontsClient
         );
     }
 
+    /**
+     * @param HttpArgs $args
+     */
     private function remoteGet(string $url, array $args = []): mixed
     {
         $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);
@@ -214,6 +279,9 @@ final class BunnyFontsClient
         return wp_remote_get($url, is_array($filteredArgs) ? $filteredArgs : $args);
     }
 
+    /**
+     * @return CatalogEntryList
+     */
     private function parseCatalogEntries(string $xml): array
     {
         if ($xml === '') {
@@ -240,6 +308,9 @@ final class BunnyFontsClient
         return array_values($entries);
     }
 
+    /**
+     * @return FamilyRecord|null
+     */
     private function parseFamilyPage(string $html, string $slug): ?array
     {
         if (trim($html) === '') {
@@ -299,6 +370,9 @@ final class BunnyFontsClient
         return trim($text);
     }
 
+    /**
+     * @return VariantTokenList
+     */
     private function extractFamilyVariants(string $html, string $slug): array
     {
         preg_match_all('~https://fonts\.bunny\.net/css\?family=([^"\']+)~i', $html, $matches);
@@ -327,6 +401,10 @@ final class BunnyFontsClient
         return ['regular'];
     }
 
+    /**
+     * @param VariantTokenList $rawTokens
+     * @return VariantTokenList
+     */
     private function normalizeBunnyVariantTokens(array $rawTokens): array
     {
         $normalized = [];
@@ -394,6 +472,9 @@ final class BunnyFontsClient
         return 'sans-serif';
     }
 
+    /**
+     * @return FamilyRecord
+     */
     private function buildFallbackFamilyRecord(string $slug, string $familyName = ''): array
     {
         $familyName = trim($familyName) !== '' ? trim($familyName) : $this->humanizeSlug($slug);
@@ -475,10 +556,13 @@ final class BunnyFontsClient
         return $words !== [] ? implode(' ', $words) : 'Bunny Font';
     }
 
+    /**
+     * @param CatalogEntry $item
+     */
     private function matchesSearchQuery(array $item, string $query): bool
     {
-        $family = strtolower((string) ($item['family'] ?? ''));
-        $slug = strtolower((string) ($item['slug'] ?? ''));
+        $family = strtolower($item['family']);
+        $slug = strtolower($item['slug']);
 
         return ($family !== '' && str_contains($family, $query))
             || ($slug !== '' && str_contains($slug, $query));

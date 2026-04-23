@@ -10,9 +10,16 @@ use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use WP_Error;
 use WP_REST_Request;
 
+/**
+ * @phpstan-type RouteArgs array<string, array<string, mixed>>
+ * @phpstan-type RestResultPayload array<string, mixed>
+ * @phpstan-type TextArg array<string, mixed>
+ * @phpstan-type NestedArg array<string, mixed>
+ */
 final class RestController
 {
     public const API_NAMESPACE = 'tasty-fonts/v1';
@@ -43,6 +50,9 @@ final class RestController
         $this->adminAccess = $adminAccess ?? new AdminAccessService(new SettingsRepository());
     }
 
+    /**
+     * @return array<string, string>
+     */
     public static function routeMap(): array
     {
         return self::ROUTES;
@@ -250,6 +260,9 @@ final class RestController
         );
     }
 
+    /**
+     * @param RouteArgs $args
+     */
     private function registerRoute(string $path, string $methods, callable $callback, array $args = []): void
     {
         register_rest_route(
@@ -264,6 +277,9 @@ final class RestController
         );
     }
 
+    /**
+     * @param RestResultPayload|WP_Error $result
+     */
     private function restResult(array|WP_Error $result, int $defaultErrorStatus = 400): mixed
     {
         if (!is_wp_error($result)) {
@@ -288,12 +304,22 @@ final class RestController
         return $value === null ? $default : (string) $value;
     }
 
+    /**
+     * @return list<string>
+     */
     private function getVariantTokens(WP_REST_Request $request): array
     {
         $variants = $request->get_param('variants');
 
         if (is_array($variants) && $variants !== []) {
-            return $variants;
+            return FontUtils::normalizeVariantTokens(
+                array_values(
+                    array_map(
+                        static fn (mixed $variant): string => is_scalar($variant) ? (string) $variant : '',
+                        $variants
+                    )
+                )
+            );
         }
 
         $variantTokens = $this->getTextParam($request, 'variant_tokens');
@@ -302,9 +328,12 @@ final class RestController
             return [];
         }
 
-        return array_map('trim', explode(',', $variantTokens));
+        return FontUtils::normalizeVariantTokens(explode(',', $variantTokens));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getRoleDraftInput(WP_REST_Request $request): array
     {
         $params = $request->get_params();
@@ -341,6 +370,9 @@ final class RestController
         return $input;
     }
 
+    /**
+     * @return RouteArgs
+     */
     private function settingsArgs(): array
     {
         $args = [];
@@ -375,6 +407,9 @@ final class RestController
         return $args;
     }
 
+    /**
+     * @return RouteArgs
+     */
     private function hostedImportArgs(): array
     {
         return [
@@ -386,6 +421,9 @@ final class RestController
         ];
     }
 
+    /**
+     * @return RouteArgs
+     */
     private function roleDraftArgs(): array
     {
         $args = [];
@@ -416,6 +454,10 @@ final class RestController
         return $args;
     }
 
+    /**
+     * @param list<string>|null $allowedValues
+     * @return TextArg
+     */
     private function buildTextArg(bool $required = false, ?array $allowedValues = null): array
     {
         return [
@@ -426,6 +468,9 @@ final class RestController
         ];
     }
 
+    /**
+     * @return TextArg
+     */
     private function buildToggleArg(): array
     {
         return [
@@ -434,6 +479,9 @@ final class RestController
         ];
     }
 
+    /**
+     * @return TextArg
+     */
     private function buildStringArrayArg(bool $required = false): array
     {
         return [
@@ -445,6 +493,9 @@ final class RestController
         ];
     }
 
+    /**
+     * @return NestedArg
+     */
     private function buildNestedArrayArg(bool $required = false): array
     {
         return [
@@ -455,6 +506,9 @@ final class RestController
         ];
     }
 
+    /**
+     * @return TextArg
+     */
     private function buildIntegerArrayArg(bool $required = false): array
     {
         return [
@@ -484,6 +538,9 @@ final class RestController
         return !empty($value) ? '1' : '0';
     }
 
+    /**
+     * @return list<string>
+     */
     public function sanitizeStringArrayArg(mixed $value): array
     {
         if (!is_array($value)) {
@@ -501,6 +558,9 @@ final class RestController
         );
     }
 
+    /**
+     * @return list<int>
+     */
     public function sanitizeIntegerArrayArg(mixed $value): array
     {
         if (!is_array($value)) {
@@ -526,6 +586,9 @@ final class RestController
         return $sanitized;
     }
 
+    /**
+     * @return array<int|string, mixed>
+     */
     public function sanitizeNestedArrayArg(mixed $value): array
     {
         if (!is_array($value)) {
@@ -622,6 +685,9 @@ final class RestController
         return true;
     }
 
+    /**
+     * @param list<string>|null $allowedValues
+     */
     private function validateTextArg(mixed $value, bool $required = false, ?array $allowedValues = null): bool
     {
         if ($value === null) {

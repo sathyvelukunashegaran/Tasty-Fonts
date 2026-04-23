@@ -16,6 +16,73 @@ use TastyFonts\Support\Storage;
 use WP_Error;
 use ZipArchive;
 
+/**
+ * @phpstan-import-type LibraryMap from ImportRepository
+ * @phpstan-import-type LibraryRecord from ImportRepository
+ * @phpstan-import-type NormalizedSettings from SettingsRepository
+ * @phpstan-import-type RoleSet from SettingsRepository
+ * @phpstan-type TransferCapabilityStatus array{available: bool, message: string}
+ * @phpstan-type TransferFileEntry array{relative_path: string, size: int, sha256: string}
+ * @phpstan-type TransferFileList list<TransferFileEntry>
+ * @phpstan-type TransferSecretRequirement array{key: string, label: string, required: bool, exported: bool}
+ * @phpstan-type TransferManifest array{
+ *     schema_version: int,
+ *     plugin_version: string,
+ *     exported_at: string,
+ *     settings: NormalizedSettings,
+ *     roles: RoleSet,
+ *     applied_roles: RoleSet,
+ *     library: LibraryMap,
+ *     secret_requirements: list<TransferSecretRequirement>,
+ *     files: TransferFileList
+ * }
+ * @phpstan-type TransferExportBundle array{
+ *     path: string,
+ *     filename: string,
+ *     content_type: string,
+ *     size: int,
+ *     manifest: TransferManifest
+ * }
+ * @phpstan-type PreparedUpload array{path: string, name: string}
+ * @phpstan-type ValidatedImportBundle array{
+ *     manifest: TransferManifest,
+ *     files: TransferFileList,
+ *     extract_dir: string,
+ *     zip_path: string
+ * }
+ * @phpstan-type StagedBundleSummary array{
+ *     bundle_name: string,
+ *     plugin_version: string,
+ *     exported_at: string,
+ *     families: int,
+ *     files: int
+ * }
+ * @phpstan-type StagedImportState array{
+ *     token: string,
+ *     path: string,
+ *     bundle_name: string,
+ *     plugin_version: string,
+ *     exported_at: string,
+ *     families: int,
+ *     files: int
+ * }
+ * @phpstan-type StagedImportResult array{
+ *     stage_token: string,
+ *     bundle_name: string,
+ *     plugin_version: string,
+ *     exported_at: string,
+ *     families: int,
+ *     files: int
+ * }
+ * @phpstan-type ImportResult array{
+ *     settings: NormalizedSettings,
+ *     roles: RoleSet,
+ *     library: LibraryMap,
+ *     families: int,
+ *     files: int,
+ *     used_fresh_google_api_key: bool
+ * }
+ */
 final class SiteTransferService
 {
     public const SCHEMA_VERSION = 1;
@@ -39,6 +106,9 @@ final class SiteTransferService
     ) {
     }
 
+    /**
+     * @return TransferCapabilityStatus
+     */
     public function getCapabilityStatus(): array
     {
         if ($this->zipSupported()) {
@@ -54,6 +124,9 @@ final class SiteTransferService
         ];
     }
 
+    /**
+     * @return TransferExportBundle|WP_Error
+     */
     public function buildExportBundle(): array|WP_Error
     {
         if (!$this->zipSupported()) {
@@ -101,11 +174,11 @@ final class SiteTransferService
             );
         }
 
-        foreach ((array) ($manifest['files'] ?? []) as $file) {
-            $relativePath = (string) ($file['relative_path'] ?? '');
+        foreach ($manifest['files'] as $file) {
+            $relativePath = $file['relative_path'];
             $absolutePath = $this->storage->pathForRelativePath($relativePath);
 
-            if ($relativePath === '' || !is_string($absolutePath) || !is_readable($absolutePath)) {
+            if (!is_string($absolutePath) || !is_readable($absolutePath)) {
                 $zip->close();
                 @unlink($zipPath);
 
@@ -137,6 +210,9 @@ final class SiteTransferService
         ];
     }
 
+    /**
+     * @return ValidatedImportBundle|WP_Error
+     */
     public function validateImportBundle(string $zipPath): array|WP_Error
     {
         if (!$this->zipSupported()) {
@@ -262,9 +338,9 @@ final class SiteTransferService
             );
         }
 
-        $manifest = json_decode($manifestJson, true);
+        $decodedManifest = json_decode($manifestJson, true);
 
-        if (!is_array($manifest)) {
+        if (!is_array($decodedManifest)) {
             $this->deleteDirectory($extractDirectory);
 
             return $this->error(
@@ -273,31 +349,15 @@ final class SiteTransferService
             );
         }
 
-        if ((int) ($manifest['schema_version'] ?? 0) !== self::SCHEMA_VERSION) {
+        $manifest = $this->normalizeTransferManifest($decodedManifest);
+
+        if (is_wp_error($manifest)) {
             $this->deleteDirectory($extractDirectory);
 
-            return $this->error(
-                'tasty_fonts_transfer_schema_unsupported',
-                __('This transfer bundle uses an unsupported schema version.', 'tasty-fonts')
-            );
+            return $manifest;
         }
 
-        if (!is_array($manifest['settings'] ?? null) || !is_array($manifest['roles'] ?? null) || !is_array($manifest['applied_roles'] ?? null) || !is_array($manifest['library'] ?? null)) {
-            $this->deleteDirectory($extractDirectory);
-
-            return $this->error(
-                'tasty_fonts_transfer_manifest_shape_invalid',
-                __('The uploaded bundle manifest is missing required settings, role, or library data.', 'tasty-fonts')
-            );
-        }
-
-        $manifestFiles = $this->normalizeManifestFiles($manifest['files'] ?? null);
-
-        if (is_wp_error($manifestFiles)) {
-            $this->deleteDirectory($extractDirectory);
-
-            return $manifestFiles;
-        }
+        $manifestFiles = $manifest['files'];
 
         if (count($manifestFiles) !== count($archiveFiles)) {
             $this->deleteDirectory($extractDirectory);
@@ -309,7 +369,7 @@ final class SiteTransferService
         }
 
         foreach ($manifestFiles as $file) {
-            $relativePath = (string) ($file['relative_path'] ?? '');
+            $relativePath = $file['relative_path'];
 
             if (!isset($archiveFiles[$relativePath])) {
                 $this->deleteDirectory($extractDirectory);
@@ -334,7 +394,7 @@ final class SiteTransferService
             $size = (int) filesize($absolutePath);
             $checksum = hash_file('sha256', $absolutePath);
 
-            if ($size !== (int) ($file['size'] ?? -1) || !is_string($checksum) || $checksum !== (string) ($file['sha256'] ?? '')) {
+            if ($size !== $file['size'] || !is_string($checksum) || $checksum !== $file['sha256']) {
                 $this->deleteDirectory($extractDirectory);
 
                 return $this->error(
@@ -352,6 +412,10 @@ final class SiteTransferService
         ];
     }
 
+    /**
+     * @param array<string, mixed> $uploadedFile
+     * @return StagedImportResult|WP_Error
+     */
     public function stageImportBundle(array $uploadedFile): array|WP_Error
     {
         $preparedUpload = $this->prepareUploadedBundle($uploadedFile);
@@ -360,17 +424,17 @@ final class SiteTransferService
             return $preparedUpload;
         }
 
-        $validation = $this->validateImportBundle((string) ($preparedUpload['path'] ?? ''));
+        $validation = $this->validateImportBundle($preparedUpload['path']);
 
         if (is_wp_error($validation)) {
-            @unlink((string) ($preparedUpload['path'] ?? ''));
+            @unlink($preparedUpload['path']);
 
             return $validation;
         }
 
         try {
-            $manifest = is_array($validation['manifest'] ?? null) ? $validation['manifest'] : [];
-            $files = is_array($validation['files'] ?? null) ? $validation['files'] : [];
+            $manifest = $validation['manifest'];
+            $files = $validation['files'];
             $stageToken = md5(uniqid('tasty-fonts-transfer-stage-', true));
 
             $this->clearStagedImportBundle();
@@ -379,16 +443,19 @@ final class SiteTransferService
 
             set_transient(
                 $this->getStagedImportTransientKey(),
-                ['token' => $stageToken, 'path' => (string) ($preparedUpload['path'] ?? '')] + $summary,
+                ['token' => $stageToken, 'path' => $preparedUpload['path']] + $summary,
                 self::STAGED_IMPORT_TTL
             );
 
             return ['stage_token' => $stageToken] + $summary;
         } finally {
-            $this->deleteDirectory((string) ($validation['extract_dir'] ?? ''));
+            $this->deleteDirectory($validation['extract_dir']);
         }
     }
 
+    /**
+     * @return ImportResult|WP_Error
+     */
     public function importStagedBundle(string $stageToken, string $freshGoogleApiKey = ''): array|WP_Error
     {
         $stagedBundle = $this->consumeStagedImportBundle($stageToken);
@@ -397,9 +464,13 @@ final class SiteTransferService
             return $stagedBundle;
         }
 
-        return $this->importPreparedBundle((string) ($stagedBundle['path'] ?? ''), $freshGoogleApiKey, true);
+        return $this->importPreparedBundle($stagedBundle['path'], $freshGoogleApiKey, true);
     }
 
+    /**
+     * @param array<string, mixed> $uploadedFile
+     * @return ImportResult|WP_Error
+     */
     public function importBundleReplacingCurrentState(array $uploadedFile, string $freshGoogleApiKey = ''): array|WP_Error
     {
         $preparedUpload = $this->prepareUploadedBundle($uploadedFile);
@@ -408,9 +479,12 @@ final class SiteTransferService
             return $preparedUpload;
         }
 
-        return $this->importPreparedBundle((string) ($preparedUpload['path'] ?? ''), $freshGoogleApiKey, true);
+        return $this->importPreparedBundle($preparedUpload['path'], $freshGoogleApiKey, true);
     }
 
+    /**
+     * @return ImportResult|WP_Error
+     */
     private function importPreparedBundle(string $zipPath, string $freshGoogleApiKey = '', bool $deleteZipWhenDone = false): array|WP_Error
     {
         $validation = $this->validateImportBundle($zipPath);
@@ -425,12 +499,12 @@ final class SiteTransferService
 
         try {
             $root = $this->storage->getRoot();
-            $manifest = is_array($validation['manifest'] ?? null) ? $validation['manifest'] : [];
-            $settings = is_array($manifest['settings'] ?? null) ? $manifest['settings'] : [];
-            $settings['applied_roles'] = is_array($manifest['applied_roles'] ?? null) ? $manifest['applied_roles'] : [];
-            $roles = is_array($manifest['roles'] ?? null) ? $manifest['roles'] : [];
-            $library = is_array($manifest['library'] ?? null) ? $manifest['library'] : [];
-            $files = is_array($validation['files'] ?? null) ? $validation['files'] : [];
+            $manifest = $validation['manifest'];
+            $settings = $manifest['settings'];
+            $settings['applied_roles'] = $manifest['applied_roles'];
+            $roles = $manifest['roles'];
+            $library = $manifest['library'];
+            $files = $validation['files'];
 
             $this->blockEditorFontLibrary->deleteAllSyncedFamilies(true);
 
@@ -452,7 +526,7 @@ final class SiteTransferService
                 );
             }
 
-            if (!$this->restoreBundleFiles((string) ($validation['extract_dir'] ?? ''), $files)) {
+            if (!$this->restoreBundleFiles($validation['extract_dir'], $files)) {
                 return $this->error(
                     'tasty_fonts_transfer_restore_files_failed',
                     __('The managed font files could not be restored from the uploaded bundle.', 'tasty-fonts')
@@ -490,7 +564,7 @@ final class SiteTransferService
                 'used_fresh_google_api_key' => trim($freshGoogleApiKey) !== '',
             ];
         } finally {
-            $this->deleteDirectory((string) ($validation['extract_dir'] ?? ''));
+            $this->deleteDirectory($validation['extract_dir']);
 
             if ($deleteZipWhenDone) {
                 @unlink($zipPath);
@@ -498,6 +572,9 @@ final class SiteTransferService
         }
     }
 
+    /**
+     * @return TransferManifest
+     */
     private function buildManifest(): array
     {
         return [
@@ -520,17 +597,26 @@ final class SiteTransferService
         ];
     }
 
+    /**
+     * @param PreparedUpload $preparedUpload
+     * @param TransferManifest $manifest
+     * @param TransferFileList $files
+     * @return StagedBundleSummary
+     */
     private function buildStagedBundleSummary(array $preparedUpload, array $manifest, array $files): array
     {
         return [
-            'bundle_name' => (string) ($preparedUpload['name'] ?? ''),
-            'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
-            'exported_at' => (string) ($manifest['exported_at'] ?? ''),
-            'families' => count(is_array($manifest['library'] ?? null) ? $manifest['library'] : []),
+            'bundle_name' => $preparedUpload['name'],
+            'plugin_version' => $manifest['plugin_version'],
+            'exported_at' => $manifest['exported_at'],
+            'families' => count($manifest['library']),
             'files' => count($files),
         ];
     }
 
+    /**
+     * @return NormalizedSettings
+     */
     private function buildPortableSettingsSnapshot(): array
     {
         $settings = $this->settings->getSettings();
@@ -562,6 +648,9 @@ final class SiteTransferService
         return $settings;
     }
 
+    /**
+     * @return TransferFileList
+     */
     private function collectManagedFiles(): array
     {
         $root = $this->storage->getRoot();
@@ -608,6 +697,10 @@ final class SiteTransferService
         return $files;
     }
 
+    /**
+     * @param array<string, mixed> $uploadedFile
+     * @return PreparedUpload|WP_Error
+     */
     private function prepareUploadedBundle(array $uploadedFile): array|WP_Error
     {
         $name = sanitize_file_name((string) ($uploadedFile['name'] ?? ''));
@@ -670,6 +763,9 @@ final class SiteTransferService
         ];
     }
 
+    /**
+     * @param TransferFileList $files
+     */
     private function restoreBundleFiles(string $extractDirectory, array $files): bool
     {
         if ($extractDirectory === '' || !is_dir($extractDirectory)) {
@@ -677,7 +773,7 @@ final class SiteTransferService
         }
 
         foreach ($files as $file) {
-            $relativePath = (string) ($file['relative_path'] ?? '');
+            $relativePath = $file['relative_path'];
 
             if (!$this->isSafeRelativePath($relativePath)) {
                 return false;
@@ -701,10 +797,6 @@ final class SiteTransferService
     private function resyncBlockEditorFontLibrary(): void
     {
         foreach ($this->imports->allFamilies() as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
             $deliveryId = (string) ($family['active_delivery_id'] ?? '');
             $profile = $deliveryId !== '' && is_array($profiles[$deliveryId] ?? null)
@@ -730,6 +822,9 @@ final class SiteTransferService
         }
     }
 
+    /**
+     * @return TransferFileList|WP_Error
+     */
     private function normalizeManifestFiles(mixed $files): array|WP_Error
     {
         if (!is_array($files)) {
@@ -772,6 +867,148 @@ final class SiteTransferService
         return array_values($normalized);
     }
 
+    /**
+     * @param array<string, mixed> $manifest
+     * @return TransferManifest|WP_Error
+     */
+    private function normalizeTransferManifest(array $manifest): array|WP_Error
+    {
+        if ((int) ($manifest['schema_version'] ?? 0) !== self::SCHEMA_VERSION) {
+            return $this->error(
+                'tasty_fonts_transfer_schema_unsupported',
+                __('This transfer bundle uses an unsupported schema version.', 'tasty-fonts')
+            );
+        }
+
+        if (!is_array($manifest['settings'] ?? null) || !is_array($manifest['roles'] ?? null) || !is_array($manifest['applied_roles'] ?? null) || !is_array($manifest['library'] ?? null)) {
+            return $this->error(
+                'tasty_fonts_transfer_manifest_shape_invalid',
+                __('The uploaded bundle manifest is missing required settings, role, or library data.', 'tasty-fonts')
+            );
+        }
+
+        $manifestFiles = $this->normalizeManifestFiles($manifest['files'] ?? null);
+
+        if (is_wp_error($manifestFiles)) {
+            return $manifestFiles;
+        }
+
+        return [
+            'schema_version' => self::SCHEMA_VERSION,
+            'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
+            'exported_at' => (string) ($manifest['exported_at'] ?? ''),
+            'settings' => $this->normalizeStringKeyedMap($manifest['settings']),
+            'roles' => $this->normalizeStringKeyedMap($manifest['roles']),
+            'applied_roles' => $this->normalizeStringKeyedMap($manifest['applied_roles']),
+            'library' => $this->normalizeLibraryMap($manifest['library']),
+            'secret_requirements' => $this->normalizeTransferSecretRequirements($manifest['secret_requirements'] ?? []),
+            'files' => $manifestFiles,
+        ];
+    }
+
+    /**
+     * @param mixed $stored
+     * @return StagedImportState
+     */
+    private function normalizeStagedImportState(mixed $stored): array
+    {
+        if (!is_array($stored)) {
+            return [
+                'token' => '',
+                'path' => '',
+                'bundle_name' => '',
+                'plugin_version' => '',
+                'exported_at' => '',
+                'families' => 0,
+                'files' => 0,
+            ];
+        }
+
+        return [
+            'token' => trim((string) ($stored['token'] ?? '')),
+            'path' => wp_normalize_path((string) ($stored['path'] ?? '')),
+            'bundle_name' => (string) ($stored['bundle_name'] ?? ''),
+            'plugin_version' => (string) ($stored['plugin_version'] ?? ''),
+            'exported_at' => (string) ($stored['exported_at'] ?? ''),
+            'families' => max(0, (int) ($stored['families'] ?? 0)),
+            'files' => max(0, (int) ($stored['files'] ?? 0)),
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private function normalizeStringKeyedMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $item) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalized[$key] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $value
+     * @return LibraryMap
+     */
+    private function normalizeLibraryMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $item) {
+            if (!is_string($key) || !is_array($item)) {
+                continue;
+            }
+
+            $normalized[$key] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $requirements
+     * @return list<TransferSecretRequirement>
+     */
+    private function normalizeTransferSecretRequirements(mixed $requirements): array
+    {
+        if (!is_array($requirements)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($requirements as $requirement) {
+            if (!is_array($requirement)) {
+                continue;
+            }
+
+            $normalized[] = [
+                'key' => (string) ($requirement['key'] ?? ''),
+                'label' => (string) ($requirement['label'] ?? ''),
+                'required' => !empty($requirement['required']),
+                'exported' => !empty($requirement['exported']),
+            ];
+        }
+
+        return $normalized;
+    }
+
     private function buildExportFilename(): string
     {
         $timestamp = gmdate('Ymd-His');
@@ -800,6 +1037,9 @@ final class SiteTransferService
         delete_transient($this->getStagedImportTransientKey());
     }
 
+    /**
+     * @return StagedImportState|WP_Error
+     */
     private function consumeStagedImportBundle(string $stageToken): array|WP_Error
     {
         $stageToken = trim($stageToken);
@@ -814,8 +1054,10 @@ final class SiteTransferService
             );
         }
 
-        $storedToken = trim((string) ($stored['token'] ?? ''));
-        $storedPath = wp_normalize_path((string) ($stored['path'] ?? ''));
+        $stored = $this->normalizeStagedImportState($stored);
+
+        $storedToken = trim($stored['token']);
+        $storedPath = $stored['path'];
 
         if ($stageToken === '' || !hash_equals($storedToken, $stageToken) || $storedPath === '' || !is_readable($storedPath)) {
             if ($storedPath !== '') {

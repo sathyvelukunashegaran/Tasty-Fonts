@@ -15,6 +15,19 @@ use TastyFonts\Support\SiteEnvironment;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
+/**
+ * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
+ * @phpstan-import-type CatalogFamily from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-import-type DeliveryProfile from CatalogService
+ * @phpstan-type ImportSyncResult array<string, mixed>
+ * @phpstan-type RestEntity array<string, mixed>
+ * @phpstan-type RestDecoded array<int|string, mixed>
+ * @phpstan-type BlockEditorFamilySettings array{name: string, slug: string, fontFamily: string}
+ * @phpstan-type BlockEditorFaceSettings array{fontFamily: string, src: list<string>, fontWeight: string, fontStyle: string, fontDisplay: string, unicodeRange?: string, fontVariationSettings?: string}
+ * @phpstan-type RestRequestArgs array<string, mixed>
+ * @phpstan-type IntegrationsLogAction array<string, string>
+ */
 final class BlockEditorFontLibraryService
 {
     private const REST_NAMESPACE = 'wp/v2';
@@ -48,7 +61,7 @@ final class BlockEditorFontLibraryService
      *
      * @since 1.4.0
      *
-     * @param array<string, mixed> $result Import result payload from the hosted import services.
+     * @param ImportSyncResult $result Import result payload from the hosted import services.
      * @param string $provider Provider identifier passed by the import hook.
      * @return void
      */
@@ -83,7 +96,7 @@ final class BlockEditorFontLibraryService
             return;
         }
 
-        $existingFamily = $this->findExistingFontFamily((string) ($familyPayload['slug'] ?? ''));
+        $existingFamily = $this->findExistingFontFamily($familyPayload['slug']);
         $familyId = $existingFamily['id'] ?? null;
 
         if ($familyId === null) {
@@ -103,7 +116,7 @@ final class BlockEditorFontLibraryService
                 return;
             }
 
-            $deleted = $this->deleteExistingFontFaces($familyId, (array) ($existingFamily['font_faces'] ?? []));
+            $deleted = $this->deleteExistingFontFaces($familyId, $this->normalizeFontFaceIdList($existingFamily['font_faces'] ?? []));
 
             if (is_wp_error($deleted)) {
                 $this->logSyncFailure($familyName, $deleted);
@@ -149,7 +162,7 @@ final class BlockEditorFontLibraryService
         $managedSlug = self::MANAGED_SLUG_PREFIX . FontUtils::slugify($familySlug);
         $existingFamily = $this->findExistingFontFamily($managedSlug);
 
-        if (!is_array($existingFamily) || empty($existingFamily['id'])) {
+        if ($existingFamily === null || empty($existingFamily['id'])) {
             return;
         }
 
@@ -175,10 +188,6 @@ final class BlockEditorFontLibraryService
     public function deleteAllSyncedFamilies(bool $force = false): void
     {
         foreach ($this->imports->allFamilies() as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
             $familySlug = (string) ($family['slug'] ?? '');
             $familyName = (string) ($family['family'] ?? '');
 
@@ -190,6 +199,9 @@ final class BlockEditorFontLibraryService
         }
     }
 
+    /**
+     * @param ImportSyncResult $result
+     */
     private function shouldSync(array $result, string $provider, bool $force = false): bool
     {
         if (!$force && !$this->settings->isBlockEditorFontLibrarySyncEnabled()) {
@@ -212,6 +224,10 @@ final class BlockEditorFontLibraryService
         return post_type_exists('wp_font_family') && post_type_exists('wp_font_face');
     }
 
+    /**
+     * @param ImportSyncResult $result
+     * @return CatalogFamily|null
+     */
     private function resolveFamilyRecord(array $result): ?array
     {
         if (is_array($result['family_record'] ?? null)) {
@@ -227,6 +243,11 @@ final class BlockEditorFontLibraryService
         return $this->imports->getFamily(FontUtils::slugify($familyName));
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param ImportSyncResult $result
+     * @return DeliveryProfile|null
+     */
     private function resolveSyncProfile(array $family, array $result): ?array
     {
         $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
@@ -247,6 +268,11 @@ final class BlockEditorFontLibraryService
         return is_array($firstProfile) ? $firstProfile : null;
     }
 
+    /**
+     * @param CatalogFamily $family
+     * @param DeliveryProfile $profile
+     * @return BlockEditorFamilySettings
+     */
     private function buildFamilySettings(array $family, array $profile, string $familyName): array
     {
         $familySlug = FontUtils::slugify((string) ($family['slug'] ?? $familyName));
@@ -258,6 +284,10 @@ final class BlockEditorFontLibraryService
         ];
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     * @return list<BlockEditorFaceSettings>
+     */
     private function buildFaceSettingsList(array $profile, string $familyName): array
     {
         $payloads = [];
@@ -311,11 +341,18 @@ final class BlockEditorFontLibraryService
         return $payloads;
     }
 
+    /**
+     * @param AxesMap $axes
+     */
     private function blockEditorFontWeight(string $weight, array $axes = []): string
     {
         return FontUtils::blockEditorFontWeightValue($weight, $axes);
     }
 
+    /**
+     * @param CatalogFace $face
+     * @return list<string>
+     */
     private function buildFaceSources(array $face): array
     {
         $sources = [];
@@ -359,6 +396,9 @@ final class BlockEditorFontLibraryService
         return untrailingslashit($rootUrl) . '/' . implode('/', $encodedSegments);
     }
 
+    /**
+     * @param DeliveryProfile $profile
+     */
     private function resolveFallback(array $profile): string
     {
         $category = strtolower(trim((string) (($profile['meta']['category'] ?? ''))));
@@ -382,6 +422,9 @@ final class BlockEditorFontLibraryService
             : 'swap';
     }
 
+    /**
+     * @return RestEntity|null
+     */
     private function findExistingFontFamily(string $managedSlug): ?array
     {
         if ($managedSlug === '') {
@@ -409,6 +452,10 @@ final class BlockEditorFontLibraryService
         return $decoded[0];
     }
 
+    /**
+     * @param BlockEditorFamilySettings $settings
+     * @return RestEntity|WP_Error
+     */
     private function createFontFamily(array $settings): array|WP_Error
     {
         $response = wp_remote_post(
@@ -423,9 +470,13 @@ final class BlockEditorFontLibraryService
             )
         );
 
-        return $this->decodeRestResponse($response);
+        return $this->decodeRestEntity($response);
     }
 
+    /**
+     * @param BlockEditorFamilySettings $settings
+     * @return RestEntity|WP_Error
+     */
     private function updateFontFamily(int $familyId, array $settings): array|WP_Error
     {
         $response = wp_remote_post(
@@ -440,9 +491,12 @@ final class BlockEditorFontLibraryService
             )
         );
 
-        return $this->decodeRestResponse($response);
+        return $this->decodeRestEntity($response);
     }
 
+    /**
+     * @param list<int|string> $fontFaceIds
+     */
     private function deleteExistingFontFaces(int $familyId, array $fontFaceIds): bool|WP_Error
     {
         foreach ($fontFaceIds as $fontFaceId) {
@@ -470,6 +524,10 @@ final class BlockEditorFontLibraryService
         return true;
     }
 
+    /**
+     * @param BlockEditorFaceSettings $settings
+     * @return RestEntity|WP_Error
+     */
     private function createFontFace(int $familyId, array $settings): array|WP_Error
     {
         $response = wp_remote_post(
@@ -484,9 +542,26 @@ final class BlockEditorFontLibraryService
             )
         );
 
-        return $this->decodeRestResponse($response);
+        return $this->decodeRestEntity($response);
     }
 
+    /**
+     * @return RestEntity|WP_Error
+     */
+    private function decodeRestEntity(mixed $response): array|WP_Error
+    {
+        $decoded = $this->decodeRestResponse($response);
+
+        if (is_wp_error($decoded)) {
+            return $decoded;
+        }
+
+        return $this->normalizeRestEntity($decoded);
+    }
+
+    /**
+     * @return RestDecoded|WP_Error
+     */
     private function decodeRestResponse(mixed $response): array|WP_Error
     {
         if (is_wp_error($response)) {
@@ -513,6 +588,52 @@ final class BlockEditorFontLibraryService
         return is_array($body) ? $body : [];
     }
 
+    /**
+     * @param mixed $entity
+     * @return RestEntity
+     */
+    private function normalizeRestEntity(mixed $entity): array
+    {
+        if (!is_array($entity)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($entity as $key => $value) {
+            $normalized[(string) $key] = $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $fontFaceIds
+     * @return list<int|string>
+     */
+    private function normalizeFontFaceIdList(mixed $fontFaceIds): array
+    {
+        if (!is_array($fontFaceIds)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($fontFaceIds as $fontFaceId) {
+            if (!is_scalar($fontFaceId)) {
+                continue;
+            }
+
+            $normalized[] = is_int($fontFaceId) ? $fontFaceId : (string) $fontFaceId;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param RestRequestArgs $args
+     * @return RestRequestArgs
+     */
     private function restRequestArgs(array $args = []): array
     {
         $headers = [
@@ -593,6 +714,9 @@ final class BlockEditorFontLibraryService
         );
     }
 
+    /**
+     * @return IntegrationsLogAction
+     */
     private function buildIntegrationsLogAction(): array
     {
         if (!function_exists('admin_url')) {

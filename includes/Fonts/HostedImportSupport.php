@@ -8,8 +8,18 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-type FaceList list<CatalogFace>
+ * @phpstan-type RequestedAxis array{weight: string, style: string}
+ * @phpstan-type RequestedAxisList list<RequestedAxis>
+ * @phpstan-type VariantTokenList list<string>
+ */
 final class HostedImportSupport
 {
+    /**
+     * @param CatalogFace $face
+     */
     public static function buildLocalFilename(string $familyName, array $face): string
     {
         $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
@@ -30,6 +40,11 @@ final class HostedImportSupport
         ) . '.woff2';
     }
 
+    /**
+     * @param FaceList $faces
+     * @param VariantTokenList $requestedVariants
+     * @return FaceList
+     */
     public static function selectPreferredFaces(array $faces, array $requestedVariants): array
     {
         $requestedAxes = [];
@@ -45,10 +60,6 @@ final class HostedImportSupport
         $selected = [];
 
         foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             if ($requestedAxes !== [] && !self::faceMatchesRequestedAxes($face, $requestedAxes)) {
                 continue;
             }
@@ -65,23 +76,20 @@ final class HostedImportSupport
         return array_values($selected);
     }
 
+    /**
+     * @param FaceList $existingFaces
+     * @param FaceList $newFaces
+     * @return FaceList
+     */
     public static function mergeManifestFaces(array $existingFaces, array $newFaces): array
     {
         $merged = [];
 
         foreach ($existingFaces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             $merged[self::faceKeyFromFace($face)] = $face;
         }
 
         foreach ($newFaces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             $merged[self::faceKeyFromFace($face)] = $face;
         }
 
@@ -90,15 +98,15 @@ final class HostedImportSupport
         return array_values($merged);
     }
 
+    /**
+     * @param FaceList $faces
+     * @return VariantTokenList
+     */
     public static function variantsFromFaces(array $faces): array
     {
         $variants = [];
 
         foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
             $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
             $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
 
@@ -129,6 +137,9 @@ final class HostedImportSupport
         return FontUtils::faceAxisKey($axis['weight'], $axis['style']);
     }
 
+    /**
+     * @param CatalogFace $face
+     */
     public static function faceKeyFromFace(array $face): string
     {
         return FontUtils::faceAxisKey(
@@ -137,6 +148,9 @@ final class HostedImportSupport
         );
     }
 
+    /**
+     * @param CatalogFace $face
+     */
     private static function preferredFaceScore(array $face): int
     {
         $range = strtoupper((string) ($face['unicode_range'] ?? ''));
@@ -168,6 +182,10 @@ final class HostedImportSupport
         return $score;
     }
 
+    /**
+     * @param CatalogFace $face
+     * @param RequestedAxisList $requestedAxes
+     */
     private static function faceMatchesRequestedAxes(array $face, array $requestedAxes): bool
     {
         foreach ($requestedAxes as $requestedAxis) {
@@ -179,10 +197,14 @@ final class HostedImportSupport
         return false;
     }
 
+    /**
+     * @param CatalogFace $face
+     * @param RequestedAxis $requestedAxis
+     */
     private static function faceMatchesRequestedAxis(array $face, array $requestedAxis): bool
     {
-        $requestedStyle = FontUtils::normalizeStyle((string) ($requestedAxis['style'] ?? 'normal'));
-        $requestedWeight = FontUtils::normalizeWeight((string) ($requestedAxis['weight'] ?? '400'));
+        $requestedStyle = FontUtils::normalizeStyle($requestedAxis['style']);
+        $requestedWeight = FontUtils::normalizeWeight($requestedAxis['weight']);
         $faceStyle = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
 
         if ($faceStyle !== $requestedStyle) {

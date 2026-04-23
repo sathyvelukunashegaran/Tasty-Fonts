@@ -8,13 +8,27 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-type PreviewView array<string, mixed>
+ * @phpstan-type FamilyLabelMap array<string, string>
+ * @phpstan-type FamilyOption array{value: string, label: string, type?: string}
+ * @phpstan-type FamilyOptionList list<FamilyOption>
+ */
 final class PreviewSectionRenderer extends AbstractSectionRenderer
 {
+    /**
+     * @param PreviewView $view
+     */
     public function render(array $view): void
     {
         $this->renderTemplate('preview-section.php', $view);
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param FamilyLabelMap $familyLabels
+     */
     public function renderPreviewScene(string $key, string $previewText, array $roles, bool $monospaceRoleEnabled = false, array $familyLabels = []): void
     {
         switch ($key) {
@@ -272,6 +286,10 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         }
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param FamilyLabelMap $familyLabels
+     */
     public function previewRoleName(string $roleKey, array $roles, array $familyLabels = []): string
     {
         $familyName = trim((string) ($roles[$roleKey] ?? ''));
@@ -292,6 +310,11 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         );
     }
 
+    /**
+     * @param FamilyOptionList $availableFamilyOptions
+     * @param RoleSet $previewRoles
+     * @param RoleSet $draftRoles
+     */
     public function renderPreviewRolePicker(
         string $roleKey,
         string $label,
@@ -321,9 +344,8 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                             <option value="" <?php selected($selectedFamily, ''); ?>><?php esc_html_e('Use Fallback Only', 'tasty-fonts'); ?></option>
                         <?php endif; ?>
                         <?php foreach ($availableFamilyOptions as $option): ?>
-                            <?php if (!is_array($option)) { continue; } ?>
-                            <?php $familyName = (string) ($option['value'] ?? ''); ?>
-                            <?php $familyLabel = (string) ($option['label'] ?? $familyName); ?>
+                            <?php $familyName = $option['value']; ?>
+                            <?php $familyLabel = $option['label']; ?>
                             <option value="<?php echo esc_attr($familyName); ?>" <?php selected($selectedFamily, $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -351,6 +373,10 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         <?php
     }
 
+    /**
+     * @param RoleSet $roles
+     * @param FamilyLabelMap $familyLabels
+     */
     public function renderCodePreviewScene(string $previewText, array $roles, bool $monospaceRoleEnabled, array $familyLabels = []): void
     {
         $editorPreviewHeadingId = 'tasty-fonts-preview-code-editor-heading';

@@ -6,6 +6,16 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
+/**
+ * @phpstan-type ParsedFilenameResult array{
+ *     family: string,
+ *     weight: string,
+ *     style: string,
+ *     is_variable: bool,
+ *     axes: array<string, array<string, string>>,
+ *     variation_defaults: array<string, string>
+ * }
+ */
 final class FontFilenameParser
 {
     private const WEIGHT_PATTERNS = [
@@ -21,6 +31,9 @@ final class FontFilenameParser
         'var' => '/[ \-]?(VariableFont|\[wght\])/i',
     ];
 
+    /**
+     * @return ParsedFilenameResult
+     */
     public function parse(string $filename): array
     {
         $result = [

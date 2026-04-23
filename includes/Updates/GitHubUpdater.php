@@ -12,6 +12,22 @@ use TastyFonts\Support\TransientKey;
 use WP_Error;
 use stdClass;
 
+/**
+ * @phpstan-type PluginMetadata array<string, string>
+ * @phpstan-type NormalizedRelease array{version: string, channel: string, package_url: string, checksum_url: string, body: string, published_at: string}
+ * @phpstan-type ReleaseManifest array{
+ *   latest_by_type: array<string, NormalizedRelease|null>,
+ *   latest_for_channel: array<string, NormalizedRelease|null>
+ * }
+ * @phpstan-type ChannelOverview array{
+ *   selected_channel: string,
+ *   installed_version: string,
+ *   latest_available: NormalizedRelease|null,
+ *   state: string,
+ *   can_reinstall: bool
+ * }
+ * @phpstan-type ReinstallResult array{channel: string, version: string, package_url: string}
+ */
 final class GitHubUpdater
 {
     public const CHANNEL_STABLE = SettingsRepository::UPDATE_CHANNEL_STABLE;
@@ -33,6 +49,7 @@ final class GitHubUpdater
     private const PACKAGE_NAME_PATTERN = 'tasty-fonts-%s.zip';
     private const PACKAGE_CHECKSUM_NAME_PATTERN = 'tasty-fonts-%s.zip.sha256';
 
+    /** @var PluginMetadata|null */
     private ?array $pluginMetadata = null;
     private ?string $pluginBasename = null;
     private ?string $installedVersion = null;
@@ -59,22 +76,29 @@ final class GitHubUpdater
             $transient = new stdClass();
         }
 
+        if (!$transient instanceof stdClass) {
+            $transient = (object) get_object_vars($transient);
+        }
+
         $release = $this->getLatestReleaseForChannel($this->selectedChannel());
 
-        if ($release === null || !$this->hasNewerVersion((string) ($release['version'] ?? ''))) {
+        if ($release === null || !$this->hasNewerVersion($release['version'])) {
             return $transient;
         }
 
-        if (!isset($transient->response) || !is_array($transient->response)) {
-            $transient->response = [];
-        }
+        $transientVars = get_object_vars($transient);
+        $response = isset($transientVars['response']) && is_array($transientVars['response'])
+            ? $transientVars['response']
+            : [];
 
-        if (isset($transient->no_update) && is_array($transient->no_update)) {
-            unset($transient->no_update[$this->pluginBasename()]);
+        if (isset($transientVars['no_update']) && is_array($transientVars['no_update'])) {
+            $noUpdate = $transientVars['no_update'];
+            unset($noUpdate[$this->pluginBasename()]);
+            $transient->no_update = $noUpdate;
         }
 
         $metadata = $this->getPluginMetadata();
-        $transient->response[$this->pluginBasename()] = (object) [
+        $response[$this->pluginBasename()] = (object) [
             'id' => self::REPOSITORY_URL,
             'slug' => self::PLUGIN_SLUG,
             'plugin' => $this->pluginBasename(),
@@ -89,6 +113,7 @@ final class GitHubUpdater
             'banners_rtl' => [],
             'compatibility' => new stdClass(),
         ];
+        $transient->response = $response;
 
         return $transient;
     }
@@ -110,18 +135,18 @@ final class GitHubUpdater
         return (object) [
             'name' => (string) ($metadata['name'] ?? 'Tasty Custom Fonts'),
             'slug' => self::PLUGIN_SLUG,
-            'version' => (string) ($release['version'] ?? TASTY_FONTS_VERSION),
+            'version' => $release['version'],
             'author' => (string) ($metadata['author'] ?? ''),
             'homepage' => (string) ($metadata['plugin_uri'] ?? self::REPOSITORY_URL),
             'requires' => (string) ($metadata['requires'] ?? ''),
             'requires_php' => (string) ($metadata['requires_php'] ?? ''),
             'tested' => (string) ($metadata['tested'] ?? ''),
-            'last_updated' => (string) ($release['published_at'] ?? ''),
-            'download_link' => (string) ($release['package_url'] ?? ''),
+            'last_updated' => $release['published_at'],
+            'download_link' => $release['package_url'],
             'external' => true,
             'sections' => [
                 'description' => $this->renderSection((string) ($metadata['description'] ?? '')),
-                'changelog' => $this->renderSection((string) ($release['body'] ?? '')),
+                'changelog' => $this->renderSection($release['body']),
             ],
             'current_version' => $this->installedVersion(),
             'installed_version' => $this->installedVersion(),
@@ -130,6 +155,9 @@ final class GitHubUpdater
         ];
     }
 
+    /**
+     * @return ChannelOverview
+     */
     public function getChannelOverview(?string $channel = null): array
     {
         $channel = $this->resolveChannel($channel);
@@ -137,8 +165,8 @@ final class GitHubUpdater
         $latestRelease = $this->getLatestReleaseForChannel($channel);
         $state = 'unavailable';
 
-        if (is_array($latestRelease)) {
-            $comparison = version_compare((string) ($latestRelease['version'] ?? ''), $installedVersion);
+        if ($latestRelease !== null) {
+            $comparison = version_compare($latestRelease['version'], $installedVersion);
 
             if ($comparison > 0) {
                 $state = 'upgrade';
@@ -158,6 +186,9 @@ final class GitHubUpdater
         ];
     }
 
+    /**
+     * @return ReinstallResult|WP_Error
+     */
     public function reinstallReleaseForChannel(?string $channel = null): array|WP_Error
     {
         if (!$this->adminAccess()->canCurrentUserAccess()) {
@@ -168,7 +199,7 @@ final class GitHubUpdater
         }
 
         $overview = $this->getChannelOverview($channel);
-        $release = is_array($overview['latest_available'] ?? null) ? $overview['latest_available'] : null;
+        $release = $overview['latest_available'];
 
         if ($release === null) {
             return new WP_Error(
@@ -177,14 +208,14 @@ final class GitHubUpdater
             );
         }
 
-        if (($overview['state'] ?? 'unavailable') !== 'rollback') {
+        if ($overview['state'] !== 'rollback') {
             return new WP_Error(
                 'tasty_fonts_release_reinstall_not_needed',
                 __('The selected update channel does not require a rollback reinstall right now.', 'tasty-fonts')
             );
         }
 
-        $packageUrl = trim((string) ($release['package_url'] ?? ''));
+        $packageUrl = trim($release['package_url']);
 
         if ($packageUrl === '') {
             return new WP_Error(
@@ -234,8 +265,8 @@ final class GitHubUpdater
         set_transient($this->installedVersionTransientKey(), $this->installedVersion(), self::INSTALLED_VERSION_TTL);
 
         return [
-            'channel' => (string) ($overview['selected_channel'] ?? self::CHANNEL_STABLE),
-            'version' => (string) ($release['version'] ?? ''),
+            'channel' => $overview['selected_channel'],
+            'version' => $release['version'],
             'package_url' => $packageUrl,
         ];
     }
@@ -251,6 +282,9 @@ final class GitHubUpdater
         return $this->adminAccess;
     }
 
+    /**
+     * @param array<string, mixed> $hookExtra
+     */
     public function handleUpgraderProcessComplete(mixed $upgrader, array $hookExtra): void
     {
         if (!in_array(($hookExtra['action'] ?? ''), ['update', 'install'], true) || ($hookExtra['type'] ?? '') !== 'plugin') {
@@ -271,6 +305,9 @@ final class GitHubUpdater
         set_transient($this->installedVersionTransientKey(), $this->installedVersion(), self::INSTALLED_VERSION_TTL);
     }
 
+    /**
+     * @param array<string, mixed> $hookExtra
+     */
     public function filterUpgraderPreDownload(mixed $reply, string $package, mixed $upgrader, array $hookExtra = []): mixed
     {
         if ($reply !== false) {
@@ -279,11 +316,11 @@ final class GitHubUpdater
 
         $release = $this->findReleaseByPackageUrl($package);
 
-        if (!is_array($release)) {
+        if ($release === null) {
             return $reply;
         }
 
-        $checksumUrl = trim((string) ($release['checksum_url'] ?? ''));
+        $checksumUrl = trim($release['checksum_url']);
 
         if ($checksumUrl === '') {
             return new WP_Error(
@@ -343,6 +380,9 @@ final class GitHubUpdater
         delete_transient($this->releaseBackoffTransientKey());
     }
 
+    /**
+     * @return NormalizedRelease|null
+     */
     private function getLatestReleaseForChannel(string $channel): ?array
     {
         $manifest = $this->getReleaseManifest();
@@ -351,15 +391,14 @@ final class GitHubUpdater
             return null;
         }
 
-        $latestForChannel = is_array($manifest['latest_for_channel'] ?? null)
-            ? $manifest['latest_for_channel']
-            : [];
+        $latestForChannel = $manifest['latest_for_channel'];
 
-        $release = $latestForChannel[$channel] ?? null;
-
-        return is_array($release) ? $release : null;
+        return $latestForChannel[$channel] ?? null;
     }
 
+    /**
+     * @return ReleaseManifest|null
+     */
     private function getReleaseManifest(): ?array
     {
         if ($this->isApiBackoffActive()) {
@@ -369,7 +408,11 @@ final class GitHubUpdater
         $cached = get_transient($this->releaseManifestTransientKey());
 
         if (is_array($cached)) {
-            return $cached;
+            $normalizedCached = $this->normalizeReleaseManifest($cached);
+
+            if ($normalizedCached !== null) {
+                return $normalizedCached;
+            }
         }
 
         $response = $this->performGitHubGet(self::API_RELEASES_URL, 'application/vnd.github+json');
@@ -411,18 +454,15 @@ final class GitHubUpdater
                 continue;
             }
 
-            $channel = (string) ($normalized['channel'] ?? self::CHANNEL_STABLE);
-            $current = $manifest['latest_by_type'][$channel] ?? null;
-            $manifest['latest_by_type'][$channel] = $this->pickNewerRelease(
-                is_array($current) ? $current : null,
-                $normalized
-            );
+            $channel = $normalized['channel'];
+            $current = $manifest['latest_by_type'][$channel];
+            $manifest['latest_by_type'][$channel] = $this->pickNewerRelease($current, $normalized);
         }
 
         $latestByType = $manifest['latest_by_type'];
-        $stable = is_array($latestByType[self::CHANNEL_STABLE] ?? null) ? $latestByType[self::CHANNEL_STABLE] : null;
-        $beta = is_array($latestByType[self::CHANNEL_BETA] ?? null) ? $latestByType[self::CHANNEL_BETA] : null;
-        $nightly = is_array($latestByType[self::CHANNEL_NIGHTLY] ?? null) ? $latestByType[self::CHANNEL_NIGHTLY] : null;
+        $stable = $latestByType[self::CHANNEL_STABLE];
+        $beta = $latestByType[self::CHANNEL_BETA];
+        $nightly = $latestByType[self::CHANNEL_NIGHTLY];
 
         $manifest['latest_for_channel'][self::CHANNEL_STABLE] = $stable;
         $manifest['latest_for_channel'][self::CHANNEL_BETA] = $this->pickNewerRelease($stable, $beta);
@@ -433,6 +473,10 @@ final class GitHubUpdater
         return $manifest;
     }
 
+    /**
+     * @param array<string, mixed> $release
+     * @return NormalizedRelease|null
+     */
     private function normalizeRelease(array $release): ?array
     {
         $version = $this->normalizeVersion((string) ($release['tag_name'] ?? ''));
@@ -491,6 +535,9 @@ final class GitHubUpdater
         return '';
     }
 
+    /**
+     * @return NormalizedRelease|null
+     */
     private function findReleaseByPackageUrl(string $packageUrl): ?array
     {
         $packageUrl = trim($packageUrl);
@@ -505,14 +552,14 @@ final class GitHubUpdater
             return null;
         }
 
-        foreach ((array) ($manifest['latest_by_type'] ?? []) as $release) {
-            if (is_array($release) && (string) ($release['package_url'] ?? '') === $packageUrl) {
+        foreach ($manifest['latest_by_type'] as $release) {
+            if ($release !== null && $release['package_url'] === $packageUrl) {
                 return $release;
             }
         }
 
-        foreach ((array) ($manifest['latest_for_channel'] ?? []) as $release) {
-            if (is_array($release) && (string) ($release['package_url'] ?? '') === $packageUrl) {
+        foreach ($manifest['latest_for_channel'] as $release) {
+            if ($release !== null && $release['package_url'] === $packageUrl) {
                 return $release;
             }
         }
@@ -592,6 +639,9 @@ final class GitHubUpdater
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function buildGitHubRequestHeaders(string $accept): array
     {
         $headers = [
@@ -607,6 +657,84 @@ final class GitHubUpdater
         return $headers;
     }
 
+    /**
+     * @param mixed $manifest
+     * @return ReleaseManifest|null
+     */
+    private function normalizeReleaseManifest(mixed $manifest): ?array
+    {
+        if (!is_array($manifest)) {
+            return null;
+        }
+
+        $latestByType = $this->normalizeReleaseMap($manifest['latest_by_type'] ?? null);
+        $latestForChannel = $this->normalizeReleaseMap($manifest['latest_for_channel'] ?? null);
+
+        if ($latestByType === null || $latestForChannel === null) {
+            return null;
+        }
+
+        return [
+            'latest_by_type' => $latestByType,
+            'latest_for_channel' => $latestForChannel,
+        ];
+    }
+
+    /**
+     * @param mixed $releases
+     * @return array<string, NormalizedRelease|null>|null
+     */
+    private function normalizeReleaseMap(mixed $releases): ?array
+    {
+        if (!is_array($releases)) {
+            return null;
+        }
+
+        $normalized = [];
+
+        foreach ([self::CHANNEL_STABLE, self::CHANNEL_BETA, self::CHANNEL_NIGHTLY] as $channel) {
+            $normalized[$channel] = $this->normalizeCachedRelease($releases[$channel] ?? null);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $release
+     * @return NormalizedRelease|null
+     */
+    private function normalizeCachedRelease(mixed $release): ?array
+    {
+        if (!is_array($release)) {
+            return null;
+        }
+
+        $version = trim((string) ($release['version'] ?? ''));
+        $channel = trim((string) ($release['channel'] ?? ''));
+        $packageUrl = trim((string) ($release['package_url'] ?? ''));
+        $checksumUrl = trim((string) ($release['checksum_url'] ?? ''));
+
+        if ($version === '' || $channel === '' || $packageUrl === '' || $checksumUrl === '') {
+            return null;
+        }
+
+        return [
+            'version' => $version,
+            'channel' => $channel,
+            'package_url' => $packageUrl,
+            'checksum_url' => $checksumUrl,
+            'body' => (string) ($release['body'] ?? ''),
+            'published_at' => (string) ($release['published_at'] ?? ''),
+        ];
+    }
+
+    private function normalizeResponseHeader(mixed $response, string $header): string
+    {
+        $value = wp_remote_retrieve_header($response, $header);
+
+        return is_string($value) ? trim($value) : '';
+    }
+
     private function isApiBackoffActive(): bool
     {
         return get_transient($this->releaseBackoffTransientKey()) !== false;
@@ -619,13 +747,13 @@ final class GitHubUpdater
         }
 
         $statusCode = (int) wp_remote_retrieve_response_code($response);
-        $remaining = trim((string) wp_remote_retrieve_header($response, 'x-ratelimit-remaining'));
+        $remaining = $this->normalizeResponseHeader($response, 'x-ratelimit-remaining');
 
         if (!in_array($statusCode, [403, 429], true) && $remaining !== '0') {
             return;
         }
 
-        $retryAfter = (int) trim((string) wp_remote_retrieve_header($response, 'retry-after'));
+        $retryAfter = (int) $this->normalizeResponseHeader($response, 'retry-after');
         $ttl = $retryAfter > 0 ? max(60, $retryAfter) : self::API_BACKOFF_TTL;
 
         set_transient(
@@ -638,6 +766,9 @@ final class GitHubUpdater
         );
     }
 
+    /**
+     * @return PluginMetadata
+     */
     private function getPluginMetadata(): array
     {
         if (is_array($this->pluginMetadata)) {
@@ -711,6 +842,10 @@ final class GitHubUpdater
         return self::CHANNEL_STABLE;
     }
 
+    /**
+     * @param list<NormalizedRelease|null> $releases
+     * @return NormalizedRelease|null
+     */
     private function pickNewestRelease(array $releases): ?array
     {
         $winner = null;
@@ -726,17 +861,22 @@ final class GitHubUpdater
         return $winner;
     }
 
+    /**
+     * @param NormalizedRelease|null $left
+     * @param NormalizedRelease|null $right
+     * @return NormalizedRelease|null
+     */
     private function pickNewerRelease(?array $left, ?array $right): ?array
     {
-        if (!is_array($left)) {
-            return is_array($right) ? $right : null;
+        if ($left === null) {
+            return $right;
         }
 
-        if (!is_array($right)) {
+        if ($right === null) {
             return $left;
         }
 
-        return version_compare((string) ($right['version'] ?? ''), (string) ($left['version'] ?? ''), '>')
+        return version_compare($right['version'], $left['version'], '>')
             ? $right
             : $left;
     }

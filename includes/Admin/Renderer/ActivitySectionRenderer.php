@@ -8,6 +8,9 @@ defined('ABSPATH') || exit;
 
 final class ActivitySectionRenderer extends AbstractSectionRenderer
 {
+    /**
+     * @param array<string, mixed> $view
+     */
     public function render(array $view): void
     {
         $this->renderTemplate('activity-section.php', $view);

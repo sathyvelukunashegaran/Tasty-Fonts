@@ -9,8 +9,15 @@ defined('ABSPATH') || exit;
 use TastyFonts\Admin\FontTypeHelper;
 use TastyFonts\Support\FontUtils;
 
+/**
+ * @phpstan-import-type ActivityLogEntry from \TastyFonts\Admin\AdminPageContextBuilder
+ * @phpstan-import-type NoticeToast from \TastyFonts\Admin\AdminPageContextBuilder
+ */
 trait SharedRenderHelpers
 {
+    /**
+     * @param list<ActivityLogEntry> $entries
+     */
     public function renderLogList(array $entries, string $className = 'tasty-fonts-log-list'): void
     {
         ?>
@@ -76,6 +83,9 @@ trait SharedRenderHelpers
         <?php
     }
 
+    /**
+     * @param list<NoticeToast> $toasts
+     */
     public function renderNotices(array $toasts): void
     {
         if ($toasts === []) {
@@ -100,6 +110,9 @@ trait SharedRenderHelpers
         <?php
     }
 
+    /**
+     * @param array<string, mixed> $notice
+     */
     public function renderEnvironmentNotice(array $notice): void
     {
         if ($notice === []) {
@@ -162,6 +175,9 @@ trait SharedRenderHelpers
         <?php
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
     public function buildLibraryCategoryOptions(): array
     {
         return [
@@ -191,11 +207,18 @@ trait SharedRenderHelpers
         };
     }
 
+    /**
+     * @param array<string, mixed> $entry
+     * @return array<string, mixed>
+     */
     public function buildFontTypeDescriptor(array $entry, string $context = 'library'): array
     {
         return FontTypeHelper::describeEntry($entry, $context);
     }
 
+    /**
+     * @param array<string, mixed>|null $entry
+     */
     public function buildFontTypeOptionLabel(string $familyName, ?array $entry = null, string $context = 'library'): string
     {
         return FontTypeHelper::buildSelectorOptionLabel($familyName, $entry, $context);
@@ -261,6 +284,9 @@ trait SharedRenderHelpers
         return $sanitized !== '' ? $sanitized : $fallback;
     }
 
+    /**
+     * @param array<string, mixed> $attributes
+     */
     public function renderFallbackInput(string $name, string $value, array $attributes = []): void
     {
         $className = 'regular-text tasty-fonts-text-control';
@@ -392,6 +418,9 @@ trait SharedRenderHelpers
         <?php
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
     public function renderHostedImportWorkflow(array $config): void
     {
         $providerKey = (string) ($config['provider_key'] ?? '');
@@ -661,6 +690,11 @@ trait SharedRenderHelpers
         <?php
     }
 
+    /**
+     * @param array<string, mixed> $config
+     * @param array<string, mixed> $roles
+     * @param list<array<string, mixed>> $availableFamilyOptions
+     */
     public function renderRoleSelectionCard(array $config, array $roles, array $availableFamilyOptions, string $roleFormId): void
     {
         $roleKey = (string) ($config['role_key'] ?? '');
@@ -729,13 +763,12 @@ trait SharedRenderHelpers
         <?php
     }
 
+    /**
+     * @param list<array<string, mixed>> $availableFamilyOptions
+     */
     private function renderRoleFamilyOptions(array $availableFamilyOptions, string $selectedFamily): void
     {
         foreach ($availableFamilyOptions as $option) {
-            if (!is_array($option)) {
-                continue;
-            }
-
             $familyName = (string) ($option['value'] ?? '');
             $familyLabel = (string) ($option['label'] ?? $familyName);
             ?>

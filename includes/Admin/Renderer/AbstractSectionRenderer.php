@@ -18,6 +18,9 @@ abstract class AbstractSectionRenderer
     {
     }
 
+    /**
+     * @param array<string, mixed> $view
+     */
     abstract public function render(array $view): void;
 
     public function setTrainingWheelsOff(bool $trainingWheelsOff): void
@@ -25,6 +28,9 @@ abstract class AbstractSectionRenderer
         $this->trainingWheelsOff = $trainingWheelsOff;
     }
 
+    /**
+     * @param array<string, mixed> $view
+     */
     protected function renderTemplate(string $template, array $view): void
     {
         $this->trainingWheelsOff = !empty($view['trainingWheelsOff']);
