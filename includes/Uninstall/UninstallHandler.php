@@ -141,7 +141,8 @@ final class UninstallHandler
 
     private function deleteAdobeProjectTransient(): void
     {
-        $projectId = strtolower(trim((string) ($this->settings['adobe_project_id'] ?? '')));
+        $projectId = $this->settings['adobe_project_id'] ?? '';
+        $projectId = is_scalar($projectId) ? strtolower(trim((string) $projectId)) : '';
         $projectId = preg_replace('/[^a-z0-9]+/', '', $projectId) ?? '';
 
         if ($projectId === '') {

@@ -28,17 +28,17 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
      */
     public function renderCodeEditor(array $panel, array $options = []): void
     {
-        $label = (string) ($panel['label'] ?? '');
-        $target = (string) ($panel['target'] ?? '');
+        $label = $this->stringValue($panel, 'label');
+        $target = $this->stringValue($panel, 'target');
         $headingId = $target !== '' ? $this->buildElementId($target . '-label', 'tasty-fonts-code-panel-label') : 'tasty-fonts-code-panel-label';
-        $value = (string) ($panel['value'] ?? '');
+        $value = $this->stringValue($panel, 'value');
         $hasDisplayValue = array_key_exists('display_value', $panel);
         $displayValue = $hasDisplayValue
-            ? (string) ($panel['display_value'] ?? '')
+            ? $this->stringValue($panel, 'display_value')
             : '';
         $hasReadableDisplayValue = array_key_exists('readable_display_value', $panel);
         $readableDisplayValue = $hasReadableDisplayValue
-            ? (string) ($panel['readable_display_value'] ?? '')
+            ? $this->stringValue($panel, 'readable_display_value')
             : '';
         $preserveDisplayFormat = !empty($options['preserve_display_format']);
 
@@ -379,5 +379,19 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
         }
 
         return $highlighted;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        $value = $values[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 }

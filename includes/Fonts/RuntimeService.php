@@ -683,7 +683,7 @@ JS;
     {
         foreach ($stylesheets as $stylesheet) {
             $handle = $this->stylesheetHandle($stylesheet, $handleSuffix);
-            $url = (string) ($stylesheet['url'] ?? '');
+            $url = $stylesheet['url'];
 
             if ($handle === '' || $url === '') {
                 continue;
@@ -704,6 +704,9 @@ JS;
         $handle = $this->stylesheetHandle(
             [
                 'handle' => 'tasty-fonts-acss-runtime',
+                'url' => '',
+                'provider' => 'acss',
+                'type' => 'runtime',
             ],
             $handleSuffix
         );
@@ -724,7 +727,7 @@ JS;
         }
 
         foreach ($this->planner->getExternalStylesheets() as $stylesheet) {
-            $url = (string) ($stylesheet['url'] ?? '');
+            $url = $stylesheet['url'];
 
             if ($url !== '') {
                 $urls[] = $url;
@@ -783,7 +786,7 @@ JS;
      */
     private function stylesheetVersion(array $stylesheet): string
     {
-        $provider = strtolower(trim((string) ($stylesheet['provider'] ?? '')));
+        $provider = strtolower(trim($stylesheet['provider']));
 
         return $provider === 'adobe'
             ? $this->adobe->getEnqueueVersion()
@@ -795,7 +798,7 @@ JS;
      */
     private function stylesheetHandle(array $stylesheet, string $handleSuffix = ''): string
     {
-        $handle = trim((string) ($stylesheet['handle'] ?? ''));
+        $handle = trim($stylesheet['handle']);
 
         if ($handle === '' || $handleSuffix === '') {
             return $handle;
@@ -860,7 +863,9 @@ JS;
             return false;
         }
 
-        $etch = isset($_GET['etch']) ? sanitize_text_field(wp_unslash((string) $_GET['etch'])) : '';
+        $etch = isset($_GET['etch']) && is_scalar($_GET['etch'])
+            ? sanitize_text_field(wp_unslash((string) $_GET['etch']))
+            : '';
 
         if ($etch === '' || !$this->canUseEtchCanvasQueryParameter()) {
             return false;

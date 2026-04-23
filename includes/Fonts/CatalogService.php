@@ -18,6 +18,8 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
+ * @phpstan-import-type ParsedFilenameResult from \TastyFonts\Fonts\FontFilenameParser
+ * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
  * @phpstan-type CatalogFace array<string, mixed>
  * @phpstan-type DeliveryProfile array<string, mixed>
  * @phpstan-type CatalogFamily array<string, mixed>
@@ -154,7 +156,7 @@ final class CatalogService
         $families = [];
 
         foreach ($this->imports->allFamilies() as $family) {
-            $familyName = (string) ($family['family'] ?? '');
+            $familyName = $family['family'];
 
             if ($familyName === '') {
                 continue;
@@ -180,14 +182,13 @@ final class CatalogService
             $counts['families']++;
             $counts['files'] += $this->countFamilyFiles($family);
 
-            if (($family['publish_state'] ?? 'published') === 'library_only') {
+            if ($this->stringValue($family, 'publish_state', 'published') === 'library_only') {
                 $counts['library_only_families']++;
             } else {
                 $counts['published_families']++;
             }
 
-            $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-            $activeType = strtolower(trim((string) ($activeDelivery['type'] ?? '')));
+            $activeType = strtolower(trim($this->stringValue($this->profileValue($family, 'active_delivery'), 'type')));
 
             if ($activeType === 'self_hosted') {
                 $counts['local_families']++;
@@ -209,11 +210,11 @@ final class CatalogService
      */
     private function normalizeFamilyRecord(array $family): array
     {
-        $familyName = (string) ($family['family'] ?? '');
-        $familySlug = (string) ($family['slug'] ?? FontUtils::slugify($familyName));
-        $publishState = (string) ($family['publish_state'] ?? 'published');
-        $activeDeliveryId = (string) ($family['active_delivery_id'] ?? '');
-        $deliveryProfiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
+        $familyName = $this->stringValue($family, 'family');
+        $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
+        $publishState = $this->stringValue($family, 'publish_state', 'published');
+        $activeDeliveryId = $this->stringValue($family, 'active_delivery_id');
+        $deliveryProfiles = $this->deliveryProfiles($family['delivery_profiles'] ?? []);
 
         return [
             'family' => $familyName,
@@ -232,15 +233,11 @@ final class CatalogService
     {
         $profiles = [];
 
-        foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $profiles[(string) ($profile['id'] ?? '')] = $this->hydrateDeliveryProfile($family, $profile);
+        foreach ($this->deliveryProfiles($family['delivery_profiles'] ?? []) as $profileId => $profile) {
+            $profiles[$profileId] = $this->hydrateDeliveryProfile($family, $profile);
         }
 
-        $activeDeliveryId = (string) ($family['active_delivery_id'] ?? '');
+        $activeDeliveryId = $this->stringValue($family, 'active_delivery_id');
 
         if ($activeDeliveryId === '' || !isset($profiles[$activeDeliveryId])) {
             $activeDeliveryId = $profiles !== [] ? (string) array_key_first($profiles) : '';
@@ -253,7 +250,7 @@ final class CatalogService
         $sources = array_values(
             array_unique(
                 array_filter(
-                    array_map(static fn (array $profile): string => strtolower(trim((string) ($profile['provider'] ?? ''))), $availableDeliveries),
+                    array_map(fn (array $profile): string => strtolower(trim($this->stringValue($profile, 'provider'))), $availableDeliveries),
                     static fn (string $source): bool => $source !== ''
                 )
             )
@@ -264,15 +261,15 @@ final class CatalogService
         $formats = $this->buildFamilyFormats($availableDeliveries);
 
         return [
-            'family' => (string) ($family['family'] ?? ''),
-            'slug' => (string) ($family['slug'] ?? FontUtils::slugify((string) ($family['family'] ?? ''))),
-            'publish_state' => (string) ($family['publish_state'] ?? 'published'),
+            'family' => $this->stringValue($family, 'family'),
+            'slug' => $this->stringValue($family, 'slug', FontUtils::slugify($this->stringValue($family, 'family'))),
+            'publish_state' => $this->stringValue($family, 'publish_state', 'published'),
             'active_delivery_id' => $activeDeliveryId,
             'active_delivery' => $activeDelivery,
             'available_deliveries' => $availableDeliveries,
             'delivery_profiles' => $profiles,
             'sources' => $sources,
-            'faces' => is_array($activeDelivery['faces'] ?? null) ? $activeDelivery['faces'] : [],
+            'faces' => $this->deliveryFaceList($activeDelivery),
             'delivery_badges' => $this->buildDeliveryBadges($family, $activeDelivery),
             'delivery_filter_tokens' => $this->buildDeliveryFilterTokens($family, $activeDelivery),
             'font_category' => $this->resolveFamilyCategory($family, $activeDelivery, $availableDeliveries),
@@ -294,18 +291,14 @@ final class CatalogService
      */
     private function hydrateDeliveryProfile(array $family, array $profile): array
     {
-        $provider = strtolower(trim((string) ($profile['provider'] ?? 'local')));
-        $type = strtolower(trim((string) ($profile['type'] ?? 'self_hosted')));
+        $provider = strtolower(trim($this->stringValue($profile, 'provider', 'local')));
+        $type = strtolower(trim($this->stringValue($profile, 'type', 'self_hosted')));
         $faces = [];
 
-        foreach ((array) ($profile['faces'] ?? []) as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
+        foreach ($this->deliveryFaceList($profile) as $face) {
             $faces[] = $this->hydrateFace(
-                (string) ($family['family'] ?? ''),
-                (string) ($family['slug'] ?? ''),
+                $this->stringValue($family, 'family'),
+                $this->stringValue($family, 'slug'),
                 $provider,
                 $type,
                 $face
@@ -321,19 +314,22 @@ final class CatalogService
                     return $comparison;
                 }
 
-                return strcmp((string) ($left['unicode_range'] ?? ''), (string) ($right['unicode_range'] ?? ''));
+                return strcmp(
+                    self::arrayStringValue($left, 'unicode_range'),
+                    self::arrayStringValue($right, 'unicode_range')
+                );
             }
         );
 
         return [
-            'id' => (string) ($profile['id'] ?? ''),
+            'id' => $this->stringValue($profile, 'id'),
             'provider' => $provider,
             'type' => $type,
             'format' => FontUtils::resolveProfileFormat($profile),
-            'label' => (string) ($profile['label'] ?? ''),
-            'variants' => (array) ($profile['variants'] ?? []),
+            'label' => $this->stringValue($profile, 'label'),
+            'variants' => $this->stringList($this->arrayValue($profile, 'variants')),
             'faces' => $faces,
-            'meta' => is_array($profile['meta'] ?? null) ? $profile['meta'] : [],
+            'meta' => $this->metaValueMap($profile),
         ];
     }
 
@@ -345,9 +341,10 @@ final class CatalogService
     {
         $files = [];
         $paths = [];
+        $axes = $this->normalizeAxes($face['axes'] ?? []);
 
-        foreach ((array) ($face['files'] ?? []) as $format => $value) {
-            if (!is_string($format) || !is_string($value) || trim($value) === '') {
+        foreach ($this->stringMap($face['files'] ?? []) as $format => $value) {
+            if (trim($value) === '') {
                 continue;
             }
 
@@ -374,8 +371,8 @@ final class CatalogService
             }
         }
 
-        foreach ((array) ($face['paths'] ?? []) as $format => $value) {
-            if (!is_string($format) || !is_string($value) || trim($value) === '') {
+        foreach ($this->stringMap($face['paths'] ?? []) as $format => $value) {
+            if (trim($value) === '') {
                 continue;
             }
 
@@ -395,18 +392,15 @@ final class CatalogService
             'family' => $familyName,
             'slug' => $familySlug,
             'source' => $provider,
-            'weight' => FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')),
-            'style' => FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')),
-            'unicode_range' => trim((string) ($face['unicode_range'] ?? '')),
+            'weight' => FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400')),
+            'style' => FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')),
+            'unicode_range' => trim($this->stringValue($face, 'unicode_range')),
             'files' => $files,
             'paths' => $paths,
-            'provider' => is_array($face['provider'] ?? null) ? $face['provider'] : [],
-            'is_variable' => !empty($face['is_variable']) || FontUtils::normalizeAxesMap($face['axes'] ?? []) !== [],
-            'axes' => FontUtils::normalizeAxesMap($face['axes'] ?? []),
-            'variation_defaults' => FontUtils::normalizeVariationDefaults(
-                $face['variation_defaults'] ?? [],
-                $face['axes'] ?? []
-            ),
+            'provider' => $this->arrayValue($face, 'provider'),
+            'is_variable' => !empty($face['is_variable']) || $axes !== [],
+            'axes' => $axes,
+            'variation_defaults' => $this->normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
         ];
     }
 
@@ -417,8 +411,8 @@ final class CatalogService
      */
     private function mergeSyntheticFamily(array &$families, array $synthetic, string $defaultPublishState): void
     {
-        $familyName = (string) ($synthetic['family'] ?? '');
-        $familySlug = (string) ($synthetic['slug'] ?? FontUtils::slugify($familyName));
+        $familyName = $this->stringValue($synthetic, 'family');
+        $familySlug = $this->stringValue($synthetic, 'slug', FontUtils::slugify($familyName));
 
         if ($familyName === '' || $familySlug === '') {
             return;
@@ -429,52 +423,43 @@ final class CatalogService
                 $familyName,
                 $familySlug,
                 $defaultPublishState,
-                (string) ($synthetic['active_delivery_id'] ?? ''),
-                is_array($synthetic['delivery_profiles'] ?? null) ? $synthetic['delivery_profiles'] : []
+                $this->stringValue($synthetic, 'active_delivery_id'),
+                $this->deliveryProfiles($synthetic['delivery_profiles'] ?? [])
             );
 
             return;
         }
 
-        /** @var array<string, DeliveryProfile> $existingProfiles */
-        $existingProfiles = is_array($families[$familyName]['delivery_profiles'] ?? null)
-            ? $families[$familyName]['delivery_profiles']
-            : [];
+        $existingProfiles = $this->deliveryProfiles($families[$familyName]['delivery_profiles'] ?? []);
 
-        foreach ((array) ($synthetic['delivery_profiles'] ?? []) as $profileId => $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $profileId = (string) $profileId;
-
+        foreach ($this->deliveryProfiles($synthetic['delivery_profiles'] ?? []) as $profileId => $profile) {
             if (!isset($existingProfiles[$profileId])) {
                 $existingProfiles[$profileId] = $profile;
                 continue;
             }
 
-            $existingFaces = $this->normalizeCatalogFaceList($existingProfiles[$profileId]['faces'] ?? []);
-            $syntheticFaces = $this->normalizeCatalogFaceList($profile['faces'] ?? []);
+            $existingFaces = $this->deliveryFaceList($existingProfiles[$profileId]);
+            $syntheticFaces = $this->deliveryFaceList($profile);
             $existingProfiles[$profileId] = array_replace($profile, $existingProfiles[$profileId]);
             $existingProfiles[$profileId]['faces'] = HostedImportSupport::mergeManifestFaces($existingFaces, $syntheticFaces);
             $existingProfiles[$profileId]['variants'] = array_values(
                 array_unique(
                     array_merge(
-                        is_array($existingProfiles[$profileId]['variants'] ?? null) ? (array) $existingProfiles[$profileId]['variants'] : [],
-                        is_array($profile['variants'] ?? null) ? (array) $profile['variants'] : []
+                        $this->stringList($existingProfiles[$profileId]['variants'] ?? []),
+                        $this->stringList($profile['variants'] ?? [])
                     )
                 )
             );
             $existingProfiles[$profileId]['meta'] = array_replace(
-                is_array($profile['meta'] ?? null) ? (array) $profile['meta'] : [],
-                is_array($existingProfiles[$profileId]['meta'] ?? null) ? (array) $existingProfiles[$profileId]['meta'] : []
+                $this->metaValueMap($profile),
+                $this->metaValueMap($existingProfiles[$profileId])
             );
         }
 
         $families[$familyName]['delivery_profiles'] = $existingProfiles;
 
-        if (trim((string) ($families[$familyName]['active_delivery_id'] ?? '')) === '') {
-            $families[$familyName]['active_delivery_id'] = (string) ($synthetic['active_delivery_id'] ?? '');
+        if (trim($this->stringValue($families[$familyName], 'active_delivery_id')) === '') {
+            $families[$familyName]['active_delivery_id'] = $this->stringValue($synthetic, 'active_delivery_id');
         }
     }
 
@@ -509,9 +494,11 @@ final class CatalogService
 
         foreach ($byFamily as &$family) {
             $profileId = $this->localDeliveryId();
-            $profile = is_array($family['delivery_profiles'][$profileId] ?? null) ? $family['delivery_profiles'][$profileId] : [];
-            $profile['faces'] = array_values((array) ($profile['faces'] ?? []));
-            $family['delivery_profiles'][$profileId] = $profile;
+            $profiles = $this->deliveryProfiles($family['delivery_profiles'] ?? []);
+            $profile = $profiles[$profileId] ?? [];
+            $profile['faces'] = array_values($this->deliveryFaceMap($profile));
+            $profiles[$profileId] = $profile;
+            $family['delivery_profiles'] = $profiles;
         }
         unset($family);
 
@@ -546,8 +533,12 @@ final class CatalogService
             );
         }
 
-        if (!isset($byFamily[$familyName]['delivery_profiles'][$profileId]['faces'][$variantKey])) {
-            $byFamily[$familyName]['delivery_profiles'][$profileId]['faces'][$variantKey] = $this->buildLocalFace($familyName, $familySlug, $meta);
+        $profiles = $this->deliveryProfiles($byFamily[$familyName]['delivery_profiles'] ?? []);
+        $profile = $profiles[$profileId] ?? $this->buildLocalScanDeliveryProfile($profileId);
+        $faces = $this->deliveryFaceMap($profile);
+
+        if (!isset($faces[$variantKey])) {
+            $faces[$variantKey] = $this->buildLocalFace($familyName, $familySlug, $meta);
         }
 
         $absolutePath = wp_normalize_path($file->getPathname());
@@ -558,35 +549,39 @@ final class CatalogService
             return $byFamily;
         }
 
-        $byFamily[$familyName]['delivery_profiles'][$profileId]['faces'][$variantKey]['files'][$extension] = $relativePath;
-        $byFamily[$familyName]['delivery_profiles'][$profileId]['faces'][$variantKey]['paths'][$extension] = $relativePath;
-        $byFamily[$familyName]['delivery_profiles'][$profileId]['variants'][] = $this->variantTokenFromMeta($meta);
+        $face = $faces[$variantKey];
+        $face['files'] = array_replace($this->stringMap($face['files'] ?? []), [$extension => $relativePath]);
+        $face['paths'] = array_replace($this->stringMap($face['paths'] ?? []), [$extension => $relativePath]);
+        $faces[$variantKey] = $face;
+        $profile['faces'] = $faces;
+        $profile['variants'] = array_values(array_unique([...$this->stringList($profile['variants'] ?? []), $this->variantTokenFromMeta($meta)]));
+        $profiles[$profileId] = $profile;
+        $byFamily[$familyName]['delivery_profiles'] = $profiles;
 
         return $byFamily;
     }
 
     /**
-     * @param array<string, mixed> $meta
+     * @param ParsedFilenameResult $meta
      * @return CatalogFace
      */
     private function buildLocalFace(string $familyName, string $familySlug, array $meta): array
     {
+        $axes = $this->normalizeAxes($meta['axes']);
+
         return [
             'family' => $familyName,
             'slug' => $familySlug,
             'source' => 'local',
-            'weight' => FontUtils::normalizeWeight((string) $meta['weight']),
-            'style' => FontUtils::normalizeStyle((string) $meta['style']),
+            'weight' => FontUtils::normalizeWeight($meta['weight']),
+            'style' => FontUtils::normalizeStyle($meta['style']),
             'unicode_range' => '',
             'files' => [],
             'paths' => [],
             'provider' => ['type' => 'local'],
             'is_variable' => !empty($meta['is_variable']),
-            'axes' => FontUtils::normalizeAxesMap($meta['axes'] ?? []),
-            'variation_defaults' => FontUtils::normalizeVariationDefaults(
-                $meta['variation_defaults'] ?? [],
-                $meta['axes'] ?? []
-            ),
+            'axes' => $axes,
+            'variation_defaults' => $this->normalizeVariationDefaults($meta['variation_defaults'], $axes),
         ];
     }
 
@@ -639,8 +634,8 @@ final class CatalogService
     private function familyHasVariableFaces(array $profiles): bool
     {
         foreach ($profiles as $profile) {
-            foreach ((array) ($profile['faces'] ?? []) as $face) {
-                if (is_array($face) && FontUtils::faceIsVariable($face)) {
+            foreach ($this->deliveryFaceList($profile) as $face) {
+                if (FontUtils::faceIsVariable($face)) {
                     return true;
                 }
             }
@@ -655,8 +650,8 @@ final class CatalogService
     private function familyHasStaticFaces(array $profiles): bool
     {
         foreach ($profiles as $profile) {
-            foreach ((array) ($profile['faces'] ?? []) as $face) {
-                if (!is_array($face) || FontUtils::faceIsVariable($face)) {
+            foreach ($this->deliveryFaceList($profile) as $face) {
+                if (FontUtils::faceIsVariable($face)) {
                     continue;
                 }
 
@@ -704,12 +699,8 @@ final class CatalogService
         $axes = [];
 
         foreach ($profiles as $profile) {
-            foreach ((array) ($profile['faces'] ?? []) as $face) {
-                if (!is_array($face)) {
-                    continue;
-                }
-
-                foreach (FontUtils::normalizeAxesMap($face['axes'] ?? []) as $tag => $definition) {
+            foreach ($this->deliveryFaceList($profile) as $face) {
+                foreach ($this->normalizeAxes($face['axes'] ?? []) as $tag => $definition) {
                     if (!isset($axes[$tag])) {
                         $axes[$tag] = $definition;
                         continue;
@@ -742,8 +733,8 @@ final class CatalogService
         $families = [];
 
         foreach ($this->adobe->getConfiguredFamilies() as $family) {
-            $familyName = (string) ($family['family'] ?? '');
-            $familySlug = (string) ($family['slug'] ?? FontUtils::slugify($familyName));
+            $familyName = $this->stringValue($family, 'family');
+            $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
 
             if ($familyName === '' || $familySlug === '') {
                 continue;
@@ -751,27 +742,22 @@ final class CatalogService
 
             $faces = [];
 
-            foreach ((array) ($family['faces'] ?? []) as $face) {
-                if (!is_array($face)) {
-                    continue;
-                }
+            foreach ($this->deliveryFaceList(['faces' => $family['faces'] ?? []]) as $face) {
+                $axes = $this->normalizeAxes($face['axes'] ?? []);
 
                 $faces[] = [
                     'family' => $familyName,
                     'slug' => $familySlug,
                     'source' => 'adobe',
-                    'weight' => FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')),
-                    'style' => FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')),
+                    'weight' => FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400')),
+                    'style' => FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')),
                     'unicode_range' => '',
                     'files' => [],
                     'paths' => [],
                     'provider' => ['type' => 'adobe', 'project_id' => $projectId],
                     'is_variable' => !empty($face['is_variable']),
-                    'axes' => FontUtils::normalizeAxesMap($face['axes'] ?? []),
-                    'variation_defaults' => FontUtils::normalizeVariationDefaults(
-                        $face['variation_defaults'] ?? [],
-                        $face['axes'] ?? []
-                    ),
+                    'axes' => $axes,
+                    'variation_defaults' => $this->normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
                 ];
             }
 
@@ -807,12 +793,12 @@ final class CatalogService
     }
 
     /**
-     * @param array<string, mixed> $meta
+     * @param ParsedFilenameResult $meta
      */
     private function variantTokenFromMeta(array $meta): string
     {
-        $weight = FontUtils::normalizeWeight((string) ($meta['weight'] ?? '400'));
-        $style = FontUtils::normalizeStyle((string) ($meta['style'] ?? 'normal'));
+        $weight = FontUtils::normalizeWeight($meta['weight']);
+        $style = FontUtils::normalizeStyle($meta['style']);
 
         if ($weight === '400' && $style === 'normal') {
             return 'regular';
@@ -832,9 +818,9 @@ final class CatalogService
      */
     private function buildDeliveryBadges(array $family, array $activeDelivery): array
     {
-        $publishState = (string) ($family['publish_state'] ?? 'published');
-        $provider = strtolower(trim((string) ($activeDelivery['provider'] ?? '')));
-        $type = strtolower(trim((string) ($activeDelivery['type'] ?? 'self_hosted')));
+        $publishState = $this->stringValue($family, 'publish_state', 'published');
+        $provider = strtolower(trim($this->stringValue($activeDelivery, 'provider')));
+        $type = strtolower(trim($this->stringValue($activeDelivery, 'type', 'self_hosted')));
         $badges = [];
 
         $badges[] = match ($publishState) {
@@ -888,9 +874,9 @@ final class CatalogService
      */
     private function buildDeliveryFilterTokens(array $family, array $activeDelivery): array
     {
-        $publishState = (string) ($family['publish_state'] ?? 'published');
-        $provider = strtolower(trim((string) ($activeDelivery['provider'] ?? '')));
-        $type = strtolower(trim((string) ($activeDelivery['type'] ?? 'self_hosted')));
+        $publishState = $this->stringValue($family, 'publish_state', 'published');
+        $provider = strtolower(trim($this->stringValue($activeDelivery, 'provider')));
+        $type = strtolower(trim($this->stringValue($activeDelivery, 'type', 'self_hosted')));
         $tokens = [$publishState];
 
         if ($publishState === 'role_active') {
@@ -929,10 +915,10 @@ final class CatalogService
     {
         $candidates = [];
 
-        $candidates[] = (string) ($activeDelivery['meta']['category'] ?? '');
+        $candidates[] = $this->profileMetaString($activeDelivery, 'category');
 
         foreach ($availableDeliveries as $profile) {
-            $candidates[] = (string) ($profile['meta']['category'] ?? '');
+            $candidates[] = $this->profileMetaString($profile, 'category');
         }
 
         foreach ($candidates as $candidate) {
@@ -943,7 +929,7 @@ final class CatalogService
             }
         }
 
-        return $this->normalizeFamilyCategory((string) ($family['family'] ?? ''));
+        return $this->normalizeFamilyCategory($this->stringValue($family, 'family'));
     }
 
     private function normalizeFamilyCategory(string $category): string
@@ -1026,13 +1012,9 @@ final class CatalogService
     {
         $count = 0;
 
-        foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            foreach ((array) ($profile['faces'] ?? []) as $face) {
-                $count += count((array) ($face['files'] ?? []));
+        foreach ($this->familyAvailableDeliveries($family) as $profile) {
+            foreach ($this->deliveryFaceList($profile) as $face) {
+                $count += count($this->stringMap($face['files'] ?? []));
             }
         }
 
@@ -1045,9 +1027,10 @@ final class CatalogService
     private function applyCatalogFilter(): array
     {
         $filtered = apply_filters('tasty_fonts_catalog', $this->catalog);
+        $normalized = $this->normalizeCatalogMap($filtered);
 
         if (is_array($filtered)) {
-            $this->catalog = $filtered;
+            $this->catalog = $normalized;
             $this->counts = $this->countCatalogFamilies($this->catalog);
         }
 
@@ -1066,14 +1049,13 @@ final class CatalogService
             $counts['families']++;
             $counts['files'] += $this->countFamilyFiles($family);
 
-            if (($family['publish_state'] ?? 'published') === 'library_only') {
+            if ($this->stringValue($family, 'publish_state', 'published') === 'library_only') {
                 $counts['library_only_families']++;
             } else {
                 $counts['published_families']++;
             }
 
-            $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-            $activeType = strtolower(trim((string) ($activeDelivery['type'] ?? '')));
+            $activeType = strtolower(trim($this->stringValue($this->profileValue($family, 'active_delivery'), 'type')));
 
             if ($activeType === 'self_hosted') {
                 $counts['local_families']++;
@@ -1107,10 +1089,100 @@ final class CatalogService
             }
         }
 
-        $this->catalog = $cached['families'];
+        $this->catalog = $this->normalizeCatalogMap($cached['families']);
         $this->counts = $this->countCatalogFamilies($this->catalog);
 
         return true;
+    }
+
+    /**
+     * @param mixed $profiles
+     * @return array<string, DeliveryProfile>
+     */
+    private function deliveryProfiles(mixed $profiles): array
+    {
+        if (!is_array($profiles)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($profiles as $profileId => $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $id = $this->stringValue($profile, 'id', is_string($profileId) ? $profileId : '');
+
+            if ($id === '') {
+                continue;
+            }
+
+            $normalized[$id] = $profile;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param DeliveryProfile|CatalogFamily $values
+     * @return DeliveryProfile
+     */
+    private function profileValue(array $values, string $key): array
+    {
+        $value = $values[$key] ?? null;
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     * @return array<string, CatalogFace>
+     */
+    private function deliveryFaceMap(array $profile): array
+    {
+        $normalized = [];
+
+        foreach ($this->normalizeCatalogFaceList($profile['faces'] ?? []) as $face) {
+            $key = HostedImportSupport::faceKeyFromFace($face);
+            $normalized[$key] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     * @return list<CatalogFace>
+     */
+    private function deliveryFaceList(array $profile): array
+    {
+        return array_values($this->deliveryFaceMap($profile));
+    }
+
+    /**
+     * @param CatalogFamily $family
+     * @return list<DeliveryProfile>
+     */
+    private function familyAvailableDeliveries(array $family): array
+    {
+        $availableDeliveries = $family['available_deliveries'] ?? null;
+
+        if (!is_array($availableDeliveries)) {
+            return array_values($this->deliveryProfiles($family['delivery_profiles'] ?? []));
+        }
+
+        $normalized = [];
+
+        foreach ($availableDeliveries as $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $normalized[] = $profile;
+        }
+
+        return $normalized;
     }
 
     /**
@@ -1134,6 +1206,198 @@ final class CatalogService
         }
 
         return $normalized;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function stringMap(mixed $values): array
+    {
+        if (!is_array($values)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($values as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalizedValue = self::scalarStringValue($value);
+
+            if ($normalizedValue === '') {
+                continue;
+            }
+
+            $normalized[$key] = $normalizedValue;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $values): array
+    {
+        if (!is_array($values)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($values as $value) {
+            $normalizedValue = self::scalarStringValue($value);
+
+            if ($normalizedValue === '') {
+                continue;
+            }
+
+            $normalized[] = $normalizedValue;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     * @return array<string, string|list<string>>
+     */
+    private function metaValueMap(array $profile): array
+    {
+        $meta = $profile['meta'] ?? null;
+
+        if (!is_array($meta)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($meta as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $normalizedList = $this->stringList($value);
+
+                if ($normalizedList !== []) {
+                    $normalized[$key] = $normalizedList;
+                }
+
+                continue;
+            }
+
+            $normalizedValue = self::scalarStringValue($value);
+
+            if ($normalizedValue !== '') {
+                $normalized[$key] = $normalizedValue;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    private function profileMetaString(array $profile, string $key): string
+    {
+        $value = $this->metaValueMap($profile)[$key] ?? '';
+
+        return is_string($value) ? $value : '';
+    }
+
+    /**
+     * @return array<string, array<string, float|int|string>>
+     */
+    private function normalizeAxes(mixed $axes): array
+    {
+        return is_array($axes) ? FontUtils::normalizeAxesMap($axes) : [];
+    }
+
+    /**
+     * @param array<string, array<string, float|int|string>> $axes
+     * @return VariationDefaults
+     */
+    private function normalizeVariationDefaults(mixed $variationDefaults, array $axes): array
+    {
+        return is_array($variationDefaults) ? FontUtils::normalizeVariationDefaults($variationDefaults, $axes) : [];
+    }
+
+    /**
+     * @return CatalogMap
+     */
+    private function normalizeCatalogMap(mixed $families): array
+    {
+        if (!is_array($families)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($families as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $familyName = $this->stringValue($family, 'family');
+
+            if ($familyName === '') {
+                continue;
+            }
+
+            $normalized[$familyName] = $family;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     * @return array<int|string, mixed>
+     */
+    private function arrayValue(array $values, string $key): array
+    {
+        $value = $values[$key] ?? null;
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        return self::arrayStringValue($values, $key, $default);
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private static function arrayStringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = self::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    private static function scalarStringValue(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        return $value === true ? '1' : '';
     }
 
     private function cacheCatalogState(): void
@@ -1211,7 +1475,7 @@ final class CatalogService
             return $leftRank <=> $rightRank;
         }
 
-        return strcmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
+        return strcmp($this->stringValue($left, 'label'), $this->stringValue($right, 'label'));
     }
 
     /**
@@ -1219,7 +1483,7 @@ final class CatalogService
      */
     private function deliveryProfileRank(array $profile): int
     {
-        return match (strtolower(trim((string) ($profile['provider'] ?? ''))) . ':' . strtolower(trim((string) ($profile['type'] ?? '')))) {
+        return match (strtolower(trim($this->stringValue($profile, 'provider'))) . ':' . strtolower(trim($this->stringValue($profile, 'type')))) {
             'local:self_hosted' => 10,
             'google:self_hosted' => 20,
             'google:cdn' => 30,

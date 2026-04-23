@@ -292,7 +292,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
      */
     public function previewRoleName(string $roleKey, array $roles, array $familyLabels = []): string
     {
-        $familyName = trim((string) ($roles[$roleKey] ?? ''));
+        $familyName = trim($this->roleStringValue($roles, $roleKey));
 
         if ($familyName !== '') {
             return (string) ($familyLabels[$familyName] ?? $familyName);
@@ -300,13 +300,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
 
         return sprintf(
             __('Fallback only (%s)', 'tasty-fonts'),
-            FontUtils::sanitizeFallback(
-                (string) match ($roleKey) {
-                    'heading' => $roles['heading_fallback'] ?? 'sans-serif',
-                    'body' => $roles['body_fallback'] ?? 'sans-serif',
-                    default => $roles['monospace_fallback'] ?? 'monospace',
-                }
-            )
+            FontUtils::sanitizeFallback($this->roleFallbackValue($roles, $roleKey))
         );
     }
 
@@ -323,13 +317,9 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         array $draftRoles,
         bool $allowFallbackOnly = false
     ): void {
-        $selectedFamily = trim((string) ($previewRoles[$roleKey] ?? ''));
-        $draftFamily = trim((string) ($draftRoles[$roleKey] ?? ''));
-        $fallbackValue = match ($roleKey) {
-            'heading' => (string) ($previewRoles['heading_fallback'] ?? 'sans-serif'),
-            'body' => (string) ($previewRoles['body_fallback'] ?? 'sans-serif'),
-            default => (string) ($previewRoles['monospace_fallback'] ?? 'monospace'),
-        };
+        $selectedFamily = trim($this->roleStringValue($previewRoles, $roleKey));
+        $draftFamily = trim($this->roleStringValue($draftRoles, $roleKey));
+        $fallbackValue = $this->roleFallbackValue($previewRoles, $roleKey);
         ?>
         <div class="tasty-fonts-preview-role-picker" data-preview-role-picker="<?php echo esc_attr($roleKey); ?>">
             <label class="tasty-fonts-stack-field tasty-fonts-preview-tray-field">
@@ -519,5 +509,41 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    private function roleStringValue(array $roles, string $key): string
+    {
+        $value = $roles[$key] ?? '';
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    private function roleFallbackValue(array $roles, string $roleKey): string
+    {
+        $fallback = match ($roleKey) {
+            'heading' => $this->roleStringValue($roles, 'heading_fallback'),
+            'body' => $this->roleStringValue($roles, 'body_fallback'),
+            default => $this->roleStringValue($roles, 'monospace_fallback'),
+        };
+
+        if ($fallback !== '') {
+            return $fallback;
+        }
+
+        return $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
     }
 }

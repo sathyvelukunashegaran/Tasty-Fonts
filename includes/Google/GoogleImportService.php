@@ -170,9 +170,9 @@ final class GoogleImportService
                 'format' => $variantPlan['format_mode'],
                 'label' => __('Self-hosted (Google import)', 'tasty-fonts'),
                 'meta' => [
-                    'category' => (string) ($metadata['category'] ?? ''),
-                    'lastModified' => (string) ($metadata['lastModified'] ?? ''),
-                    'version' => (string) ($metadata['version'] ?? ''),
+                    'category' => $this->stringValue($metadata, 'category'),
+                    'lastModified' => $this->stringValue($metadata, 'lastModified'),
+                    'version' => $this->stringValue($metadata, 'version'),
                     'imported_at' => current_time('mysql'),
                 ],
             ],
@@ -216,9 +216,9 @@ final class GoogleImportService
                 'format' => $variantPlan['format_mode'],
                 'label' => __('Google CDN', 'tasty-fonts'),
                 'meta' => [
-                    'category' => (string) ($metadata['category'] ?? ''),
-                    'lastModified' => (string) ($metadata['lastModified'] ?? ''),
-                    'version' => (string) ($metadata['version'] ?? ''),
+                    'category' => $this->stringValue($metadata, 'category'),
+                    'lastModified' => $this->stringValue($metadata, 'lastModified'),
+                    'version' => $this->stringValue($metadata, 'version'),
                     'saved_at' => current_time('mysql'),
                 ],
             ],
@@ -259,9 +259,10 @@ final class GoogleImportService
     private function resolveProfileId(?array $family, string $deliveryMode, string $formatMode): string
     {
         $existing = $this->findDeliveryProfile($family, 'google', $deliveryMode, $formatMode);
+        $existingId = $this->stringValue($existing, 'id');
 
-        if (is_array($existing) && trim((string) ($existing['id'] ?? '')) !== '') {
-            return (string) $existing['id'];
+        if ($existingId !== '') {
+            return $existingId;
         }
 
         $baseId = $this->profileId($deliveryMode);
@@ -290,10 +291,10 @@ final class GoogleImportService
     {
         return [
             'type' => 'google',
-            'category' => (string) ($metadata['category'] ?? ''),
+            'category' => $this->stringValue($metadata, 'category'),
             'variants' => $variants,
-            'lastModified' => (string) ($metadata['lastModified'] ?? ''),
-            'version' => (string) ($metadata['version'] ?? ''),
+            'lastModified' => $this->stringValue($metadata, 'lastModified'),
+            'version' => $this->stringValue($metadata, 'version'),
         ];
     }
 
@@ -364,5 +365,17 @@ final class GoogleImportService
             'write_failed_code' => 'tasty_fonts_google_write_failed',
             'write_failed_message' => __('The imported font file could not be written to uploads/fonts.', 'tasty-fonts'),
         ];
+    }
+
+    /**
+     * @param array<string, mixed>|null $values
+     */
+    private function stringValue(?array $values, string $key, string $default = ''): string
+    {
+        if ($values === null) {
+            return $default;
+        }
+
+        return FontUtils::scalarStringValue($values[$key] ?? $default);
     }
 }

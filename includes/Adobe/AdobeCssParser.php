@@ -29,9 +29,12 @@ final class AdobeCssParser
         $families = [];
 
         foreach ($faces as $face) {
-            $familyName = (string) $face['family'];
+            $familyName = $this->faceStringValue($face, 'family');
             $familyKey = strtolower($familyName);
-            $faceKey = FontUtils::faceAxisKey((string) $face['weight'], (string) $face['style']);
+            $weight = $this->faceStringValue($face, 'weight');
+            $style = $this->faceStringValue($face, 'style');
+            $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
+            $faceKey = FontUtils::faceAxisKey($weight, $style);
 
             if (!isset($families[$familyKey])) {
                 $families[$familyKey] = [
@@ -44,11 +47,11 @@ final class AdobeCssParser
 
             $existingFace = (array) ($families[$familyKey]['faces'][$faceKey] ?? []);
             $nextFace = [
-                'weight' => (string) $face['weight'],
-                'style' => (string) $face['style'],
+                'weight' => $weight,
+                'style' => $style,
                 'is_variable' => !empty($face['is_variable']),
-                'axes' => FontUtils::normalizeAxesMap($face['axes'] ?? []),
-                'variation_defaults' => FontUtils::normalizeVariationDefaults($face['variation_defaults'] ?? [], $face['axes'] ?? []),
+                'axes' => $axes,
+                'variation_defaults' => FontUtils::normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
             ];
 
             $families[$familyKey]['faces'][$faceKey] = !empty($existingFace['is_variable']) && empty($nextFace['is_variable'])
@@ -65,5 +68,19 @@ final class AdobeCssParser
         uasort($families, static fn (array $left, array $right): int => strcasecmp($left['family'], $right['family']));
 
         return array_values($families);
+    }
+
+    /**
+     * @param array<string, mixed> $face
+     */
+    private function faceStringValue(array $face, string $key, string $default = ''): string
+    {
+        $value = $face[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 }

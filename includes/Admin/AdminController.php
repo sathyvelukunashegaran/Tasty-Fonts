@@ -38,6 +38,9 @@ use WP_Error;
  * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
  * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogService
  * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
+ * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type FamilyFontDisplayMap from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
  * @phpstan-type Payload array<string, mixed>
@@ -530,13 +533,13 @@ final class AdminController
             $axes = $this->normalizeUploadAxesInput($row['axes'] ?? []);
 
             $rows[] = [
-                'family' => sanitize_text_field((string) ($row['family'] ?? '')),
-                'weight' => sanitize_text_field((string) ($row['weight'] ?? '400')),
-                'style' => sanitize_text_field((string) ($row['style'] ?? 'normal')),
-                'fallback' => sanitize_text_field((string) ($row['fallback'] ?? 'sans-serif')),
+                'family' => sanitize_text_field($this->stringValue($row, 'family')),
+                'weight' => sanitize_text_field($this->stringValue($row, 'weight', '400')),
+                'style' => sanitize_text_field($this->stringValue($row, 'style', 'normal')),
+                'fallback' => sanitize_text_field($this->stringValue($row, 'fallback', 'sans-serif')),
                 'is_variable' => !empty($row['is_variable']),
                 'axes' => $axes,
-                'variation_defaults' => FontUtils::normalizeVariationDefaults($row['variation_defaults'] ?? [], $axes),
+                'variation_defaults' => FontUtils::normalizeVariationDefaults($this->mapValue($row, 'variation_defaults'), $axes),
                 'file' => $uploadedFiles[$index] ?? [],
             ];
         }
@@ -661,7 +664,7 @@ final class AdminController
     public function saveSettingsValues(array $submittedValues): array|WP_Error
     {
         $previousSettings = $this->settings->getSettings();
-        $submittedGoogleKey = sanitize_text_field((string) ($submittedValues['google_api_key'] ?? ''));
+        $submittedGoogleKey = sanitize_text_field($this->stringValue($submittedValues, 'google_api_key'));
         $clearGoogleKey = !empty($submittedValues['tasty_fonts_clear_google_api_key']);
         $settingsInput = $this->buildSettingsSaveInput($submittedValues);
         $settingsInput = $this->preserveUnavailableIntegrationSettings($settingsInput);
@@ -746,13 +749,15 @@ final class AdminController
 
         if ($submittedGoogleKey !== '') {
             $validation = $this->googleClient->validateApiKey($submittedGoogleKey);
+            $validationState = $this->stringValue($validation, 'state', 'unknown');
+            $validationMessage = $this->stringValue($validation, 'message');
 
             $this->settings->saveGoogleApiKeyStatus(
-                (string) ($validation['state'] ?? 'unknown'),
-                (string) ($validation['message'] ?? '')
+                $validationState,
+                $validationMessage
             );
 
-            if (($validation['state'] ?? 'unknown') === 'valid') {
+            if ($validationState === 'valid') {
                 $message = $this->buildNoticeMessage('google_key_saved');
                 $this->log->add(__('Google Fonts API key validated.', 'tasty-fonts'));
 
@@ -768,10 +773,9 @@ final class AdminController
 
             return new WP_Error(
                 'tasty_fonts_google_api_key_invalid',
-                (string) (
-                    $validation['message']
-                    ?? __('Google Fonts API key could not be validated.', 'tasty-fonts')
-                )
+                $validationMessage !== ''
+                    ? $validationMessage
+                    : __('Google Fonts API key could not be validated.', 'tasty-fonts')
             );
         }
 
@@ -1022,8 +1026,8 @@ final class AdminController
             $messages[] = trim($bricksMessage);
         }
 
-        $familyCount = (int) ($result['families'] ?? 0);
-        $fileCount = (int) ($result['files'] ?? 0);
+        $familyCount = $this->intValue($result, 'families');
+        $fileCount = $this->intValue($result, 'files');
         $message = sprintf(
             __('Imported the site transfer bundle (%1$d famil%2$s, %3$d file%4$s).', 'tasty-fonts'),
             $familyCount,
@@ -1103,7 +1107,9 @@ final class AdminController
                 continue;
             }
 
-            if (FontUtils::slugify((string) ($candidate['slug'] ?? $candidate['family'] ?? '')) !== $familySlug) {
+            $candidateSlug = $this->stringValue($candidate, 'slug', $this->stringValue($candidate, 'family'));
+
+            if (FontUtils::slugify($candidateSlug) !== $familySlug) {
                 continue;
             }
 
@@ -1121,15 +1127,19 @@ final class AdminController
         $renderer = new \TastyFonts\Admin\Renderer\FamilyCardRenderer($this->storage);
         $renderer->setTrainingWheelsOff(!empty($view['trainingWheelsOff']));
 
+        $viewRoles = $this->sanitizeRoleValues(
+            is_array($view['roles'] ?? null) ? $view['roles'] : []
+        );
+
         ob_start();
         $renderer->renderFamilyCardDetails(
             $family,
-            is_array($view['roles'] ?? null) ? $view['roles'] : [],
-            is_array($view['familyFallbacks'] ?? null) ? $view['familyFallbacks'] : [],
-            is_array($view['familyFontDisplays'] ?? null) ? $view['familyFontDisplays'] : [],
+            $viewRoles,
+            $this->stringMapValue($view['familyFallbacks'] ?? []),
+            $this->stringMapValue($view['familyFontDisplays'] ?? []),
             $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
-            (string) ($view['previewText'] ?? ''),
-            is_array($view['categoryAliasOwners'] ?? null) ? $view['categoryAliasOwners'] : [],
+            $this->stringValue($view, 'previewText'),
+            $this->stringMapValue($view['categoryAliasOwners'] ?? []),
             is_array($view['extendedVariableOptions'] ?? null) ? $view['extendedVariableOptions'] : [],
             !empty($view['monospaceRoleEnabled']),
             is_array($view['classOutputOptions'] ?? null) ? $view['classOutputOptions'] : []
@@ -1232,7 +1242,7 @@ final class AdminController
             $this->redirectWithError($result->get_error_message());
         }
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Plugin settings reset.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Plugin settings reset.', 'tasty-fonts')));
     }
 
     private function handleWipeManagedFontLibraryAction(): bool
@@ -1249,7 +1259,7 @@ final class AdminController
             $this->redirectWithError($result->get_error_message());
         }
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Managed font library wiped.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Managed font library wiped.', 'tasty-fonts')));
     }
 
     private function handleClearPluginCachesAction(): bool
@@ -1266,7 +1276,7 @@ final class AdminController
             $this->redirectWithError($result->get_error_message());
         }
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Plugin caches cleared.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Plugin caches cleared.', 'tasty-fonts')));
     }
 
     private function handleRegenerateCssAction(): bool
@@ -1283,7 +1293,7 @@ final class AdminController
             $this->redirectWithError($result->get_error_message());
         }
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Generated CSS regenerated.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Generated CSS regenerated.', 'tasty-fonts')));
     }
 
     private function handleResetIntegrationDetectionStateAction(): bool
@@ -1295,7 +1305,7 @@ final class AdminController
         check_admin_referer('tasty_fonts_reset_integration_detection_state');
 
         $result = $this->resetIntegrationDetectionState();
-        $this->redirectWithSuccess($result['message']);
+        $this->redirectWithSuccess($this->stringValue($result, 'message'));
     }
 
     private function handleResetSuppressedNoticesAction(): bool
@@ -1308,7 +1318,7 @@ final class AdminController
 
         $result = $this->resetSuppressedNotices();
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Suppressed notices reset.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Suppressed notices reset.', 'tasty-fonts')));
     }
 
     private function handleImportSiteTransferBundleAction(): bool
@@ -1335,11 +1345,11 @@ final class AdminController
                 $this->formatSiteTransferStatusForActivityLog($status),
                 $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE)
             );
-            $this->redirectWithError((string) ($status['message'] ?? $result->get_error_message()));
+            $this->redirectWithError($this->stringValue($status, 'message', $result->get_error_message()));
         }
 
         $this->clearQueuedSiteTransferStatus();
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Site transfer bundle imported.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Site transfer bundle imported.', 'tasty-fonts')));
     }
 
     private function handleReinstallUpdateChannelAction(): bool
@@ -1356,7 +1366,7 @@ final class AdminController
             $this->redirectWithError($result->get_error_message());
         }
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Selected channel release reinstalled.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Selected channel release reinstalled.', 'tasty-fonts')));
     }
 
     private function handleSaveSettingsAction(): bool
@@ -1373,7 +1383,7 @@ final class AdminController
             $this->redirectWithError($result->get_error_message());
         }
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Plugin settings saved.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Plugin settings saved.', 'tasty-fonts')));
     }
 
     private function handleSaveFamilyFallbackAction(): bool
@@ -1396,12 +1406,12 @@ final class AdminController
         $this->log->add(
             sprintf(
                 __('Saved fallback for %1$s: %2$s.', 'tasty-fonts'),
-                (string) ($result['family'] ?? $family),
-                (string) ($result['fallback'] ?? $fallback)
+                $this->stringValue($result, 'family', $family),
+                $this->stringValue($result, 'fallback', $fallback)
             )
         );
 
-        $this->redirectWithSuccess((string) ($result['message'] ?? __('Font fallback saved.', 'tasty-fonts')));
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Font fallback saved.', 'tasty-fonts')));
     }
 
     private function handleSaveFamilyFontDisplayAction(): bool
@@ -1421,7 +1431,7 @@ final class AdminController
 
         $result = $this->saveFamilyFontDisplaySelection($family, $display);
 
-        $this->redirectWithSuccess($result['message']);
+        $this->redirectWithSuccess($this->stringValue($result, 'message'));
     }
 
     private function handleDeleteFamilyAction(): bool
@@ -1638,14 +1648,14 @@ final class AdminController
             $this->redirectWithError($bundle->get_error_message());
         }
 
-        $path = wp_normalize_path((string) ($bundle['path'] ?? ''));
+        $path = wp_normalize_path($this->stringValue($bundle, 'path'));
 
         if ($path === '' || !is_readable($path)) {
             $this->redirectWithError(__('The site transfer bundle could not be prepared for download.', 'tasty-fonts'));
         }
 
-        $filename = sanitize_file_name((string) ($bundle['filename'] ?? 'tasty-fonts-transfer.zip'));
-        $contentType = trim((string) ($bundle['content_type'] ?? 'application/zip'));
+        $filename = sanitize_file_name($this->stringValue($bundle, 'filename', 'tasty-fonts-transfer.zip'));
+        $contentType = trim($this->stringValue($bundle, 'content_type', 'application/zip'));
         $size = is_file($path) ? (int) filesize($path) : 0;
         $this->log->add(
             __('Exported a site transfer bundle.', 'tasty-fonts'),
@@ -1709,7 +1719,7 @@ final class AdminController
      * @param RoleSet $roles
      * @param NormalizedSettings $settings
      * @param CatalogMap $catalog
-     * @param RoleSet $appliedRoles
+     * @param RoleSet|array{} $appliedRoles
      * @return list<OutputPanel>
      */
     private function buildOutputPanels(
@@ -1739,7 +1749,7 @@ final class AdminController
     {
         $panel = $this->buildGeneratedCssPanel($settings);
         $toolsRenderer = new ToolsSectionRenderer($this->storage);
-        $panelValue = (string) ($panel['value'] ?? '');
+        $panelValue = $this->stringValue($panel, 'value');
 
         $panel['display_value'] = $panelValue;
         $panel['readable_display_value'] = $toolsRenderer->formatSnippetForDisplay($panelValue);
@@ -1793,14 +1803,14 @@ final class AdminController
         if (($before['css_delivery_mode'] ?? '') !== ($after['css_delivery_mode'] ?? '')) {
             $changes[] = sprintf(
                 __('delivery mode set to %s', 'tasty-fonts'),
-                $this->formatCssDeliveryModeLabel((string) ($after['css_delivery_mode'] ?? 'file'))
+                $this->formatCssDeliveryModeLabel($this->stringValue($after, 'css_delivery_mode', 'file'))
             );
         }
 
         if (($before['font_display'] ?? '') !== ($after['font_display'] ?? '')) {
             $changes[] = sprintf(
                 __('font-display set to %s', 'tasty-fonts'),
-                (string) ($after['font_display'] ?? 'swap')
+                $this->stringValue($after, 'font_display', 'swap')
             );
         }
 
@@ -1808,7 +1818,7 @@ final class AdminController
             /* translators: %s is the selected unicode-range output mode label. */
             $changes[] = sprintf(
                 __('unicode-range output set to %s', 'tasty-fonts'),
-                $this->formatUnicodeRangeModeLabel((string) ($after['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF))
+                $this->formatUnicodeRangeModeLabel($this->stringValue($after, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF))
             );
         }
 
@@ -1869,7 +1879,7 @@ final class AdminController
         if (($before['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE) !== ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE)) {
             $changes[] = sprintf(
                 __('update channel set to %s', 'tasty-fonts'),
-                $this->formatUpdateChannelLabel((string) ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE))
+                $this->formatUpdateChannelLabel($this->stringValue($after, 'update_channel', SettingsRepository::UPDATE_CHANNEL_STABLE))
             );
         }
 
@@ -2178,11 +2188,11 @@ final class AdminController
     private function validateUnicodeRangeSettingsInput(array &$settingsInput, array $previousSettings): ?WP_Error
     {
         $nextMode = array_key_exists('unicode_range_mode', $settingsInput)
-            ? FontUtils::normalizeUnicodeRangeMode((string) $settingsInput['unicode_range_mode'])
-            : FontUtils::normalizeUnicodeRangeMode((string) ($previousSettings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF));
+            ? FontUtils::normalizeUnicodeRangeMode($this->stringValue($settingsInput, 'unicode_range_mode'))
+            : FontUtils::normalizeUnicodeRangeMode($this->stringValue($previousSettings, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF));
         $customValue = array_key_exists('unicode_range_custom_value', $settingsInput)
-            ? (string) $settingsInput['unicode_range_custom_value']
-            : (string) ($previousSettings['unicode_range_custom_value'] ?? '');
+            ? $this->stringValue($settingsInput, 'unicode_range_custom_value')
+            : $this->stringValue($previousSettings, 'unicode_range_custom_value');
         $customValue = FontUtils::normalizeUnicodeRangeValue($customValue);
 
         if ($customValue !== '' && !FontUtils::unicodeRangeValueIsValid($customValue)) {
@@ -2385,7 +2395,9 @@ final class AdminController
             return null;
         }
 
-        return $property->getValue($this);
+        $value = $property->getValue($this);
+
+        return $value instanceof AdminPageContextBuilder ? $value : null;
     }
 
     /**
@@ -2393,7 +2405,7 @@ final class AdminController
      */
     private function buildSearchDisabledMessage(array $googleApiStatus): string
     {
-        return match ((string) ($googleApiStatus['state'] ?? 'empty')) {
+        return match ($this->stringValue($googleApiStatus, 'state', 'empty')) {
             'invalid' => __('Search is disabled because the saved Google Fonts API key is invalid. Replace it above to re-enable catalog search.', 'tasty-fonts'),
             'unknown' => __('Search is unavailable until the saved Google Fonts API key is validated. Re-save or replace the key above to continue.', 'tasty-fonts'),
             default => __('Add a Google Fonts API key above to enable search, or use manual import below.', 'tasty-fonts'),
@@ -2412,7 +2424,7 @@ final class AdminController
             $actors = [];
 
             foreach ($logs as $entry) {
-                $actor = trim((string) ($entry['actor'] ?? ''));
+                $actor = trim($this->stringValue($entry, 'actor'));
 
                 if ($actor === '') {
                     continue;
@@ -2482,7 +2494,7 @@ final class AdminController
         $preferences = get_option(self::LOCAL_ENV_NOTICE_OPTION, []);
         $preferences = is_array($preferences) ? $preferences : [];
         $normalized = [
-            'hidden_until' => max(0, (int) ($preference['hidden_until'] ?? 0)),
+            'hidden_until' => max(0, $this->intValue($preference, 'hidden_until')),
             'dismissed_forever' => !empty($preference['dismissed_forever']),
         ];
 
@@ -2520,7 +2532,23 @@ final class AdminController
      */
     private function sanitizeRoleValues(array $roleValues, ?array $catalog = null): array
     {
-        $sanitized = [];
+        $sanitized = [
+            'heading' => '',
+            'body' => '',
+            'monospace' => '',
+            'heading_delivery_id' => '',
+            'body_delivery_id' => '',
+            'monospace_delivery_id' => '',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+            'monospace_fallback' => 'monospace',
+            'heading_weight' => '',
+            'body_weight' => '',
+            'monospace_weight' => '',
+            'heading_axes' => [],
+            'body_axes' => [],
+            'monospace_axes' => [],
+        ];
         $catalog = $catalog ?? $this->catalog->getCatalog();
         $variableFontsEnabled = !empty($this->settings->getSettings()['variable_fonts_enabled']);
 
@@ -2529,7 +2557,7 @@ final class AdminController
                 continue;
             }
 
-            $sanitized[$roleKey] = sanitize_text_field((string) $roleValues[$roleKey]);
+            $sanitized[$roleKey] = sanitize_text_field(FontUtils::scalarStringValue($roleValues[$roleKey]));
         }
 
         foreach (
@@ -2543,16 +2571,23 @@ final class AdminController
                 continue;
             }
 
-            $sanitized[$roleKey] = FontUtils::sanitizeFallback((string) $roleValues[$roleKey] ?: $defaultFallback);
+            $sanitized[$roleKey] = FontUtils::sanitizeFallback(
+                FontUtils::scalarStringValue($roleValues[$roleKey]) ?: $defaultFallback
+            );
         }
 
         foreach (['heading', 'body', 'monospace'] as $roleKey) {
-            $familyName = (string) ($sanitized[$roleKey] ?? $roleValues[$roleKey] ?? '');
+            $familyName = $sanitized[$roleKey];
             $profile = $this->roleProfileForFamily($familyName, $catalog);
+            $deliveryKey = $roleKey . '_delivery_id';
             $weightKey = $roleKey . '_weight';
             $axisKey = $roleKey . '_axes';
             $supportsVariableAxes = $variableFontsEnabled && $this->profileVariationAxes($profile) !== [];
             $supportsStaticWeightOverride = $profile !== [] && !$this->profileHasWeightAxis($profile);
+
+            if (array_key_exists($deliveryKey, $roleValues)) {
+                $sanitized[$deliveryKey] = sanitize_text_field(FontUtils::scalarStringValue($roleValues[$deliveryKey]));
+            }
 
             if (array_key_exists($weightKey, $roleValues)) {
                 $sanitized[$weightKey] = $this->sanitizeRoleWeightValue(
@@ -2575,7 +2610,23 @@ final class AdminController
             }
         }
 
-        return $sanitized;
+        return [
+            'heading' => FontUtils::scalarStringValue($sanitized['heading']),
+            'body' => FontUtils::scalarStringValue($sanitized['body']),
+            'monospace' => FontUtils::scalarStringValue($sanitized['monospace']),
+            'heading_delivery_id' => FontUtils::scalarStringValue($sanitized['heading_delivery_id']),
+            'body_delivery_id' => FontUtils::scalarStringValue($sanitized['body_delivery_id']),
+            'monospace_delivery_id' => FontUtils::scalarStringValue($sanitized['monospace_delivery_id']),
+            'heading_fallback' => FontUtils::scalarStringValue($sanitized['heading_fallback']),
+            'body_fallback' => FontUtils::scalarStringValue($sanitized['body_fallback']),
+            'monospace_fallback' => FontUtils::scalarStringValue($sanitized['monospace_fallback']),
+            'heading_weight' => FontUtils::scalarStringValue($sanitized['heading_weight']),
+            'body_weight' => FontUtils::scalarStringValue($sanitized['body_weight']),
+            'monospace_weight' => FontUtils::scalarStringValue($sanitized['monospace_weight']),
+            'heading_axes' => $this->normalizeRoleAxes($sanitized['heading_axes']),
+            'body_axes' => $this->normalizeRoleAxes($sanitized['body_axes']),
+            'monospace_axes' => $this->normalizeRoleAxes($sanitized['monospace_axes']),
+        ];
     }
 
     /**
@@ -2647,15 +2698,13 @@ final class AdminController
         $validation = $this->adobe->validateProject($projectId);
 
         $this->settings->saveAdobeProjectStatus(
-            $validation['state'],
-            $validation['message']
+            $this->stringValue($validation, 'state'),
+            $this->stringValue($validation, 'message')
         );
 
-        if ($validation['state'] !== 'valid') {
+        if ($this->stringValue($validation, 'state') !== 'valid') {
             $this->log->add(__('Adobe Fonts project validation failed.', 'tasty-fonts'));
-            $this->redirectWithError(
-                $validation['message']
-            );
+            $this->redirectWithError($this->stringValue($validation, 'message'));
         }
 
         $this->log->add($isResync
@@ -2677,12 +2726,20 @@ final class AdminController
         if ($this->isSearchCooldownActive($cooldownKey, $provider, $query)) {
             $cached = get_transient($cacheKey);
 
-            if (is_array($cached) || $cached instanceof WP_Error) {
+            if ($cached instanceof WP_Error) {
                 return $cached;
+            }
+
+            if (is_array($cached)) {
+                return $this->payloadMapValue($cached);
             }
         }
 
         $result = $resolver($query);
+
+        if (is_array($result)) {
+            $result = $this->payloadMapValue($result);
+        }
 
         set_transient($cacheKey, $result, self::SEARCH_CACHE_TTL);
         set_transient(
@@ -2723,7 +2780,7 @@ final class AdminController
         $savedDisplay = $this->settings->getFamilyFontDisplay($family);
         $effectiveDisplay = $savedDisplay !== ''
             ? $savedDisplay
-            : (string) ($settings['font_display'] ?? 'swap');
+            : $this->stringValue($settings, 'font_display', 'swap');
 
         $this->assets->refreshGeneratedAssets(false);
 
@@ -2776,7 +2833,9 @@ final class AdminController
     {
         $projectId = strtolower(trim($projectId));
 
-        return trim((string) (preg_replace('/[^a-z0-9]+/', '', $projectId) ?? ''));
+        $normalized = preg_replace('/[^a-z0-9]+/', '', $projectId);
+
+        return trim(is_string($normalized) ? $normalized : '');
     }
 
     private function isValidAdobeProjectId(string $projectId): bool
@@ -2790,7 +2849,13 @@ final class AdminController
             return $default;
         }
 
-        return sanitize_text_field(wp_unslash((string) $_POST[$key]));
+        $value = $_POST[$key];
+
+        if (!is_scalar($value)) {
+            return $default;
+        }
+
+        return sanitize_text_field(FontUtils::scalarStringValue(wp_unslash($value)));
     }
 
     private function byteLength(string $value): int
@@ -2995,13 +3060,18 @@ final class AdminController
 
         $normalized = [];
 
+        $types = $this->mapValue($rawFiles, 'type');
+        $tmpNames = $this->mapValue($rawFiles, 'tmp_name');
+        $errors = $this->mapValue($rawFiles, 'error');
+        $sizes = $this->mapValue($rawFiles, 'size');
+
         foreach ($rawFiles['name'] as $index => $name) {
             $normalized[$index] = [
                 'name' => is_string($name) ? $name : '',
-                'type' => is_array($rawFiles['type'] ?? null) ? (string) ($rawFiles['type'][$index] ?? '') : '',
-                'tmp_name' => is_array($rawFiles['tmp_name']) ? (string) ($rawFiles['tmp_name'][$index] ?? '') : '',
-                'error' => is_array($rawFiles['error']) ? (int) ($rawFiles['error'][$index] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE,
-                'size' => is_array($rawFiles['size']) ? (int) ($rawFiles['size'][$index] ?? 0) : 0,
+                'type' => $this->stringValue($types, $index),
+                'tmp_name' => $this->stringValue($tmpNames, $index),
+                'error' => $this->intValue($errors, $index, UPLOAD_ERR_NO_FILE),
+                'size' => $this->intValue($sizes, $index),
             ];
         }
 
@@ -3017,11 +3087,13 @@ final class AdminController
             return [];
         }
 
-        return wp_unslash($_POST[$key]);
+        $unslashed = wp_unslash($_POST[$key]);
+
+        return $this->payloadMapValue($unslashed);
     }
 
     /**
-     * @return array<string, mixed>
+     * @return AxesMap
      */
     private function normalizeUploadAxesInput(mixed $rawAxes): array
     {
@@ -3037,13 +3109,13 @@ final class AdminController
             }
 
             $tag = array_key_exists('tag', $definition)
-                ? sanitize_text_field((string) $definition['tag'])
-                : (string) $key;
+                ? sanitize_text_field($this->stringValue($definition, 'tag'))
+                : (is_string($key) ? $key : '');
 
             $axes[$tag] = [
-                'min' => sanitize_text_field((string) ($definition['min'] ?? '')),
-                'default' => sanitize_text_field((string) ($definition['default'] ?? '')),
-                'max' => sanitize_text_field((string) ($definition['max'] ?? '')),
+                'min' => sanitize_text_field($this->stringValue($definition, 'min')),
+                'default' => sanitize_text_field($this->stringValue($definition, 'default')),
+                'max' => sanitize_text_field($this->stringValue($definition, 'max')),
             ];
         }
 
@@ -3052,7 +3124,7 @@ final class AdminController
 
     /**
      * @param CatalogMap $catalog
-     * @return array<string, int|float|string>
+     * @return array<string, string>
      */
     private function sanitizeRoleAxisValues(mixed $rawValues, string $familyName, array $catalog): array
     {
@@ -3083,15 +3155,40 @@ final class AdminController
 
             $axis = $availableAxes[$tag];
             $numericValue = (float) $value;
+            $axisMin = $this->floatValue($axis, 'min');
+            $axisMax = $this->floatValue($axis, 'max');
 
-            if ($numericValue < (float) $axis['min'] || $numericValue > (float) $axis['max']) {
+            if ($numericValue < $axisMin || $numericValue > $axisMax) {
                 continue;
             }
 
-            $filtered[$tag] = $value;
+            $filtered[$tag] = (string) $value;
         }
 
         return $filtered;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, string>
+     */
+    private function normalizeRoleAxes(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $tag => $axisValue) {
+            if (!is_string($tag) || !is_scalar($axisValue)) {
+                continue;
+            }
+
+            $normalized[$tag] = (string) $axisValue;
+        }
+
+        return $normalized;
     }
 
     /**
@@ -3102,11 +3199,11 @@ final class AdminController
     {
         $map = [];
         $settings = $this->settings->getSettings();
-        $familyFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
+        $familyFallbacks = $this->stringMapValue($settings['family_fallbacks'] ?? []);
 
         foreach ($catalog as $familyName => $family) {
             $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-            $deliveryId = sanitize_text_field((string) ($activeDelivery['id'] ?? ''));
+            $deliveryId = sanitize_text_field($this->stringValue($activeDelivery, 'id'));
 
             if ($deliveryId === '') {
                 continue;
@@ -3115,7 +3212,7 @@ final class AdminController
             $map[(string) $familyName] = [
                 'activeDeliveryId' => $deliveryId,
                 'activeDeliveryLabel' => trim(
-                    $this->translateProfileLabel((string) ($activeDelivery['label'] ?? ''))
+                    $this->translateProfileLabel($this->stringValue($activeDelivery, 'label'))
                     . ' · '
                     . ucfirst(FontUtils::resolveProfileFormat($activeDelivery))
                 ),
@@ -3124,8 +3221,8 @@ final class AdminController
                 'axes' => $this->profileVariationAxes($activeDelivery),
                 'hasWeightAxis' => $this->profileHasWeightAxis($activeDelivery),
                 'fallback' => array_key_exists((string) $familyName, $familyFallbacks)
-                    ? FontUtils::sanitizeFallback((string) $familyFallbacks[(string) $familyName])
-                    : FontUtils::defaultFallbackForCategory((string) ($family['font_category'] ?? '')),
+                    ? FontUtils::sanitizeFallback($familyFallbacks[(string) $familyName])
+                    : FontUtils::defaultFallbackForCategory($this->stringValue($family, 'font_category')),
             ];
         }
 
@@ -3137,7 +3234,7 @@ final class AdminController
      */
     private function sanitizeRoleWeightValue(mixed $weightValue, string $familyName, array $catalog): string
     {
-        $weight = $this->resolveConcreteRoleWeight((string) $weightValue);
+        $weight = $this->resolveConcreteRoleWeight(FontUtils::scalarStringValue($weightValue));
 
         if ($weight === '' || trim($familyName) === '') {
             return '';
@@ -3170,12 +3267,12 @@ final class AdminController
         foreach ((array) ($profile['faces'] ?? []) as $face) {
             if (
                 !is_array($face)
-                || FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')) !== 'normal'
+                || FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')) !== 'normal'
             ) {
                 continue;
             }
 
-            $weight = $this->resolveConcreteRoleWeight((string) ($face['weight'] ?? ''));
+            $weight = $this->resolveConcreteRoleWeight($this->stringValue($face, 'weight'));
 
             if ($weight === '') {
                 continue;
@@ -3194,7 +3291,7 @@ final class AdminController
 
     /**
      * @param array<string, mixed> $profile
-     * @return array<string, mixed>
+     * @return AxesMap
      */
     private function profileVariationAxes(array $profile): array
     {
@@ -3358,14 +3455,14 @@ final class AdminController
     {
         return ($settings['acss_font_role_sync_enabled'] ?? null) === false
             && empty($settings['acss_font_role_sync_applied'])
-            && trim((string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? '')) === ''
-            && trim((string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')) === ''
-            && trim((string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? '')) === ''
-            && trim((string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')) === ''
-            && trim((string) ($current['heading'] ?? '')) === ''
-            && trim((string) ($current['body'] ?? '')) === ''
-            && trim((string) ($current['heading_weight'] ?? '')) === ''
-            && trim((string) ($current['body_weight'] ?? '')) === '';
+            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family')) === ''
+            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family')) === ''
+            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight')) === ''
+            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')) === ''
+            && trim($this->stringValue($current, 'heading')) === ''
+            && trim($this->stringValue($current, 'body')) === ''
+            && trim($this->stringValue($current, 'heading_weight')) === ''
+            && trim($this->stringValue($current, 'body_weight')) === '';
     }
 
     private function reconcileAcssIntegrationDrift(): void
@@ -3390,10 +3487,10 @@ final class AdminController
         $this->settings->saveAcssFontRoleSyncState(
             false,
             false,
-            (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
+            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
         );
 
         $message = __('Automatic.css font sync was turned off because its managed font settings no longer match the Tasty Fonts values. Enable it again to reapply the mapping.', 'tasty-fonts');
@@ -3411,8 +3508,8 @@ final class AdminController
         $masterEnabled = ($settings['bricks_integration_enabled'] ?? null) !== false;
         $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
         $themeStylesEnabled = !empty($settings[BricksIntegrationService::FEATURE_THEME_STYLES]);
-        $targetMode = (string) ($settings['bricks_theme_style_target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED);
-        $targetStyleId = (string) ($settings['bricks_theme_style_target_id'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_ID);
+        $targetMode = $this->stringValue($settings, 'bricks_theme_style_target_mode', BricksIntegrationService::TARGET_MODE_MANAGED);
+        $targetStyleId = $this->stringValue($settings, 'bricks_theme_style_target_id', BricksIntegrationService::MANAGED_THEME_STYLE_ID);
         $state = $this->bricksIntegration->readState($settings);
 
         if ($this->bricksIntegration->hasLegacyManagedVariables()) {
@@ -3478,7 +3575,7 @@ final class AdminController
             $settingsInput['bricks_theme_style_target_id'] = BricksIntegrationService::MANAGED_THEME_STYLE_ID;
         }
 
-        $targetMode = (string) ($settingsInput['bricks_theme_style_target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED);
+        $targetMode = $this->stringValue($settingsInput, 'bricks_theme_style_target_mode', BricksIntegrationService::TARGET_MODE_MANAGED);
 
         if (!in_array($targetMode, [
             BricksIntegrationService::TARGET_MODE_MANAGED,
@@ -3498,7 +3595,7 @@ final class AdminController
 
         $availableStyles = $this->bricksIntegration->getThemeStyleChoices();
         $fallbackTargetId = array_key_first($availableStyles) ?: BricksIntegrationService::MANAGED_THEME_STYLE_ID;
-        $requestedTargetId = trim((string) ($settingsInput['bricks_theme_style_target_id'] ?? ''));
+        $requestedTargetId = trim($this->stringValue($settingsInput, 'bricks_theme_style_target_id'));
 
         $settingsInput['bricks_theme_style_target_id'] = $requestedTargetId !== '' && isset($availableStyles[$requestedTargetId])
             ? $requestedTargetId
@@ -3526,7 +3623,7 @@ final class AdminController
 
         $settingsInput['bricks_theme_style_target_mode'] = $wasUsingManagedTarget && $fallbackTargetId !== BricksIntegrationService::MANAGED_THEME_STYLE_ID
             ? BricksIntegrationService::TARGET_MODE_SELECTED
-            : (string) ($previousSettings['bricks_theme_style_target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED);
+            : $this->stringValue($previousSettings, 'bricks_theme_style_target_mode', BricksIntegrationService::TARGET_MODE_MANAGED);
         $settingsInput['bricks_theme_style_target_id'] = $fallbackTargetId;
 
         if ($wasUsingManagedTarget && $fallbackTargetId === BricksIntegrationService::MANAGED_THEME_STYLE_ID) {
@@ -3692,8 +3789,8 @@ final class AdminController
 
         $themeStylesEnabled = !empty($settings[BricksIntegrationService::FEATURE_THEME_STYLES]);
         $disableGoogleFontsEnabled = !empty($settings[BricksIntegrationService::FEATURE_DISABLE_GOOGLE_FONTS]);
-        $targetMode = (string) ($settings['bricks_theme_style_target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED);
-        $targetStyleId = (string) ($settings['bricks_theme_style_target_id'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_ID);
+        $targetMode = $this->stringValue($settings, 'bricks_theme_style_target_mode', BricksIntegrationService::TARGET_MODE_MANAGED);
+        $targetStyleId = $this->stringValue($settings, 'bricks_theme_style_target_id', BricksIntegrationService::MANAGED_THEME_STYLE_ID);
 
         if ($this->bricksIntegration->hasLegacyManagedVariables()) {
             $this->bricksIntegration->removeLegacyManagedVariables();
@@ -3780,10 +3877,10 @@ final class AdminController
             $this->settings->saveAcssFontRoleSyncState(
                 false,
                 false,
-                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
-                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
-                $clearBackupWhenDisabled ? '' : (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
+                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
+                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
+                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
+                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
             );
 
             return $applied
@@ -3795,10 +3892,10 @@ final class AdminController
             $this->settings->saveAcssFontRoleSyncState(
                 true,
                 false,
-                (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
+                $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
+                $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
+                $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
+                $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
             );
 
             return __('Automatic.css sync is enabled and will apply when Automatic.css is active on this site.', 'tasty-fonts');
@@ -3816,10 +3913,10 @@ final class AdminController
             $this->settings->saveAcssFontRoleSyncState(
                 true,
                 false,
-                (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
-                (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
+                $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
+                $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
+                $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
+                $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
             );
 
             return $applied
@@ -3843,10 +3940,10 @@ final class AdminController
         $this->settings->saveAcssFontRoleSyncState(
             true,
             true,
-            (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
+            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
         );
 
         return $applied
@@ -3860,25 +3957,37 @@ final class AdminController
      */
     private function captureAcssIntegrationBackupValues(array $settings): array
     {
-        $hasHeadingBackup = trim((string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? '')) !== '';
-        $hasTextBackup = trim((string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? '')) !== '';
-        $hasHeadingWeightBackup = trim((string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? '')) !== '';
-        $hasTextWeightBackup = trim((string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')) !== '';
+        $hasHeadingBackup = trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family')) !== '';
+        $hasTextBackup = trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family')) !== '';
+        $hasHeadingWeightBackup = trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight')) !== '';
+        $hasTextWeightBackup = trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')) !== '';
 
         if ($hasHeadingBackup || $hasTextBackup || $hasHeadingWeightBackup || $hasTextWeightBackup) {
-            return $settings;
+            return [
+                'acss_font_role_sync_previous_heading_font_family' => $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
+                'acss_font_role_sync_previous_text_font_family' => $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
+                'acss_font_role_sync_previous_heading_font_weight' => $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
+                'acss_font_role_sync_previous_text_font_weight' => $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight'),
+            ];
         }
 
         $current = $this->acssIntegration->getCurrentSettings();
 
-        return $this->settings->saveAcssFontRoleSyncState(
+        $saved = $this->settings->saveAcssFontRoleSyncState(
             true,
             !empty($settings['acss_font_role_sync_applied']),
-            $current['heading'],
-            $current['body'],
-            (string) ($current['heading_weight'] ?? ''),
-            (string) ($current['body_weight'] ?? '')
+            $this->stringValue($current, 'heading'),
+            $this->stringValue($current, 'body'),
+            $this->stringValue($current, 'heading_weight'),
+            $this->stringValue($current, 'body_weight')
         );
+
+        return [
+            'acss_font_role_sync_previous_heading_font_family' => $this->stringValue($saved, 'acss_font_role_sync_previous_heading_font_family'),
+            'acss_font_role_sync_previous_text_font_family' => $this->stringValue($saved, 'acss_font_role_sync_previous_text_font_family'),
+            'acss_font_role_sync_previous_heading_font_weight' => $this->stringValue($saved, 'acss_font_role_sync_previous_heading_font_weight'),
+            'acss_font_role_sync_previous_text_font_weight' => $this->stringValue($saved, 'acss_font_role_sync_previous_text_font_weight'),
+        ];
     }
 
     /**
@@ -3888,10 +3997,10 @@ final class AdminController
     private function restoreAcssIntegration(array $settings): array|WP_Error
     {
         return $this->acssIntegration->restoreFontSettings(
-            (string) ($settings['acss_font_role_sync_previous_heading_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_family'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_heading_font_weight'] ?? ''),
-            (string) ($settings['acss_font_role_sync_previous_text_font_weight'] ?? '')
+            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
+            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
         );
     }
 
@@ -3937,10 +4046,10 @@ final class AdminController
      */
     private function queueSiteTransferStatus(array $status): void
     {
-        $tone = (string) ($status['tone'] ?? '') === 'success' ? 'success' : 'error';
-        $title = sanitize_text_field((string) ($status['title'] ?? ''));
-        $message = sanitize_text_field((string) ($status['message'] ?? ''));
-        $code = $this->normalizeSiteTransferStatusCode((string) ($status['code'] ?? ''));
+        $tone = $this->stringValue($status, 'tone') === 'success' ? 'success' : 'error';
+        $title = sanitize_text_field($this->stringValue($status, 'title'));
+        $message = sanitize_text_field($this->stringValue($status, 'message'));
+        $code = $this->normalizeSiteTransferStatusCode($this->stringValue($status, 'code'));
 
         if ($message === '') {
             return;
@@ -3976,17 +4085,17 @@ final class AdminController
             return [];
         }
 
-        $message = sanitize_text_field((string) ($storedStatus['message'] ?? ''));
+        $message = sanitize_text_field($this->stringValue($storedStatus, 'message'));
 
         if ($message === '') {
             return [];
         }
 
         return [
-            'tone' => (string) ($storedStatus['tone'] ?? '') === 'success' ? 'success' : 'error',
-            'title' => sanitize_text_field((string) ($storedStatus['title'] ?? '')),
+            'tone' => $this->stringValue($storedStatus, 'tone') === 'success' ? 'success' : 'error',
+            'title' => sanitize_text_field($this->stringValue($storedStatus, 'title')),
             'message' => $message,
-            'code' => $this->normalizeSiteTransferStatusCode((string) ($storedStatus['code'] ?? '')),
+            'code' => $this->normalizeSiteTransferStatusCode($this->stringValue($storedStatus, 'code')),
         ];
     }
 
@@ -4016,8 +4125,8 @@ final class AdminController
      */
     private function formatSiteTransferStatusForActivityLog(array $status): string
     {
-        $message = sanitize_text_field((string) ($status['message'] ?? ''));
-        $code = $this->normalizeSiteTransferStatusCode((string) ($status['code'] ?? ''));
+        $message = sanitize_text_field($this->stringValue($status, 'message'));
+        $code = $this->normalizeSiteTransferStatusCode($this->stringValue($status, 'code'));
 
         if ($message === '') {
             return __('Site transfer import failed.', 'tasty-fonts');
@@ -4073,6 +4182,90 @@ final class AdminController
         return $normalized;
     }
 
+    /**
+     * @param array<int|string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function payloadMapValue(array $values): array
+    {
+        $normalized = [];
+
+        foreach ($values as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     * @return array<int|string, mixed>
+     */
+    private function mapValue(array $values, int|string $key): array
+    {
+        $value = $values[$key] ?? null;
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, int|string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function intValue(array $values, int|string $key, int $default = 0): int
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        return FontUtils::scalarIntValue($values[$key], $default);
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function floatValue(array $values, int|string $key, float $default = 0.0): float
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = $values[$key];
+
+        if (is_float($value) || is_int($value)) {
+            return (float) $value;
+        }
+
+        $normalized = FontUtils::scalarStringValue($value);
+
+        return is_numeric($normalized) ? (float) $normalized : $default;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function stringMapValue(mixed $value): array
+    {
+        return FontUtils::normalizeStringMap($value);
+    }
+
     private function getPendingNoticeTransientKey(): string
     {
         return TransientKey::forSite(self::NOTICE_TRANSIENT_PREFIX . max(0, (int) get_current_user_id()));
@@ -4118,15 +4311,15 @@ final class AdminController
             return false;
         }
 
-        $expiresAt = (float) ($cooldown['expires_at'] ?? 0);
+        $expiresAt = $this->floatValue($cooldown, 'expires_at');
 
         if ($expiresAt <= microtime(true)) {
             delete_transient($cooldownKey);
             return false;
         }
 
-        return strtolower(trim((string) ($cooldown['provider'] ?? ''))) === strtolower(trim($provider))
-            && strtolower(trim((string) ($cooldown['query'] ?? ''))) === strtolower(trim($query));
+        return strtolower(trim($this->stringValue($cooldown, 'provider'))) === strtolower(trim($provider))
+            && strtolower(trim($this->stringValue($cooldown, 'query'))) === strtolower(trim($query));
     }
 
     private function startRateLimitedActionCooldown(string $action): bool|WP_Error
@@ -4144,7 +4337,7 @@ final class AdminController
 
         $cooldownKey = $this->getActionCooldownTransientKey($action);
         $cooldown = get_transient($cooldownKey);
-        $expiresAt = is_array($cooldown) ? (float) ($cooldown['expires_at'] ?? 0) : 0.0;
+        $expiresAt = is_array($cooldown) ? $this->floatValue($cooldown, 'expires_at') : 0.0;
 
         if ($expiresAt > microtime(true)) {
             return new WP_Error(
@@ -4198,11 +4391,11 @@ final class AdminController
 
     private function isOversizedSiteTransferUploadRequest(): bool
     {
-        if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') {
+        if (strtoupper(FontUtils::scalarStringValue($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') {
             return false;
         }
 
-        if ((string) ($_GET['page'] ?? '') !== self::MENU_SLUG) {
+        if (FontUtils::scalarStringValue($_GET['page'] ?? '') !== self::MENU_SLUG) {
             return false;
         }
 
@@ -4210,13 +4403,13 @@ final class AdminController
             return false;
         }
 
-        $contentType = strtolower(trim((string) ($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '')));
+        $contentType = strtolower(trim(FontUtils::scalarStringValue($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '')));
 
         if ($contentType !== '' && !str_contains($contentType, 'multipart/form-data')) {
             return false;
         }
 
-        $contentLength = max(0, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
+        $contentLength = max(0, FontUtils::scalarIntValue($_SERVER['CONTENT_LENGTH'] ?? 0));
         $postMaxSize = $this->parsePhpIniSizeToBytes((string) ini_get('post_max_size'));
 
         return $contentLength > 0 && $postMaxSize > 0 && $contentLength > $postMaxSize;

@@ -12,15 +12,20 @@ use TastyFonts\Fonts\UploadedFileValidatorInterface;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use WP_Error;
 use ZipArchive;
 
 /**
+ * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
  * @phpstan-import-type LibraryMap from ImportRepository
  * @phpstan-import-type LibraryRecord from ImportRepository
+ * @phpstan-import-type DeliveryProfile from ImportRepository
+ * @phpstan-import-type FaceRecord from ImportRepository
  * @phpstan-import-type NormalizedSettings from SettingsRepository
  * @phpstan-import-type RoleSet from SettingsRepository
+ * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
  * @phpstan-type TransferCapabilityStatus array{available: bool, message: string}
  * @phpstan-type TransferFileEntry array{relative_path: string, size: int, sha256: string}
  * @phpstan-type TransferFileList list<TransferFileEntry>
@@ -349,7 +354,7 @@ final class SiteTransferService
             );
         }
 
-        $manifest = $this->normalizeTransferManifest($decodedManifest);
+        $manifest = $this->normalizeTransferManifest($this->normalizeStringKeyedMap($decodedManifest));
 
         if (is_wp_error($manifest)) {
             $this->deleteDirectory($extractDirectory);
@@ -542,7 +547,7 @@ final class SiteTransferService
             }
 
             $this->library->syncLiveRolePublishStates(
-                is_array($savedSettings['applied_roles'] ?? null) ? $savedSettings['applied_roles'] : [],
+                $this->normalizeAppliedRoles($savedSettings['applied_roles'] ?? []),
                 !empty($savedSettings['auto_apply_roles'])
             );
 
@@ -635,7 +640,7 @@ final class SiteTransferService
         $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
         $settings['acss_font_role_sync_previous_text_font_weight'] = '';
 
-        if (trim((string) ($settings['adobe_project_id'] ?? '')) === '') {
+        if (trim($this->scalarStringValue($settings, 'adobe_project_id')) === '') {
             $settings['adobe_enabled'] = false;
             $settings['adobe_project_status'] = 'empty';
         } else {
@@ -703,9 +708,9 @@ final class SiteTransferService
      */
     private function prepareUploadedBundle(array $uploadedFile): array|WP_Error
     {
-        $name = sanitize_file_name((string) ($uploadedFile['name'] ?? ''));
-        $tmpName = (string) ($uploadedFile['tmp_name'] ?? '');
-        $error = isset($uploadedFile['error']) ? (int) $uploadedFile['error'] : UPLOAD_ERR_NO_FILE;
+        $name = sanitize_file_name($this->scalarStringValue($uploadedFile, 'name'));
+        $tmpName = $this->scalarStringValue($uploadedFile, 'tmp_name');
+        $error = $this->scalarIntValue($uploadedFile, 'error', UPLOAD_ERR_NO_FILE);
 
         if ($error === UPLOAD_ERR_NO_FILE || $name === '' || $tmpName === '') {
             return $this->error(
@@ -797,8 +802,8 @@ final class SiteTransferService
     private function resyncBlockEditorFontLibrary(): void
     {
         foreach ($this->imports->allFamilies() as $family) {
-            $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
-            $deliveryId = (string) ($family['active_delivery_id'] ?? '');
+            $profiles = $family['delivery_profiles'];
+            $deliveryId = $family['active_delivery_id'];
             $profile = $deliveryId !== '' && is_array($profiles[$deliveryId] ?? null)
                 ? $profiles[$deliveryId]
                 : reset($profiles);
@@ -807,13 +812,13 @@ final class SiteTransferService
                 continue;
             }
 
-            $resolvedDeliveryId = $deliveryId !== '' ? $deliveryId : (string) ($profile['id'] ?? '');
-            $provider = trim((string) ($profile['provider'] ?? 'import'));
+            $resolvedDeliveryId = $deliveryId !== '' ? $deliveryId : $profile['id'];
+            $provider = trim($profile['provider']);
 
             $this->blockEditorFontLibrary->syncImportedFamily(
                 [
                     'status' => 'imported',
-                    'family' => (string) ($family['family'] ?? ''),
+                    'family' => $family['family'],
                     'delivery_id' => $resolvedDeliveryId,
                     'family_record' => $family,
                 ],
@@ -844,9 +849,10 @@ final class SiteTransferService
                 );
             }
 
-            $relativePath = (string) ($file['relative_path'] ?? '');
-            $size = (int) ($file['size'] ?? -1);
-            $checksum = trim((string) ($file['sha256'] ?? ''));
+            $normalizedFile = $this->normalizeStringKeyedMap($file);
+            $relativePath = $this->scalarStringValue($normalizedFile, 'relative_path');
+            $size = $this->scalarIntValue($normalizedFile, 'size', -1);
+            $checksum = trim($this->scalarStringValue($normalizedFile, 'sha256'));
 
             if (!$this->isSafeRelativePath($relativePath) || $size < 0 || $checksum === '') {
                 return $this->error(
@@ -873,7 +879,7 @@ final class SiteTransferService
      */
     private function normalizeTransferManifest(array $manifest): array|WP_Error
     {
-        if ((int) ($manifest['schema_version'] ?? 0) !== self::SCHEMA_VERSION) {
+        if ($this->scalarIntValue($manifest, 'schema_version') !== self::SCHEMA_VERSION) {
             return $this->error(
                 'tasty_fonts_transfer_schema_unsupported',
                 __('This transfer bundle uses an unsupported schema version.', 'tasty-fonts')
@@ -895,11 +901,11 @@ final class SiteTransferService
 
         return [
             'schema_version' => self::SCHEMA_VERSION,
-            'plugin_version' => (string) ($manifest['plugin_version'] ?? ''),
-            'exported_at' => (string) ($manifest['exported_at'] ?? ''),
+            'plugin_version' => $this->scalarStringValue($manifest, 'plugin_version'),
+            'exported_at' => $this->scalarStringValue($manifest, 'exported_at'),
             'settings' => $this->normalizeStringKeyedMap($manifest['settings']),
-            'roles' => $this->normalizeStringKeyedMap($manifest['roles']),
-            'applied_roles' => $this->normalizeStringKeyedMap($manifest['applied_roles']),
+            'roles' => $this->normalizeRoleSet($manifest['roles']),
+            'applied_roles' => $this->normalizeRoleSet($manifest['applied_roles']),
             'library' => $this->normalizeLibraryMap($manifest['library']),
             'secret_requirements' => $this->normalizeTransferSecretRequirements($manifest['secret_requirements'] ?? []),
             'files' => $manifestFiles,
@@ -924,14 +930,16 @@ final class SiteTransferService
             ];
         }
 
+        $storedMap = $this->normalizeStringKeyedMap($stored);
+
         return [
-            'token' => trim((string) ($stored['token'] ?? '')),
-            'path' => wp_normalize_path((string) ($stored['path'] ?? '')),
-            'bundle_name' => (string) ($stored['bundle_name'] ?? ''),
-            'plugin_version' => (string) ($stored['plugin_version'] ?? ''),
-            'exported_at' => (string) ($stored['exported_at'] ?? ''),
-            'families' => max(0, (int) ($stored['families'] ?? 0)),
-            'files' => max(0, (int) ($stored['files'] ?? 0)),
+            'token' => trim($this->scalarStringValue($storedMap, 'token')),
+            'path' => wp_normalize_path($this->scalarStringValue($storedMap, 'path')),
+            'bundle_name' => $this->scalarStringValue($storedMap, 'bundle_name'),
+            'plugin_version' => $this->scalarStringValue($storedMap, 'plugin_version'),
+            'exported_at' => $this->scalarStringValue($storedMap, 'exported_at'),
+            'families' => max(0, $this->scalarIntValue($storedMap, 'families')),
+            'files' => max(0, $this->scalarIntValue($storedMap, 'files')),
         ];
     }
 
@@ -975,10 +983,333 @@ final class SiteTransferService
                 continue;
             }
 
-            $normalized[$key] = $item;
+            $normalized[$key] = $this->normalizeLibraryRecord($this->normalizeStringKeyedMap($item));
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param mixed $value
+     * @return RoleSet
+     */
+    private function normalizeRoleSet(mixed $value): array
+    {
+        $roles = is_array($value) ? $value : [];
+
+        return [
+            'heading' => $this->scalarStringValue($roles, 'heading'),
+            'body' => $this->scalarStringValue($roles, 'body'),
+            'monospace' => $this->scalarStringValue($roles, 'monospace'),
+            'heading_delivery_id' => $this->scalarStringValue($roles, 'heading_delivery_id'),
+            'body_delivery_id' => $this->scalarStringValue($roles, 'body_delivery_id'),
+            'monospace_delivery_id' => $this->scalarStringValue($roles, 'monospace_delivery_id'),
+            'heading_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'heading_fallback', 'sans-serif')),
+            'body_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'body_fallback', 'sans-serif')),
+            'monospace_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'monospace_fallback', 'monospace')),
+            'heading_weight' => $this->scalarStringValue($roles, 'heading_weight'),
+            'body_weight' => $this->scalarStringValue($roles, 'body_weight'),
+            'monospace_weight' => $this->scalarStringValue($roles, 'monospace_weight'),
+            'heading_axes' => $this->normalizeStringMap($roles['heading_axes'] ?? []),
+            'body_axes' => $this->normalizeStringMap($roles['body_axes'] ?? []),
+            'monospace_axes' => $this->normalizeStringMap($roles['monospace_axes'] ?? []),
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return array{heading?: string, body?: string, monospace?: string}
+     */
+    private function normalizeAppliedRoles(mixed $value): array
+    {
+        $roles = $this->normalizeRoleSet($value);
+        $applied = [];
+
+        foreach (['heading', 'body', 'monospace'] as $roleKey) {
+            $roleValue = $roles[$roleKey];
+
+            if ($roleValue === '') {
+                continue;
+            }
+
+            $applied[$roleKey] = $roleValue;
+        }
+
+        return $applied;
+    }
+
+    /**
+     * @param array<string, mixed> $value
+     * @return LibraryRecord
+     */
+    private function normalizeLibraryRecord(array $value): array
+    {
+        return [
+            'family' => $this->scalarStringValue($value, 'family'),
+            'slug' => $this->scalarStringValue($value, 'slug'),
+            'publish_state' => $this->scalarStringValue($value, 'publish_state'),
+            'manual_publish_state' => $this->scalarStringValue($value, 'manual_publish_state'),
+            'active_delivery_id' => $this->scalarStringValue($value, 'active_delivery_id'),
+            'delivery_profiles' => $this->normalizeDeliveryProfiles($value['delivery_profiles'] ?? []),
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, DeliveryProfile>
+     */
+    private function normalizeDeliveryProfiles(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $profiles = [];
+
+        foreach ($value as $key => $profile) {
+            if (!is_string($key) || !is_array($profile)) {
+                continue;
+            }
+
+            $profiles[$key] = $this->normalizeDeliveryProfile($this->normalizeStringKeyedMap($profile));
+        }
+
+        return $profiles;
+    }
+
+    /**
+     * @param array<string, mixed> $value
+     * @return DeliveryProfile
+     */
+    private function normalizeDeliveryProfile(array $value): array
+    {
+        return [
+            'id' => $this->scalarStringValue($value, 'id'),
+            'provider' => $this->scalarStringValue($value, 'provider'),
+            'type' => $this->scalarStringValue($value, 'type'),
+            'format' => $this->scalarStringValue($value, 'format'),
+            'label' => $this->scalarStringValue($value, 'label'),
+            'variants' => $this->normalizeStringList($value['variants'] ?? []),
+            'faces' => $this->normalizeFaceList($value['faces'] ?? []),
+            'meta' => $this->normalizeProfileMetaMap($value['meta'] ?? []),
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return list<FaceRecord>
+     */
+    private function normalizeFaceList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $faces = [];
+
+        foreach ($value as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $faces[] = $this->normalizeFaceRecord($this->normalizeStringKeyedMap($face));
+        }
+
+        return $faces;
+    }
+
+    /**
+     * @param array<string, mixed> $value
+     * @return FaceRecord
+     */
+    private function normalizeFaceRecord(array $value): array
+    {
+        return [
+            'family' => $this->scalarStringValue($value, 'family'),
+            'slug' => $this->scalarStringValue($value, 'slug'),
+            'source' => $this->scalarStringValue($value, 'source'),
+            'weight' => $this->scalarStringValue($value, 'weight'),
+            'style' => $this->scalarStringValue($value, 'style'),
+            'unicode_range' => $this->scalarStringValue($value, 'unicode_range'),
+            'files' => $this->normalizeStringMap($value['files'] ?? []),
+            'paths' => $this->normalizeStringMap($value['paths'] ?? []),
+            'provider' => $this->normalizeStringKeyedMap($value['provider'] ?? []),
+            'is_variable' => !empty($value['is_variable']),
+            'axes' => $this->normalizeAxesMap($value['axes'] ?? []),
+            'variation_defaults' => $this->normalizeVariationDefaultsMap($value['variation_defaults'] ?? []),
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, string|list<string>>
+     */
+    private function normalizeProfileMetaMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $meta = [];
+
+        foreach ($value as $key => $item) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            if (is_array($item)) {
+                $meta[$key] = $this->normalizeStringList($item);
+                continue;
+            }
+
+            $meta[$key] = is_scalar($item) ? (string) $item : '';
+        }
+
+        return $meta;
+    }
+
+    /**
+     * @param mixed $value
+     * @return AxesMap
+     */
+    private function normalizeAxesMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $axes = [];
+
+        foreach ($value as $key => $axis) {
+            if (!is_string($key) || !is_array($axis)) {
+                continue;
+            }
+
+            $normalizedAxis = [];
+
+            foreach ($axis as $axisKey => $axisValue) {
+                if (!is_string($axisKey) || !is_scalar($axisValue)) {
+                    continue;
+                }
+
+                $normalizedAxis[$axisKey] = is_string($axisValue) ? $axisValue : $axisValue + 0;
+            }
+
+            $axes[$key] = $normalizedAxis;
+        }
+
+        return $axes;
+    }
+
+    /**
+     * @param mixed $value
+     * @return VariationDefaults
+     */
+    private function normalizeVariationDefaultsMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $defaults = [];
+
+        foreach ($value as $key => $defaultValue) {
+            if (!is_string($key) || !is_scalar($defaultValue)) {
+                continue;
+            }
+
+            $defaults[$key] = is_string($defaultValue) ? $defaultValue : $defaultValue + 0;
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * @param mixed $value
+     * @return list<string>
+     */
+    private function normalizeStringList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $values = [];
+
+        foreach ($value as $item) {
+            if (!is_scalar($item)) {
+                continue;
+            }
+
+            $normalizedItem = trim((string) $item);
+
+            if ($normalizedItem === '') {
+                continue;
+            }
+
+            $values[] = $normalizedItem;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, string>
+     */
+    private function normalizeStringMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $item) {
+            if (!is_string($key) || !is_scalar($item)) {
+                continue;
+            }
+
+            $normalized[$key] = (string) $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function scalarStringValue(array $values, string $key, string $default = ''): string
+    {
+        $value = $values[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function scalarIntValue(array $values, string $key, int $default = 0): int
+    {
+        $value = $values[$key] ?? null;
+
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_float($value)) {
+            return (int) $value;
+        }
+
+        if (is_string($value) && preg_match('/^-?\d+$/', $value) === 1) {
+            return (int) $value;
+        }
+
+        return $default;
     }
 
     /**
@@ -999,8 +1330,8 @@ final class SiteTransferService
             }
 
             $normalized[] = [
-                'key' => (string) ($requirement['key'] ?? ''),
-                'label' => (string) ($requirement['label'] ?? ''),
+                'key' => $this->scalarStringValue($this->normalizeStringKeyedMap($requirement), 'key'),
+                'label' => $this->scalarStringValue($this->normalizeStringKeyedMap($requirement), 'label'),
                 'required' => !empty($requirement['required']),
                 'exported' => !empty($requirement['exported']),
             ];
@@ -1027,7 +1358,7 @@ final class SiteTransferService
         $existing = get_transient($this->getStagedImportTransientKey());
 
         if (is_array($existing)) {
-            $path = wp_normalize_path((string) ($existing['path'] ?? ''));
+            $path = $this->normalizeStagedImportState($existing)['path'];
 
             if ($path !== '') {
                 @unlink($path);

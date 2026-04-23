@@ -13,14 +13,16 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 
 /**
+ * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
  * @phpstan-import-type CatalogFamily from CatalogService
  * @phpstan-import-type CatalogMap from CatalogService
  * @phpstan-import-type CatalogFace from CatalogService
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
  * @phpstan-type RuntimeFamilyList list<CatalogFamily>
  * @phpstan-type PreloadFaceScore array{0: int, 1: int, 2: int}
- * @phpstan-type StylesheetDescriptor array<string, mixed>
+ * @phpstan-type StylesheetDescriptor array{handle: string, url: string, provider: string, type: string}
  */
 final class RuntimeAssetPlanner
 {
@@ -107,7 +109,7 @@ final class RuntimeAssetPlanner
         $variableFontsEnabled = !empty($settings['variable_fonts_enabled']);
 
         foreach ($this->getRuntimeFamilies() as $family) {
-            $familyName = (string) ($family['family'] ?? '');
+            $familyName = $this->familyStringValue($family, 'family');
 
             if ($familyName === '') {
                 continue;
@@ -115,7 +117,7 @@ final class RuntimeAssetPlanner
 
             $fontFamilies[$familyName] = [
                 'name' => $familyName,
-                'slug' => (string) ($family['slug'] ?? FontUtils::slugify($familyName)),
+                'slug' => $this->familyStringValue($family, 'slug', FontUtils::slugify($familyName)),
                 'fontFamily' => FontUtils::buildFontStack(
                     $familyName,
                     $this->resolveFamilyFallback($family)
@@ -150,11 +152,11 @@ final class RuntimeAssetPlanner
         foreach (
             [
                 [
-                    'family' => (string) ($roles['heading'] ?? ''),
+                    'family' => $roles['heading'],
                     'weight' => $this->resolvePrimaryRoleWeight($roles, 'heading', 700),
                 ],
                 [
-                    'family' => (string) ($roles['body'] ?? ''),
+                    'family' => $roles['body'],
                     'weight' => $this->resolvePrimaryRoleWeight($roles, 'body', 400),
                 ],
             ] as $target
@@ -195,9 +197,9 @@ final class RuntimeAssetPlanner
         $origins = [];
 
         foreach ($this->getRuntimeFamilies() as $family) {
-            $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-            $provider = strtolower(trim((string) ($activeDelivery['provider'] ?? '')));
-            $type = strtolower(trim((string) ($activeDelivery['type'] ?? '')));
+            $activeDelivery = $this->familyDelivery($family);
+            $provider = strtolower(trim($this->deliveryStringValue($activeDelivery, 'provider')));
+            $type = strtolower(trim($this->deliveryStringValue($activeDelivery, 'type')));
 
             if ($type === 'self_hosted') {
                 continue;
@@ -223,7 +225,7 @@ final class RuntimeAssetPlanner
      */
     private function resolveFamilyFallback(array $family): string
     {
-        $familyName = trim((string) ($family['family'] ?? ''));
+        $familyName = trim($this->familyStringValue($family, 'family'));
 
         if ($familyName === '') {
             return 'sans-serif';
@@ -232,11 +234,11 @@ final class RuntimeAssetPlanner
         $settings = $this->settings->getSettings();
         $savedFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
 
-        if (array_key_exists($familyName, $savedFallbacks)) {
+        if (array_key_exists($familyName, $savedFallbacks) && is_scalar($savedFallbacks[$familyName])) {
             return FontUtils::sanitizeFallback((string) $savedFallbacks[$familyName]);
         }
 
-        return FontUtils::defaultFallbackForCategory((string) ($family['font_category'] ?? ''));
+        return FontUtils::defaultFallbackForCategory($this->familyStringValue($family, 'font_category'));
     }
 
     /**
@@ -248,7 +250,7 @@ final class RuntimeAssetPlanner
         $filtered = [];
 
         foreach ($families as $key => $family) {
-            $publishState = (string) ($family['publish_state'] ?? 'published');
+            $publishState = $this->familyStringValue($family, 'publish_state', 'published');
 
             if (!$includeLibraryOnly && $publishState === 'library_only') {
                 continue;
@@ -271,11 +273,12 @@ final class RuntimeAssetPlanner
         $variableFontsEnabled = !empty($settings['variable_fonts_enabled']);
 
         foreach ($families as $family) {
-            $delivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-            $provider = strtolower(trim((string) ($delivery['provider'] ?? '')));
-            $type = strtolower(trim((string) ($delivery['type'] ?? '')));
+            $delivery = $this->familyDelivery($family);
+            $provider = strtolower(trim($this->deliveryStringValue($delivery, 'provider')));
+            $type = strtolower(trim($this->deliveryStringValue($delivery, 'type')));
             $format = FontUtils::resolveProfileFormat($delivery);
-            $deliveryId = (string) ($delivery['id'] ?? '');
+            $deliveryId = $this->deliveryStringValue($delivery, 'id');
+            $familyName = $this->familyStringValue($family, 'family');
 
             if ($deliveryId === '' || $provider === 'adobe' || $type !== 'self_hosted') {
                 continue;
@@ -285,18 +288,18 @@ final class RuntimeAssetPlanner
                 continue;
             }
 
-            $catalog[$this->catalogDeliveryKey((string) ($family['family'] ?? ''), $deliveryId)] = [
-                'family' => (string) ($family['family'] ?? ''),
-                'slug' => (string) ($family['slug'] ?? ''),
-                'publish_state' => (string) ($family['publish_state'] ?? 'published'),
-                'active_delivery_id' => (string) ($family['active_delivery_id'] ?? ''),
+            $catalog[$this->catalogDeliveryKey($familyName, $deliveryId)] = [
+                'family' => $familyName,
+                'slug' => $this->familyStringValue($family, 'slug'),
+                'publish_state' => $this->familyStringValue($family, 'publish_state', 'published'),
+                'active_delivery_id' => $this->familyStringValue($family, 'active_delivery_id'),
                 'delivery_id' => $deliveryId,
                 'active_delivery' => $delivery,
-                'available_deliveries' => (array) ($family['available_deliveries'] ?? []),
-                'delivery_badges' => (array) ($family['delivery_badges'] ?? []),
-                'delivery_filter_tokens' => (array) ($family['delivery_filter_tokens'] ?? []),
-                'sources' => [$delivery['provider'] ?? 'local'],
-                'faces' => is_array($delivery['faces'] ?? null) ? $delivery['faces'] : [],
+                'available_deliveries' => $this->familyListValue($family, 'available_deliveries'),
+                'delivery_badges' => $this->familyListValue($family, 'delivery_badges'),
+                'delivery_filter_tokens' => $this->familyListValue($family, 'delivery_filter_tokens'),
+                'sources' => [$provider !== '' ? $provider : 'local'],
+                'faces' => $this->deliveryFaces($delivery),
             ];
         }
 
@@ -312,10 +315,10 @@ final class RuntimeAssetPlanner
         $stylesheets = [];
 
         foreach ($families as $family) {
-            $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+            $activeDelivery = $this->familyDelivery($family);
             $stylesheet = $this->buildStylesheetDescriptor(
-                (string) ($family['family'] ?? ''),
-                (string) ($family['slug'] ?? ''),
+                $this->familyStringValue($family, 'family'),
+                $this->familyStringValue($family, 'slug'),
                 $activeDelivery,
                 $displayOverride
             );
@@ -336,8 +339,8 @@ final class RuntimeAssetPlanner
      */
     private function buildStylesheetDescriptor(string $familyName, string $familySlug, array $delivery, string $displayOverride = ''): ?array
     {
-        $provider = strtolower(trim((string) ($delivery['provider'] ?? '')));
-        $type = strtolower(trim((string) ($delivery['type'] ?? '')));
+        $provider = strtolower(trim($this->deliveryStringValue($delivery, 'provider')));
+        $type = strtolower(trim($this->deliveryStringValue($delivery, 'type')));
 
         if ($provider === '' || $type === '' || $type === 'self_hosted') {
             return null;
@@ -351,7 +354,7 @@ final class RuntimeAssetPlanner
                 $familyName,
                 $variants,
                 $display,
-                ['faces' => (array) ($delivery['faces'] ?? [])]
+                ['faces' => $this->deliveryFaces($delivery)]
             ),
             'bunny:cdn' => $this->bunny->buildCssUrl($familyName, $variants, $display),
             'adobe:adobe_hosted' => $this->adobeStylesheetUrl($delivery),
@@ -375,7 +378,7 @@ final class RuntimeAssetPlanner
      */
     private function adobeStylesheetUrl(array $delivery): string
     {
-        $projectId = sanitize_text_field((string) (($delivery['meta']['project_id'] ?? '') ?: $this->adobe->getProjectId()));
+        $projectId = sanitize_text_field($this->deliveryMetaStringValue($delivery, 'project_id', $this->adobe->getProjectId()));
 
         return $projectId === '' ? '' : $this->adobe->getStylesheetUrl($projectId);
     }
@@ -412,7 +415,7 @@ final class RuntimeAssetPlanner
         $settings = $this->settings->getSettings();
         $saved = $this->settings->getFamilyFontDisplay($familyName);
 
-        return $saved !== '' ? $saved : (string) ($settings['font_display'] ?? 'swap');
+        return $saved !== '' ? $saved : $this->settingsStringValue($settings, 'font_display', 'swap');
     }
 
     private function runtimeStylesheetDisplay(string $familyName, string $provider, string $type, string $displayOverride = ''): string
@@ -433,7 +436,7 @@ final class RuntimeAssetPlanner
      */
     private function isSelfHostedDelivery(array $delivery): bool
     {
-        return strtolower(trim((string) ($delivery['type'] ?? ''))) === 'self_hosted';
+        return strtolower(trim($this->deliveryStringValue($delivery, 'type'))) === 'self_hosted';
     }
 
     /**
@@ -442,7 +445,7 @@ final class RuntimeAssetPlanner
      */
     private function buildEditorFontFaceList(array $family, bool $variableFontsEnabled): array
     {
-        $delivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+        $delivery = $this->familyDelivery($family);
         $settings = $this->settings->getSettings();
 
         if (!$this->isSelfHostedDelivery($delivery)) {
@@ -451,11 +454,7 @@ final class RuntimeAssetPlanner
 
         $faces = [];
 
-        foreach ((array) ($delivery['faces'] ?? []) as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
+        foreach ($this->deliveryFaces($delivery) as $face) {
             if (!$variableFontsEnabled && FontUtils::faceIsVariable($face)) {
                 continue;
             }
@@ -467,9 +466,9 @@ final class RuntimeAssetPlanner
             }
 
             $entry = [
-                'fontFamily' => '"' . FontUtils::escapeFontFamily((string) ($family['family'] ?? '')) . '"',
-                'fontStyle' => FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')),
-                'fontWeight' => $this->editorFontFaceWeight((string) ($face['weight'] ?? '400'), (array) ($face['axes'] ?? [])),
+                'fontFamily' => '"' . FontUtils::escapeFontFamily($this->familyStringValue($family, 'family')) . '"',
+                'fontStyle' => FontUtils::normalizeStyle($this->faceStringValue($face, 'style', 'normal')),
+                'fontWeight' => $this->editorFontFaceWeight($this->faceStringValue($face, 'weight', '400'), $this->faceAxes($face)),
                 'src' => $src,
             ];
 
@@ -481,7 +480,7 @@ final class RuntimeAssetPlanner
 
             if ($variableFontsEnabled) {
                 $variationSettings = FontUtils::buildFontVariationSettings(
-                    FontUtils::faceLevelVariationDefaults($face['variation_defaults'] ?? [], $face['axes'] ?? [])
+                    FontUtils::faceLevelVariationDefaults($this->faceVariationDefaults($face), $this->faceAxes($face))
                 );
 
                 if ($variationSettings !== 'normal') {
@@ -502,7 +501,7 @@ final class RuntimeAssetPlanner
     private function editorFontFaceSources(array $face): array
     {
         $sources = [];
-        $files = is_array($face['files'] ?? null) ? $face['files'] : [];
+        $files = $this->faceFiles($face);
 
         foreach (['woff2', 'woff', 'ttf', 'otf'] as $format) {
             $value = $files[$format] ?? null;
@@ -552,11 +551,10 @@ final class RuntimeAssetPlanner
         $bestFace = null;
         $bestScore = null;
 
-        foreach ((array) ($family['faces'] ?? []) as $face) {
+        foreach ($this->familyFaces($family) as $face) {
             if (
-                !is_array($face)
-                || FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')) !== 'normal'
-                || !is_string($face['files']['woff2'] ?? null)
+                FontUtils::normalizeStyle($this->faceStringValue($face, 'style', 'normal')) !== 'normal'
+                || $this->faceFileValue($face, 'woff2') === ''
                 || $this->getSameOriginWoff2Url($face) === ''
             ) {
                 continue;
@@ -586,7 +584,7 @@ final class RuntimeAssetPlanner
         }
 
         foreach ($catalog as $family) {
-            if (($family['family'] ?? '') !== $familyName) {
+            if ($this->familyStringValue($family, 'family') !== $familyName) {
                 continue;
             }
 
@@ -601,7 +599,7 @@ final class RuntimeAssetPlanner
      */
     private function getSameOriginWoff2Url(array $face): string
     {
-        $url = trim((string) ($face['files']['woff2'] ?? ''));
+        $url = trim($this->faceFileValue($face, 'woff2'));
 
         if ($url === '' || !$this->isSameOriginFontUrl($url)) {
             return '';
@@ -622,7 +620,7 @@ final class RuntimeAssetPlanner
             return (int) $axisWeight;
         }
 
-        $weight = trim((string) ($roles[$roleKey . '_weight'] ?? ''));
+        $weight = trim($this->roleStringValue($roles, $roleKey . '_weight'));
 
         if ($weight === 'normal') {
             return 400;
@@ -659,7 +657,7 @@ final class RuntimeAssetPlanner
      */
     private function preloadFaceScore(array $face, int $targetWeight): array
     {
-        $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
+        $weight = FontUtils::normalizeWeight($this->faceStringValue($face, 'weight', '400'));
         $weightRange = FontUtils::weightRangeFromFace($face);
         $isVariable = $weightRange !== null;
         $distance = $weightRange !== null
@@ -737,5 +735,234 @@ final class RuntimeAssetPlanner
     private function catalogDeliveryKey(string $familyName, string $deliveryId): string
     {
         return FontUtils::slugify($familyName) . '::' . FontUtils::slugify($deliveryId);
+    }
+
+    /**
+     * @param CatalogFamily $family
+     * @return array<string, mixed>
+     */
+    private function familyDelivery(array $family): array
+    {
+        $delivery = $family['active_delivery'] ?? null;
+
+        return is_array($delivery) ? $delivery : [];
+    }
+
+    /**
+     * @param CatalogFamily $family
+     * @return list<CatalogFace>
+     */
+    private function familyFaces(array $family): array
+    {
+        $faces = $family['faces'] ?? null;
+
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param CatalogFamily $family
+     * @return list<mixed>
+     */
+    private function familyListValue(array $family, string $key): array
+    {
+        $value = $family[$key] ?? null;
+
+        return is_array($value) ? array_values($value) : [];
+    }
+
+    /**
+     * @param CatalogFamily $family
+     */
+    private function familyStringValue(array $family, string $key, string $default = ''): string
+    {
+        $value = $family[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<string, mixed> $delivery
+     */
+    private function deliveryStringValue(array $delivery, string $key, string $default = ''): string
+    {
+        $value = $delivery[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<string, mixed> $delivery
+     */
+    private function deliveryMetaStringValue(array $delivery, string $key, string $default = ''): string
+    {
+        $meta = $delivery['meta'] ?? null;
+
+        if (!is_array($meta)) {
+            return $default;
+        }
+
+        $value = $meta[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<string, mixed> $delivery
+     * @return list<CatalogFace>
+     */
+    private function deliveryFaces(array $delivery): array
+    {
+        $faces = $delivery['faces'] ?? null;
+
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param CatalogFace $face
+     */
+    private function faceStringValue(array $face, string $key, string $default = ''): string
+    {
+        $value = $face[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param CatalogFace $face
+     * @return array<string, string>
+     */
+    private function faceFiles(array $face): array
+    {
+        $files = $face['files'] ?? null;
+
+        if (!is_array($files)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($files as $key => $value) {
+            if (!is_string($key) || !is_scalar($value)) {
+                continue;
+            }
+
+            $normalized[$key] = (string) $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param CatalogFace $face
+     */
+    private function faceFileValue(array $face, string $key): string
+    {
+        return $this->faceFiles($face)[$key] ?? '';
+    }
+
+    /**
+     * @param CatalogFace $face
+     * @return AxesMap
+     */
+    private function faceAxes(array $face): array
+    {
+        $axes = $face['axes'] ?? null;
+
+        if (!is_array($axes)) {
+            return [];
+        }
+
+        return FontUtils::normalizeAxesMap($axes);
+    }
+
+    /**
+     * @param CatalogFace $face
+     * @return VariationDefaults
+     */
+    private function faceVariationDefaults(array $face): array
+    {
+        $defaults = $face['variation_defaults'] ?? null;
+
+        if (!is_array($defaults)) {
+            return [];
+        }
+
+        return FontUtils::normalizeVariationDefaults($defaults);
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function settingsStringValue(array $settings, string $key, string $default = ''): string
+    {
+        $value = $settings[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    private function roleStringValue(array $roles, string $key): string
+    {
+        $value = $roles[$key] ?? '';
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        return '';
     }
 }

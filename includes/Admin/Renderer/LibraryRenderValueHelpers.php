@@ -17,8 +17,8 @@ use TastyFonts\Support\FontUtils;
 trait LibraryRenderValueHelpers
 {
     /**
-     * @param RoleSet $left
-     * @param RoleSet $right
+     * @param array<int|string, mixed> $left
+     * @param array<int|string, mixed> $right
      * @param CatalogMap $catalog
      * @param FamilyFallbackMap $familyFallbacks
      */
@@ -38,7 +38,7 @@ trait LibraryRenderValueHelpers
         }
 
         foreach ($roleKeys as $roleKey) {
-            if (trim((string) ($left[$roleKey] ?? '')) !== trim((string) ($right[$roleKey] ?? ''))) {
+            if (trim($this->roleStringValue($left, $roleKey)) !== trim($this->roleStringValue($right, $roleKey))) {
                 return false;
             }
 
@@ -50,8 +50,8 @@ trait LibraryRenderValueHelpers
             }
 
             if (
-                trim((string) ($left[$roleKey . '_weight'] ?? ''))
-                !== trim((string) ($right[$roleKey . '_weight'] ?? ''))
+                trim($this->roleStringValue($left, $roleKey . '_weight'))
+                !== trim($this->roleStringValue($right, $roleKey . '_weight'))
             ) {
                 return false;
             }
@@ -69,7 +69,7 @@ trait LibraryRenderValueHelpers
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param CatalogMap $catalog
      * @param FamilyFallbackMap $familyFallbacks
      */
@@ -81,7 +81,7 @@ trait LibraryRenderValueHelpers
     ): string
     {
         $default = $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
-        $familyName = trim((string) ($roles[$roleKey] ?? ''));
+        $familyName = trim($this->roleStringValue($roles, $roleKey));
 
         if ($familyName !== '') {
             if (array_key_exists($familyName, $familyFallbacks)) {
@@ -99,7 +99,7 @@ trait LibraryRenderValueHelpers
             }
         }
 
-        $fallback = trim((string) ($roles[$roleKey . '_fallback'] ?? ''));
+        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
 
         return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
     }
@@ -115,7 +115,7 @@ trait LibraryRenderValueHelpers
         }
 
         foreach ($catalog as $family) {
-            if (trim((string) ($family['family'] ?? '')) === $familyName) {
+            if (trim($this->mapStringValue($family, 'family')) === $familyName) {
                 return $family;
             }
         }
@@ -130,7 +130,7 @@ trait LibraryRenderValueHelpers
 
     /**
      * @param CatalogMap $families
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @return array<string, string>
      */
     protected function buildCategoryAliasOwners(array $families, array $roles, bool $includeMonospace): array
@@ -139,12 +139,12 @@ trait LibraryRenderValueHelpers
         $orderedFamilies = [];
         $usedKeys = [];
         $priorityNames = [
-            trim((string) ($roles['heading'] ?? '')),
-            trim((string) ($roles['body'] ?? '')),
+            trim($this->roleStringValue($roles, 'heading')),
+            trim($this->roleStringValue($roles, 'body')),
         ];
 
         if ($includeMonospace) {
-            $priorityNames[] = trim((string) ($roles['monospace'] ?? ''));
+            $priorityNames[] = trim($this->roleStringValue($roles, 'monospace'));
         }
 
         foreach ($priorityNames as $priorityName) {
@@ -157,7 +157,7 @@ trait LibraryRenderValueHelpers
                     continue;
                 }
 
-                if (trim((string) ($family['family'] ?? '')) !== $priorityName) {
+                if (trim($this->mapStringValue($family, 'family')) !== $priorityName) {
                     continue;
                 }
 
@@ -188,7 +188,7 @@ trait LibraryRenderValueHelpers
                 continue;
             }
 
-            $owners[$property] = trim((string) ($family['family'] ?? ''));
+            $owners[$property] = trim($this->mapStringValue($family, 'family'));
         }
 
         return $owners;
@@ -199,10 +199,10 @@ trait LibraryRenderValueHelpers
      */
     protected function resolveFamilyCategory(array $family): string
     {
-        $category = trim((string) ($family['font_category'] ?? ''));
+        $category = trim($this->mapStringValue($family, 'font_category'));
 
         if ($category === '' && is_array($family['active_delivery'] ?? null) && is_array($family['active_delivery']['meta'] ?? null)) {
-            $category = trim((string) ($family['active_delivery']['meta']['category'] ?? ''));
+            $category = trim($this->mapStringValue($family['active_delivery']['meta'], 'category'));
         }
 
         return $category;
@@ -216,5 +216,41 @@ trait LibraryRenderValueHelpers
             'monospace' => '--font-mono',
             default => '',
         };
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    protected function roleStringValue(array $roles, string $key): string
+    {
+        $value = $roles[$key] ?? '';
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    protected function mapStringValue(array $values, int|string $key, string $default = ''): string
+    {
+        $value = $values[$key] ?? null;
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 }

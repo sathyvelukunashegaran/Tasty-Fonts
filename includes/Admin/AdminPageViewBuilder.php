@@ -15,6 +15,8 @@ use TastyFonts\Support\Storage;
 
 /**
  * @phpstan-import-type PageContext from AdminPageContextBuilder
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
  */
 final class AdminPageViewBuilder
 {
@@ -34,17 +36,20 @@ final class AdminPageViewBuilder
     public function build(array $context): array
     {
         $this->trainingWheelsOff = !empty($context['training_wheels_off']);
-        $storage = is_array($context['storage'] ?? null) ? $context['storage'] : null;
-        $currentPage = (string) ($context['current_page'] ?? AdminController::PAGE_ROLES);
-        $currentPageSlug = (string) ($context['current_page_slug'] ?? '');
-        $pageUrls = is_array($context['page_urls'] ?? null) ? $context['page_urls'] : [];
-        $catalog = is_array($context['catalog'] ?? null) ? $context['catalog'] : [];
+        $storage = $this->mapValue($context, 'storage');
+        $currentPage = $this->stringValue($context, 'current_page', AdminController::PAGE_ROLES);
+        $currentPageSlug = $this->stringValue($context, 'current_page_slug');
+        $pageUrls = $this->stringMapValue($context, 'page_urls');
+        $catalog = $this->catalogMapValue($context, 'catalog');
         $libraryCategoryOptions = $this->buildLibraryCategoryOptions();
-        $availableFamilies = is_array($context['available_families'] ?? null) ? $context['available_families'] : array_keys($catalog);
-        $availableFamilyOptions = is_array($context['available_family_options'] ?? null) ? $context['available_family_options'] : array_map(
+        $availableFamilies = $this->stringListValue($context, 'available_families', array_keys($catalog));
+        $availableFamilyOptions = $this->selectorOptionListValue($context, 'available_family_options');
+
+        if ($availableFamilyOptions === []) {
+            $availableFamilyOptions = array_map(
             static function ($familyName) use ($catalog): array {
-                $name = trim((string) $familyName);
-                $catalogEntry = is_array($catalog[$name] ?? null) ? $catalog[$name] : null;
+                $name = trim($familyName);
+                $catalogEntry = $catalog[$name] ?? null;
                 $descriptor = $catalogEntry !== null ? FontTypeHelper::describeEntry($catalogEntry) : null;
 
                 return [
@@ -55,60 +60,57 @@ final class AdminPageViewBuilder
             },
             $availableFamilies
         );
+        }
         $availableFamilyLabels = [];
 
         foreach ($availableFamilyOptions as $option) {
-            if (!is_array($option)) {
-                continue;
-            }
-
-            $optionValue = trim((string) ($option['value'] ?? ''));
+            $optionValue = trim($option['value']);
 
             if ($optionValue === '') {
                 continue;
             }
 
-            $availableFamilyLabels[$optionValue] = (string) ($option['label'] ?? $optionValue);
+            $availableFamilyLabels[$optionValue] = $option['label'] !== '' ? $option['label'] : $optionValue;
         }
-        $roles = is_array($context['roles'] ?? null) ? $context['roles'] : [];
-        $appliedRoles = is_array($context['applied_roles'] ?? null) ? $context['applied_roles'] : [];
-        $logs = is_array($context['logs'] ?? null) ? $context['logs'] : [];
-        $activityActorOptions = is_array($context['activity_actor_options'] ?? null) ? $context['activity_actor_options'] : [];
-        $familyFallbacks = is_array($context['family_fallbacks'] ?? null) ? $context['family_fallbacks'] : [];
-        $familyFontDisplays = is_array($context['family_font_displays'] ?? null) ? $context['family_font_displays'] : [];
-        $familyFontDisplayOptions = is_array($context['family_font_display_options'] ?? null) ? $context['family_font_display_options'] : [];
-        $previewText = (string) ($context['preview_text'] ?? '');
-        $previewSize = (int) ($context['preview_size'] ?? 32);
-        $googleApiState = (string) ($context['google_api_state'] ?? 'empty');
+        $roles = $this->mapValue($context, 'roles');
+        $appliedRoles = $this->mapValue($context, 'applied_roles');
+        $logs = $this->listOfMapsValue($context, 'logs');
+        $activityActorOptions = $this->stringListValue($context, 'activity_actor_options');
+        $familyFallbacks = $this->stringMapValue($context, 'family_fallbacks');
+        $familyFontDisplays = $this->stringMapValue($context, 'family_font_displays');
+        $familyFontDisplayOptions = $this->valueLabelOptionListValue($context, 'family_font_display_options');
+        $previewText = $this->stringValue($context, 'preview_text');
+        $previewSize = $this->intValue($context, 'preview_size', 32);
+        $googleApiState = $this->stringValue($context, 'google_api_state', 'empty');
         $googleApiEnabled = !empty($context['google_api_enabled']);
         $googleApiSaved = !empty($context['google_api_saved']);
         $googleAccessExpanded = !empty($context['google_access_expanded']);
-        $adobeProjectState = (string) ($context['adobe_project_state'] ?? 'empty');
-        $googleStatusLabel = (string) ($context['google_status_label'] ?? '');
-        $googleStatusClass = (string) ($context['google_status_class'] ?? '');
-        $googleAccessCopy = (string) ($context['google_access_copy'] ?? '');
-        $googleSearchDisabledCopy = (string) ($context['google_search_disabled_copy'] ?? '');
+        $adobeProjectState = $this->stringValue($context, 'adobe_project_state', 'empty');
+        $googleStatusLabel = $this->stringValue($context, 'google_status_label');
+        $googleStatusClass = $this->stringValue($context, 'google_status_class');
+        $googleAccessCopy = $this->stringValue($context, 'google_access_copy');
+        $googleSearchDisabledCopy = $this->stringValue($context, 'google_search_disabled_copy');
         $adobeProjectEnabled = !empty($context['adobe_project_enabled']);
         $adobeProjectSaved = !empty($context['adobe_project_saved']);
         $adobeAccessExpanded = !empty($context['adobe_access_expanded']);
-        $adobeProjectId = (string) ($context['adobe_project_id'] ?? '');
-        $adobeStatusLabel = (string) ($context['adobe_status_label'] ?? '');
-        $adobeStatusClass = (string) ($context['adobe_status_class'] ?? '');
-        $adobeAccessCopy = (string) ($context['adobe_access_copy'] ?? '');
-        $adobeProjectLink = (string) ($context['adobe_project_link'] ?? 'https://fonts.adobe.com/');
-        $adobeDetectedFamilies = is_array($context['adobe_detected_families'] ?? null) ? $context['adobe_detected_families'] : [];
+        $adobeProjectId = $this->stringValue($context, 'adobe_project_id');
+        $adobeStatusLabel = $this->stringValue($context, 'adobe_status_label');
+        $adobeStatusClass = $this->stringValue($context, 'adobe_status_class');
+        $adobeAccessCopy = $this->stringValue($context, 'adobe_access_copy');
+        $adobeProjectLink = $this->stringValue($context, 'adobe_project_link', 'https://fonts.adobe.com/');
+        $adobeDetectedFamilies = $this->stringListValue($context, 'adobe_detected_families');
         $bunnyCatalogLink = 'https://fonts.bunny.net/';
         $googleAccessButtonLabel = $googleApiEnabled ? __('Edit Key', 'tasty-fonts') : __('Key Settings', 'tasty-fonts');
         $adobeAccessButtonLabel = $adobeProjectSaved ? __('Project Settings', 'tasty-fonts') : __('Add Project', 'tasty-fonts');
-        $cssDeliveryMode = (string) ($context['css_delivery_mode'] ?? 'file');
-        $cssDeliveryModeOptions = is_array($context['css_delivery_mode_options'] ?? null) ? $context['css_delivery_mode_options'] : [];
-        $fontDisplay = (string) ($context['font_display'] ?? 'swap');
-        $fontDisplayOptions = is_array($context['font_display_options'] ?? null) ? $context['font_display_options'] : [];
-        $unicodeRangeMode = (string) ($context['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF);
-        $unicodeRangeCustomValue = (string) ($context['unicode_range_custom_value'] ?? '');
-        $unicodeRangeModeOptions = is_array($context['unicode_range_mode_options'] ?? null) ? $context['unicode_range_mode_options'] : [];
+        $cssDeliveryMode = $this->stringValue($context, 'css_delivery_mode', 'file');
+        $cssDeliveryModeOptions = $this->valueLabelOptionListValue($context, 'css_delivery_mode_options');
+        $fontDisplay = $this->stringValue($context, 'font_display', 'swap');
+        $fontDisplayOptions = $this->valueLabelOptionListValue($context, 'font_display_options');
+        $unicodeRangeMode = $this->stringValue($context, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF);
+        $unicodeRangeCustomValue = $this->stringValue($context, 'unicode_range_custom_value');
+        $unicodeRangeModeOptions = $this->valueLabelOptionListValue($context, 'unicode_range_mode_options');
         $unicodeRangeCustomVisible = !empty($context['unicode_range_custom_visible']);
-        $outputQuickModePreference = (string) ($context['output_quick_mode_preference'] ?? '');
+        $outputQuickModePreference = $this->stringValue($context, 'output_quick_mode_preference');
         $classOutputEnabled = !empty($context['class_output_enabled']);
         $classOutputRoleHeadingEnabled = !array_key_exists('class_output_role_heading_enabled', $context)
             || !empty($context['class_output_role_heading_enabled']);
@@ -149,40 +151,38 @@ final class AdminPageViewBuilder
             || !empty($context['extended_variable_category_mono_enabled']);
         $preloadPrimaryFonts = !empty($context['preload_primary_fonts']);
         $remoteConnectionHints = !empty($context['remote_connection_hints']);
-        $updateChannel = (string) ($context['update_channel'] ?? 'stable');
-        $updateChannelOptions = is_array($context['update_channel_options'] ?? null) ? $context['update_channel_options'] : [];
-        $updateChannelStatus = is_array($context['update_channel_status'] ?? null) ? $context['update_channel_status'] : [];
+        $updateChannel = $this->stringValue($context, 'update_channel', 'stable');
+        $updateChannelOptions = $this->valueLabelOptionListValue($context, 'update_channel_options');
+        $updateChannelStatus = $this->mapValue($context, 'update_channel_status');
         $adminAccessCustomEnabled = !empty($context['admin_access_custom_enabled']);
-        $adminAccessRoleSlugs = is_array($context['admin_access_role_slugs'] ?? null) ? array_values(array_map('strval', $context['admin_access_role_slugs'])) : [];
-        $adminAccessRoleOptions = is_array($context['admin_access_role_options'] ?? null) ? $context['admin_access_role_options'] : [];
-        $adminAccessUserIds = is_array($context['admin_access_user_ids'] ?? null)
-            ? array_values(array_map(static fn ($value): string => (string) $value, $context['admin_access_user_ids']))
-            : [];
-        $adminAccessUserOptions = is_array($context['admin_access_user_options'] ?? null) ? $context['admin_access_user_options'] : [];
-        $adminAccessSummary = is_array($context['admin_access_summary'] ?? null) ? $context['admin_access_summary'] : [];
-        $developerToolStatuses = is_array($context['developer_tool_statuses'] ?? null) ? $context['developer_tool_statuses'] : [];
+        $adminAccessRoleSlugs = $this->stringListValue($context, 'admin_access_role_slugs');
+        $adminAccessRoleOptions = $this->listOfMapsValue($context, 'admin_access_role_options');
+        $adminAccessUserIds = $this->stringListValue($context, 'admin_access_user_ids');
+        $adminAccessUserOptions = $this->listOfMapsValue($context, 'admin_access_user_options');
+        $adminAccessSummary = $this->mapValue($context, 'admin_access_summary');
+        $developerToolStatuses = $this->mapValue($context, 'developer_tool_statuses');
         $blockEditorFontLibrarySyncEnabled = !empty($context['block_editor_font_library_sync_enabled']);
         $trainingWheelsOff = $this->trainingWheelsOff;
         $variableFontsEnabled = !empty($context['variable_fonts_enabled']);
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
-        $diagnosticItems = is_array($context['diagnostic_items'] ?? null) ? $context['diagnostic_items'] : [];
-        $overviewMetrics = is_array($context['overview_metrics'] ?? null) ? $context['overview_metrics'] : [];
-        $outputPanels = is_array($context['output_panels'] ?? null) ? $context['output_panels'] : [];
-        $generatedCssPanel = is_array($context['generated_css_panel'] ?? null) ? $context['generated_css_panel'] : [];
-        $previewPanels = is_array($context['preview_panels'] ?? null) ? $context['preview_panels'] : [];
-        $localEnvironmentNotice = is_array($context['local_environment_notice'] ?? null) ? $context['local_environment_notice'] : [];
-        $siteTransfer = is_array($context['site_transfer'] ?? null) ? $context['site_transfer'] : [];
-        $gutenbergIntegration = is_array($context['gutenberg_integration'] ?? null) ? $context['gutenberg_integration'] : [];
-        $etchIntegration = is_array($context['etch_integration'] ?? null) ? $context['etch_integration'] : [];
-        $acssIntegration = is_array($context['acss_integration'] ?? null) ? $context['acss_integration'] : [];
-        $bricksIntegration = is_array($context['bricks_integration'] ?? null) ? $context['bricks_integration'] : [];
+        $diagnosticItems = $this->listOfMapsValue($context, 'diagnostic_items');
+        $overviewMetrics = $this->listOfMapsValue($context, 'overview_metrics');
+        $outputPanels = $this->listOfMapsValue($context, 'output_panels');
+        $generatedCssPanel = $this->mapValue($context, 'generated_css_panel');
+        $previewPanels = $this->listOfMapsValue($context, 'preview_panels');
+        $localEnvironmentNotice = $this->mapValue($context, 'local_environment_notice');
+        $siteTransfer = $this->mapValue($context, 'site_transfer');
+        $gutenbergIntegration = $this->mapValue($context, 'gutenberg_integration');
+        $etchIntegration = $this->mapValue($context, 'etch_integration');
+        $acssIntegration = $this->mapValue($context, 'acss_integration');
+        $bricksIntegration = $this->mapValue($context, 'bricks_integration');
         $bricksIntegration = $this->buildBricksIntegrationView($bricksIntegration);
-        $oxygenIntegration = is_array($context['oxygen_integration'] ?? null) ? $context['oxygen_integration'] : [];
-        $toasts = is_array($context['toasts'] ?? null) ? $context['toasts'] : [];
+        $oxygenIntegration = $this->mapValue($context, 'oxygen_integration');
+        $toasts = $this->listOfMapsValue($context, 'toasts');
         $applyEverywhere = !empty($context['apply_everywhere']);
-        $previewBaselineSource = (string) ($context['preview_baseline_source'] ?? ($applyEverywhere ? 'live_sitewide' : 'draft'));
-        $previewBaselineLabel = (string) ($context['preview_baseline_label'] ?? ($applyEverywhere ? __('Live sitewide', 'tasty-fonts') : __('Current draft', 'tasty-fonts')));
-        $roleDeployment = is_array($context['role_deployment'] ?? null) ? $context['role_deployment'] : [];
+        $previewBaselineSource = $this->stringValue($context, 'preview_baseline_source', $applyEverywhere ? 'live_sitewide' : 'draft');
+        $previewBaselineLabel = $this->stringValue($context, 'preview_baseline_label', $applyEverywhere ? __('Live sitewide', 'tasty-fonts') : __('Current draft', 'tasty-fonts'));
+        $roleDeployment = $this->mapValue($context, 'role_deployment');
         $monospaceRoleEnabled = !empty($context['monospace_role_enabled']);
         $previewRoles = $previewBaselineSource === 'live_sitewide' && $appliedRoles !== []
             ? $appliedRoles
@@ -194,24 +194,24 @@ final class AdminPageViewBuilder
         $previewBodyFallback = $this->resolveEffectiveRoleFallback('body', $previewRoles, $catalog, $familyFallbacks);
         $previewMonospaceFallback = $this->resolveEffectiveRoleFallback('monospace', $previewRoles, $catalog, $familyFallbacks);
         $previewHeadingStack = FontUtils::buildFontStack(
-            (string) ($previewRoles['heading'] ?? ''),
+            $this->stringValue($previewRoles, 'heading'),
             $previewHeadingFallback
         );
         $previewBodyStack = FontUtils::buildFontStack(
-            (string) ($previewRoles['body'] ?? ''),
+            $this->stringValue($previewRoles, 'body'),
             $previewBodyFallback
         );
         $previewMonospaceStack = FontUtils::buildFontStack(
-            (string) ($previewRoles['monospace'] ?? ''),
+            $this->stringValue($previewRoles, 'monospace'),
             $previewMonospaceFallback
         );
         $saveDraftDisabledCopy = __('No draft changes to save.', 'tasty-fonts');
         $applyLiveDisabledCopy = !$applyEverywhere
             ? __('Sitewide delivery is off. Turn it on before publishing role changes.', 'tasty-fonts')
             : __('No live role changes to publish.', 'tasty-fonts');
-        $headingFamily = (string) ($roles['heading'] ?? '');
-        $bodyFamily = (string) ($roles['body'] ?? '');
-        $monospaceFamily = (string) ($roles['monospace'] ?? '');
+        $headingFamily = $this->stringValue($roles, 'heading');
+        $bodyFamily = $this->stringValue($roles, 'body');
+        $monospaceFamily = $this->stringValue($roles, 'monospace');
         $headingFallback = $this->resolveEffectiveRoleFallback('heading', $roles, $catalog, $familyFallbacks);
         $bodyFallback = $this->resolveEffectiveRoleFallback('body', $roles, $catalog, $familyFallbacks);
         $monospaceFallback = $this->resolveEffectiveRoleFallback('monospace', $roles, $catalog, $familyFallbacks);
@@ -237,17 +237,17 @@ final class AdminPageViewBuilder
             $pluginVersion,
             $pluginVersionChannelLabel,
             $pluginVersionStateLabel,
-            trim((string) ($updateChannelStatus['latest_version'] ?? ''))
+            $this->stringValue($updateChannelStatus, 'latest_version')
         );
         $pluginVersionAriaLabel = $this->buildPluginVersionAriaLabel(
             $pluginVersion,
             $pluginVersionChannelLabel,
             $pluginVersionStateLabel
         );
-        $roleDeploymentBadge = (string) ($roleDeployment['badge'] ?? '');
-        $roleDeploymentBadgeClass = (string) ($roleDeployment['badge_class'] ?? '');
-        $roleDeploymentTitle = trim((string) ($roleDeployment['title'] ?? ''));
-        $roleDeploymentCopy = trim((string) ($roleDeployment['copy'] ?? ''));
+        $roleDeploymentBadge = $this->stringValue($roleDeployment, 'badge');
+        $roleDeploymentBadgeClass = $this->stringValue($roleDeployment, 'badge_class');
+        $roleDeploymentTitle = $this->stringValue($roleDeployment, 'title');
+        $roleDeploymentCopy = $this->stringValue($roleDeployment, 'copy');
         $roleDeploymentTooltip = trim(
             $roleDeploymentTitle . ($roleDeploymentTitle !== '' && $roleDeploymentCopy !== '' ? '. ' : '') . $roleDeploymentCopy
         );
@@ -304,22 +304,23 @@ final class AdminPageViewBuilder
      */
     private function buildBricksIntegrationView(array $integration): array
     {
-        $featureDescriptions = is_array($integration['feature_descriptions'] ?? null)
-            ? $integration['feature_descriptions']
-            : [];
+        $featureDescriptions = $this->mapValue($integration, 'feature_descriptions');
         $themeStyles = $this->buildBricksFeatureView(
             'bricks_theme_styles_sync_enabled',
-            is_array($integration['theme_styles'] ?? null) ? $integration['theme_styles'] : [],
-            (string) ($featureDescriptions['theme_styles'] ?? '')
+            $this->mapValue($integration, 'theme_styles'),
+            $this->stringValue($featureDescriptions, 'theme_styles')
         );
         $googleFonts = $this->buildBricksFeatureView(
             'bricks_disable_google_fonts_enabled',
-            is_array($integration['google_fonts'] ?? null) ? $integration['google_fonts'] : [],
-            (string) ($featureDescriptions['google_fonts'] ?? '')
+            $this->mapValue($integration, 'google_fonts'),
+            $this->stringValue($featureDescriptions, 'google_fonts')
         );
+        $ui = $this->mapValue($themeStyles, 'ui');
 
-        $themeStyles['ui']['targeting'] = $this->buildBricksThemeStyleTargetView($themeStyles);
-        $themeStyles['ui']['details'] = $this->buildBricksMappingDetailsView($themeStyles, $googleFonts);
+        $ui['targeting'] = $this->buildBricksThemeStyleTargetView($themeStyles);
+        $themeStyles['ui'] = $ui;
+        $ui['details'] = $this->buildBricksMappingDetailsView($themeStyles, $googleFonts);
+        $themeStyles['ui'] = $ui;
         $integration['theme_styles'] = $themeStyles;
         $integration['google_fonts'] = $googleFonts;
         $integration['maintenance'] = [
@@ -336,7 +337,7 @@ final class AdminPageViewBuilder
      */
     private function buildBricksFeatureView(string $featureKey, array $featureState, string $description): array
     {
-        $status = trim((string) ($featureState['status'] ?? 'disabled'));
+        $status = $this->stringValue($featureState, 'status', 'disabled');
 
         $featureState['description'] = $description;
         $featureState['ui'] = [
@@ -354,17 +355,17 @@ final class AdminPageViewBuilder
      */
     private function buildBricksThemeStyleTargetView(array $themeStyles): array
     {
-        $summary = is_array($themeStyles['summary'] ?? null) ? $themeStyles['summary'] : [];
-        $managedThemeStyleLabel = trim((string) ($summary['managed_style_label'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_LABEL));
-        $availableThemeStyles = is_array($summary['available_styles'] ?? null) ? $summary['available_styles'] : [];
+        $summary = $this->mapValue($themeStyles, 'summary');
+        $managedThemeStyleLabel = $this->stringValue($summary, 'managed_style_label', BricksIntegrationService::MANAGED_THEME_STYLE_LABEL);
+        $availableThemeStyles = $this->stringMapValue($summary, 'available_styles');
         $selectableThemeStyles = array_filter(
             $availableThemeStyles,
-            static fn ($label, $styleId): bool => (string) $styleId !== BricksIntegrationService::MANAGED_THEME_STYLE_ID,
+            static fn (string $label, string $styleId): bool => $styleId !== BricksIntegrationService::MANAGED_THEME_STYLE_ID,
             ARRAY_FILTER_USE_BOTH
         );
-        $targetMode = trim((string) ($summary['target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED));
-        $targetStyleId = trim((string) ($summary['target_style_id'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_ID));
-        $targetStyleLabel = trim((string) ($summary['target_style_label'] ?? $managedThemeStyleLabel));
+        $targetMode = $this->stringValue($summary, 'target_mode', BricksIntegrationService::TARGET_MODE_MANAGED);
+        $targetStyleId = $this->stringValue($summary, 'target_style_id', BricksIntegrationService::MANAGED_THEME_STYLE_ID);
+        $targetStyleLabel = $this->stringValue($summary, 'target_style_label', $managedThemeStyleLabel);
         $hasThemeStyles = !empty($summary['has_theme_styles']);
         $managedThemeStyleExists = !empty($summary['managed_style_exists']);
         $targetIsManaged = !empty($summary['target_is_managed']);
@@ -415,8 +416,8 @@ final class AdminPageViewBuilder
      */
     private function buildBricksThemeStyleTargetCopy(array $summary): string
     {
-        $managedThemeStyleLabel = trim((string) ($summary['managed_style_label'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_LABEL));
-        $targetStyleLabel = trim((string) ($summary['target_style_label'] ?? $managedThemeStyleLabel));
+        $managedThemeStyleLabel = $this->stringValue($summary, 'managed_style_label', BricksIntegrationService::MANAGED_THEME_STYLE_LABEL);
+        $targetStyleLabel = $this->stringValue($summary, 'target_style_label', $managedThemeStyleLabel);
 
         if (empty($summary['has_theme_styles']) && empty($summary['managed_style_exists'])) {
             return __('Create the managed style to start syncing.', 'tasty-fonts');
@@ -452,13 +453,13 @@ final class AdminPageViewBuilder
      */
     private function buildBricksMappingDetailsView(array $themeStyles, array $googleFonts): array
     {
-        $summary = is_array($themeStyles['summary'] ?? null) ? $themeStyles['summary'] : [];
-        $targeting = is_array($themeStyles['ui']['targeting'] ?? null) ? $themeStyles['ui']['targeting'] : [];
-        $current = is_array($themeStyles['current'] ?? null) ? $themeStyles['current'] : [];
-        $desired = is_array($themeStyles['desired'] ?? null) ? $themeStyles['desired'] : [];
-        $googleCurrent = is_array($googleFonts['current'] ?? null) ? $googleFonts['current'] : [];
-        $managedThemeStyleLabel = trim((string) ($targeting['managed_style_label'] ?? BricksIntegrationService::MANAGED_THEME_STYLE_LABEL));
-        $targetStyleLabel = trim((string) ($targeting['selected_style_label'] ?? ''));
+        $summary = $this->mapValue($themeStyles, 'summary');
+        $targeting = $this->mapValue($this->mapValue($themeStyles, 'ui'), 'targeting');
+        $current = $this->mapValue($themeStyles, 'current');
+        $desired = $this->mapValue($themeStyles, 'desired');
+        $googleCurrent = $this->mapValue($googleFonts, 'current');
+        $managedThemeStyleLabel = $this->stringValue($targeting, 'managed_style_label', BricksIntegrationService::MANAGED_THEME_STYLE_LABEL);
+        $targetStyleLabel = $this->stringValue($targeting, 'selected_style_label');
         $themeStylesApplied = !empty($themeStyles['applied']);
         $currentIntro = '';
 
@@ -490,45 +491,45 @@ final class AdminPageViewBuilder
             'current_rows' => [
                 [
                     'label' => __('Body', 'tasty-fonts'),
-                    'value' => (string) ($current['body_family'] ?? '') !== ''
-                        ? (string) $current['body_family']
+                    'value' => $this->stringValue($current, 'body_family') !== ''
+                        ? $this->stringValue($current, 'body_family')
                         : __('empty', 'tasty-fonts'),
                 ],
                 [
                     'label' => __('Heading', 'tasty-fonts'),
-                    'value' => (string) ($current['heading_family'] ?? '') !== ''
-                        ? (string) $current['heading_family']
+                    'value' => $this->stringValue($current, 'heading_family') !== ''
+                        ? $this->stringValue($current, 'heading_family')
                         : __('empty', 'tasty-fonts'),
                 ],
                 [
                     'label' => __('Body Weight', 'tasty-fonts'),
-                    'value' => (string) ($current['body_weight'] ?? '') !== ''
-                        ? (string) $current['body_weight']
+                    'value' => $this->stringValue($current, 'body_weight') !== ''
+                        ? $this->stringValue($current, 'body_weight')
                         : __('empty', 'tasty-fonts'),
                 ],
                 [
                     'label' => __('Heading Weight', 'tasty-fonts'),
-                    'value' => (string) ($current['heading_weight'] ?? '') !== ''
-                        ? (string) $current['heading_weight']
+                    'value' => $this->stringValue($current, 'heading_weight') !== ''
+                        ? $this->stringValue($current, 'heading_weight')
                         : __('empty', 'tasty-fonts'),
                 ],
             ],
             'desired_rows' => [
                 [
                     'label' => __('Body', 'tasty-fonts'),
-                    'value' => (string) ($desired['body_family'] ?? BricksIntegrationService::DESIRED_BODY_VALUE),
+                    'value' => $this->stringValue($desired, 'body_family', BricksIntegrationService::DESIRED_BODY_VALUE),
                 ],
                 [
                     'label' => __('Heading', 'tasty-fonts'),
-                    'value' => (string) ($desired['heading_family'] ?? BricksIntegrationService::DESIRED_HEADING_VALUE),
+                    'value' => $this->stringValue($desired, 'heading_family', BricksIntegrationService::DESIRED_HEADING_VALUE),
                 ],
                 [
                     'label' => __('Body Weight', 'tasty-fonts'),
-                    'value' => (string) ($desired['body_weight'] ?? BricksIntegrationService::DESIRED_BODY_WEIGHT_VALUE),
+                    'value' => $this->stringValue($desired, 'body_weight', BricksIntegrationService::DESIRED_BODY_WEIGHT_VALUE),
                 ],
                 [
                     'label' => __('Heading Weight', 'tasty-fonts'),
-                    'value' => (string) ($desired['heading_weight'] ?? BricksIntegrationService::DESIRED_HEADING_WEIGHT_VALUE),
+                    'value' => $this->stringValue($desired, 'heading_weight', BricksIntegrationService::DESIRED_HEADING_WEIGHT_VALUE),
                 ],
             ],
         ];
@@ -582,7 +583,7 @@ final class AdminPageViewBuilder
      */
     private function buildPluginVersionChannelLabel(string $pluginVersion, array $updateChannelStatus): string
     {
-        $selectedChannelLabel = trim((string) ($updateChannelStatus['selected_channel_label'] ?? ''));
+        $selectedChannelLabel = $this->stringValue($updateChannelStatus, 'selected_channel_label');
 
         if ($selectedChannelLabel !== '') {
             return $selectedChannelLabel;
@@ -610,7 +611,7 @@ final class AdminPageViewBuilder
             'current' => __('Latest', 'tasty-fonts'),
             'upgrade' => __('Update Available', 'tasty-fonts'),
             'rollback' => __('Rollback Available', 'tasty-fonts'),
-            default => trim((string) ($updateChannelStatus['state_label'] ?? '')),
+            default => $this->stringValue($updateChannelStatus, 'state_label'),
         };
     }
 
@@ -633,14 +634,14 @@ final class AdminPageViewBuilder
      */
     private function resolvePluginVersionState(array $updateChannelStatus): string
     {
-        $state = trim((string) ($updateChannelStatus['state'] ?? ''));
+        $state = $this->stringValue($updateChannelStatus, 'state');
 
         if ($state !== '') {
             return $state;
         }
 
-        $stateLabel = strtolower(trim((string) ($updateChannelStatus['state_label'] ?? '')));
-        $stateClass = trim((string) ($updateChannelStatus['state_class'] ?? ''));
+        $stateLabel = strtolower($this->stringValue($updateChannelStatus, 'state_label'));
+        $stateClass = $this->stringValue($updateChannelStatus, 'state_class');
 
         if (str_contains($stateLabel, 'rollback')) {
             return 'rollback';
@@ -807,5 +808,176 @@ final class AdminPageViewBuilder
         return in_array($preference, ['minimal', 'variables', 'classes', 'custom'], true)
             ? $preference
             : '';
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function mapValue(array $values, string $key): array
+    {
+        $value = $values[$key] ?? null;
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function intValue(array $values, string $key, int $default = 0): int
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        return FontUtils::scalarIntValue($values[$key], $default);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return CatalogMap
+     */
+    private function catalogMapValue(array $values, string $key): array
+    {
+        $catalog = $this->mapValue($values, $key);
+        $normalized = [];
+
+        foreach ($catalog as $familyName => $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $normalized[$familyName] = $family;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return FamilyFallbackMap
+     */
+    private function stringMapValue(array $values, string $key): array
+    {
+        return FontUtils::normalizeStringMap($values[$key] ?? []);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @param list<string> $default
+     * @return list<string>
+     */
+    private function stringListValue(array $values, string $key, array $default = []): array
+    {
+        if (!array_key_exists($key, $values) || !is_array($values[$key])) {
+            return $default;
+        }
+
+        $normalized = [];
+
+        foreach ($values[$key] as $value) {
+            $stringValue = FontUtils::scalarStringValue($value);
+
+            if ($stringValue === '') {
+                continue;
+            }
+
+            $normalized[] = $stringValue;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return list<array<string, mixed>>
+     */
+    private function listOfMapsValue(array $values, string $key): array
+    {
+        $items = $values[$key] ?? [];
+
+        if (!is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $normalized[] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return list<array{value: string, label: string}>
+     */
+    private function valueLabelOptionListValue(array $values, string $key): array
+    {
+        $options = $this->listOfMapsValue($values, $key);
+        $normalized = [];
+
+        foreach ($options as $option) {
+            $value = $this->stringValue($option, 'value');
+            $label = $this->stringValue($option, 'label');
+
+            if ($value === '' && $label === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'value' => $value,
+                'label' => $label,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return list<array{value: string, label: string, type: string}>
+     */
+    private function selectorOptionListValue(array $values, string $key): array
+    {
+        $options = $this->listOfMapsValue($values, $key);
+        $normalized = [];
+
+        foreach ($options as $option) {
+            $value = $this->stringValue($option, 'value');
+            $label = $this->stringValue($option, 'label');
+            $type = $this->stringValue($option, 'type');
+
+            if ($value === '' && $label === '' && $type === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'value' => $value,
+                'label' => $label,
+                'type' => $type,
+            ];
+        }
+
+        return $normalized;
     }
 }

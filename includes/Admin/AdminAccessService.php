@@ -46,9 +46,16 @@ final class AdminAccessService
         if (empty($settings['admin_access_custom_enabled'])) {
             return false;
         }
-        $allowedRoleSlugs = $this->normalizeRoleSlugs($settings['admin_access_role_slugs'] ?? []);
+        $allowedRoleSlugs = $this->normalizeRoleSlugs(
+            is_array($settings['admin_access_role_slugs'] ?? null) ? $settings['admin_access_role_slugs'] : []
+        );
         $allowedUserIds = is_array($settings['admin_access_user_ids'] ?? null)
-            ? array_map('absint', $settings['admin_access_user_ids'])
+            ? array_values(
+                array_map(
+                    static fn (mixed $userId): int => absint(is_scalar($userId) ? (string) $userId : 0),
+                    $settings['admin_access_user_ids']
+                )
+            )
             : [];
 
         if (in_array($userId, $allowedUserIds, true)) {

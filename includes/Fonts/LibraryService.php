@@ -66,7 +66,7 @@ final class LibraryService
             );
         }
 
-        $familyName = (string) ($family['family'] ?? $familySlug);
+        $familyName = $this->stringValue($family, 'family', $familySlug);
         $roleLabels = $this->getProtectedRoleLabels($familyName);
 
         if ($roleLabels !== []) {
@@ -133,13 +133,14 @@ final class LibraryService
             return $selection;
         }
 
-        $familySlug = (string) $selection['family_slug'];
-        $deliveryId = (string) $selection['delivery_id'];
-        $family = (array) $selection['family'];
-        $profile = (array) $selection['profile'];
+        $selection = $this->normalizedSelectionPayload($selection);
+        $familySlug = $selection['family_slug'];
+        $deliveryId = $selection['delivery_id'];
+        $family = $selection['family'];
+        $profile = $selection['profile'];
 
-        $familyName = (string) ($family['family'] ?? $familySlug);
-        $isActiveDelivery = (string) ($family['active_delivery_id'] ?? '') === $deliveryId;
+        $familyName = $this->stringValue($family, 'family', $familySlug);
+        $isActiveDelivery = $this->stringValue($family, 'active_delivery_id') === $deliveryId;
 
         if ($isActiveDelivery && $this->isLiveRoleFamily($familyName)) {
             return $this->error(
@@ -148,7 +149,7 @@ final class LibraryService
             );
         }
 
-        if (count((array) ($family['available_deliveries'] ?? [])) <= 1) {
+        if (count($this->availableDeliveries($family)) <= 1) {
             $result = $this->deleteFamily($familySlug);
 
             if (is_wp_error($result)) {
@@ -174,18 +175,18 @@ final class LibraryService
 
         $storedFamily = $this->imports->getFamily($familySlug);
 
-        if ($storedFamily !== null && isset(($storedFamily['delivery_profiles'] ?? [])[$deliveryId])) {
+        if ($storedFamily !== null && isset($storedFamily['delivery_profiles'][$deliveryId])) {
             $this->imports->deleteProfile($familySlug, $deliveryId);
         } elseif ($isActiveDelivery) {
             $fallbackProfile = $this->firstStoredAlternativeProfile($family, $deliveryId);
 
             if ($fallbackProfile !== null) {
                 $this->persistProfile($family, $fallbackProfile, false);
-                $this->imports->setActiveDelivery($familySlug, (string) ($fallbackProfile['id'] ?? ''));
+                $this->imports->setActiveDelivery($familySlug, $this->stringValue($fallbackProfile, 'id'));
             }
         }
 
-        $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
+        $provider = strtolower(trim($this->stringValue($profile, 'provider')));
 
         if ($this->isManagedImportSource($provider)) {
             $this->storage->deleteRelativeDirectory($provider . '/' . $familySlug);
@@ -193,12 +194,8 @@ final class LibraryService
 
         $this->assets->refreshGeneratedAssets();
 
-        $label = (string) ($profile['label'] ?? ucfirst($provider));
-        $message = sprintf(
-            __('Removed %1$s from %2$s.', 'tasty-fonts'),
-            $label,
-            $familyName
-        );
+        $label = $this->stringValue($profile, 'label', ucfirst($provider));
+        $message = sprintf(__('Removed %1$s from %2$s.', 'tasty-fonts'), $label, $familyName);
         $this->log->add($message);
 
         return [
@@ -233,10 +230,11 @@ final class LibraryService
             return $selection;
         }
 
-        $familySlug = (string) $selection['family_slug'];
-        $deliveryId = (string) $selection['delivery_id'];
-        $family = (array) $selection['family'];
-        $profile = (array) $selection['profile'];
+        $selection = $this->normalizedSelectionPayload($selection);
+        $familySlug = $selection['family_slug'];
+        $deliveryId = $selection['delivery_id'];
+        $family = $selection['family'];
+        $profile = $selection['profile'];
 
         $this->persistProfile($family, $profile, false);
 
@@ -251,11 +249,11 @@ final class LibraryService
 
         $this->assets->refreshGeneratedAssets();
 
-        $familyName = (string) ($family['family'] ?? $familySlug);
+        $familyName = $this->stringValue($family, 'family', $familySlug);
         $message = sprintf(
             __('Live delivery for %1$s switched to %2$s.', 'tasty-fonts'),
             $familyName,
-            (string) ($profile['label'] ?? __('the selected profile', 'tasty-fonts'))
+            $this->stringValue($profile, 'label', __('the selected profile', 'tasty-fonts'))
         );
         $this->log->add($message);
 
@@ -263,7 +261,7 @@ final class LibraryService
             'family' => $familyName,
             'family_slug' => $familySlug,
             'delivery_id' => $deliveryId,
-            'delivery_label' => (string) ($profile['label'] ?? ''),
+            'delivery_label' => $this->stringValue($profile, 'label'),
             'message' => $message,
         ];
     }
@@ -307,6 +305,30 @@ final class LibraryService
     }
 
     /**
+     * @param array{
+     *     family_slug: string,
+     *     delivery_id: string,
+     *     family: array<string, mixed>,
+     *     profile: array<string, mixed>
+     * } $selection
+     * @return array{
+     *     family_slug: string,
+     *     delivery_id: string,
+     *     family: array<string, mixed>,
+     *     profile: array<string, mixed>
+     * }
+     */
+    private function normalizedSelectionPayload(array $selection): array
+    {
+        return [
+            'family_slug' => $this->stringValue($selection, 'family_slug'),
+            'delivery_id' => $this->stringValue($selection, 'delivery_id'),
+            'family' => (array) $selection['family'],
+            'profile' => (array) $selection['profile'],
+        ];
+    }
+
+    /**
      * Save a manual published or paused state for a family.
      *
      * @since 1.4.0
@@ -340,7 +362,7 @@ final class LibraryService
             );
         }
 
-        $familyName = (string) ($family['family'] ?? $familySlug);
+        $familyName = $this->stringValue($family, 'family', $familySlug);
 
         if ($publishState === 'library_only' && $this->isLiveRoleFamily($familyName)) {
             return $this->error(
@@ -352,12 +374,12 @@ final class LibraryService
         $storedFamily = $this->imports->getFamily($familySlug);
 
         if ($storedFamily === null) {
-            $this->imports->ensureFamily(
-                $familyName,
-                $familySlug,
-                (string) ($family['publish_state'] ?? 'published'),
-                (string) ($family['active_delivery_id'] ?? '')
-            );
+                $this->imports->ensureFamily(
+                    $familyName,
+                    $familySlug,
+                    $this->stringValue($family, 'publish_state', 'published'),
+                    $this->stringValue($family, 'active_delivery_id')
+                );
         }
 
         $saved = $this->imports->setPublishState($familySlug, $publishState);
@@ -408,8 +430,8 @@ final class LibraryService
         }
 
         foreach ($this->imports->allFamilies() as $storedFamily) {
-            $familyName = trim((string) ($storedFamily['family'] ?? ''));
-            $familySlug = FontUtils::slugify((string) ($storedFamily['slug'] ?? $familyName));
+            $familyName = trim($storedFamily['family']);
+            $familySlug = FontUtils::slugify($storedFamily['slug']);
 
             if ($familyName === '' || $familySlug === '') {
                 continue;
@@ -419,7 +441,7 @@ final class LibraryService
                 ? 'role_active'
                 : $this->manualPublishStateForFamily($storedFamily);
 
-            if ((string) ($storedFamily['publish_state'] ?? 'published') !== $targetState) {
+            if ($storedFamily['publish_state'] !== $targetState) {
                 $this->imports->setPublishState($familySlug, $targetState);
             }
         }
@@ -428,18 +450,18 @@ final class LibraryService
             $storedFamily = $this->imports->getFamily($familySlug);
 
             if ($storedFamily === null) {
-                $catalogFamily = $this->findFamilyBySlug($familySlug);
+                $catalogFamily = $this->findFamilyBySlug($familySlug) ?? [];
                 $this->imports->ensureFamily(
                     $familyName,
                     $familySlug,
                     'role_active',
-                    (string) ($catalogFamily['active_delivery_id'] ?? ''),
+                    $this->stringValue($catalogFamily, 'active_delivery_id'),
                     'library_only'
                 );
                 continue;
             }
 
-            if ((string) ($storedFamily['publish_state'] ?? 'published') !== 'role_active') {
+            if ($storedFamily['publish_state'] !== 'role_active') {
                 $this->imports->setPublishState($familySlug, 'role_active');
             }
         }
@@ -452,13 +474,13 @@ final class LibraryService
      */
     private function manualPublishStateForFamily(array $family): string
     {
-        $manualState = strtolower(trim((string) ($family['manual_publish_state'] ?? '')));
+        $manualState = strtolower(trim($this->stringValue($family, 'manual_publish_state')));
 
         if (in_array($manualState, self::MANUAL_PUBLISH_STATES, true)) {
             return $manualState;
         }
 
-        $publishState = strtolower(trim((string) ($family['publish_state'] ?? 'published')));
+        $publishState = strtolower(trim($this->stringValue($family, 'publish_state', 'published')));
 
         return in_array($publishState, self::MANUAL_PUBLISH_STATES, true) ? $publishState : 'published';
     }
@@ -498,7 +520,7 @@ final class LibraryService
         $normalizedStyle = FontUtils::normalizeStyle($style);
         $normalizedSource = trim($source) !== '' ? strtolower(trim($source)) : 'local';
         $normalizedUnicodeRange = $this->isManagedImportSource($normalizedSource) ? '' : trim($unicodeRange);
-        $faces = $this->normalizeFaceList($activeDelivery['faces'] ?? []);
+        $faces = FontUtils::normalizeFaceList($activeDelivery['faces'] ?? []);
         $faceIndex = $this->findMatchingFaceIndex($faces, $normalizedWeight, $normalizedStyle, $normalizedSource, $normalizedUnicodeRange);
 
         if ($faceIndex === null) {
@@ -509,7 +531,7 @@ final class LibraryService
         }
 
         $face = $faces[$faceIndex];
-        $familyName = (string) ($family['family'] ?? $familySlug);
+        $familyName = $this->stringValue($family, 'family', $familySlug);
         $roleLabels = $this->getProtectedRoleLabels($familyName);
 
         if (count($faces) <= 1 && $roleLabels !== []) {
@@ -521,10 +543,10 @@ final class LibraryService
 
         $relativePaths = $this->collectFaceRelativePaths($face);
         $storedFamily = $this->imports->getFamily($familySlug);
-        $deliveryId = (string) ($activeDelivery['id'] ?? '');
+        $deliveryId = $this->stringValue($activeDelivery, 'id');
         $hasStoredActiveProfile = $storedFamily !== null
             && $deliveryId !== ''
-            && isset(($storedFamily['delivery_profiles'] ?? [])[$deliveryId]);
+            && isset($storedFamily['delivery_profiles'][$deliveryId]);
 
         if ($relativePaths === [] && !$hasStoredActiveProfile) {
             return $this->error(
@@ -550,8 +572,8 @@ final class LibraryService
                 $familyName,
                 $familySlug,
                 $profile,
-                (string) ($storedFamily['publish_state'] ?? 'published'),
-                (string) ($storedFamily['active_delivery_id'] ?? '') === $deliveryId
+                $storedFamily['publish_state'],
+                $storedFamily['active_delivery_id'] === $deliveryId
             );
         }
 
@@ -586,7 +608,7 @@ final class LibraryService
     private function findFamilyBySlug(string $familySlug): ?array
     {
         foreach ($this->catalog->getCatalog() as $family) {
-            $slug = is_string($family['slug'] ?? null) ? $family['slug'] : '';
+            $slug = $this->stringValue($family, 'slug');
 
             if ($slug === $familySlug) {
                 return $family;
@@ -602,8 +624,8 @@ final class LibraryService
      */
     private function findDeliveryProfile(array $family, string $deliveryId): ?array
     {
-        foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
-            if (is_array($profile) && (string) ($profile['id'] ?? '') === $deliveryId) {
+        foreach ($this->availableDeliveries($family) as $profile) {
+            if ($this->stringValue($profile, 'id') === $deliveryId) {
                 return $profile;
             }
         }
@@ -619,11 +641,7 @@ final class LibraryService
     {
         $paths = [];
 
-        foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
+        foreach ($this->availableDeliveries($family) as $profile) {
             $paths = array_merge($paths, $this->collectProfileRelativePaths($profile));
         }
 
@@ -638,11 +656,7 @@ final class LibraryService
     {
         $paths = [];
 
-        foreach ((array) ($profile['faces'] ?? []) as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
+        foreach (FontUtils::normalizeFaceList($profile['faces'] ?? []) as $face) {
             $paths = array_merge($paths, $this->collectFaceRelativePaths($face));
         }
 
@@ -657,16 +671,16 @@ final class LibraryService
     {
         $paths = [];
 
-        foreach ((array) ($face['paths'] ?? []) as $path) {
-            if (!is_string($path) || trim($path) === '') {
+        foreach (FontUtils::normalizeStringMap($face['paths'] ?? []) as $path) {
+            if (trim($path) === '') {
                 continue;
             }
 
             $paths[] = trim($path);
         }
 
-        foreach ((array) ($face['files'] ?? []) as $file) {
-            if (!is_string($file) || trim($file) === '' || FontUtils::isRemoteUrl($file)) {
+        foreach (FontUtils::normalizeStringMap($face['files'] ?? []) as $file) {
+            if (trim($file) === '' || FontUtils::isRemoteUrl($file)) {
                 continue;
             }
 
@@ -700,12 +714,12 @@ final class LibraryService
      */
     private function faceMatches(array $face, string $weight, string $style, string $source, string $unicodeRange): bool
     {
-        $faceSource = strtolower(trim((string) ($face['source'] ?? 'local')));
-        $faceUnicodeRange = $this->isManagedImportSource($faceSource) ? '' : trim((string) ($face['unicode_range'] ?? ''));
+        $faceSource = strtolower(trim($this->stringValue($face, 'source', 'local')));
+        $faceUnicodeRange = $this->isManagedImportSource($faceSource) ? '' : trim($this->stringValue($face, 'unicode_range'));
 
         return $faceSource === $source
-            && FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')) === $weight
-            && FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')) === $style
+            && FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400')) === $weight
+            && FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')) === $style
             && $faceUnicodeRange === $unicodeRange;
     }
 
@@ -719,29 +733,6 @@ final class LibraryService
     }
 
     /**
-     * @param mixed $faces
-     * @return list<CatalogFace>
-     */
-    private function normalizeFaceList(mixed $faces): array
-    {
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
-    }
-
-    /**
      * @param CatalogFamily $family
      * @return list<string>
      */
@@ -749,12 +740,12 @@ final class LibraryService
     {
         $sources = [];
 
-        foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
-            if (!is_array($profile) || !$this->isSelfHostedProfile($profile)) {
+        foreach ($this->availableDeliveries($family) as $profile) {
+            if (!$this->isSelfHostedProfile($profile)) {
                 continue;
             }
 
-            $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
+            $provider = strtolower(trim($this->stringValue($profile, 'provider')));
 
             if ($this->isManagedImportSource($provider)) {
                 $sources[] = $provider;
@@ -774,7 +765,7 @@ final class LibraryService
      */
     private function isSelfHostedProfile(array $profile): bool
     {
-        return strtolower(trim((string) ($profile['type'] ?? ''))) === 'self_hosted';
+        return strtolower(trim($this->stringValue($profile, 'type'))) === 'self_hosted';
     }
 
     private function isLiveRoleFamily(string $familyName): bool
@@ -801,20 +792,20 @@ final class LibraryService
      */
     private function persistProfile(array $family, array $profile, bool $activate): void
     {
-        $familyName = (string) ($family['family'] ?? '');
-        $familySlug = (string) ($family['slug'] ?? FontUtils::slugify($familyName));
+        $familyName = $this->stringValue($family, 'family');
+        $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
 
         if ($familyName === '' || $familySlug === '') {
             return;
         }
 
         $storedFamily = $this->imports->getFamily($familySlug);
-        $deliveryId = (string) ($profile['id'] ?? '');
+        $deliveryId = $this->stringValue($profile, 'id');
 
         if (
             $deliveryId !== ''
             && $storedFamily !== null
-            && isset(($storedFamily['delivery_profiles'] ?? [])[$deliveryId])
+            && isset($storedFamily['delivery_profiles'][$deliveryId])
         ) {
             return;
         }
@@ -823,7 +814,7 @@ final class LibraryService
             $familyName,
             $familySlug,
             $profile,
-            (string) ($family['publish_state'] ?? 'published'),
+            $this->stringValue($family, 'publish_state', 'published'),
             $activate
         );
     }
@@ -834,12 +825,8 @@ final class LibraryService
      */
     private function firstStoredAlternativeProfile(array $family, string $excludedDeliveryId): ?array
     {
-        foreach ((array) ($family['available_deliveries'] ?? []) as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $profileId = (string) ($profile['id'] ?? '');
+        foreach ($this->availableDeliveries($family) as $profile) {
+            $profileId = $this->stringValue($profile, 'id');
 
             if ($profileId === '' || $profileId === $excludedDeliveryId) {
                 continue;
@@ -911,6 +898,29 @@ final class LibraryService
         $message = trim($this->storage->getLastFilesystemErrorMessage());
 
         return $message !== '' ? $message : $fallback;
+    }
+
+    /**
+     * @param CatalogFamily $family
+     * @return list<DeliveryProfile>
+     */
+    private function availableDeliveries(array $family): array
+    {
+        return FontUtils::normalizeFaceList($family['available_deliveries'] ?? []);
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
     }
 
     private function error(string $code, string $message): WP_Error

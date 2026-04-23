@@ -292,7 +292,7 @@ final class GitHubUpdater
         }
 
         $plugins = $hookExtra['plugins'] ?? [];
-        $plugin = (string) ($hookExtra['plugin'] ?? '');
+        $plugin = $this->arrayStringValue($hookExtra, 'plugin');
 
         if (
             $plugin !== $this->pluginBasename()
@@ -479,7 +479,7 @@ final class GitHubUpdater
      */
     private function normalizeRelease(array $release): ?array
     {
-        $version = $this->normalizeVersion((string) ($release['tag_name'] ?? ''));
+        $version = $this->normalizeVersion($this->arrayStringValue($release, 'tag_name'));
         $channel = $this->classifyReleaseChannel($version);
         $packageUrl = $this->findPackageUrl($version, $release['assets'] ?? []);
         $checksumUrl = $this->findChecksumUrl($version, $release['assets'] ?? []);
@@ -517,9 +517,9 @@ final class GitHubUpdater
                 continue;
             }
 
-            $name = strtolower((string) ($asset['name'] ?? ''));
-            $url = trim((string) ($asset['browser_download_url'] ?? ''));
-            $state = strtolower((string) ($asset['state'] ?? 'uploaded'));
+            $name = strtolower($this->arrayStringValue($asset, 'name'));
+            $url = trim($this->arrayStringValue($asset, 'browser_download_url'));
+            $state = strtolower($this->arrayStringValue($asset, 'state', 'uploaded'));
 
             if ($name !== $expectedName || $url === '' || $state !== 'uploaded') {
                 continue;
@@ -624,7 +624,10 @@ final class GitHubUpdater
         return '<p>' . nl2br(esc_html($content)) . '</p>';
     }
 
-    private function performGitHubGet(string $url, string $accept): mixed
+    /**
+     * @return array<string, mixed>|WP_Error
+     */
+    private function performGitHubGet(string $url, string $accept): array|WP_Error
     {
         return wp_remote_get(
             $url,
@@ -706,10 +709,10 @@ final class GitHubUpdater
         }
 
         return $this->buildNormalizedRelease(
-            trim((string) ($release['version'] ?? '')),
-            trim((string) ($release['channel'] ?? '')),
-            trim((string) ($release['package_url'] ?? '')),
-            trim((string) ($release['checksum_url'] ?? '')),
+            trim($this->arrayStringValue($release, 'version')),
+            trim($this->arrayStringValue($release, 'channel')),
+            trim($this->arrayStringValue($release, 'package_url')),
+            trim($this->arrayStringValue($release, 'checksum_url')),
             $release['body'] ?? '',
             $release['published_at'] ?? ''
         );
@@ -735,12 +738,15 @@ final class GitHubUpdater
             'channel' => $channel,
             'package_url' => $packageUrl,
             'checksum_url' => $checksumUrl,
-            'body' => (string) $body,
-            'published_at' => (string) $publishedAt,
+            'body' => $this->scalarStringValue($body),
+            'published_at' => $this->scalarStringValue($publishedAt),
         ];
     }
 
-    private function normalizeResponseHeader(mixed $response, string $header): string
+    /**
+     * @param array<string, mixed>|WP_Error $response
+     */
+    private function normalizeResponseHeader(array|WP_Error $response, string $header): string
     {
         $value = wp_remote_retrieve_header($response, $header);
 
@@ -752,7 +758,10 @@ final class GitHubUpdater
         return get_transient($this->releaseBackoffTransientKey()) !== false;
     }
 
-    private function cacheApiBackoffFromResponse(mixed $response): void
+    /**
+     * @param array<string, mixed>|WP_Error $response
+     */
+    private function cacheApiBackoffFromResponse(array|WP_Error $response): void
     {
         if (is_wp_error($response)) {
             return;
@@ -776,6 +785,23 @@ final class GitHubUpdater
             ],
             $ttl
         );
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function arrayStringValue(array $values, string $key, string $default = ''): string
+    {
+        return $this->scalarStringValue($values[$key] ?? null, $default);
+    }
+
+    private function scalarStringValue(mixed $value, string $default = ''): string
+    {
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 
     /**

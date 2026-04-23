@@ -11,8 +11,36 @@ use TastyFonts\Support\FontUtils;
 
 /**
  * @phpstan-type RoleAxes array<string, string>
- * @phpstan-type RoleSet array<string, mixed>
- * @phpstan-type GoogleApiKeyData array<string, mixed>
+ * @phpstan-type RoleSet array{
+ *     heading: string,
+ *     body: string,
+ *     monospace: string,
+ *     heading_delivery_id: string,
+ *     body_delivery_id: string,
+ *     monospace_delivery_id: string,
+ *     heading_fallback: string,
+ *     body_fallback: string,
+ *     monospace_fallback: string,
+ *     heading_weight: string,
+ *     body_weight: string,
+ *     monospace_weight: string,
+ *     heading_axes: RoleAxes,
+ *     body_axes: RoleAxes,
+ *     monospace_axes: RoleAxes
+ * }
+ * @phpstan-type GoogleApiKeyData array{
+ *     google_api_key: string,
+ *     google_api_key_status: string,
+ *     google_api_key_status_message: string,
+ *     google_api_key_checked_at: int
+ * }
+ * @phpstan-type StoredGoogleApiKeyData array{
+ *     google_api_key_status: string,
+ *     google_api_key_status_message: string,
+ *     google_api_key_checked_at: int,
+ *     google_api_key?: string,
+ *     google_api_key_encrypted?: string
+ * }
  * @phpstan-type AdobeProjectStatus array{state: string, message: string, checked_at: int}
  * @phpstan-type FamilyFallbackMap array<string, string>
  * @phpstan-type FamilyFontDisplayMap array<string, string>
@@ -165,9 +193,13 @@ final class SettingsRepository
         $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions($settings));
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($storedSettings, $settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
-        $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'swap'));
-        $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF));
-        $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue((string) ($settings['unicode_range_custom_value'] ?? ''));
+        $settings['font_display'] = $this->normalizeFontDisplay($this->stringValue($settings, 'font_display', 'swap'));
+        $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode(
+            $this->stringValue($settings, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF)
+        );
+        $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue(
+            $this->stringValue($settings, 'unicode_range_custom_value')
+        );
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
@@ -180,7 +212,9 @@ final class SettingsRepository
         $settings['extended_variable_category_mono_enabled'] = !empty($settings['extended_variable_category_mono_enabled']);
         $settings['preload_primary_fonts'] = !empty($settings['preload_primary_fonts']);
         $settings['remote_connection_hints'] = !empty($settings['remote_connection_hints']);
-        $settings['update_channel'] = $this->normalizeUpdateChannel((string) ($settings['update_channel'] ?? self::UPDATE_CHANNEL_STABLE));
+        $settings['update_channel'] = $this->normalizeUpdateChannel(
+            $this->stringValue($settings, 'update_channel', self::UPDATE_CHANNEL_STABLE)
+        );
         $settings['block_editor_font_library_sync_enabled'] = $this->normalizeBlockEditorFontLibrarySyncSetting(
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
@@ -209,16 +243,16 @@ final class SettingsRepository
         $settings['acss_font_role_sync_previous_text_font_weight'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_text_font_weight'] ?? '');
         $settings['preview_sentence'] = $this->sanitizePreviewSentence($settings['preview_sentence'] ?? '');
         $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
-        $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
+        $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId($this->stringValue($settings, 'adobe_project_id'));
         $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
-            (string) ($settings['adobe_project_status'] ?? 'empty'),
-            (string) ($settings['adobe_project_id'] ?? '')
+            $this->stringValue($settings, 'adobe_project_status', 'empty'),
+            $this->stringValue($settings, 'adobe_project_id')
         );
         $settings['adobe_project_status_message'] = $this->sanitizeStatusMessage($settings['adobe_project_status_message'] ?? '');
         $settings['adobe_project_checked_at'] = $this->normalizeTimestamp($settings['adobe_project_checked_at'] ?? 0);
         $settings['google_api_key_status'] = $this->normalizeGoogleApiKeyStatus(
-            (string) ($settings['google_api_key_status'] ?? 'empty'),
-            (string) ($settings['google_api_key'] ?? '')
+            $this->stringValue($settings, 'google_api_key_status', 'empty'),
+            $this->stringValue($settings, 'google_api_key')
         );
         $settings['google_api_key_status_message'] = $this->sanitizeStatusMessage($settings['google_api_key_status_message'] ?? '');
         $settings['google_api_key_checked_at'] = $this->normalizeTimestamp($settings['google_api_key_checked_at'] ?? 0);
@@ -243,8 +277,8 @@ final class SettingsRepository
         $monospaceRoleWasEnabled = !empty($settings['monospace_role_enabled']);
         $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions($settings);
         $clearGoogleKey = !empty($input['tasty_fonts_clear_google_api_key']);
-        $submittedGoogleKey = isset($input['google_api_key'])
-            ? sanitize_text_field((string) $input['google_api_key'])
+        $submittedGoogleKey = array_key_exists('google_api_key', $input)
+            ? sanitize_text_field($this->stringValue($input, 'google_api_key'))
             : null;
         $settingsChanged = false;
         $googleApiKeyDataChanged = false;
@@ -264,23 +298,29 @@ final class SettingsRepository
         }
 
         if (isset($input['css_delivery_mode'])) {
-            $mode = sanitize_text_field((string) $input['css_delivery_mode']);
+            $mode = sanitize_text_field($this->stringValue($input, 'css_delivery_mode'));
             $settings['css_delivery_mode'] = in_array($mode, ['file', 'inline'], true) ? $mode : 'file';
             $settingsChanged = true;
         }
 
         if (isset($input['font_display'])) {
-            $settings['font_display'] = $this->normalizeFontDisplay(sanitize_text_field((string) $input['font_display']));
+            $settings['font_display'] = $this->normalizeFontDisplay(
+                sanitize_text_field($this->stringValue($input, 'font_display'))
+            );
             $settingsChanged = true;
         }
 
         if (array_key_exists('unicode_range_mode', $input)) {
-            $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode((string) $input['unicode_range_mode']);
+            $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode(
+                $this->stringValue($input, 'unicode_range_mode')
+            );
             $settingsChanged = true;
         }
 
         if (array_key_exists('unicode_range_custom_value', $input)) {
-            $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue((string) $input['unicode_range_custom_value']);
+            $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue(
+                $this->stringValue($input, 'unicode_range_custom_value')
+            );
             $settingsChanged = true;
         }
 
@@ -363,7 +403,7 @@ final class SettingsRepository
         }
 
         if (array_key_exists('update_channel', $input)) {
-            $settings['update_channel'] = $this->normalizeUpdateChannel((string) $input['update_channel']);
+            $settings['update_channel'] = $this->normalizeUpdateChannel($this->stringValue($input, 'update_channel'));
             $settingsChanged = true;
         }
 
@@ -454,7 +494,7 @@ final class SettingsRepository
 
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
         $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
-            (string) ($settings['output_quick_mode_preference'] ?? ''),
+            $this->stringValue($settings, 'output_quick_mode_preference'),
             $settings
         );
 
@@ -485,7 +525,7 @@ final class SettingsRepository
 
     public function getUpdateChannel(): string
     {
-        return (string) ($this->getSettings()['update_channel'] ?? self::UPDATE_CHANNEL_STABLE);
+        return $this->stringValue($this->getSettings(), 'update_channel', self::UPDATE_CHANNEL_STABLE);
     }
 
     /**
@@ -592,7 +632,7 @@ final class SettingsRepository
     {
         $settings = $this->getSettings();
         $existingRoles = is_array($settings['applied_roles'] ?? null)
-            ? $this->normalizeRoleSet($settings['applied_roles'], $catalog)
+            ? $this->normalizeRoleSet($this->normalizeInputMap($settings['applied_roles']), $catalog)
             : $this->getRoles($catalog);
         $normalizedRoles = $this->normalizeRoleSet(array_replace($existingRoles, $roles), $catalog);
         $settings['applied_roles'] = $normalizedRoles;
@@ -616,7 +656,7 @@ final class SettingsRepository
     {
         $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
 
-        return trim((string) $googleApiKeyData['google_api_key']) !== '';
+        return trim($googleApiKeyData['google_api_key']) !== '';
     }
 
     public function isAdobeEnabled(): bool
@@ -766,7 +806,7 @@ final class SettingsRepository
 
     public function getAdobeProjectId(): string
     {
-        return trim((string) ($this->getSettings()['adobe_project_id'] ?? ''));
+        return trim($this->stringValue($this->getSettings(), 'adobe_project_id'));
     }
 
     /**
@@ -777,9 +817,9 @@ final class SettingsRepository
         $settings = $this->getSettings();
 
         return [
-            'state' => (string) ($settings['adobe_project_status'] ?? 'empty'),
-            'message' => (string) ($settings['adobe_project_status_message'] ?? ''),
-            'checked_at' => (int) ($settings['adobe_project_checked_at'] ?? 0),
+            'state' => $this->stringValue($settings, 'adobe_project_status', 'empty'),
+            'message' => $this->stringValue($settings, 'adobe_project_status_message'),
+            'checked_at' => $this->intValue($settings, 'adobe_project_checked_at'),
         ];
     }
 
@@ -804,7 +844,7 @@ final class SettingsRepository
     public function saveAdobeProjectStatus(string $state, string $message = ''): array
     {
         $settings = $this->getSettings();
-        $normalizedState = $this->normalizeAdobeProjectStatus($state, (string) ($settings['adobe_project_id'] ?? ''));
+        $normalizedState = $this->normalizeAdobeProjectStatus($state, $this->stringValue($settings, 'adobe_project_id'));
 
         $settings['adobe_project_status'] = $normalizedState;
         $settings['adobe_project_status_message'] = $normalizedState === 'empty'
@@ -840,19 +880,19 @@ final class SettingsRepository
         $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
 
         return [
-            'state' => (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
-            'message' => (string) ($googleApiKeyData['google_api_key_status_message'] ?? ''),
-            'checked_at' => (int) ($googleApiKeyData['google_api_key_checked_at'] ?? 0),
+            'state' => $this->stringValue($googleApiKeyData, 'google_api_key_status', 'empty'),
+            'message' => $this->stringValue($googleApiKeyData, 'google_api_key_status_message'),
+            'checked_at' => $this->intValue($googleApiKeyData, 'google_api_key_checked_at'),
         ];
     }
 
     /**
-     * @return GoogleApiKeyData
+     * @return AdobeProjectStatus
      */
     public function saveGoogleApiKeyStatus(string $state, string $message = ''): array
     {
         $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
-        $normalizedState = $this->normalizeGoogleApiKeyStatus($state, (string) ($googleApiKeyData['google_api_key'] ?? ''));
+        $normalizedState = $this->normalizeGoogleApiKeyStatus($state, $googleApiKeyData['google_api_key']);
 
         $googleApiKeyData['google_api_key_status'] = $normalizedState;
         $googleApiKeyData['google_api_key_status_message'] = $normalizedState === 'empty'
@@ -862,9 +902,9 @@ final class SettingsRepository
         $googleApiKeyData = $this->persistGoogleApiKeyData($googleApiKeyData);
 
         return [
-            'state' => (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
-            'message' => (string) ($googleApiKeyData['google_api_key_status_message'] ?? ''),
-            'checked_at' => (int) ($googleApiKeyData['google_api_key_checked_at'] ?? 0),
+            'state' => $googleApiKeyData['google_api_key_status'],
+            'message' => $googleApiKeyData['google_api_key_status_message'],
+            'checked_at' => $googleApiKeyData['google_api_key_checked_at'],
         ];
     }
 
@@ -876,7 +916,7 @@ final class SettingsRepository
             return FontUtils::sanitizeFallback($default);
         }
 
-        return FontUtils::sanitizeFallback((string) ($fallbacks[$family] ?? $default));
+        return FontUtils::sanitizeFallback($this->mixedStringValue($fallbacks[$family] ?? $default, $default));
     }
 
     /**
@@ -887,7 +927,7 @@ final class SettingsRepository
         $family = sanitize_text_field($family);
 
         if ($family === '') {
-            return $this->getSettings()['family_fallbacks'] ?? [];
+            return $this->normalizeFamilyFallbacks($this->getSettings()['family_fallbacks'] ?? []);
         }
 
         $settings = $this->getSettings();
@@ -913,7 +953,7 @@ final class SettingsRepository
             return $default === '' ? '' : $this->normalizeFontDisplay($default);
         }
 
-        return $this->normalizeFontDisplay((string) $displays[$family]);
+        return $this->normalizeFontDisplay($this->mixedStringValue($displays[$family] ?? '', ''));
     }
 
     /**
@@ -924,7 +964,7 @@ final class SettingsRepository
         $family = sanitize_text_field($family);
 
         if ($family === '') {
-            return $this->getSettings()['family_font_displays'] ?? [];
+            return $this->normalizeFamilyFontDisplays($this->getSettings()['family_font_displays'] ?? []);
         }
 
         $settings = $this->getSettings();
@@ -977,7 +1017,7 @@ final class SettingsRepository
         $value = get_option($option, null);
 
         if (is_array($value)) {
-            return $value;
+            return $this->normalizeInputMap($value);
         }
 
         $legacyValue = $legacyOption !== null ? get_option($legacyOption, null) : null;
@@ -988,7 +1028,7 @@ final class SettingsRepository
 
         update_option($option, $legacyValue, false);
 
-        return $legacyValue;
+        return $this->normalizeInputMap($legacyValue);
     }
 
     /**
@@ -1006,7 +1046,7 @@ final class SettingsRepository
         $settings['acss_font_role_sync_previous_heading_font_weight'] = '';
         $settings['acss_font_role_sync_previous_text_font_weight'] = '';
 
-        if (trim((string) ($settings['adobe_project_id'] ?? '')) === '') {
+        if (trim($this->stringValue($settings, 'adobe_project_id')) === '') {
             $settings['adobe_enabled'] = false;
             $settings['adobe_project_status'] = 'empty';
         } else {
@@ -1025,13 +1065,17 @@ final class SettingsRepository
             $settings
         );
         $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
-            (string) ($settings['output_quick_mode_preference'] ?? ''),
+            $this->stringValue($settings, 'output_quick_mode_preference'),
             $settings
         );
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
-        $settings['font_display'] = $this->normalizeFontDisplay((string) ($settings['font_display'] ?? 'swap'));
-        $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF));
-        $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue((string) ($settings['unicode_range_custom_value'] ?? ''));
+        $settings['font_display'] = $this->normalizeFontDisplay($this->stringValue($settings, 'font_display', 'swap'));
+        $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode(
+            $this->stringValue($settings, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF)
+        );
+        $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue(
+            $this->stringValue($settings, 'unicode_range_custom_value')
+        );
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
@@ -1044,7 +1088,9 @@ final class SettingsRepository
         $settings['extended_variable_category_mono_enabled'] = !empty($settings['extended_variable_category_mono_enabled']);
         $settings['preload_primary_fonts'] = !empty($settings['preload_primary_fonts']);
         $settings['remote_connection_hints'] = !empty($settings['remote_connection_hints']);
-        $settings['update_channel'] = $this->normalizeUpdateChannel((string) ($settings['update_channel'] ?? self::UPDATE_CHANNEL_STABLE));
+        $settings['update_channel'] = $this->normalizeUpdateChannel(
+            $this->stringValue($settings, 'update_channel', self::UPDATE_CHANNEL_STABLE)
+        );
         $settings['block_editor_font_library_sync_enabled'] = $this->normalizeBlockEditorFontLibrarySyncSetting(
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
@@ -1073,16 +1119,16 @@ final class SettingsRepository
         $settings['acss_font_role_sync_previous_text_font_weight'] = '';
         $settings['preview_sentence'] = $this->sanitizePreviewSentence($settings['preview_sentence'] ?? '');
         $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
-        $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId((string) ($settings['adobe_project_id'] ?? ''));
+        $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId($this->stringValue($settings, 'adobe_project_id'));
         $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
-            (string) ($settings['adobe_project_status'] ?? 'empty'),
-            (string) ($settings['adobe_project_id'] ?? '')
+            $this->stringValue($settings, 'adobe_project_status', 'empty'),
+            $this->stringValue($settings, 'adobe_project_id')
         );
         $settings['adobe_project_status_message'] = $this->sanitizeStatusMessage($settings['adobe_project_status_message'] ?? '');
         $settings['adobe_project_checked_at'] = $this->normalizeTimestamp($settings['adobe_project_checked_at'] ?? 0);
         $settings['google_api_key_status'] = $this->normalizeGoogleApiKeyStatus(
-            (string) ($settings['google_api_key_status'] ?? 'empty'),
-            (string) ($settings['google_api_key'] ?? '')
+            $this->stringValue($settings, 'google_api_key_status', 'empty'),
+            $this->stringValue($settings, 'google_api_key')
         );
         $settings['google_api_key_status_message'] = $this->sanitizeStatusMessage($settings['google_api_key_status_message'] ?? '');
         $settings['google_api_key_checked_at'] = $this->normalizeTimestamp($settings['google_api_key_checked_at'] ?? 0);
@@ -1157,7 +1203,7 @@ final class SettingsRepository
 
     private function normalizeRoleWeight(mixed $weight): string
     {
-        $rawWeight = trim(wp_unslash((string) $weight));
+        $rawWeight = trim(wp_unslash($this->mixedStringValue($weight)));
 
         if ($rawWeight === '') {
             return '';
@@ -1204,7 +1250,7 @@ final class SettingsRepository
 
     private function normalizeRoleFallback(mixed $value, string $default): string
     {
-        $rawValue = trim(wp_unslash((string) $value));
+        $rawValue = trim(wp_unslash($this->mixedStringValue($value)));
 
         if ($rawValue === '') {
             return $default;
@@ -1215,12 +1261,12 @@ final class SettingsRepository
 
     private function sanitizeTextValue(mixed $value): string
     {
-        return sanitize_text_field(wp_unslash((string) $value));
+        return sanitize_text_field(wp_unslash($this->mixedStringValue($value)));
     }
 
     private function sanitizePreviewSentence(mixed $value): string
     {
-        $text = wp_unslash((string) $value);
+        $text = wp_unslash($this->mixedStringValue($value));
         $text = wp_strip_all_tags($text);
         $text = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $text) ?? $text;
         $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
@@ -1345,7 +1391,15 @@ final class SettingsRepository
             }
 
             $userId = absint($user->ID);
-            $userRoles = array_values(array_map('sanitize_key', $user->roles));
+            $userRoles = array_values(
+                array_filter(
+                    array_map(
+                        static fn (mixed $role): string => is_string($role) ? sanitize_key($role) : '',
+                        $user->roles
+                    ),
+                    static fn (string $role): bool => $role !== ''
+                )
+            );
 
             if ($userId <= 0 || in_array('administrator', $userRoles, true)) {
                 continue;
@@ -1402,13 +1456,7 @@ final class SettingsRepository
      */
     private function persistSettings(array $settings): array
     {
-        $googleApiKeyData = $this->extractGoogleApiKeyData($settings);
-
-        if ($googleApiKeyData === []) {
-            $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
-        } else {
-            $googleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
-        }
+        $googleApiKeyData = $this->normalizeGoogleApiKeyData($this->extractGoogleApiKeyData($settings));
 
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($settings));
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
@@ -1419,7 +1467,7 @@ final class SettingsRepository
             $settings
         );
         $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
-            (string) ($settings['output_quick_mode_preference'] ?? ''),
+            $this->stringValue($settings, 'output_quick_mode_preference'),
             $settings
         );
         $settings = $this->withoutGoogleApiKeyData($settings);
@@ -1570,7 +1618,7 @@ final class SettingsRepository
 
     private function sanitizeOutputQuickModePreference(mixed $value): string
     {
-        $value = strtolower(trim((string) $value));
+        $value = strtolower(trim($this->mixedStringValue($value)));
         $value = preg_replace('/[^a-z0-9_-]+/', '', $value);
         $value = is_string($value) ? $value : '';
 
@@ -1708,7 +1756,7 @@ final class SettingsRepository
     private function mergeGoogleApiKeyDataIntoSettings(array $settings, array $googleApiKeyData): array
     {
         foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
-            $settings[$field] = $googleApiKeyData[$field] ?? self::DEFAULT_GOOGLE_API_KEY_DATA[$field];
+            $settings[$field] = $googleApiKeyData[$field];
         }
 
         return $settings;
@@ -1720,17 +1768,12 @@ final class SettingsRepository
      */
     private function extractGoogleApiKeyData(array $settings): array
     {
-        $googleApiKeyData = [];
-
-        foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
-            if (!array_key_exists($field, $settings)) {
-                continue;
-            }
-
-            $googleApiKeyData[$field] = $settings[$field];
-        }
-
-        return $googleApiKeyData;
+        return [
+            'google_api_key' => $this->stringValue($settings, 'google_api_key'),
+            'google_api_key_status' => $this->stringValue($settings, 'google_api_key_status', 'empty'),
+            'google_api_key_status_message' => $this->stringValue($settings, 'google_api_key_status_message'),
+            'google_api_key_checked_at' => $this->intValue($settings, 'google_api_key_checked_at'),
+        ];
     }
 
     /**
@@ -1755,8 +1798,8 @@ final class SettingsRepository
     {
         $googleApiKeyData = is_array($value) ? $value : [];
         $googleApiKeyData = wp_parse_args($googleApiKeyData, self::DEFAULT_GOOGLE_API_KEY_DATA);
-        $plaintextApiKey = trim(sanitize_text_field((string) ($googleApiKeyData['google_api_key'] ?? '')));
-        $encryptedApiKey = trim(sanitize_text_field((string) ($googleApiKeyData[self::GOOGLE_API_KEY_ENCRYPTED_FIELD] ?? '')));
+        $plaintextApiKey = trim(sanitize_text_field($this->stringValue($googleApiKeyData, 'google_api_key')));
+        $encryptedApiKey = trim(sanitize_text_field($this->stringValue($googleApiKeyData, self::GOOGLE_API_KEY_ENCRYPTED_FIELD)));
 
         if ($plaintextApiKey === '' && $encryptedApiKey !== '') {
             $plaintextApiKey = $this->decryptGoogleApiKey($encryptedApiKey);
@@ -1765,7 +1808,7 @@ final class SettingsRepository
         $googleApiKeyData['google_api_key'] = $plaintextApiKey;
         unset($googleApiKeyData[self::GOOGLE_API_KEY_ENCRYPTED_FIELD]);
         $googleApiKeyData['google_api_key_status'] = $this->normalizeGoogleApiKeyStatus(
-            (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
+            $this->stringValue($googleApiKeyData, 'google_api_key_status', 'empty'),
             $googleApiKeyData['google_api_key']
         );
         $googleApiKeyData['google_api_key_status_message'] = $this->sanitizeStatusMessage($googleApiKeyData['google_api_key_status_message'] ?? '');
@@ -1776,16 +1819,16 @@ final class SettingsRepository
 
     /**
      * @param GoogleApiKeyData $googleApiKeyData
-     * @return GoogleApiKeyData
+     * @return StoredGoogleApiKeyData
      */
     private function buildStoredGoogleApiKeyData(array $googleApiKeyData): array
     {
         $storedGoogleApiKeyData = [
-            'google_api_key_status' => (string) ($googleApiKeyData['google_api_key_status'] ?? 'empty'),
-            'google_api_key_status_message' => (string) ($googleApiKeyData['google_api_key_status_message'] ?? ''),
-            'google_api_key_checked_at' => (int) ($googleApiKeyData['google_api_key_checked_at'] ?? 0),
+            'google_api_key_status' => $googleApiKeyData['google_api_key_status'],
+            'google_api_key_status_message' => $googleApiKeyData['google_api_key_status_message'],
+            'google_api_key_checked_at' => $googleApiKeyData['google_api_key_checked_at'],
         ];
-        $googleApiKey = trim((string) ($googleApiKeyData['google_api_key'] ?? ''));
+        $googleApiKey = trim($googleApiKeyData['google_api_key']);
 
         if ($googleApiKey === '') {
             return $storedGoogleApiKeyData;
@@ -1970,9 +2013,9 @@ final class SettingsRepository
         }
 
         if (!$hasBooleanInput && array_key_exists('class_output_mode', $input)) {
-            $normalized = $this->classOutputSettingsFromLegacyMode((string) $input['class_output_mode']);
+            $normalized = $this->classOutputSettingsFromLegacyMode($this->stringValue($input, 'class_output_mode'));
         } elseif (!$hasBooleanInput && array_key_exists('class_output_mode', $fallback)) {
-            $normalized = $this->classOutputSettingsFromLegacyMode((string) $fallback['class_output_mode']);
+            $normalized = $this->classOutputSettingsFromLegacyMode($this->stringValue($fallback, 'class_output_mode'));
         }
 
         return $normalized;
@@ -2063,11 +2106,15 @@ final class SettingsRepository
 
     private function sanitizeStatusMessage(mixed $message): string
     {
-        return sanitize_text_field((string) $message);
+        return sanitize_text_field($this->mixedStringValue($message));
     }
 
     private function normalizeTimestamp(mixed $value): int
     {
+        if (!is_scalar($value) && $value !== null) {
+            return 0;
+        }
+
         return max(0, absint($value));
     }
 
@@ -2100,7 +2147,7 @@ final class SettingsRepository
                 continue;
             }
 
-            $normalized[$family] = FontUtils::sanitizeFallback((string) $fallback);
+            $normalized[$family] = FontUtils::sanitizeFallback($this->mixedStringValue($fallback));
         }
 
         return $normalized;
@@ -2119,7 +2166,7 @@ final class SettingsRepository
 
         foreach ($value as $family => $display) {
             $family = sanitize_text_field((string) $family);
-            $display = sanitize_text_field((string) $display);
+            $display = sanitize_text_field($this->mixedStringValue($display));
 
             if ($family === '' || !$this->isSupportedFontDisplay($display)) {
                 continue;
@@ -2154,5 +2201,60 @@ final class SettingsRepository
         $settings['bricks_builder_preview_enabled'] = $bricksEnabled;
 
         return $settings;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        return $this->mixedStringValue($values[$key], $default);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function intValue(array $values, string $key, int $default = 0): int
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        return $this->normalizeTimestamp($values[$key]);
+    }
+
+    private function mixedStringValue(mixed $value, string $default = ''): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeInputMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $item) {
+            $normalized[(string) $key] = $item;
+        }
+
+        return $normalized;
     }
 }

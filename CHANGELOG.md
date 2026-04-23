@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 - Refactored duplicated hosted-provider import logic into a shared trait used by the Google Fonts and Bunny Fonts import services, while consolidating related utility helpers across library, runtime, transfer, and updater code paths.
 - Consolidated repeated admin renderer and messaging logic into shared helpers so the library and studio views reuse the same formatting and render support paths.
 - Updated the shared quality workflow and local pre-commit hook to run PHPStan alongside the repo-local `bin/run-jscpd` entrypoint, and documented the local git-hook setup.
+- Raised the repo's enforced PHPStan level progressively from onboarding coverage to level 9, backed by shared typed normalization helpers and stricter internal contracts across admin, provider, runtime, updater, repository, and integration code paths.
+- Tightened release packaging so GitHub archive builds exclude repository-only tooling, hooks, agent metadata, and other development-only files from distributable plugin zip files.
+
+### Fixed
+
+- Hardened mixed-data normalization across admin actions, renderer payloads, provider clients, transfer bundles, updater responses, and runtime font planning so static analysis and runtime behavior stay aligned without loosening WordPress-facing boundaries.
 
 ## [1.13.0-beta.2] - 2026-04-17
 

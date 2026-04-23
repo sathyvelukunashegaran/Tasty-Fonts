@@ -9,10 +9,42 @@ defined('ABSPATH') || exit;
 use TastyFonts\Support\FontUtils;
 
 /**
- * @phpstan-type LibraryRecord array<string, mixed>
+ * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
+ * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
+ * @phpstan-type ProfileMetaValue string|list<string>
+ * @phpstan-type FaceRecord array{
+ *     family: string,
+ *     slug: string,
+ *     source: string,
+ *     weight: string,
+ *     style: string,
+ *     unicode_range: string,
+ *     files: array<string, string>,
+ *     paths: array<string, string>,
+ *     provider: array<string, mixed>,
+ *     is_variable: bool,
+ *     axes: AxesMap,
+ *     variation_defaults: VariationDefaults
+ * }
+ * @phpstan-type DeliveryProfile array{
+ *     id: string,
+ *     provider: string,
+ *     type: string,
+ *     format: string,
+ *     label: string,
+ *     variants: list<string>,
+ *     faces: list<FaceRecord>,
+ *     meta: array<string, ProfileMetaValue>
+ * }
+ * @phpstan-type LibraryRecord array{
+ *     family: string,
+ *     slug: string,
+ *     publish_state: string,
+ *     manual_publish_state: string,
+ *     active_delivery_id: string,
+ *     delivery_profiles: array<string, DeliveryProfile>
+ * }
  * @phpstan-type LibraryMap array<string, LibraryRecord>
- * @phpstan-type DeliveryProfile array<string, mixed>
- * @phpstan-type FaceRecord array<string, mixed>
  */
 final class ImportRepository
 {
@@ -60,13 +92,12 @@ final class ImportRepository
         }
 
         $library = $this->getLibrary();
-        $family = $library[$slug] ?? null;
 
-        return is_array($family) ? $family : null;
+        return $library[$slug] ?? null;
     }
 
     /**
-     * @param LibraryRecord $family
+     * @param array<string, mixed> $family
      */
     public function upsert(array $family): void
     {
@@ -74,18 +105,27 @@ final class ImportRepository
     }
 
     /**
-     * @param LibraryRecord $family
+     * @param array<string, mixed> $family
      */
     public function saveFamily(array $family): void
     {
-        if (empty($family['slug']) || !is_string($family['slug'])) {
+        $rawSlug = $this->stringValue($family, 'slug');
+
+        if ($rawSlug === '') {
             return;
         }
 
+        $slug = FontUtils::slugify($rawSlug);
+
         $library = $this->getLibrary();
-        $slug = FontUtils::slugify((string) $family['slug']);
         $existing = $library[$slug] ?? null;
-        $library[$slug] = $this->normalizeFamilyRecord($family, is_array($existing) ? $existing : null);
+        $normalizedFamily = $this->normalizeFamilyRecord($family, $existing);
+
+        if ($normalizedFamily === []) {
+            return;
+        }
+
+        $library[$slug] = $normalizedFamily;
         $this->persistLibrary($library);
     }
 
@@ -113,7 +153,7 @@ final class ImportRepository
     }
 
     /**
-     * @return LibraryRecord
+     * @return LibraryRecord|array{}
      */
     public function ensureFamily(
         string $familyName,
@@ -132,7 +172,7 @@ final class ImportRepository
         $library = $this->getLibrary();
         $existing = $library[$familySlug] ?? null;
 
-        if (is_array($existing)) {
+        if ($existing !== null) {
             return $existing;
         }
 
@@ -148,6 +188,10 @@ final class ImportRepository
             null
         );
 
+        if ($family === []) {
+            return [];
+        }
+
         $library[$familySlug] = $family;
         $this->persistLibrary($library);
 
@@ -155,8 +199,8 @@ final class ImportRepository
     }
 
     /**
-     * @param DeliveryProfile $profile
-     * @return LibraryRecord
+     * @param array<string, mixed> $profile
+     * @return LibraryRecord|array{}
      */
     public function saveProfile(
         string $familyName,
@@ -183,27 +227,37 @@ final class ImportRepository
         ];
 
         if ($activate) {
-            $familyInput['active_delivery_id'] = (string) ($normalizedProfile['id'] ?? '');
+            $familyInput['active_delivery_id'] = $normalizedProfile['id'];
         }
 
-        $family = $this->normalizeFamilyRecord($familyInput, is_array($existing) ? $existing : null);
+        $family = $this->normalizeFamilyRecord($familyInput, $existing);
 
-        $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
-        $profiles[(string) $normalizedProfile['id']] = $normalizedProfile;
+        if ($family === []) {
+            return [];
+        }
+
+        $profiles = $family['delivery_profiles'];
+        $profiles[$normalizedProfile['id']] = $normalizedProfile;
         $family['delivery_profiles'] = $profiles;
 
-        if ($activate || trim((string) ($family['active_delivery_id'] ?? '')) === '') {
-            $family['active_delivery_id'] = (string) $normalizedProfile['id'];
+        if ($activate || trim($family['active_delivery_id']) === '') {
+            $family['active_delivery_id'] = $normalizedProfile['id'];
         }
 
-        $library[$familySlug] = $this->normalizeFamilyRecord($family, $family);
+        $normalizedFamily = $this->normalizeFamilyRecord($family, $family);
+
+        if ($normalizedFamily === []) {
+            return [];
+        }
+
+        $library[$familySlug] = $normalizedFamily;
         $this->persistLibrary($library);
 
         return $library[$familySlug];
     }
 
     /**
-     * @return LibraryRecord|null
+     * @return LibraryRecord|array{}|null
      */
     public function deleteProfile(string $familySlug, string $deliveryId): ?array
     {
@@ -220,7 +274,7 @@ final class ImportRepository
 
                 $family['delivery_profiles'] = $profiles;
 
-                if ((string) ($family['active_delivery_id'] ?? '') === $normalizedDeliveryId) {
+                if ($family['active_delivery_id'] === $normalizedDeliveryId) {
                     $family['active_delivery_id'] = (string) array_key_first($profiles);
                 }
 
@@ -230,7 +284,7 @@ final class ImportRepository
     }
 
     /**
-     * @return LibraryRecord|null
+     * @return LibraryRecord|array{}|null
      */
     public function setActiveDelivery(string $familySlug, string $deliveryId, ?string $publishState = null): ?array
     {
@@ -254,7 +308,7 @@ final class ImportRepository
     }
 
     /**
-     * @return LibraryRecord|null
+     * @return LibraryRecord|array{}|null
      */
     public function setPublishState(string $familySlug, string $publishState): ?array
     {
@@ -267,7 +321,7 @@ final class ImportRepository
         $library = $this->getLibrary();
         $family = $library[$familySlug] ?? null;
 
-        if (!is_array($family)) {
+        if ($family === null) {
             return null;
         }
 
@@ -277,7 +331,13 @@ final class ImportRepository
             $family['manual_publish_state'] = $publishState;
         }
 
-        $library[$familySlug] = $this->normalizeFamilyRecord($family, $family);
+        $normalizedFamily = $this->normalizeFamilyRecord($family, $family);
+
+        if ($normalizedFamily === []) {
+            return [];
+        }
+
+        $library[$familySlug] = $normalizedFamily;
         $this->persistLibrary($library);
 
         return $library[$familySlug];
@@ -285,7 +345,7 @@ final class ImportRepository
 
     /**
      * @param callable(LibraryMap, string, LibraryRecord, array<string, DeliveryProfile>, string): (LibraryRecord|null) $mutator
-     * @return LibraryRecord|null
+     * @return LibraryRecord|array{}|null
      */
     private function mutateFamilyDelivery(string $familySlug, string $deliveryId, callable $mutator): ?array
     {
@@ -299,11 +359,11 @@ final class ImportRepository
         $library = $this->getLibrary();
         $family = $library[$familySlug] ?? null;
 
-        if (!is_array($family)) {
+        if ($family === null) {
             return null;
         }
 
-        $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
+        $profiles = $family['delivery_profiles'];
 
         if (!isset($profiles[$deliveryId])) {
             return null;
@@ -316,7 +376,13 @@ final class ImportRepository
             return null;
         }
 
-        $library[$familySlug] = $this->normalizeFamilyRecord($mutatedFamily, $mutatedFamily);
+        $normalizedFamily = $this->normalizeFamilyRecord($mutatedFamily, $mutatedFamily);
+
+        if ($normalizedFamily === []) {
+            return [];
+        }
+
+        $library[$familySlug] = $normalizedFamily;
         $this->persistLibrary($library);
 
         return $library[$familySlug];
@@ -377,7 +443,7 @@ final class ImportRepository
     }
 
     /**
-     * @param LibraryMap $library
+     * @param array<int|string, mixed> $library
      * @return LibraryMap
      */
     private function normalizeLibrary(array $library): array
@@ -385,72 +451,72 @@ final class ImportRepository
         $normalized = [];
 
         foreach ($library as $slug => $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
             $normalizedFamily = $this->normalizeFamilyRecord($family, null);
 
             if ($normalizedFamily === []) {
                 continue;
             }
 
-            $normalized[(string) $normalizedFamily['slug']] = $normalizedFamily;
+            $normalized[$normalizedFamily['slug']] = $normalizedFamily;
         }
 
         uasort(
             $normalized,
-            static fn (array $left, array $right): int => strcmp((string) ($left['family'] ?? ''), (string) ($right['family'] ?? ''))
+            static fn (array $left, array $right): int => strcmp($left['family'], $right['family'])
         );
 
         return $normalized;
     }
 
     /**
-     * @param LibraryRecord $family
+     * @param array<array-key, mixed> $family
      * @param LibraryRecord|null $existing
-     * @return LibraryRecord
+     * @return LibraryRecord|array{}
      */
     private function normalizeFamilyRecord(array $family, ?array $existing): array
     {
-        $familyName = sanitize_text_field((string) ($family['family'] ?? ($existing['family'] ?? '')));
-        $familySlug = FontUtils::slugify((string) ($family['slug'] ?? ($existing['slug'] ?? $familyName)));
+        $familyName = sanitize_text_field($this->stringValue($family, 'family', $existing !== null ? $existing['family'] : ''));
+        $familySlug = FontUtils::slugify($this->stringValue($family, 'slug', $existing !== null ? $existing['slug'] : $familyName));
 
         if ($familyName === '' || $familySlug === '') {
             return [];
         }
 
-        $existingProfiles = is_array($existing['delivery_profiles'] ?? null) ? $existing['delivery_profiles'] : [];
-        $inputProfiles = $family['delivery_profiles'] ?? [];
+        $existingProfiles = $existing !== null ? $existing['delivery_profiles'] : [];
+        $inputProfiles = $this->arrayValue($family, 'delivery_profiles');
         $profiles = [];
 
         foreach ($existingProfiles as $key => $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $normalizedProfile = $this->normalizeDeliveryProfile($profile + ['id' => is_string($key) ? $key : '']);
+            $normalizedProfile = $this->normalizeDeliveryProfile($profile + ['id' => $key]);
 
             if ($normalizedProfile === []) {
                 continue;
             }
 
-            $profiles[(string) $normalizedProfile['id']] = $normalizedProfile;
+            $profiles[$normalizedProfile['id']] = $normalizedProfile;
         }
 
-        if (is_array($inputProfiles)) {
-            foreach ($inputProfiles as $key => $profile) {
-                if (!is_array($profile)) {
-                    continue;
-                }
-
-                $normalizedProfile = $this->normalizeDeliveryProfile($profile + ['id' => is_string($key) ? $key : '']);
-
-                if ($normalizedProfile === []) {
-                    continue;
-                }
-
-                $profiles[(string) $normalizedProfile['id']] = $normalizedProfile;
+        foreach ($inputProfiles as $key => $profile) {
+            if (!is_array($profile)) {
+                continue;
             }
+
+            $normalizedProfile = $this->normalizeDeliveryProfile($profile + ['id' => $key]);
+
+            if ($normalizedProfile === []) {
+                continue;
+            }
+
+            $profiles[$normalizedProfile['id']] = $normalizedProfile;
         }
 
-        $activeDeliveryId = $this->normalizeDeliveryId((string) ($family['active_delivery_id'] ?? ($existing['active_delivery_id'] ?? '')));
+        $activeDeliveryId = $this->normalizeDeliveryId(
+            $this->stringValue($family, 'active_delivery_id', $existing !== null ? $existing['active_delivery_id'] : '')
+        );
 
         if ($activeDeliveryId === '') {
             $activeDeliveryId = $profiles !== [] ? (string) array_key_first($profiles) : '';
@@ -459,11 +525,13 @@ final class ImportRepository
         return [
             'family' => $familyName,
             'slug' => $familySlug,
-            'publish_state' => $this->normalizePublishState((string) ($family['publish_state'] ?? ($existing['publish_state'] ?? 'published'))),
+            'publish_state' => $this->normalizePublishState(
+                $this->stringValue($family, 'publish_state', $existing !== null ? $existing['publish_state'] : 'published')
+            ),
             'manual_publish_state' => $this->normalizeManualPublishState(
-                (string) ($family['manual_publish_state'] ?? ''),
-                (string) ($family['publish_state'] ?? ''),
-                is_array($existing) ? $existing : null
+                $this->stringValue($family, 'manual_publish_state'),
+                $this->stringValue($family, 'publish_state'),
+                $existing
             ),
             'active_delivery_id' => $activeDeliveryId,
             'delivery_profiles' => $profiles,
@@ -471,14 +539,14 @@ final class ImportRepository
     }
 
     /**
-     * @param DeliveryProfile $profile
-     * @return DeliveryProfile
+     * @param array<array-key, mixed> $profile
+     * @return DeliveryProfile|array{}
      */
     private function normalizeDeliveryProfile(array $profile): array
     {
-        $provider = $this->normalizeProvider((string) ($profile['provider'] ?? ''));
-        $type = $this->normalizeDeliveryType((string) ($profile['type'] ?? ''));
-        $id = $this->normalizeDeliveryId((string) ($profile['id'] ?? ''));
+        $provider = $this->normalizeProvider($this->stringValue($profile, 'provider'));
+        $type = $this->normalizeDeliveryType($this->stringValue($profile, 'type'));
+        $id = $this->normalizeDeliveryId($this->stringValue($profile, 'id'));
 
         if ($id === '') {
             $id = $this->defaultProfileId($provider, $type);
@@ -492,16 +560,16 @@ final class ImportRepository
             'id' => $id,
             'provider' => $provider,
             'type' => $type,
-            'format' => $this->normalizeFormat((string) ($profile['format'] ?? ''), $this->normalizeFaceList($profile['faces'] ?? [])),
-            'label' => sanitize_text_field((string) ($profile['label'] ?? $this->defaultProfileLabel($provider, $type))),
+            'format' => $this->normalizeFormat($this->stringValue($profile, 'format'), $this->normalizeFaceList($profile['faces'] ?? [])),
+            'label' => sanitize_text_field($this->stringValue($profile, 'label', $this->defaultProfileLabel($provider, $type))),
             'variants' => $this->normalizeVariantTokenList($profile['variants'] ?? []),
             'faces' => $this->normalizeFaces($this->normalizeFaceList($profile['faces'] ?? [])),
-            'meta' => $this->normalizeMeta((array) ($profile['meta'] ?? [])),
+            'meta' => $this->normalizeMeta($this->arrayValue($profile, 'meta')),
         ];
     }
 
     /**
-     * @param list<FaceRecord> $faces
+     * @param list<array<string, mixed>> $faces
      * @return list<FaceRecord>
      */
     private function normalizeFaces(array $faces): array
@@ -511,27 +579,25 @@ final class ImportRepository
         foreach ($faces as $face) {
             $files = is_array($face['files'] ?? null) ? $face['files'] : [];
             $paths = is_array($face['paths'] ?? null) ? $face['paths'] : [];
+            $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
 
             if ($files === [] && $paths === []) {
                 continue;
             }
 
             $normalized[] = [
-                'family' => sanitize_text_field((string) ($face['family'] ?? '')),
-                'slug' => FontUtils::slugify((string) ($face['slug'] ?? '')),
-                'source' => $this->normalizeProvider((string) ($face['source'] ?? '')) ?: 'local',
-                'weight' => FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')),
-                'style' => FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')),
-                'unicode_range' => sanitize_text_field((string) ($face['unicode_range'] ?? '')),
+                'family' => sanitize_text_field($this->stringValue($face, 'family')),
+                'slug' => FontUtils::slugify($this->stringValue($face, 'slug')),
+                'source' => $this->normalizeProvider($this->stringValue($face, 'source')) ?: 'local',
+                'weight' => FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400')),
+                'style' => FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')),
+                'unicode_range' => sanitize_text_field($this->stringValue($face, 'unicode_range')),
                 'files' => $this->normalizeStringMap($files),
                 'paths' => $this->normalizeStringMap($paths),
                 'provider' => is_array($face['provider'] ?? null) ? $face['provider'] : [],
-                'is_variable' => !empty($face['is_variable']) || FontUtils::normalizeAxesMap($face['axes'] ?? []) !== [],
-                'axes' => FontUtils::normalizeAxesMap($face['axes'] ?? []),
-                'variation_defaults' => FontUtils::normalizeVariationDefaults(
-                    $face['variation_defaults'] ?? [],
-                    $face['axes'] ?? []
-                ),
+                'is_variable' => !empty($face['is_variable']) || $axes !== [],
+                'axes' => $axes,
+                'variation_defaults' => FontUtils::normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
             ];
         }
 
@@ -542,7 +608,7 @@ final class ImportRepository
 
     /**
      * @param array<string, mixed> $meta
-     * @return array<string, mixed>
+     * @return array<string, ProfileMetaValue>
      */
     private function normalizeMeta(array $meta): array
     {
@@ -559,7 +625,7 @@ final class ImportRepository
                 continue;
             }
 
-            $normalized[$key] = sanitize_text_field((string) $value);
+            $normalized[$key] = sanitize_text_field($this->mixedStringValue($value));
         }
 
         return $normalized;
@@ -602,7 +668,7 @@ final class ImportRepository
             return $state;
         }
 
-        $existingState = is_array($existing) ? sanitize_text_field((string) ($existing['manual_publish_state'] ?? '')) : '';
+        $existingState = $existing !== null ? sanitize_text_field($existing['manual_publish_state']) : '';
 
         if (in_array($existingState, ['library_only', 'published'], true)) {
             return $existingState;
@@ -657,7 +723,7 @@ final class ImportRepository
                 continue;
             }
 
-            $normalized[] = (string) $variant;
+            $normalized[] = $this->mixedStringValue($variant);
         }
 
         return FontUtils::normalizeVariantTokens($normalized);
@@ -665,7 +731,7 @@ final class ImportRepository
 
     /**
      * @param mixed $faces
-     * @return list<FaceRecord>
+     * @return list<array<string, mixed>>
      */
     private function normalizeFaceList(mixed $faces): array
     {
@@ -687,7 +753,7 @@ final class ImportRepository
     }
 
     /**
-     * @param list<FaceRecord> $faces
+     * @param list<array<string, mixed>> $faces
      */
     private function normalizeFormat(string $format, array $faces): string
     {
@@ -719,7 +785,7 @@ final class ImportRepository
     }
 
     /**
-     * @param LibraryMap $imports
+     * @param array<int|string, mixed> $imports
      * @return LibraryMap
      */
     private function migrateLegacyImports(array $imports): array
@@ -727,9 +793,13 @@ final class ImportRepository
         $library = [];
 
         foreach ($imports as $slug => $import) {
-            $familyName = sanitize_text_field((string) ($import['family'] ?? ''));
-            $familySlug = FontUtils::slugify($slug !== '' ? $slug : (string) ($import['slug'] ?? $familyName));
-            $provider = $this->normalizeProvider((string) ($import['provider'] ?? ''));
+            if (!is_array($import)) {
+                continue;
+            }
+
+            $familyName = sanitize_text_field($this->stringValue($import, 'family'));
+            $familySlug = FontUtils::slugify(is_string($slug) && $slug !== '' ? $slug : $this->stringValue($import, 'slug', $familyName));
+            $provider = $this->normalizeProvider($this->stringValue($import, 'provider'));
 
             if ($provider === '') {
                 $provider = $this->inferProviderFromFaces($this->normalizeFaceList($import['faces'] ?? []));
@@ -742,7 +812,7 @@ final class ImportRepository
             $type = $provider === 'adobe' ? 'adobe_hosted' : 'self_hosted';
             $profileId = $this->defaultProfileId($provider, $type);
 
-            $library[$familySlug] = $this->normalizeFamilyRecord(
+            $family = $this->normalizeFamilyRecord(
                 [
                     'family' => $familyName,
                     'slug' => $familySlug,
@@ -754,29 +824,35 @@ final class ImportRepository
                             'provider' => $provider,
                             'type' => $type,
                             'label' => $this->defaultProfileLabel($provider, $type),
-                            'variants' => (array) ($import['variants'] ?? []),
-                            'faces' => (array) ($import['faces'] ?? []),
+                            'variants' => is_array($import['variants'] ?? null) ? $import['variants'] : [],
+                            'faces' => is_array($import['faces'] ?? null) ? $import['faces'] : [],
                             'meta' => [
-                                'category' => (string) ($import['category'] ?? ''),
-                                'imported_at' => (string) ($import['imported_at'] ?? ''),
+                                'category' => $this->stringValue($import, 'category'),
+                                'imported_at' => $this->stringValue($import, 'imported_at'),
                             ],
                         ],
                     ],
                 ],
                 null
             );
+
+            if ($family === []) {
+                continue;
+            }
+
+            $library[$familySlug] = $family;
         }
 
         return $library;
     }
 
     /**
-     * @param list<FaceRecord> $faces
+     * @param list<array<string, mixed>> $faces
      */
     private function inferProviderFromFaces(array $faces): string
     {
         foreach ($faces as $face) {
-            $provider = $this->normalizeProvider((string) ($face['source'] ?? ''));
+            $provider = $this->normalizeProvider($this->stringValue($face, 'source'));
 
             if ($provider !== '') {
                 return $provider;
@@ -784,5 +860,53 @@ final class ImportRepository
         }
 
         return '';
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = $values[$key];
+
+        return $this->mixedStringValue($value, $default);
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function arrayValue(array $values, string $key): array
+    {
+        $value = $values[$key] ?? null;
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $nestedKey => $nestedValue) {
+            $normalized[(string) $nestedKey] = $nestedValue;
+        }
+
+        return $normalized;
+    }
+
+    private function mixedStringValue(mixed $value, string $default = ''): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 }

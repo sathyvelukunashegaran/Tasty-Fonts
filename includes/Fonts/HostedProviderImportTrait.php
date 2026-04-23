@@ -53,10 +53,12 @@ trait HostedProviderImportTrait
         }
 
         foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
+            $profile = $this->normalizeHostedMap($profile);
+
             if (
-                !is_array($profile)
-                || strtolower(trim((string) ($profile['provider'] ?? ''))) !== $provider
-                || strtolower(trim((string) ($profile['type'] ?? ''))) !== $type
+                $profile === []
+                || strtolower($this->stringValue($profile, 'provider')) !== $provider
+                || strtolower($this->stringValue($profile, 'type')) !== $type
             ) {
                 continue;
             }
@@ -81,7 +83,9 @@ trait HostedProviderImportTrait
         $existingKeys = [];
 
         foreach ((array) ($existingProfile['faces'] ?? []) as $face) {
-            if (!is_array($face)) {
+            $face = $this->normalizeHostedMap($face);
+
+            if ($face === []) {
                 continue;
             }
 
@@ -90,23 +94,23 @@ trait HostedProviderImportTrait
 
         $normalizedRequested = $normalizeRequested === null
             ? $requestedVariants
-            : (array) $normalizeRequested($requestedVariants);
+            : $this->normalizeHostedVariantList($normalizeRequested($requestedVariants));
         $toImport = [];
         $skipped = [];
 
         foreach ($normalizedRequested as $variant) {
-            $faceKey = HostedImportSupport::faceKeyFromVariant((string) $variant);
+            $faceKey = HostedImportSupport::faceKeyFromVariant($variant);
 
             if ($faceKey === null) {
                 continue;
             }
 
             if (isset($existingKeys[$faceKey])) {
-                $skipped[] = (string) $variant;
+                $skipped[] = $variant;
                 continue;
             }
 
-            $toImport[] = (string) $variant;
+            $toImport[] = $variant;
         }
 
         return [
@@ -129,8 +133,8 @@ trait HostedProviderImportTrait
         array $messages
     ): array {
         $message = $deliveryMode === 'cdn'
-            ? sprintf((string) $messages['cdn'], $familyName)
-            : sprintf((string) $messages['existing'], $familyName);
+            ? sprintf($this->stringValue($messages, 'cdn'), $familyName)
+            : sprintf($this->stringValue($messages, 'existing'), $familyName);
 
         $this->log->add($message);
 
@@ -186,8 +190,8 @@ trait HostedProviderImportTrait
 
         if (!$this->storage->ensureDirectory($familyDirectory)) {
             return $this->error(
-                (string) $config['family_dir_error_code'],
-                $this->storageErrorMessage((string) $config['family_dir_error_message'])
+                $this->stringValue($config, 'family_dir_error_code'),
+                $this->storageErrorMessage($this->stringValue($config, 'family_dir_error_message'))
             );
         }
 
@@ -206,7 +210,7 @@ trait HostedProviderImportTrait
             );
         }
 
-        $providerRoot = $this->storage->getProviderRoot((string) $config['provider_root']);
+        $providerRoot = $this->storage->getProviderRoot($this->stringValue($config, 'provider_root'));
 
         if (!$providerRoot) {
             return $this->error(
@@ -235,7 +239,7 @@ trait HostedProviderImportTrait
     ): array|WP_Error|null {
         $relativeFiles = [];
 
-        foreach ((array) $face['files'] as $format => $url) {
+        foreach ($this->arrayValue($face, 'files') as $format => $url) {
             if ($format !== 'woff2') {
                 continue;
             }
@@ -249,7 +253,7 @@ trait HostedProviderImportTrait
                 continue;
             }
 
-            $download = $this->downloadHostedFontFile((string) $url, $absolutePath, $config);
+            $download = $this->downloadHostedFontFile(FontUtils::scalarStringValue($url), $absolutePath, $config);
 
             if (is_wp_error($download)) {
                 return $download;
@@ -266,15 +270,15 @@ trait HostedProviderImportTrait
         return [
             'family' => $familyName,
             'slug' => $familySlug,
-            'source' => (string) $config['source'],
-            'weight' => (string) ($face['weight'] ?? '400'),
-            'style' => (string) ($face['style'] ?? 'normal'),
-            'unicode_range' => (string) ($face['unicode_range'] ?? ''),
+            'source' => $this->stringValue($config, 'source'),
+            'weight' => $this->stringValue($face, 'weight', '400'),
+            'style' => $this->stringValue($face, 'style', 'normal'),
+            'unicode_range' => $this->stringValue($face, 'unicode_range'),
             'files' => $relativeFiles,
             'provider' => $provider,
             'is_variable' => !empty($face['is_variable']),
-            'axes' => (array) ($face['axes'] ?? []),
-            'variation_defaults' => (array) ($face['variation_defaults'] ?? []),
+            'axes' => $this->arrayValue($face, 'axes'),
+            'variation_defaults' => $this->arrayValue($face, 'variation_defaults'),
         ];
     }
 
@@ -292,14 +296,14 @@ trait HostedProviderImportTrait
                 'family' => $familyName,
                 'slug' => $familySlug,
                 'source' => $source,
-                'weight' => (string) ($face['weight'] ?? '400'),
-                'style' => (string) ($face['style'] ?? 'normal'),
-                'unicode_range' => (string) ($face['unicode_range'] ?? ''),
-                'files' => (array) ($face['files'] ?? []),
+                'weight' => $this->stringValue($face, 'weight', '400'),
+                'style' => $this->stringValue($face, 'style', 'normal'),
+                'unicode_range' => $this->stringValue($face, 'unicode_range'),
+                'files' => $this->arrayValue($face, 'files'),
                 'provider' => $provider,
                 'is_variable' => !empty($face['is_variable']),
-                'axes' => (array) ($face['axes'] ?? []),
-                'variation_defaults' => (array) ($face['variation_defaults'] ?? []),
+                'axes' => $this->arrayValue($face, 'axes'),
+                'variation_defaults' => $this->arrayValue($face, 'variation_defaults'),
             ];
         }
 
@@ -381,7 +385,7 @@ trait HostedProviderImportTrait
             $familyName,
             $familySlug,
             $profile,
-            $existingFamily === null ? 'library_only' : (string) ($existingFamily['publish_state'] ?? 'published'),
+            $existingFamily === null ? 'library_only' : $this->stringValue($existingFamily, 'publish_state', 'published'),
             $existingFamily === null
         );
 
@@ -420,7 +424,7 @@ trait HostedProviderImportTrait
             return $familyDirectory;
         }
 
-        $provider = (array) ($profile['provider_face'] ?? []);
+        $provider = $this->arrayValue($profile, 'provider_face');
         unset($profile['provider_face']);
         $manifest = $this->buildHostedManifestFaces($familyName, $familySlug, $familyDirectory, $faces, $provider, $config);
 
@@ -444,7 +448,7 @@ trait HostedProviderImportTrait
         );
 
         $faceCount = count($manifestFaces);
-        $fileCount = (int) $manifest['files'];
+        $fileCount = $this->intValue($manifest, 'files');
         $message = $this->buildHostedImportMessageWithFiles(
             $successTemplate,
             $familyName,
@@ -457,12 +461,12 @@ trait HostedProviderImportTrait
             'imported',
             $message,
             $familyName,
-            (array) $persisted['family_record'],
-            (string) ($profile['type'] ?? 'self_hosted'),
-            (string) ($profile['id'] ?? ''),
+            $this->arrayValue($persisted, 'family_record'),
+            $this->stringValue($profile, 'type', 'self_hosted'),
+            $this->stringValue($profile, 'id'),
             $faceCount,
             $fileCount,
-            (array) $persisted['variants'],
+            $persisted['variants'],
             $variantPlan
         );
     }
@@ -487,14 +491,14 @@ trait HostedProviderImportTrait
         array $config,
         string $successTemplate
     ): array|WP_Error {
-        $provider = (array) ($profile['provider_face'] ?? []);
+        $provider = $this->arrayValue($profile, 'provider_face');
         unset($profile['provider_face']);
         $cdnFaces = $this->buildHostedCdnFaces(
             $familyName,
             $familySlug,
             $faces,
             $provider,
-            (string) ($config['source'] ?? '')
+            $this->stringValue($config, 'source')
         );
         $persisted = $this->persistHostedProfile(
             $familyName,
@@ -517,12 +521,12 @@ trait HostedProviderImportTrait
             'saved',
             $message,
             $familyName,
-            (array) $persisted['family_record'],
-            (string) ($profile['type'] ?? 'cdn'),
-            (string) ($profile['id'] ?? ''),
+            $this->arrayValue($persisted, 'family_record'),
+            $this->stringValue($profile, 'type', 'cdn'),
+            $this->stringValue($profile, 'id'),
             $faceCount,
             0,
-            (array) $persisted['variants'],
+            $persisted['variants'],
             $variantPlan
         );
     }
@@ -659,7 +663,7 @@ trait HostedProviderImportTrait
 
         if ($status !== 200) {
             return $this->error(
-                (string) $config['download_failed_code'],
+                $this->stringValue($config, 'download_failed_code'),
                 sprintf(__('Font download failed with status %d.', 'tasty-fonts'), $status)
             );
         }
@@ -668,14 +672,14 @@ trait HostedProviderImportTrait
 
         if ($body === '') {
             return $this->error(
-                (string) $config['empty_file_code'],
-                (string) $config['empty_file_message']
+                $this->stringValue($config, 'empty_file_code'),
+                $this->stringValue($config, 'empty_file_message')
             );
         }
 
         if (strlen($body) > static::MAX_FONT_FILE_BYTES) {
             return $this->error(
-                (string) $config['file_too_large_code'],
+                $this->stringValue($config, 'file_too_large_code'),
                 __('The downloaded font file exceeded the safety size limit.', 'tasty-fonts')
             );
         }
@@ -689,15 +693,15 @@ trait HostedProviderImportTrait
             && !str_contains($contentType, 'octet-stream')
         ) {
             return $this->error(
-                (string) $config['invalid_type_code'],
-                (string) $config['invalid_type_message']
+                $this->stringValue($config, 'invalid_type_code'),
+                $this->stringValue($config, 'invalid_type_message')
             );
         }
 
         if (!$this->storage->writeAbsoluteFile($targetPath, $body)) {
             return $this->error(
-                (string) $config['write_failed_code'],
-                $this->storageErrorMessage((string) $config['write_failed_message'])
+                $this->stringValue($config, 'write_failed_code'),
+                $this->storageErrorMessage($this->stringValue($config, 'write_failed_message'))
             );
         }
 
@@ -717,7 +721,9 @@ trait HostedProviderImportTrait
         $normalized = [];
 
         foreach ($faces as $face) {
-            if (!is_array($face)) {
+            $face = $this->normalizeHostedMap($face);
+
+            if ($face === []) {
                 continue;
             }
 
@@ -752,7 +758,7 @@ trait HostedProviderImportTrait
 
     private function normalizeHostedErrorCode(int|string $code): string
     {
-        return (string) $code;
+        return is_int($code) ? (string) $code : $code;
     }
 
     private function normalizeHostedHeaderValue(mixed $value): string
@@ -779,21 +785,21 @@ trait HostedProviderImportTrait
      */
     private function validateHostedRemoteFontUrl(string $url, array $config): bool|WP_Error
     {
-        $parts = wp_parse_url($url);
-        $host = strtolower((string) ($parts['host'] ?? ''));
-        $path = strtolower((string) ($parts['path'] ?? ''));
+        $parts = $this->normalizeHostedMap(wp_parse_url($url));
+        $host = strtolower($this->stringValue($parts, 'host'));
+        $path = strtolower($this->stringValue($parts, 'path'));
 
-        if ($host !== strtolower((string) $config['expected_host'])) {
+        if ($host !== strtolower($this->stringValue($config, 'expected_host'))) {
             return $this->error(
-                (string) $config['invalid_host_code'],
-                (string) $config['invalid_host_message']
+                $this->stringValue($config, 'invalid_host_code'),
+                $this->stringValue($config, 'invalid_host_message')
             );
         }
 
         if (!str_ends_with($path, '.woff2')) {
             return $this->error(
-                (string) $config['invalid_extension_code'],
-                (string) $config['invalid_extension_message']
+                $this->stringValue($config, 'invalid_extension_code'),
+                $this->stringValue($config, 'invalid_extension_message')
             );
         }
 
@@ -812,5 +818,63 @@ trait HostedProviderImportTrait
         $this->log->add($message);
 
         return new WP_Error($code, $message);
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private function normalizeHostedMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $item) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalized[$key] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function arrayValue(array $values, string $key): array
+    {
+        return $this->normalizeHostedMap($values[$key] ?? []);
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function intValue(array $values, string $key, int $default = 0): int
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        return FontUtils::scalarIntValue($values[$key], $default);
     }
 }

@@ -38,7 +38,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      */
     public function renderAdobeFamilyCard(array $family): void
     {
-        $familyName = (string) ($family['family'] ?? '');
+        $familyName = $this->stringValue($family, 'family');
 
         if ($familyName === '') {
             return;
@@ -53,8 +53,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             <div class="tasty-fonts-adobe-family-head">
                 <strong><?php echo esc_html($familyName); ?></strong>
                 <span class="tasty-fonts-badge"><?php esc_html_e('Adobe', 'tasty-fonts'); ?></span>
-                <span class="tasty-fonts-badge <?php echo esc_attr((string) ($fontTypeDescriptor['badge_class'] ?? '')); ?>">
-                    <?php echo esc_html((string) ($fontTypeDescriptor['label'] ?? '')); ?>
+                <span class="tasty-fonts-badge <?php echo esc_attr($this->stringValue($fontTypeDescriptor, 'badge_class')); ?>">
+                    <?php echo esc_html($this->stringValue($fontTypeDescriptor, 'label')); ?>
                 </span>
             </div>
             <?php if ($faceSummaryLabels !== []): ?>
@@ -216,11 +216,11 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         bool $monospaceRoleEnabled = false,
         array $classOutputOptions = []
     ): array {
-        $familyName = (string) ($family['family'] ?? '');
-        $familySlug = (string) ($family['slug'] ?? FontUtils::slugify($familyName));
-        $isHeading = ($roles['heading'] ?? '') === $familyName;
-        $isBody = ($roles['body'] ?? '') === $familyName;
-        $isMonospace = $monospaceRoleEnabled && (($roles['monospace'] ?? '') === $familyName);
+        $familyName = $this->stringValue($family, 'family');
+        $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
+        $isHeading = $roles['heading'] === $familyName;
+        $isBody = $roles['body'] === $familyName;
+        $isMonospace = $monospaceRoleEnabled && ($roles['monospace'] === $familyName);
         $assignedRoleKeys = array_values(
             array_filter(
                 [
@@ -232,19 +232,13 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         );
         $isRoleFamily = $assignedRoleKeys !== [];
         $fontTypeDescriptor = $this->buildFontTypeDescriptor($family);
-        $sourceTokens = array_values(array_unique(array_filter(
-            array_map(static fn (mixed $token): string => is_scalar($token) ? (string) $token : '', (array) ($family['delivery_filter_tokens'] ?? [])),
-            static fn (string $token): bool => $token !== ''
-        )));
-        $categoryTokens = array_values(array_unique(array_filter(
-            array_map(static fn (mixed $token): string => is_scalar($token) ? (string) $token : '', (array) ($family['font_category_tokens'] ?? [])),
-            static fn (string $token): bool => $token !== ''
-        )));
+        $sourceTokens = $this->normalizeStringList($family['delivery_filter_tokens'] ?? []);
+        $categoryTokens = $this->normalizeStringList($family['font_category_tokens'] ?? []);
         if (!empty($fontTypeDescriptor['has_variable'])) {
             $categoryTokens[] = 'variable';
         }
         $categoryTokens = array_values(array_unique($categoryTokens));
-        $fontCategoryLabel = $this->formatLibraryCategoryLabel((string) ($family['font_category'] ?? ''));
+        $fontCategoryLabel = $this->formatLibraryCategoryLabel($this->stringValue($family, 'font_category'));
         $deleteBlockedMessage = $this->buildDeleteBlockedMessage($familyName, $assignedRoleKeys);
         $deleteBlockedMessages = [];
         $deleteBlockedSelections = [
@@ -265,18 +259,18 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         }
 
         $savedFallback = array_key_exists($familyName, $familyFallbacks)
-            ? FontUtils::sanitizeFallback((string) $familyFallbacks[$familyName])
-            : FontUtils::defaultFallbackForCategory((string) ($family['font_category'] ?? ''));
-        $savedFontDisplay = (string) ($familyFontDisplays[$familyName] ?? '');
+            ? FontUtils::sanitizeFallback($familyFallbacks[$familyName])
+            : FontUtils::defaultFallbackForCategory($this->stringValue($family, 'font_category'));
+        $savedFontDisplay = array_key_exists($familyName, $familyFontDisplays) ? $familyFontDisplays[$familyName] : '';
         $currentFontDisplay = $savedFontDisplay !== '' ? $savedFontDisplay : 'inherit';
-        $publishState = (string) ($family['publish_state'] ?? 'published');
+        $publishState = $this->stringValue($family, 'publish_state', 'published');
         $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-        $activeDeliveryId = (string) ($family['active_delivery_id'] ?? '');
+        $activeDeliveryId = $this->stringValue($family, 'active_delivery_id');
         $availableDeliveries = is_array($family['available_deliveries'] ?? null) ? (array) $family['available_deliveries'] : [];
         $deliveryCount = count($availableDeliveries);
-        $activeDeliveryLabel = $this->translateProfileLabel((string) ($activeDelivery['label'] ?? ''));
+        $activeDeliveryLabel = $this->translateProfileLabel($this->stringValue($activeDelivery, 'label'));
         $activeDeliveryLabel = $activeDeliveryLabel !== '' ? $activeDeliveryLabel : __('Unavailable', 'tasty-fonts');
-        $supportsFontDisplayOverride = strtolower(trim((string) ($activeDelivery['provider'] ?? ''))) !== 'adobe';
+        $supportsFontDisplayOverride = strtolower(trim($this->stringValue($activeDelivery, 'provider'))) !== 'adobe';
         $defaultStack = FontUtils::buildFontStack($familyName, $savedFallback);
         $previewLabel = $isMonospace ? __('Code Preview', 'tasty-fonts') : __('Preview', 'tasty-fonts');
         $inlinePreviewText = $this->buildFacePreviewText($previewText, $familyName, $isMonospace, false);
@@ -292,14 +286,14 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $defaultStack,
             $assignedRoleKeys,
             $roles,
-            (string) ($family['font_category'] ?? ''),
+            $this->stringValue($family, 'font_category'),
             $categoryAliasOwners,
             $extendedVariableOptions
         );
         $familyCssClassSnippets = $this->buildFamilyCssClassSnippets(
             $familyName,
             $assignedRoleKeys,
-            (string) ($family['font_category'] ?? ''),
+            $this->stringValue($family, 'font_category'),
             $categoryAliasOwners,
             $classOutputOptions
         );
@@ -316,13 +310,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      */
     public function renderMigrateDeliveryButton(string $familyName, array $profile, string $className = 'button'): void
     {
-        $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
-        $variants = array_values(
-            array_filter(
-                array_map(static fn (mixed $variant): string => is_scalar($variant) ? trim((string) $variant) : '', (array) ($profile['variants'] ?? [])),
-                static fn (string $variant): bool => $variant !== ''
-            )
-        );
+        $provider = strtolower(trim($this->stringValue($profile, 'provider')));
+        $variants = $this->normalizeStringList($profile['variants'] ?? []);
         ?>
         <button
             type="button"
@@ -348,9 +337,9 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         string $publishState,
         array $profile
     ): void {
-        $profileId = (string) ($profile['id'] ?? '');
-        $profileLabel = $this->translateProfileLabel((string) ($profile['label'] ?? ''));
-        $profileProvider = (string) ($profile['provider'] ?? '');
+        $profileId = $this->stringValue($profile, 'id');
+        $profileLabel = $this->translateProfileLabel($this->stringValue($profile, 'label'));
+        $profileProvider = $this->stringValue($profile, 'provider');
         $profileIsActive = $profileId === $activeDeliveryId;
         $profileVariantCount = $this->countProfileVariants($profile);
         $profileDeleteBlocked = $profileIsActive && $publishState === 'role_active'
@@ -368,8 +357,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                         <?php else: ?>
                             <span class="tasty-fonts-badge"><?php esc_html_e('Saved', 'tasty-fonts'); ?></span>
                         <?php endif; ?>
-                        <span class="tasty-fonts-badge <?php echo esc_attr((string) ($fontTypeDescriptor['badge_class'] ?? '')); ?>">
-                            <?php echo esc_html((string) ($fontTypeDescriptor['label'] ?? '')); ?>
+                        <span class="tasty-fonts-badge <?php echo esc_attr($this->stringValue($fontTypeDescriptor, 'badge_class')); ?>">
+                            <?php echo esc_html($this->stringValue($fontTypeDescriptor, 'label')); ?>
                         </span>
                     </div>
                     <p class="tasty-fonts-detail-card-summary"><?php echo esc_html($this->buildProfileRequestSummary($profile)); ?></p>
@@ -474,10 +463,10 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         array $face,
         bool $isMonospace = false
     ): void {
-        $faceWeight = (string) ($face['weight'] ?? '400');
-        $faceStyle = (string) ($face['style'] ?? 'normal');
-        $faceSource = (string) ($face['source'] ?? 'local');
-        $faceUnicodeRange = (string) ($face['unicode_range'] ?? '');
+        $faceWeight = $this->stringValue($face, 'weight', '400');
+        $faceStyle = $this->stringValue($face, 'style', 'normal');
+        $faceSource = $this->stringValue($face, 'source', 'local');
+        $faceUnicodeRange = $this->stringValue($face, 'unicode_range');
         $faceStorageSummary = $this->buildFaceStorageSummary($face);
         $fontTypeDescriptor = $this->buildFontTypeDescriptor($face);
         $canDeleteVariant = $this->canDeleteFaceVariant($activeDelivery);
@@ -495,8 +484,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                     <div class="tasty-fonts-detail-card-title-row">
                         <h5 class="tasty-fonts-detail-card-title"><?php echo esc_html($faceTitle); ?></h5>
                         <span class="tasty-fonts-badge"><?php echo esc_html($this->buildFamilySourceLabel($faceSource)); ?></span>
-                        <span class="tasty-fonts-badge <?php echo esc_attr((string) ($fontTypeDescriptor['badge_class'] ?? '')); ?>">
-                            <?php echo esc_html((string) ($fontTypeDescriptor['label'] ?? '')); ?>
+                        <span class="tasty-fonts-badge <?php echo esc_attr($this->stringValue($fontTypeDescriptor, 'badge_class')); ?>">
+                            <?php echo esc_html($this->stringValue($fontTypeDescriptor, 'label')); ?>
                         </span>
                     </div>
                     <p class="tasty-fonts-detail-card-summary"><?php echo esc_html($faceStorageSummary); ?></p>
@@ -548,7 +537,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                     <dt><?php esc_html_e('Formats', 'tasty-fonts'); ?></dt>
                     <dd class="tasty-fonts-detail-chip-row">
                         <?php foreach ($formats as $format): ?>
-                            <span class="tasty-fonts-chip"><?php echo esc_html(strtoupper((string) $format)); ?></span>
+                            <span class="tasty-fonts-chip"><?php echo esc_html(strtoupper(is_string($format) ? $format : FontUtils::scalarStringValue($format))); ?></span>
                         <?php endforeach; ?>
                     </dd>
                 </div>
@@ -557,10 +546,10 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             <div class="tasty-fonts-detail-files tasty-fonts-detail-files--css">
                 <span class="tasty-fonts-detail-files-label"><?php esc_html_e('CSS', 'tasty-fonts'); ?></span>
                 <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--selection">
-                    <?php $this->renderFaceVariableCopyPill(__('Family', 'tasty-fonts'), (string) ($faceCssSnippets['family'] ?? ''), __('Family CSS copied.', 'tasty-fonts')); ?>
-                    <?php $this->renderFaceVariableCopyPill(__('Weight', 'tasty-fonts'), (string) ($faceCssSnippets['weight'] ?? ''), __('Weight CSS copied.', 'tasty-fonts')); ?>
-                    <?php $this->renderFaceVariableCopyPill(__('Style', 'tasty-fonts'), (string) ($faceCssSnippets['style'] ?? ''), __('Style CSS copied.', 'tasty-fonts')); ?>
-                    <?php $this->renderFaceVariableCopyPill(__('Snippet', 'tasty-fonts'), (string) ($faceCssSnippets['snippet'] ?? ''), __('CSS snippet copied.', 'tasty-fonts')); ?>
+                    <?php $this->renderFaceVariableCopyPill(__('Family', 'tasty-fonts'), $this->stringValue($faceCssSnippets, 'family'), __('Family CSS copied.', 'tasty-fonts')); ?>
+                    <?php $this->renderFaceVariableCopyPill(__('Weight', 'tasty-fonts'), $this->stringValue($faceCssSnippets, 'weight'), __('Weight CSS copied.', 'tasty-fonts')); ?>
+                    <?php $this->renderFaceVariableCopyPill(__('Style', 'tasty-fonts'), $this->stringValue($faceCssSnippets, 'style'), __('Style CSS copied.', 'tasty-fonts')); ?>
+                    <?php $this->renderFaceVariableCopyPill(__('Snippet', 'tasty-fonts'), $this->stringValue($faceCssSnippets, 'snippet'), __('CSS snippet copied.', 'tasty-fonts')); ?>
                 </div>
             </div>
 
@@ -570,8 +559,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                     <div class="tasty-fonts-detail-file-list">
                         <?php foreach ($paths as $format => $path): ?>
                             <div class="tasty-fonts-file-path">
-                                <strong><?php echo esc_html(strtoupper((string) $format)); ?>:</strong>
-                                <div class="tasty-fonts-code"><?php echo esc_html(FontUtils::compactRelativePath((string) $path)); ?></div>
+                                <strong><?php echo esc_html(strtoupper(is_string($format) ? $format : FontUtils::scalarStringValue($format))); ?>:</strong>
+                                <div class="tasty-fonts-code"><?php echo esc_html(FontUtils::compactRelativePath(FontUtils::scalarStringValue($path))); ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -579,5 +568,43 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             <?php endif; ?>
         </article>
         <?php
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, int|string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeStringList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            $stringValue = FontUtils::scalarStringValue($item);
+
+            if ($stringValue === '') {
+                continue;
+            }
+
+            $normalized[] = $stringValue;
+        }
+
+        return array_values(array_unique($normalized));
     }
 }

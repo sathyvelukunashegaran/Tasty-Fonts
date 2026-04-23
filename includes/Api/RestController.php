@@ -186,7 +186,7 @@ final class RestController
         return $this->restResult(
             $this->admin->uploadLocalFontRows(
                 $this->admin->prepareUploadRows(
-                    is_array($postedRows) ? $postedRows : [],
+                    $this->normalizePostedUploadRows($postedRows),
                     is_array($rawFiles['files'] ?? null) ? $rawFiles['files'] : []
                 )
             )
@@ -709,5 +709,23 @@ final class RestController
         }
 
         return in_array(strtolower($normalized), array_map('strtolower', $allowedValues), true);
+    }
+
+    /**
+     * @return array<int|string, array<string, mixed>>
+     */
+    private function normalizePostedUploadRows(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $row) {
+            $normalized[$key] = is_array($row) ? $row : [];
+        }
+
+        return $normalized;
     }
 }

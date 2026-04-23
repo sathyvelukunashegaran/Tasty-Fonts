@@ -29,7 +29,8 @@ final class StudioSectionRenderer extends AbstractSectionRenderer
         $this->previewRenderer->render($view);
         $view['embeddedPreviewSection'] = (string) ob_get_clean();
 
-        $view['currentPage'] = (string) ($view['currentPage'] ?? AdminController::PAGE_ROLES);
+        $currentPage = $view['currentPage'] ?? AdminController::PAGE_ROLES;
+        $view['currentPage'] = is_scalar($currentPage) ? (string) $currentPage : AdminController::PAGE_ROLES;
 
         ob_start();
         $this->toolsRenderer->render($view);

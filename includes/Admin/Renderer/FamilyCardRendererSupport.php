@@ -450,8 +450,8 @@ trait FamilyCardRendererSupport
      */
     protected function buildProfileRequestSummary(array $profile): string
     {
-        $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
-        $type = strtolower(trim((string) ($profile['type'] ?? '')));
+        $provider = strtolower(trim($this->mapStringValue($profile, 'provider')));
+        $type = strtolower(trim($this->mapStringValue($profile, 'type')));
 
         return match ($provider . ':' . $type) {
             'google:cdn' => __('External request via Google Fonts', 'tasty-fonts'),
@@ -466,8 +466,8 @@ trait FamilyCardRendererSupport
      */
     protected function isMigratableCdnProfile(array $profile): bool
     {
-        $provider = strtolower(trim((string) ($profile['provider'] ?? '')));
-        $type = strtolower(trim((string) ($profile['type'] ?? '')));
+        $provider = strtolower(trim($this->mapStringValue($profile, 'provider')));
+        $type = strtolower(trim($this->mapStringValue($profile, 'type')));
 
         return $type === 'cdn' && in_array($provider, ['google', 'bunny'], true);
     }
@@ -481,11 +481,11 @@ trait FamilyCardRendererSupport
         $items = [];
 
         foreach ($faces as $face) {
-            $normalizedWeight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
+            $normalizedWeight = FontUtils::normalizeWeight($this->mapStringValue($face, 'weight', '400'));
             $weight = preg_match('/^\d{1,4}\.\.\d{1,4}$/', $normalizedWeight) === 1
                 ? $normalizedWeight
                 : (preg_replace('/[^0-9]/', '', $normalizedWeight) ?: '400');
-            $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
+            $style = FontUtils::normalizeStyle($this->mapStringValue($face, 'style', 'normal'));
             $key = FontUtils::faceAxisKey($weight, $style);
 
             if (isset($items[$key])) {
@@ -533,9 +533,9 @@ trait FamilyCardRendererSupport
 
         foreach ($faces as $face) {
             foreach (FontUtils::normalizeAxesMap($face['axes'] ?? []) as $tag => $definition) {
-                $min = (string) ($definition['min'] ?? '');
-                $max = (string) ($definition['max'] ?? '');
-                $default = (string) ($definition['default'] ?? '');
+                $min = $this->mapStringValue($definition, 'min');
+                $max = $this->mapStringValue($definition, 'max');
+                $default = $this->mapStringValue($definition, 'default');
                 $range = $min !== '' && $max !== '' && $min !== $max
                     ? $min . '..' . $max
                     : ($default !== '' ? $default : ($min !== '' ? $min : $max));
@@ -579,8 +579,8 @@ trait FamilyCardRendererSupport
      */
     protected function canDeleteFaceVariant(array $activeDelivery): bool
     {
-        $provider = strtolower(trim((string) ($activeDelivery['provider'] ?? '')));
-        $type = strtolower(trim((string) ($activeDelivery['type'] ?? '')));
+        $provider = strtolower(trim($this->mapStringValue($activeDelivery, 'provider')));
+        $type = strtolower(trim($this->mapStringValue($activeDelivery, 'type')));
 
         return $activeDelivery !== [] && $provider !== 'adobe' && $type !== 'adobe_hosted';
     }

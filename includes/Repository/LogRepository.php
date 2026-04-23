@@ -27,10 +27,10 @@ final class LogRepository
     public function add(string $message, array $context = []): void
     {
         $log = $this->all();
-        $actionLabel = sanitize_text_field((string) ($context['action_label'] ?? ''));
-        $actionUrl = esc_url_raw((string) ($context['action_url'] ?? ''));
-        $category = sanitize_key((string) ($context['category'] ?? ''));
-        $event = sanitize_key((string) ($context['event'] ?? ''));
+        $actionLabel = sanitize_text_field($this->stringValue($context, 'action_label'));
+        $actionUrl = esc_url_raw($this->stringValue($context, 'action_url'));
+        $category = sanitize_key($this->stringValue($context, 'category'));
+        $event = sanitize_key($this->stringValue($context, 'event'));
         $entry = [
             'time' => current_time('mysql', true),
             'message' => $message,
@@ -157,5 +157,19 @@ final class LogRepository
         }
 
         return __('System', 'tasty-fonts');
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        $value = $values[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 }

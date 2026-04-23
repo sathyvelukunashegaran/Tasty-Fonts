@@ -12,14 +12,16 @@ use TastyFonts\Support\TransientKey;
 use WP_Error;
 
 /**
+ * @phpstan-import-type AdobeProjectStatus from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type GoogleApiKeyData from \TastyFonts\Repository\SettingsRepository
  * @phpstan-type CatalogItem array<string, mixed>
  * @phpstan-type CatalogIndex array<string, CatalogItem>
  * @phpstan-type MetadataIndex array<string, array<string, mixed>>
  * @phpstan-type SearchResultItem array<string, mixed>
  * @phpstan-type ApiStatus array<string, mixed>
- * @phpstan-type VariableCssRequest array<string, mixed>
+ * @phpstan-type VariableCssRequest array{axis_list: string, rows: list<string>}
  * @phpstan-type ImportFormatMap array<string, array<string, bool|string>>
+ * @phpstan-type RemoteGetArgs array{timeout?: float|int, headers?: array<string, string>}
  */
 final class GoogleFontsClient
 {
@@ -115,7 +117,7 @@ final class GoogleFontsClient
         $errorMessage = '';
 
         if (is_array($body)) {
-            $errorMessage = trim((string) ($body['error']['message'] ?? ''));
+            $errorMessage = $this->stringValue($this->arrayValue($body, 'error'), 'message');
         }
 
         if ($status === 400 || $status === 403) {
@@ -137,7 +139,7 @@ final class GoogleFontsClient
     }
 
     /**
-     * @return GoogleApiKeyData
+     * @return AdobeProjectStatus
      */
     public function revalidateStoredApiKeyStatus(): array
     {
@@ -152,8 +154,8 @@ final class GoogleFontsClient
         $validation = $this->validateApiKey($apiKey);
 
         return $this->settings->saveGoogleApiKeyStatus(
-            (string) ($validation['state'] ?? 'unknown'),
-            (string) ($validation['message'] ?? '')
+            $this->stringValue($validation, 'state', 'unknown'),
+            $this->stringValue($validation, 'message')
         );
     }
 
@@ -171,7 +173,7 @@ final class GoogleFontsClient
         $results = [];
 
         foreach ($this->fetchCatalogIndex() as $slug => $item) {
-            $family = (string) ($item['family'] ?? '');
+            $family = $this->stringValue($item, 'family');
 
             if (!$this->matchesSearchQuery($family, $query)) {
                 continue;
@@ -183,14 +185,16 @@ final class GoogleFontsClient
         usort(
             $results,
             static function (array $left, array $right) use ($query): int {
-                $leftStarts = str_starts_with(strtolower((string) $left['family']), $query);
-                $rightStarts = str_starts_with(strtolower((string) $right['family']), $query);
+                $leftFamily = is_scalar($left['family'] ?? null) ? (string) $left['family'] : '';
+                $rightFamily = is_scalar($right['family'] ?? null) ? (string) $right['family'] : '';
+                $leftStarts = str_starts_with(strtolower($leftFamily), $query);
+                $rightStarts = str_starts_with(strtolower($rightFamily), $query);
 
                 if ($leftStarts !== $rightStarts) {
                     return $leftStarts ? -1 : 1;
                 }
 
-                return strcmp((string) $left['family'], (string) $right['family']);
+                return strcmp($leftFamily, $rightFamily);
             }
         );
 
@@ -207,7 +211,7 @@ final class GoogleFontsClient
         }
 
         foreach ($this->fetchCatalogItems() as $item) {
-            if ($this->isMatchingFamilyName((string) ($item['family'] ?? ''), $familyName)) {
+            if ($this->isMatchingFamilyName($this->stringValue($item, 'family'), $familyName)) {
                 return $this->normalizeCatalogItem($item);
             }
         }
@@ -306,14 +310,7 @@ final class GoogleFontsClient
         $cached = get_transient(TransientKey::forSite(self::TRANSIENT_CATALOG));
 
         if ($this->isCatalogIndex($cached)) {
-            $this->catalogIndex = $cached;
-
-            return $this->catalogIndex;
-        }
-
-        if ($this->isLegacyCatalogItemsCache($cached)) {
-            $this->catalogItems = $cached;
-            $this->catalogIndex = $this->buildCatalogIndex($cached);
+            $this->catalogIndex = $this->normalizedCatalogIndex($cached);
             set_transient(TransientKey::forSite(self::TRANSIENT_CATALOG), $this->catalogIndex, self::CATALOG_TTL);
 
             return $this->catalogIndex;
@@ -364,16 +361,16 @@ final class GoogleFontsClient
     private function normalizeCatalogItem(array $item): array
     {
         $item = $this->enrichCatalogItemWithMetadata($item);
-        $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
+        $axes = $this->normalizeCatalogAxes($this->arrayValue($item, 'axes'));
         $formats = $this->buildImportOptions($axes);
 
         return [
-            'family' => (string) ($item['family'] ?? ''),
-            'category' => (string) ($item['category'] ?? ''),
+            'family' => $this->stringValue($item, 'family'),
+            'category' => $this->stringValue($item, 'category'),
             'variants' => $this->normalizeVariantTokenList($item['variants'] ?? []),
             'subsets' => array_values(array_filter((array) ($item['subsets'] ?? []), 'is_string')),
-            'version' => (string) ($item['version'] ?? ''),
-            'lastModified' => (string) ($item['lastModified'] ?? ''),
+            'version' => $this->stringValue($item, 'version'),
+            'lastModified' => $this->stringValue($item, 'lastModified'),
             'is_variable' => $axes !== [],
             'axes' => $axes,
             'formats' => $formats,
@@ -388,14 +385,14 @@ final class GoogleFontsClient
     private function normalizeSearchResultItem(string $slug, array $item): array
     {
         $item = $this->enrichCatalogItemWithMetadata($item);
-        $axes = FontUtils::normalizeAxesMap((array) ($item['axes'] ?? []));
+        $axes = FontUtils::normalizeAxesMap($this->arrayValue($item, 'axes'));
         $formats = $this->buildImportOptions($axes);
 
         return [
-            'family' => (string) ($item['family'] ?? ''),
+            'family' => $this->stringValue($item, 'family'),
             'slug' => $slug,
-            'category' => (string) ($item['category'] ?? ''),
-            'variants_count' => max(0, (int) ($item['variants_count'] ?? 0)),
+            'category' => $this->stringValue($item, 'category'),
+            'variants_count' => max(0, $this->intValue($item, 'variants_count')),
             'variants' => $this->normalizeVariantTokenList($item['variants'] ?? []),
             'is_variable' => $axes !== [] || !empty($item['is_variable']),
             'axes' => $axes,
@@ -410,13 +407,14 @@ final class GoogleFontsClient
     }
 
     /**
-     * @param array<string, mixed> $args
+     * @param RemoteGetArgs $args
+     * @return array<string, mixed>|WP_Error
      */
-    private function remoteGet(string $url, array $args = []): mixed
+    private function remoteGet(string $url, array $args = []): array|WP_Error
     {
         $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);
 
-        return wp_remote_get($url, is_array($filteredArgs) ? $filteredArgs : $args);
+        return wp_remote_get($url, $this->normalizeRequestArgs($filteredArgs, $args));
     }
 
     /**
@@ -460,7 +458,7 @@ final class GoogleFontsClient
 
     private function getApiKey(): string
     {
-        return trim((string) $this->settings->getSettings()['google_api_key']);
+        return $this->stringValue($this->settings->getSettings(), 'google_api_key');
     }
 
     /**
@@ -472,7 +470,7 @@ final class GoogleFontsClient
             return;
         }
 
-        $checkedAt = (int) ($status['checked_at'] ?? 0);
+        $checkedAt = $this->intValue($status, 'checked_at');
 
         if ($checkedAt > 0 && (time() - $checkedAt) < self::API_KEY_REVALIDATION_INTERVAL) {
             return;
@@ -533,9 +531,9 @@ final class GoogleFontsClient
 
         foreach ($items as $item) {
             $item = $this->enrichCatalogItemWithMetadata($item, $metadataIndex);
-            $family = trim((string) ($item['family'] ?? ''));
+            $family = $this->stringValue($item, 'family');
             $slug = FontUtils::slugify($family);
-            $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
+            $axes = $this->normalizeCatalogAxes($this->arrayValue($item, 'axes'));
 
             if ($family === '' || $slug === '') {
                 continue;
@@ -543,7 +541,7 @@ final class GoogleFontsClient
 
             $index[$slug] = [
                 'family' => $family,
-                'category' => (string) ($item['category'] ?? ''),
+                'category' => $this->stringValue($item, 'category'),
                 'variants_count' => count($this->normalizeVariantTokenList($item['variants'] ?? [])),
                 'variants' => $this->normalizeVariantTokenList($item['variants'] ?? []),
                 'is_variable' => $axes !== [],
@@ -583,6 +581,15 @@ final class GoogleFontsClient
      */
     private function normalizeCatalogItemList(mixed $items): array
     {
+        return $this->itemList($items);
+    }
+
+    /**
+     * @param mixed $items
+     * @return list<array<string, mixed>>
+     */
+    private function itemList(mixed $items): array
+    {
         if (!is_array($items)) {
             return [];
         }
@@ -595,6 +602,29 @@ final class GoogleFontsClient
             }
 
             $normalized[] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $cached
+     * @return CatalogIndex
+     */
+    private function normalizedCatalogIndex(mixed $cached): array
+    {
+        if (!is_array($cached)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($cached as $slug => $item) {
+            if (!is_string($slug) || !is_array($item)) {
+                continue;
+            }
+
+            $normalized[$slug] = $item;
         }
 
         return $normalized;
@@ -624,11 +654,6 @@ final class GoogleFontsClient
         return true;
     }
 
-    private function isLegacyCatalogItemsCache(mixed $cached): bool
-    {
-        return false;
-    }
-
     /**
      * @return MetadataIndex
      */
@@ -641,7 +666,7 @@ final class GoogleFontsClient
         $cached = get_transient(TransientKey::forSite(self::TRANSIENT_METADATA));
 
         if ($this->isMetadataIndex($cached)) {
-            $this->metadataIndex = $cached;
+            $this->metadataIndex = $this->normalizedMetadataIndex($cached);
 
             return $this->metadataIndex;
         }
@@ -666,19 +691,13 @@ final class GoogleFontsClient
         }
 
         $decoded = $this->decodeMetadataPayload((string) wp_remote_retrieve_body($response));
-        $familyMetadata = is_array($decoded['familyMetadataList'] ?? null)
-            ? (array) $decoded['familyMetadataList']
-            : [];
+        $familyMetadata = $this->itemList($decoded['familyMetadataList'] ?? []);
         $index = [];
 
         foreach ($familyMetadata as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-            $family = trim((string) ($item['family'] ?? ''));
+            $family = $this->stringValue($item, 'family');
             $slug = FontUtils::slugify($family);
-            $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
+            $axes = $this->normalizeCatalogAxes($this->arrayValue($item, 'axes'));
 
             if ($family === '' || $slug === '') {
                 continue;
@@ -696,6 +715,29 @@ final class GoogleFontsClient
         }
 
         return $this->metadataIndex ?? [];
+    }
+
+    /**
+     * @param mixed $cached
+     * @return MetadataIndex
+     */
+    private function normalizedMetadataIndex(mixed $cached): array
+    {
+        if (!is_array($cached)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($cached as $slug => $item) {
+            if (!is_string($slug) || !is_array($item)) {
+                continue;
+            }
+
+            $normalized[$slug] = $item;
+        }
+
+        return $normalized;
     }
 
     private function isMetadataIndex(mixed $cached): bool
@@ -716,6 +758,39 @@ final class GoogleFontsClient
         }
 
         return true;
+    }
+
+    /**
+     * @param mixed $maybeArgs
+     * @param RemoteGetArgs $fallback
+     * @return RemoteGetArgs
+     */
+    private function normalizeRequestArgs(mixed $maybeArgs, array $fallback): array
+    {
+        $source = is_array($maybeArgs) ? $maybeArgs : $fallback;
+        $normalized = [];
+        $timeout = $source['timeout'] ?? $fallback['timeout'] ?? null;
+
+        if (is_int($timeout) || is_float($timeout)) {
+            $normalized['timeout'] = $timeout;
+        }
+
+        $headers = $this->stringMap($source['headers'] ?? ($fallback['headers'] ?? []));
+
+        if ($headers !== []) {
+            $normalized['headers'] = $headers;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, string>
+     */
+    private function stringMap(mixed $value): array
+    {
+        return FontUtils::normalizeStringMap($value);
     }
 
     /**
@@ -747,7 +822,7 @@ final class GoogleFontsClient
      */
     private function enrichCatalogItemWithMetadata(array $item, ?array $metadataIndex = null): array
     {
-        $axes = $this->normalizeCatalogAxes((array) ($item['axes'] ?? []));
+        $axes = $this->normalizeCatalogAxes($this->arrayValue($item, 'axes'));
 
         if ($axes !== []) {
             $item['axes'] = $axes;
@@ -756,7 +831,7 @@ final class GoogleFontsClient
             return $item;
         }
 
-        $family = trim((string) ($item['family'] ?? ''));
+        $family = $this->stringValue($item, 'family');
         $slug = FontUtils::slugify($family);
 
         if ($family === '' || $slug === '') {
@@ -767,8 +842,8 @@ final class GoogleFontsClient
         }
 
         $metadataIndex = $metadataIndex ?? $this->fetchMetadataIndex();
-        $metadata = is_array($metadataIndex[$slug] ?? null) ? (array) $metadataIndex[$slug] : [];
-        $metadataAxes = $this->normalizeCatalogAxes((array) ($metadata['axes'] ?? []));
+        $metadata = $this->arrayValue($metadataIndex, $slug);
+        $metadataAxes = $this->normalizeCatalogAxes($this->arrayValue($metadata, 'axes'));
 
         $item['axes'] = $metadataAxes;
         $item['is_variable'] = $metadataAxes !== [];
@@ -782,7 +857,7 @@ final class GoogleFontsClient
     }
 
     /**
-     * @param array<string, mixed>|list<array<string, mixed>> $axes
+     * @param array<int|string, mixed>|list<array<string, mixed>> $axes
      * @return array<string, array<string, float|int|string>>
      */
     private function normalizeCatalogAxes(array $axes): array
@@ -843,13 +918,13 @@ final class GoogleFontsClient
                 continue;
             }
 
-            $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
+            $style = FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal'));
 
             if (!isset($requestedStyles[$style])) {
                 continue;
             }
 
-            $rowAxes = FontUtils::normalizeAxesMap((array) ($face['axes'] ?? []));
+            $rowAxes = FontUtils::normalizeAxesMap($this->arrayValue($face, 'axes'));
             $rows[$style] = [
                 'style' => $style,
                 'axes' => $rowAxes !== [] ? $rowAxes : $familyAxes,
@@ -939,5 +1014,56 @@ final class GoogleFontsClient
     private function matchesSearchQuery(string $family, string $query): bool
     {
         return $family !== '' && str_contains(strtolower($family), $query);
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     * @return array<int|string, mixed>
+     */
+    private function arrayValue(array $values, string $key): array
+    {
+        $value = $values[$key] ?? null;
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function intValue(array $values, string $key, int $default = 0): int
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = $values[$key];
+
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_float($value)) {
+            return (int) $value;
+        }
+
+        if (is_string($value) && $value !== '' && preg_match('/^-?\d+$/', $value) === 1) {
+            return (int) $value;
+        }
+
+        return $default;
     }
 }

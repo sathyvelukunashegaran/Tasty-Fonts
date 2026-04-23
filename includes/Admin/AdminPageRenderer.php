@@ -80,14 +80,14 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         $storage = $view['storage'] ?? null;
         $toasts = $this->normalizeToastList($view['toasts'] ?? []);
         $trainingWheelsOff = !empty($view['trainingWheelsOff']);
-        $storageErrorMessage = (string) ($view['storageErrorMessage'] ?? '');
-        $currentPage = (string) ($view['currentPage'] ?? AdminController::PAGE_ROLES);
-        $pluginVersion = (string) ($view['pluginVersion'] ?? '');
-        $pluginVersionUrl = (string) ($view['pluginVersionUrl'] ?? '');
-        $pluginVersionMeta = (string) ($view['pluginVersionMeta'] ?? '');
-        $pluginVersionBadgeClass = (string) ($view['pluginVersionBadgeClass'] ?? 'is-role');
-        $pluginVersionTooltip = (string) ($view['pluginVersionTooltip'] ?? '');
-        $pluginVersionAriaLabel = (string) ($view['pluginVersionAriaLabel'] ?? '');
+        $storageErrorMessage = $this->stringValue($view, 'storageErrorMessage');
+        $currentPage = $this->stringValue($view, 'currentPage', AdminController::PAGE_ROLES);
+        $pluginVersion = $this->stringValue($view, 'pluginVersion');
+        $pluginVersionUrl = $this->stringValue($view, 'pluginVersionUrl');
+        $pluginVersionMeta = $this->stringValue($view, 'pluginVersionMeta');
+        $pluginVersionBadgeClass = $this->stringValue($view, 'pluginVersionBadgeClass', 'is-role');
+        $pluginVersionTooltip = $this->stringValue($view, 'pluginVersionTooltip');
+        $pluginVersionAriaLabel = $this->stringValue($view, 'pluginVersionAriaLabel');
         $pageTabs = self::pageTabs();
         $pageHeader = $pageTabs[$currentPage] ?? $pageTabs[AdminController::PAGE_ROLES];
 
@@ -261,6 +261,20 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        $value = $values[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 
     /**

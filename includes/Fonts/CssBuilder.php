@@ -29,7 +29,7 @@ final class CssBuilder
 
     /**
      * @param CatalogMap $catalog
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param NormalizedSettings $settings
      * @param VariableFamilyMap $variableFamilies
      */
@@ -49,7 +49,7 @@ final class CssBuilder
 
     /**
      * @param CatalogMap $catalog
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param NormalizedSettings $settings
      * @param VariableFamilyMap $variableFamilies
      */
@@ -62,17 +62,17 @@ final class CssBuilder
         string $displayOverride = ''
     ): string {
         $blocks = [];
-        $defaultDisplay = $this->resolveFontDisplay((string) ($settings['font_display'] ?? 'swap'));
-        $familyDisplays = is_array($settings['family_font_displays'] ?? null) ? $settings['family_font_displays'] : [];
+        $defaultDisplay = $this->resolveFontDisplay($this->stringValue($settings, 'font_display', 'swap'));
+        $familyDisplays = FontUtils::normalizeStringMap($settings['family_font_displays'] ?? []);
         $includeMonospace = !empty($settings['monospace_role_enabled']);
 
         foreach ($catalog as $family) {
-            $familyName = (string) ($family['family'] ?? '');
+            $familyName = $this->stringValue($family, 'family');
             $display = $displayOverride !== ''
                 ? $this->resolveFontDisplay($displayOverride)
                 : $this->resolveFamilyFontDisplay($familyName, $familyDisplays, $defaultDisplay);
 
-            foreach ((array) ($family['faces'] ?? []) as $face) {
+            foreach ($this->normalizeFaceList($family['faces'] ?? []) as $face) {
                 $rule = $this->buildFaceRule($face, $display, $settings);
 
                 if ($rule !== '') {
@@ -111,7 +111,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param VariableFamilyMap $variableFamilies
      * @param NormalizedSettings $settings
      */
@@ -141,7 +141,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param VariableFamilyMap $variableFamilies
      * @param NormalizedSettings $settings
      */
@@ -162,7 +162,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param VariableFamilyMap $variableFamilies
      * @param NormalizedSettings $settings
      */
@@ -187,20 +187,20 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param NormalizedSettings $settings
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      */
     public function buildRoleStackSnippet(array $roles, bool $includeMonospace = false, array $settings = [], array $families = []): string
     {
         $stacks = [
-            FontUtils::buildFontStack((string) ($roles['heading'] ?? ''), $this->resolveRoleFallback('heading', $roles, $settings, $families)),
-            FontUtils::buildFontStack((string) ($roles['body'] ?? ''), $this->resolveRoleFallback('body', $roles, $settings, $families)),
+            FontUtils::buildFontStack($this->roleStringValue($roles, 'heading'), $this->resolveRoleFallback('heading', $roles, $settings, $families)),
+            FontUtils::buildFontStack($this->roleStringValue($roles, 'body'), $this->resolveRoleFallback('body', $roles, $settings, $families)),
         ];
 
         if ($includeMonospace) {
             $stacks[] = FontUtils::buildFontStack(
-                (string) ($roles['monospace'] ?? ''),
+                $this->roleStringValue($roles, 'monospace'),
                 $this->resolveRoleFallback('monospace', $roles, $settings, $families)
             );
         }
@@ -209,21 +209,21 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      */
     public function buildRoleNameSnippet(array $roles, bool $includeMonospace = false): string
     {
-        $names = [(string) ($roles['heading'] ?? ''), (string) ($roles['body'] ?? '')];
+        $names = [$this->roleStringValue($roles, 'heading'), $this->roleStringValue($roles, 'body')];
 
         if ($includeMonospace) {
-            $names[] = (string) ($roles['monospace'] ?? '');
+            $names[] = $this->roleStringValue($roles, 'monospace');
         }
 
         return implode("\n", $names);
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param NormalizedSettings $settings
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      */
@@ -232,17 +232,17 @@ final class CssBuilder
         $blocks = [];
 
         if ($this->classOutputRoleEnabled($settings, 'heading')) {
-            $blocks[] = $this->buildClassRule('.font-heading', (string) ($roles['heading'] ?? ''), $this->resolveRoleFallback('heading', $roles, $settings, $families));
+            $blocks[] = $this->buildClassRule('.font-heading', $this->roleStringValue($roles, 'heading'), $this->resolveRoleFallback('heading', $roles, $settings, $families));
         }
 
         if ($this->classOutputRoleEnabled($settings, 'body')) {
-            $blocks[] = $this->buildClassRule('.font-body', (string) ($roles['body'] ?? ''), $this->resolveRoleFallback('body', $roles, $settings, $families));
+            $blocks[] = $this->buildClassRule('.font-body', $this->roleStringValue($roles, 'body'), $this->resolveRoleFallback('body', $roles, $settings, $families));
         }
 
         if ($includeMonospace && $this->classOutputRoleEnabled($settings, 'monospace')) {
             $blocks[] = $this->buildClassRule(
                 '.font-monospace',
-                (string) ($roles['monospace'] ?? ''),
+                $this->roleStringValue($roles, 'monospace'),
                 $this->resolveRoleFallback('monospace', $roles, $settings, $families)
             );
         }
@@ -260,7 +260,7 @@ final class CssBuilder
         $seenSelectors = [];
 
         foreach ($families as $family) {
-            $familyName = trim((string) ($family['family'] ?? ''));
+            $familyName = trim($this->stringValue($family, 'family'));
             $selector = $this->familyClassSelector($familyName);
 
             if ($familyName === '' || $selector === '' || isset($seenSelectors[$selector])) {
@@ -285,7 +285,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      * @param NormalizedSettings $settings
      */
@@ -312,7 +312,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      * @param NormalizedSettings $settings
      */
@@ -359,7 +359,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      * @param NormalizedSettings $settings
      * @return list<ClassOutputBlock>
@@ -419,9 +419,9 @@ final class CssBuilder
      */
     private function buildFaceRule(array $face, string $display, array $settings = []): string
     {
-        $family = (string) ($face['family'] ?? '');
-        $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-        $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
+        $family = $this->stringValue($face, 'family');
+        $weight = FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400'));
+        $style = FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal'));
         $unicodeRange = FontUtils::resolveFaceUnicodeRange($face, $settings);
         $files = is_array($face['files'] ?? null) ? $face['files'] : [];
         $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
@@ -443,7 +443,7 @@ final class CssBuilder
                 continue;
             }
 
-            $sources[] = $this->buildSourceEntry($format, (string) $files[$format]);
+            $sources[] = $this->buildSourceEntry($format, FontUtils::scalarStringValue($files[$format]));
         }
 
         if ($sources !== []) {
@@ -604,7 +604,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param NormalizedSettings $settings
      */
     private function buildRoleUsageRulesSnippet(
@@ -618,7 +618,7 @@ final class CssBuilder
             return '';
         }
 
-        if (trim((string) ($roles['heading'] ?? '')) === '' || trim((string) ($roles['body'] ?? '')) === '') {
+        if (trim($this->roleStringValue($roles, 'heading')) === '' || trim($this->roleStringValue($roles, 'body')) === '') {
             return '';
         }
 
@@ -710,7 +710,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param VariableFamilyMap $variableFamilies
      * @param NormalizedSettings $settings
      * @return DeclarationLines
@@ -722,9 +722,9 @@ final class CssBuilder
         array $settings = [],
         bool $includeComments = false
     ): array {
-        $headingFamily = trim((string) ($roles['heading'] ?? ''));
-        $bodyFamily = trim((string) ($roles['body'] ?? ''));
-        $monospaceFamily = trim((string) ($roles['monospace'] ?? ''));
+        $headingFamily = trim($this->roleStringValue($roles, 'heading'));
+        $bodyFamily = trim($this->roleStringValue($roles, 'body'));
+        $monospaceFamily = trim($this->roleStringValue($roles, 'monospace'));
         $headingFallback = $this->resolveRoleFallback('heading', $roles, $settings, $variableFamilies);
         $bodyFallback = $this->resolveRoleFallback('body', $roles, $settings, $variableFamilies);
         $monospaceFallback = $this->resolveRoleFallback('monospace', $roles, $settings, $variableFamilies);
@@ -813,7 +813,7 @@ final class CssBuilder
                 $roleAliasDeclarations['--font-ui'] = 'var(--font-body)';
             }
 
-            if ($includeMonospace && trim((string) ($roles['monospace'] ?? '')) !== '') {
+            if ($includeMonospace && trim($this->roleStringValue($roles, 'monospace')) !== '') {
                 $roleAliasDeclarations['--font-code'] = 'var(--font-monospace)';
             }
         }
@@ -854,7 +854,7 @@ final class CssBuilder
         $declarations = [];
 
         foreach ($families as $family) {
-            $familyName = trim((string) ($family['family'] ?? ''));
+            $familyName = trim($this->stringValue($family, 'family'));
             $familyVariable = FontUtils::fontVariableName($familyName);
 
             if ($familyName === '' || $familyVariable === '') {
@@ -967,7 +967,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      * @param NormalizedSettings $settings
      * @return DeclarationMap
@@ -994,7 +994,7 @@ final class CssBuilder
                 continue;
             }
 
-            $reference = FontUtils::fontVariableReference((string) ($family['family'] ?? ''));
+            $reference = FontUtils::fontVariableReference($this->stringValue($family, 'family'));
 
             if ($property === '' || $reference === '') {
                 continue;
@@ -1007,7 +1007,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      * @param NormalizedSettings $settings
      */
@@ -1023,7 +1023,7 @@ final class CssBuilder
         foreach ($this->orderedAliasFamilies($roles, $includeMonospace, $families) as $family) {
             $categoryKey = $this->resolveCategoryAliasKey($family);
             $selector = $selectors[$categoryKey] ?? '';
-            $familyName = trim((string) ($family['family'] ?? ''));
+            $familyName = trim($this->stringValue($family, 'family'));
 
             if (
                 $selector === ''
@@ -1049,7 +1049,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      * @return list<CatalogFamily>
      */
@@ -1058,12 +1058,12 @@ final class CssBuilder
         $orderedFamilies = [];
         $usedKeys = [];
         $priorityNames = [
-            trim((string) ($roles['heading'] ?? '')),
-            trim((string) ($roles['body'] ?? '')),
+            trim($this->roleStringValue($roles, 'heading')),
+            trim($this->roleStringValue($roles, 'body')),
         ];
 
         if ($includeMonospace) {
-            $priorityNames[] = trim((string) ($roles['monospace'] ?? ''));
+            $priorityNames[] = trim($this->roleStringValue($roles, 'monospace'));
         }
 
         foreach ($priorityNames as $priorityName) {
@@ -1076,7 +1076,7 @@ final class CssBuilder
                     continue;
                 }
 
-                if (trim((string) ($family['family'] ?? '')) !== $priorityName) {
+                if (trim($this->stringValue($family, 'family')) !== $priorityName) {
                     continue;
                 }
 
@@ -1102,10 +1102,10 @@ final class CssBuilder
      */
     private function resolveCategoryAliasKey(array $family): string
     {
-        $category = strtolower(trim((string) ($family['font_category'] ?? '')));
+        $category = strtolower(trim($this->stringValue($family, 'font_category')));
 
         if ($category === '' && is_array($family['active_delivery'] ?? null) && is_array($family['active_delivery']['meta'] ?? null)) {
-            $category = strtolower(trim((string) ($family['active_delivery']['meta']['category'] ?? '')));
+            $category = strtolower(trim(FontUtils::scalarStringValue($family['active_delivery']['meta']['category'] ?? '')));
         }
 
         return match ($category) {
@@ -1133,7 +1133,7 @@ final class CssBuilder
                     continue;
                 }
 
-                $weight = $this->resolveConcreteWeightValue((string) ($face['weight'] ?? '400'));
+                $weight = $this->resolveConcreteWeightValue($this->stringValue($face, 'weight', '400'));
 
                 if ($weight === '') {
                     continue;
@@ -1185,7 +1185,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      */
     private function resolveRoleUsageWeightValue(array $roles, string $roleKey): string
     {
@@ -1196,7 +1196,7 @@ final class CssBuilder
             return $weightFromAxes;
         }
 
-        $storedWeight = $this->resolveConcreteWeightValue((string) ($roles[$roleKey . '_weight'] ?? ''));
+        $storedWeight = $this->resolveConcreteWeightValue($this->roleStringValue($roles, $roleKey . '_weight'));
 
         if ($storedWeight !== '') {
             return $storedWeight;
@@ -1206,7 +1206,7 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      */
     private function roleUsageWeightComesFromAxis(array $roles, string $roleKey): bool
     {
@@ -1233,16 +1233,16 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param NormalizedSettings $settings
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      */
     private function buildRoleAliasClassSnippet(array $roles, bool $includeMonospace = false, array $settings = [], array $families = []): string
     {
         $blocks = [];
-        $bodyFamily = trim((string) ($roles['body'] ?? ''));
+        $bodyFamily = trim($this->roleStringValue($roles, 'body'));
         $bodyFallback = $this->resolveRoleFallback('body', $roles, $settings, $families);
-        $monospaceFamily = trim((string) ($roles['monospace'] ?? ''));
+        $monospaceFamily = trim($this->roleStringValue($roles, 'monospace'));
         $monospaceFallback = $this->resolveRoleFallback('monospace', $roles, $settings, $families);
 
         if ($bodyFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'interface')) {
@@ -1447,7 +1447,7 @@ final class CssBuilder
 
     /**
      * @param DeclarationMap $declarations
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      */
     private function appendRoleVariationDeclarations(array &$declarations, array $roles, string $roleKey): void
     {
@@ -1464,8 +1464,10 @@ final class CssBuilder
      */
     private function fontWeightDescriptor(string $weight, array $axes = []): string
     {
-        if (isset($axes['WGHT']['min'], $axes['WGHT']['max'])) {
-            return (string) $axes['WGHT']['min'] . ' ' . (string) $axes['WGHT']['max'];
+        $weightAxis = is_array($axes['WGHT'] ?? null) ? $axes['WGHT'] : [];
+
+        if (isset($weightAxis['min'], $weightAxis['max'])) {
+            return $this->stringValue($weightAxis, 'min') . ' ' . $this->stringValue($weightAxis, 'max');
         }
 
         if (preg_match('/^(\d{1,4})\.\.(\d{1,4})$/', $weight, $matches) === 1) {
@@ -1476,14 +1478,14 @@ final class CssBuilder
     }
 
     /**
-     * @param RoleSet $roles
+     * @param array<int|string, mixed> $roles
      * @param NormalizedSettings $settings
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      */
     private function resolveRoleFallback(string $roleKey, array $roles, array $settings, array $families = []): string
     {
         $default = $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
-        $familyName = trim((string) ($roles[$roleKey] ?? ''));
+        $familyName = trim($this->roleStringValue($roles, $roleKey));
 
         if ($familyName !== '') {
             $family = $this->findFamilyByName($familyName, $families);
@@ -1492,10 +1494,10 @@ final class CssBuilder
                 return $this->resolveFamilyFallback($family, $settings);
             }
 
-            $fallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
+            $fallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
 
             if (array_key_exists($familyName, $fallbacks)) {
-                $configuredFallback = trim((string) $fallbacks[$familyName]);
+                $configuredFallback = trim($fallbacks[$familyName]);
 
                 if ($configuredFallback !== '') {
                     return FontUtils::sanitizeFallback($configuredFallback);
@@ -1503,7 +1505,7 @@ final class CssBuilder
             }
         }
 
-        $fallback = trim((string) ($roles[$roleKey . '_fallback'] ?? ''));
+        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
 
         return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
     }
@@ -1521,7 +1523,7 @@ final class CssBuilder
         }
 
         foreach ($families as $family) {
-            if (trim((string) ($family['family'] ?? '')) === $familyName) {
+            if (trim($this->stringValue($family, 'family')) === $familyName) {
                 return $family;
             }
         }
@@ -1535,19 +1537,74 @@ final class CssBuilder
      */
     private function resolveFamilyFallback(array $family, array $settings): string
     {
-        $familyName = trim((string) ($family['family'] ?? ''));
-        $fallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
+        $familyName = trim($this->stringValue($family, 'family'));
+        $fallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
 
         if ($familyName !== '' && array_key_exists($familyName, $fallbacks)) {
-            return FontUtils::sanitizeFallback((string) $fallbacks[$familyName]);
+            return FontUtils::sanitizeFallback($fallbacks[$familyName]);
         }
 
-        $category = strtolower(trim((string) ($family['font_category'] ?? '')));
+        $category = strtolower(trim($this->stringValue($family, 'font_category')));
 
         if ($category === '' && is_array($family['active_delivery'] ?? null) && is_array($family['active_delivery']['meta'] ?? null)) {
-            $category = strtolower(trim((string) ($family['active_delivery']['meta']['category'] ?? '')));
+            $category = strtolower(trim(FontUtils::scalarStringValue($family['active_delivery']['meta']['category'] ?? '')));
         }
 
         return FontUtils::defaultFallbackForCategory($category);
+    }
+
+    /**
+     * @param mixed $faces
+     * @return list<CatalogFace>
+     */
+    private function normalizeFaceList(mixed $faces): array
+    {
+        if (!is_array($faces)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($faces as $face) {
+            if (!is_array($face)) {
+                continue;
+            }
+
+            $normalized[] = $face;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, int|string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    private function roleStringValue(array $roles, string $key): string
+    {
+        $value = $roles[$key] ?? '';
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        return '';
     }
 }

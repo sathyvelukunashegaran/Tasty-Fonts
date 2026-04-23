@@ -22,13 +22,13 @@ final class HostedImportSupport
      */
     public static function buildLocalFilename(string $familyName, array $face): string
     {
-        $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
+        $style = FontUtils::normalizeStyle(self::faceStringValue($face, 'style', 'normal'));
 
         if (FontUtils::faceIsVariable($face)) {
             return FontUtils::buildVariableFontFilename($familyName, $style, 'woff2');
         }
 
-        $weight = preg_replace('/[^0-9]+/', '-', (string) ($face['weight'] ?? '400')) ?: '400';
+        $weight = preg_replace('/[^0-9]+/', '-', self::faceStringValue($face, 'weight', '400')) ?: '400';
 
         return implode(
             '-',
@@ -107,8 +107,8 @@ final class HostedImportSupport
         $variants = [];
 
         foreach ($faces as $face) {
-            $weight = FontUtils::normalizeWeight((string) ($face['weight'] ?? '400'));
-            $style = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
+            $weight = FontUtils::normalizeWeight(self::faceStringValue($face, 'weight', '400'));
+            $style = FontUtils::normalizeStyle(self::faceStringValue($face, 'style', 'normal'));
 
             if ($weight === '400' && $style === 'normal') {
                 $variants[] = 'regular';
@@ -143,8 +143,8 @@ final class HostedImportSupport
     public static function faceKeyFromFace(array $face): string
     {
         return FontUtils::faceAxisKey(
-            (string) ($face['weight'] ?? '400'),
-            (string) ($face['style'] ?? 'normal')
+            self::faceStringValue($face, 'weight', '400'),
+            self::faceStringValue($face, 'style', 'normal')
         );
     }
 
@@ -153,7 +153,7 @@ final class HostedImportSupport
      */
     private static function preferredFaceScore(array $face): int
     {
-        $range = strtoupper((string) ($face['unicode_range'] ?? ''));
+        $range = strtoupper(self::faceStringValue($face, 'unicode_range'));
 
         if ($range === '') {
             return 1000;
@@ -205,7 +205,7 @@ final class HostedImportSupport
     {
         $requestedStyle = FontUtils::normalizeStyle($requestedAxis['style']);
         $requestedWeight = FontUtils::normalizeWeight($requestedAxis['weight']);
-        $faceStyle = FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal'));
+        $faceStyle = FontUtils::normalizeStyle(self::faceStringValue($face, 'style', 'normal'));
 
         if ($faceStyle !== $requestedStyle) {
             return false;
@@ -217,6 +217,21 @@ final class HostedImportSupport
             return FontUtils::requestedWeightMatchesRange($requestedWeight, $weightRange[0], $weightRange[1]);
         }
 
-        return FontUtils::normalizeWeight((string) ($face['weight'] ?? '400')) === $requestedWeight;
+        return FontUtils::normalizeWeight(self::faceStringValue($face, 'weight', '400')) === $requestedWeight;
+    }
+
+    private static function faceStringValue(mixed $face, string $key, string $default = ''): string
+    {
+        if (!is_array($face)) {
+            return $default;
+        }
+
+        $value = $face[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 }

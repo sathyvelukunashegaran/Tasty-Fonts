@@ -79,8 +79,8 @@ final class AdminPageContextBuilder
         $logs = $this->log->all();
         $counts = $this->catalog->getCounts();
         $assetStatus = $this->assets->getStatus();
-        $familyFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
-        $familyFontDisplays = is_array($settings['family_font_displays'] ?? null) ? $settings['family_font_displays'] : [];
+        $familyFallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
+        $familyFontDisplays = FontUtils::normalizeStringMap($settings['family_font_displays'] ?? []);
         $applyEverywhere = !empty($settings['auto_apply_roles']);
         $previewContext = $this->buildPreviewContext($settings);
         $adobeAccessContext = $this->buildAdobeAccessContext();
@@ -96,7 +96,7 @@ final class AdminPageContextBuilder
         $acssIntegration = $this->buildAcssIntegrationContext($settings);
         $bricksIntegration = $this->buildBricksIntegrationContext($settings);
         $oxygenIntegration = $this->buildOxygenIntegrationContext($settings);
-        $updateChannel = (string) ($settings['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE);
+        $updateChannel = $this->stringValue($settings, 'update_channel', SettingsRepository::UPDATE_CHANNEL_STABLE);
         $updateChannelStatus = $this->buildUpdateChannelStatus($updateChannel);
         $adminAccessCustomEnabled = !empty($settings['admin_access_custom_enabled']);
         $adminAccessRoleSlugs = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
@@ -126,7 +126,7 @@ final class AdminPageContextBuilder
             'activity_actor_options' => $this->buildActivityActorOptions($logs),
             'family_fallbacks' => $familyFallbacks,
             'family_font_displays' => $familyFontDisplays,
-            'family_font_display_options' => $this->buildFamilyFontDisplayOptions((string) ($settings['font_display'] ?? 'swap')),
+            'family_font_display_options' => $this->buildFamilyFontDisplayOptions($this->stringValue($settings, 'font_display', 'swap')),
             'preview_text' => $previewContext['preview_text'],
             'preview_size' => $previewContext['preview_size'],
             'google_api_state' => $googleAccessContext['google_api_state'],
@@ -147,15 +147,15 @@ final class AdminPageContextBuilder
             'adobe_access_copy' => $adobeAccessContext['adobe_access_copy'],
             'adobe_project_link' => $adobeAccessContext['adobe_project_link'],
             'adobe_detected_families' => $adobeAccessContext['adobe_detected_families'],
-            'css_delivery_mode' => (string) ($settings['css_delivery_mode'] ?? 'file'),
+            'css_delivery_mode' => $this->stringValue($settings, 'css_delivery_mode', 'file'),
             'css_delivery_mode_options' => $this->buildCssDeliveryModeOptions(),
-            'font_display' => (string) ($settings['font_display'] ?? 'swap'),
+            'font_display' => $this->stringValue($settings, 'font_display', 'swap'),
             'font_display_options' => $this->buildFontDisplayOptions(),
-            'unicode_range_mode' => (string) ($settings['unicode_range_mode'] ?? FontUtils::UNICODE_RANGE_MODE_OFF),
-            'unicode_range_custom_value' => (string) ($settings['unicode_range_custom_value'] ?? ''),
+            'unicode_range_mode' => $this->stringValue($settings, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF),
+            'unicode_range_custom_value' => $this->stringValue($settings, 'unicode_range_custom_value'),
             'unicode_range_mode_options' => $this->buildUnicodeRangeModeOptions(),
-            'unicode_range_custom_visible' => FontUtils::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? '')) === FontUtils::UNICODE_RANGE_MODE_CUSTOM,
-            'output_quick_mode_preference' => (string) ($settings['output_quick_mode_preference'] ?? 'minimal'),
+            'unicode_range_custom_visible' => FontUtils::normalizeUnicodeRangeMode($this->stringValue($settings, 'unicode_range_mode')) === FontUtils::UNICODE_RANGE_MODE_CUSTOM,
+            'output_quick_mode_preference' => $this->stringValue($settings, 'output_quick_mode_preference', 'minimal'),
             'class_output_enabled' => !empty($settings['class_output_enabled']),
             'class_output_role_heading_enabled' => !empty($settings['class_output_role_heading_enabled']),
             'class_output_role_body_enabled' => !empty($settings['class_output_role_body_enabled']),
@@ -218,11 +218,11 @@ final class AdminPageContextBuilder
      */
     public function buildDiagnosticItems(array $assetStatus, ?array $storage, array $settings, array $counts): array
     {
-        $cssPath = (string) ($assetStatus['path'] ?? '');
-        $cssUrl = (string) ($assetStatus['url'] ?? '');
+        $cssPath = $this->stringValue($assetStatus, 'path');
+        $cssUrl = $this->stringValue($assetStatus, 'url');
         $cssExists = !empty($assetStatus['exists']);
-        $cssSize = (int) ($assetStatus['size'] ?? 0);
-        $cssLastModified = (int) ($assetStatus['last_modified'] ?? 0);
+        $cssSize = $this->intValue($assetStatus, 'size');
+        $cssLastModified = $this->intValue($assetStatus, 'last_modified');
 
         return [
             [
@@ -245,45 +245,45 @@ final class AdminPageContextBuilder
             [
                 'label' => __('Last Generated', 'tasty-fonts'),
                 'value' => $cssExists && $cssLastModified > 0
-                    ? wp_date(get_option('date_format') . ' ' . get_option('time_format'), $cssLastModified)
+                    ? wp_date($this->dateTimeFormat(), $cssLastModified)
                     : __('Not available', 'tasty-fonts'),
                 'code' => false,
             ],
             [
                 'label' => __('Fonts Directory', 'tasty-fonts'),
-                'value' => is_array($storage) ? (string) ($storage['dir'] ?? __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
+                'value' => is_array($storage) ? $this->stringValue($storage, 'dir', __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
                 'code' => true,
                 'copyable' => is_array($storage) && !empty($storage['dir']),
             ],
             [
                 'label' => __('Fonts Public URL', 'tasty-fonts'),
                 'value' => is_array($storage)
-                    ? (string) ($storage['url_full'] ?? $storage['url'] ?? __('Not available', 'tasty-fonts'))
+                    ? $this->stringValue($storage, 'url_full', $this->stringValue($storage, 'url', __('Not available', 'tasty-fonts')))
                     : __('Not available', 'tasty-fonts'),
                 'code' => true,
                 'copyable' => is_array($storage) && (!empty($storage['url_full']) || !empty($storage['url'])),
             ],
             [
                 'label' => __('Google Import Folder', 'tasty-fonts'),
-                'value' => is_array($storage) ? (string) ($storage['google_dir'] ?? __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
+                'value' => is_array($storage) ? $this->stringValue($storage, 'google_dir', __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
                 'code' => true,
                 'copyable' => is_array($storage) && !empty($storage['google_dir']),
             ],
             [
                 'label' => __('Bunny Import Folder', 'tasty-fonts'),
-                'value' => is_array($storage) ? (string) ($storage['bunny_dir'] ?? __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
+                'value' => is_array($storage) ? $this->stringValue($storage, 'bunny_dir', __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
                 'code' => true,
                 'copyable' => is_array($storage) && !empty($storage['bunny_dir']),
             ],
             [
                 'label' => __('Local Upload Folder', 'tasty-fonts'),
-                'value' => is_array($storage) ? (string) ($storage['upload_dir'] ?? __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
+                'value' => is_array($storage) ? $this->stringValue($storage, 'upload_dir', __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
                 'code' => true,
                 'copyable' => is_array($storage) && !empty($storage['upload_dir']),
             ],
             [
                 'label' => __('Adobe Folder', 'tasty-fonts'),
-                'value' => is_array($storage) ? (string) ($storage['adobe_dir'] ?? __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
+                'value' => is_array($storage) ? $this->stringValue($storage, 'adobe_dir', __('Not available', 'tasty-fonts')) : __('Not available', 'tasty-fonts'),
                 'code' => true,
                 'copyable' => is_array($storage) && !empty($storage['adobe_dir']),
             ],
@@ -298,12 +298,12 @@ final class AdminPageContextBuilder
             ],
             [
                 'label' => __('Generated CSS Delivery', 'tasty-fonts'),
-                'value' => $this->formatCssDeliveryModeLabel((string) ($settings['css_delivery_mode'] ?? 'file')),
+                'value' => $this->formatCssDeliveryModeLabel($this->stringValue($settings, 'css_delivery_mode', 'file')),
                 'code' => false,
             ],
             [
                 'label' => __('Default Font Display', 'tasty-fonts'),
-                'value' => (string) ($settings['font_display'] ?? 'swap'),
+                'value' => $this->stringValue($settings, 'font_display', 'swap'),
                 'code' => false,
             ],
         ];
@@ -414,7 +414,7 @@ final class AdminPageContextBuilder
      * @param RoleSet $roles
      * @param NormalizedSettings $settings
      * @param CatalogMap $catalog
-     * @param RoleSet $appliedRoles
+     * @param RoleSet|array{} $appliedRoles
      * @return list<OutputPanel>
      */
     public function buildOutputPanels(
@@ -600,14 +600,14 @@ final class AdminPageContextBuilder
                 continue;
             }
 
-            $message = sanitize_text_field((string) ($toast['message'] ?? ''));
+            $message = sanitize_text_field($this->stringValue($toast, 'message'));
 
             if ($message === '') {
                 continue;
             }
 
-            $tone = (string) ($toast['tone'] ?? 'success');
-            $role = (string) ($toast['role'] ?? ($tone === 'error' ? 'alert' : 'status'));
+            $tone = $this->stringValue($toast, 'tone', 'success');
+            $role = $this->stringValue($toast, 'role', $tone === 'error' ? 'alert' : 'status');
 
             $toasts[] = [
                 'tone' => $tone === 'error' ? 'error' : 'success',
@@ -764,7 +764,7 @@ final class AdminPageContextBuilder
         $catalog = $catalog ?? $this->catalog->getCatalog();
 
         foreach ($this->effectiveRoleKeys($settings) as $roleKey) {
-            if (trim((string) ($left[$roleKey] ?? '')) !== trim((string) ($right[$roleKey] ?? ''))) {
+            if (trim($this->roleStringValue($left, $roleKey)) !== trim($this->roleStringValue($right, $roleKey))) {
                 return false;
             }
 
@@ -773,8 +773,8 @@ final class AdminPageContextBuilder
             }
 
             if (
-                trim((string) ($left[$roleKey . '_weight'] ?? ''))
-                !== trim((string) ($right[$roleKey . '_weight'] ?? ''))
+                trim($this->roleStringValue($left, $roleKey . '_weight'))
+                !== trim($this->roleStringValue($right, $roleKey . '_weight'))
             ) {
                 return false;
             }
@@ -800,7 +800,7 @@ final class AdminPageContextBuilder
         $actors = [];
 
         foreach ($logs as $entry) {
-            $actor = trim((string) ($entry['actor'] ?? ''));
+            $actor = $this->stringValue($entry, 'actor');
 
             if ($actor === '') {
                 continue;
@@ -838,13 +838,13 @@ final class AdminPageContextBuilder
      */
     private function isTransferLogEntry(array $entry): bool
     {
-        $category = strtolower(trim((string) ($entry['category'] ?? '')));
+        $category = strtolower($this->stringValue($entry, 'category'));
 
         if ($category === LogRepository::CATEGORY_TRANSFER) {
             return true;
         }
 
-        $message = strtolower(trim((string) ($entry['message'] ?? '')));
+        $message = strtolower($this->stringValue($entry, 'message'));
 
         if ($message === '') {
             return false;
@@ -966,7 +966,7 @@ final class AdminPageContextBuilder
     {
         $state = $this->bricksIntegration->readState($settings);
 
-        $status = (string) ($state['status'] ?? 'disabled');
+        $status = $state['status'];
 
         return array_merge(
             $state,
@@ -995,7 +995,10 @@ final class AdminPageContextBuilder
      */
     public function buildOxygenIntegrationContext(array $settings): array
     {
-        $state = $this->oxygenIntegration->readState($settings['oxygen_integration_enabled'] ?? null);
+        $enabled = array_key_exists('oxygen_integration_enabled', $settings)
+            ? $this->nullableBoolValue($settings['oxygen_integration_enabled'])
+            : null;
+        $state = $this->oxygenIntegration->readState($enabled);
 
         $status = $state['status'];
 
@@ -1021,9 +1024,9 @@ final class AdminPageContextBuilder
     public function buildPreviewContext(array $settings): array
     {
         $previewText = isset($_GET['preview_text'])
-            ? wp_strip_all_tags(sanitize_text_field(wp_unslash((string) $_GET['preview_text'])))
-            : (string) ($settings['preview_sentence'] ?? '');
-        $previewSize = isset($_GET['preview_size']) ? absint($_GET['preview_size']) : 32;
+            ? wp_strip_all_tags(sanitize_text_field(wp_unslash(FontUtils::scalarStringValue($_GET['preview_text']))))
+            : $this->stringValue($settings, 'preview_sentence');
+        $previewSize = isset($_GET['preview_size']) ? absint(FontUtils::scalarStringValue($_GET['preview_size'])) : 32;
         $previewText = $previewText !== ''
             ? $previewText
             : __('The quick brown fox jumps over the lazy dog. 1234567890', 'tasty-fonts');
@@ -1071,8 +1074,8 @@ final class AdminPageContextBuilder
         $googleApiEnabled = $this->googleClient->canSearch();
         $googleApiSaved = $this->googleClient->hasApiKey();
         $googleApiStatus = $this->googleClient->getApiKeyStatus();
-        $googleApiState = (string) ($googleApiStatus['state'] ?? 'empty');
-        $googleApiStatusMessage = (string) ($googleApiStatus['message'] ?? '');
+        $googleApiState = $this->stringValue($googleApiStatus, 'state', 'empty');
+        $googleApiStatusMessage = $this->stringValue($googleApiStatus, 'message');
 
         return [
             'google_api_state' => $googleApiState,
@@ -1096,7 +1099,7 @@ final class AdminPageContextBuilder
         $storedRoles = $this->settings->getRoles([]);
 
         foreach ($this->effectiveRoleKeys() as $roleKey) {
-            $familyName = trim((string) ($storedRoles[$roleKey] ?? ''));
+            $familyName = trim($this->roleStringValue($storedRoles, $roleKey));
 
             if ($familyName !== '') {
                 $families[] = $familyName;
@@ -1192,14 +1195,14 @@ final class AdminPageContextBuilder
                 continue;
             }
 
-            $userId = absint($user->ID ?? 0);
+            $userId = absint(FontUtils::scalarStringValue($user->ID ?? 0));
 
             if ($userId <= 0) {
                 continue;
             }
 
-            $userLogin = trim((string) ($user->user_login ?? ''));
-            $userRoles = is_array($user->roles ?? null) ? array_values(array_map('sanitize_key', $user->roles)) : [];
+            $userLogin = FontUtils::scalarStringValue($user->user_login ?? '');
+            $userRoles = $this->sanitizeKeyList($user->roles ?? []);
             $isImplicitAdmin = in_array(AdminAccessService::IMPLICIT_ROLE, $userRoles, true);
             $userRoleLabels = [];
 
@@ -1243,7 +1246,7 @@ final class AdminPageContextBuilder
                 continue;
             }
 
-            $userRoles = is_array($user->roles ?? null) ? array_values(array_map('sanitize_key', $user->roles)) : [];
+            $userRoles = $this->sanitizeKeyList($user->roles ?? []);
 
             if (!in_array(AdminAccessService::IMPLICIT_ROLE, $userRoles, true)) {
                 continue;
@@ -1353,7 +1356,7 @@ final class AdminPageContextBuilder
             array_filter(
                 array_unique(
                     array_map(
-                        static fn (mixed $userId): int => absint($userId),
+                        static fn (mixed $userId): int => absint(FontUtils::scalarStringValue($userId)),
                         $value
                     )
                 ),
@@ -1432,7 +1435,7 @@ final class AdminPageContextBuilder
      */
     private function catalogCount(array $counts, string $key): int
     {
-        return isset($counts[$key]) ? max(0, (int) $counts[$key]) : 0;
+        return isset($counts[$key]) ? max(0, FontUtils::scalarIntValue($counts[$key])) : 0;
     }
 
     /**
@@ -1441,12 +1444,12 @@ final class AdminPageContextBuilder
     private function buildDeveloperToolLastRunCopy(array $logs, string $message): string
     {
         foreach ($logs as $entry) {
-            if (trim((string) ($entry['message'] ?? '')) !== $message) {
+            if ($this->stringValue($entry, 'message') !== $message) {
                 continue;
             }
 
-            $timestamp = trim((string) ($entry['time'] ?? ''));
-            $actor = trim((string) ($entry['actor'] ?? __('System', 'tasty-fonts')));
+            $timestamp = $this->stringValue($entry, 'time');
+            $actor = $this->stringValue($entry, 'actor', __('System', 'tasty-fonts'));
             $formattedTime = $this->formatLogTimestamp($timestamp);
 
             if ($formattedTime === '') {
@@ -1500,7 +1503,7 @@ final class AdminPageContextBuilder
             }
 
             foreach ($user->roles as $roleSlug) {
-                $normalizedSlug = sanitize_key((string) $roleSlug);
+                $normalizedSlug = sanitize_key(FontUtils::scalarStringValue($roleSlug));
 
                 if ($normalizedSlug === '') {
                     continue;
@@ -1545,7 +1548,7 @@ final class AdminPageContextBuilder
         $settings = $settings ?? $this->settings->getSettings();
 
         foreach ($this->effectiveRoleKeys($settings) as $roleKey) {
-            $familyName = trim((string) ($roles[$roleKey] ?? ''));
+            $familyName = trim($this->roleStringValue($roles, $roleKey));
             $fallback = $this->resolveEffectiveRoleFallback($roleKey, $roles, $this->catalog->getCatalog(), $settings);
 
             if ($familyName === '' && $roleKey !== 'monospace') {
@@ -1581,7 +1584,7 @@ final class AdminPageContextBuilder
         $parts = [];
 
         foreach ($this->effectiveRoleKeys($settings) as $roleKey) {
-            $familyName = trim((string) ($roles[$roleKey] ?? ''));
+            $familyName = trim($this->roleStringValue($roles, $roleKey));
             $fallback = $this->resolveEffectiveRoleFallback($roleKey, $roles, $this->catalog->getCatalog(), $settings);
 
             $parts[] = sprintf(
@@ -1635,7 +1638,7 @@ final class AdminPageContextBuilder
         $families = [];
 
         foreach ($catalog as $key => $family) {
-            if ((string) ($family['publish_state'] ?? 'published') === 'library_only') {
+            if ($this->stringValue($family, 'publish_state', 'published') === 'library_only') {
                 continue;
             }
 
@@ -1682,8 +1685,8 @@ final class AdminPageContextBuilder
             'unavailable' => __('Automatic.css is not active on this site yet.', 'tasty-fonts'),
             default => sprintf(
                 __('Current values: heading `%1$s`, body `%2$s`.', 'tasty-fonts'),
-                $current['heading'] !== '' ? $current['heading'] : __('empty', 'tasty-fonts'),
-                $current['body'] !== '' ? $current['body'] : __('empty', 'tasty-fonts')
+                $this->stringValue($current, 'heading') !== '' ? $this->stringValue($current, 'heading') : __('empty', 'tasty-fonts'),
+                $this->stringValue($current, 'body') !== '' ? $this->stringValue($current, 'body') : __('empty', 'tasty-fonts')
             ),
         };
     }
@@ -1808,7 +1811,7 @@ final class AdminPageContextBuilder
             return false;
         }
 
-        return (int) ($preference['hidden_until'] ?? 0) <= time();
+        return FontUtils::scalarIntValue($preference['hidden_until'] ?? 0) <= time();
     }
 
     /**
@@ -1829,7 +1832,7 @@ final class AdminPageContextBuilder
         $preference = is_array($preferences[$userId] ?? null) ? $preferences[$userId] : [];
 
         return [
-            'hidden_until' => max(0, (int) ($preference['hidden_until'] ?? 0)),
+            'hidden_until' => max(0, FontUtils::scalarIntValue($preference['hidden_until'] ?? 0)),
             'dismissed_forever' => !empty($preference['dismissed_forever']),
         ];
     }
@@ -1844,7 +1847,7 @@ final class AdminPageContextBuilder
         }
 
         $delivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-        $label = strtolower(trim((string) ($delivery['label'] ?? '')));
+        $label = strtolower($this->stringValue($delivery, 'label'));
 
         if ($label === '') {
             return $familyName;
@@ -1861,18 +1864,18 @@ final class AdminPageContextBuilder
     private function resolveEffectiveRoleFallback(string $roleKey, array $roles, array $catalog, array $settings): string
     {
         $default = $this->defaultRoleFallback($roleKey);
-        $familyName = trim((string) ($roles[$roleKey] ?? ''));
+        $familyName = trim($this->roleStringValue($roles, $roleKey));
 
         if ($familyName !== '') {
-            $familyFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
+                $familyFallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
 
-            if (array_key_exists($familyName, $familyFallbacks)) {
-                $configuredFallback = trim((string) $familyFallbacks[$familyName]);
+                if (array_key_exists($familyName, $familyFallbacks)) {
+                    $configuredFallback = trim($familyFallbacks[$familyName]);
 
-                if ($configuredFallback !== '') {
-                    return FontUtils::sanitizeFallback($configuredFallback);
+                    if ($configuredFallback !== '') {
+                        return FontUtils::sanitizeFallback($configuredFallback);
+                    }
                 }
-            }
 
             $family = $this->findCatalogFamilyByName($familyName, $catalog);
 
@@ -1881,7 +1884,7 @@ final class AdminPageContextBuilder
             }
         }
 
-        $fallback = trim((string) ($roles[$roleKey . '_fallback'] ?? ''));
+        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
 
         return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
     }
@@ -1897,7 +1900,7 @@ final class AdminPageContextBuilder
         }
 
         foreach ($catalog as $family) {
-            if (trim((string) ($family['family'] ?? '')) === $familyName) {
+            if ($this->stringValue($family, 'family') === $familyName) {
                 return $family;
             }
         }
@@ -1910,10 +1913,10 @@ final class AdminPageContextBuilder
      */
     private function resolveFamilyCategory(array $family): string
     {
-        $category = trim((string) ($family['font_category'] ?? ''));
+        $category = $this->stringValue($family, 'font_category');
 
         if ($category === '' && is_array($family['active_delivery'] ?? null) && is_array($family['active_delivery']['meta'] ?? null)) {
-            $category = trim((string) ($family['active_delivery']['meta']['category'] ?? ''));
+            $category = $this->stringValue($family['active_delivery']['meta'], 'category');
         }
 
         return $category;
@@ -1938,6 +1941,96 @@ final class AdminPageContextBuilder
     private function defaultRoleFallback(string $roleKey): string
     {
         return $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function intValue(array $values, string $key, int $default = 0): int
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        return FontUtils::scalarIntValue($values[$key], $default);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function sanitizeKeyList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            $key = sanitize_key(FontUtils::scalarStringValue($item));
+
+            if ($key === '') {
+                continue;
+            }
+
+            $normalized[] = $key;
+        }
+
+        return $normalized;
+    }
+
+    private function nullableBoolValue(mixed $value): ?bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        $normalized = strtolower(FontUtils::scalarStringValue($value));
+
+        return match ($normalized) {
+            '1', 'true', 'yes', 'on' => true,
+            '0', 'false', 'no', 'off' => false,
+            default => null,
+        };
+    }
+
+    private function dateTimeFormat(): string
+    {
+        return FontUtils::scalarStringValue(get_option('date_format'))
+            . ' '
+            . FontUtils::scalarStringValue(get_option('time_format'));
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    private function roleStringValue(array $roles, string $key): string
+    {
+        $value = $roles[$key] ?? '';
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        return '';
     }
 
     private function roleLabel(string $roleKey): string

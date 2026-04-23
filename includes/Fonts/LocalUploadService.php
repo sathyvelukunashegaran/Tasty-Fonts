@@ -89,23 +89,23 @@ final class LocalUploadService
         $batchKeys = [];
 
         foreach ($normalizedRows as $row) {
-            $index = (int) ($row['index'] ?? 0);
+            $index = $this->intValue($row, 'index');
 
             if (!empty($row['error'])) {
-                $results[] = $this->buildRowResult($index, 'error', (string) $row['error']);
+                $results[] = $this->buildRowResult($index, 'error', $this->stringValue($row, 'error'));
                 $errorCount++;
                 continue;
             }
 
-            $familySlug = (string) ($row['family_slug'] ?? '');
-            $familyName = (string) ($row['family'] ?? '');
-            $weight = (string) ($row['weight'] ?? '400');
-            $style = (string) ($row['style'] ?? 'normal');
+            $familySlug = $this->stringValue($row, 'family_slug');
+            $familyName = $this->stringValue($row, 'family');
+            $weight = $this->stringValue($row, 'weight', '400');
+            $style = $this->stringValue($row, 'style', 'normal');
             $isVariable = !empty($row['is_variable']);
-            $fallback = (string) ($row['fallback'] ?? 'sans-serif');
-            $axes = is_array($row['axes'] ?? null) ? (array) $row['axes'] : [];
-            $variationDefaults = is_array($row['variation_defaults'] ?? null) ? (array) $row['variation_defaults'] : [];
-            $file = is_array($row['file'] ?? null) ? (array) $row['file'] : [];
+            $fallback = $this->stringValue($row, 'fallback', 'sans-serif');
+            $axes = $this->arrayValue($row, 'axes');
+            $variationDefaults = $this->arrayValue($row, 'variation_defaults');
+            $file = $this->arrayValue($row, 'file');
 
             if (isset($conflictedFamilySlugs[$familySlug])) {
                 $results[] = $this->buildRowResult(
@@ -224,17 +224,17 @@ final class LocalUploadService
      */
     private function normalizeRow(array $row, int $index, array $familyLookup): array
     {
-        $familyInput = preg_replace('/\s+/', ' ', trim(wp_strip_all_tags((string) ($row['family'] ?? '')))) ?? '';
+        $familyInput = preg_replace('/\s+/', ' ', trim(wp_strip_all_tags($this->stringValue($row, 'family')))) ?? '';
         $familySlug = FontUtils::slugify($familyInput);
         $familyName = $familyLookup[$familySlug] ?? $familyInput;
-        $rawWeight = trim((string) ($row['weight'] ?? '400'));
+        $rawWeight = trim($this->stringValue($row, 'weight', '400'));
         $weight = FontUtils::normalizeWeight($rawWeight);
-        $style = FontUtils::normalizeStyle((string) ($row['style'] ?? 'normal'));
+        $style = FontUtils::normalizeStyle($this->stringValue($row, 'style', 'normal'));
         $isVariable = !empty($row['is_variable']);
-        $fallback = FontUtils::sanitizeFallback((string) ($row['fallback'] ?? 'sans-serif'));
+        $fallback = FontUtils::sanitizeFallback($this->stringValue($row, 'fallback', 'sans-serif'));
         $axes = FontUtils::normalizeAxesMap($row['axes'] ?? []);
         $variationDefaults = FontUtils::normalizeVariationDefaults($row['variation_defaults'] ?? [], $axes);
-        $file = is_array($row['file'] ?? null) ? (array) $row['file'] : [];
+        $file = $this->arrayValue($row, 'file');
         $error = '';
 
         if ($familyInput === '') {
@@ -276,8 +276,8 @@ final class LocalUploadService
                 continue;
             }
 
-            $familySlug = (string) ($row['family_slug'] ?? '');
-            $fallback = (string) ($row['fallback'] ?? 'sans-serif');
+            $familySlug = $this->stringValue($row, 'family_slug');
+            $fallback = $this->stringValue($row, 'fallback', 'sans-serif');
 
             if ($familySlug === '') {
                 continue;
@@ -297,15 +297,15 @@ final class LocalUploadService
     }
 
     /**
-     * @param array<string, mixed> $file
+     * @param array<int|string, mixed> $file
      * @return ValidatedUploadFile|WP_Error
      */
     private function validateUploadedFile(array $file): array|WP_Error
     {
-        $name = trim((string) ($file['name'] ?? ''));
-        $tmpName = (string) ($file['tmp_name'] ?? '');
-        $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
-        $size = (int) ($file['size'] ?? 0);
+        $name = trim($this->stringValue($file, 'name'));
+        $tmpName = $this->stringValue($file, 'tmp_name');
+        $error = $this->intValue($file, 'error', UPLOAD_ERR_NO_FILE);
+        $size = $this->intValue($file, 'size');
 
         if ($error === UPLOAD_ERR_NO_FILE || $name === '' || $tmpName === '') {
             return $this->error('tasty_fonts_upload_missing_file', __('Choose a font file to upload.', 'tasty-fonts'));
@@ -336,7 +336,7 @@ final class LocalUploadService
             return $this->error('tasty_fonts_upload_missing_tmp', __('The uploaded file was not readable on the server.', 'tasty-fonts'));
         }
 
-        $originalExtension = strtolower((string) pathinfo($name, PATHINFO_EXTENSION));
+        $originalExtension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
         if ($originalExtension === 'zip') {
             return $this->error(
@@ -517,8 +517,8 @@ final class LocalUploadService
         $lookup = [];
 
         foreach ($this->catalog->getCatalog() as $family) {
-            $familyName = (string) ($family['family'] ?? '');
-            $familySlug = (string) ($family['slug'] ?? '');
+            $familyName = $this->stringValue($family, 'family');
+            $familySlug = $this->stringValue($family, 'slug');
 
             if ($familyName === '' || $familySlug === '') {
                 continue;
@@ -538,19 +538,19 @@ final class LocalUploadService
         $keys = [];
 
         foreach ($this->catalog->getCatalog() as $family) {
-            $familySlug = (string) ($family['slug'] ?? '');
+            $familySlug = $this->stringValue($family, 'slug');
 
             if ($familySlug === '') {
                 continue;
             }
 
-            foreach ((array) ($family['faces'] ?? []) as $face) {
-                    $weight = (string) ($face['weight'] ?? '400');
-                $style = (string) ($face['style'] ?? 'normal');
+            foreach ($this->normalizeCatalogFaceList($family['faces'] ?? []) as $face) {
+                $weight = $this->stringValue($face, 'weight', '400');
+                $style = $this->stringValue($face, 'style', 'normal');
                 $isVariable = !empty($face['is_variable']);
 
-                foreach (array_keys((array) ($face['files'] ?? [])) as $format) {
-                    $keys[$this->buildDuplicateKey($familySlug, $weight, $style, strtolower((string) $format), $isVariable)] = true;
+                foreach (array_keys($this->arrayValue($face, 'files')) as $format) {
+                    $keys[$this->buildDuplicateKey($familySlug, $weight, $style, strtolower(is_string($format) ? $format : ''), $isVariable)] = true;
                 }
             }
         }
@@ -621,8 +621,9 @@ final class LocalUploadService
 
         $existingFamily = $this->imports->getFamily($familySlug);
         $profileId = FontUtils::slugify('local-self_hosted');
-        $existingProfile = is_array($existingFamily['delivery_profiles'][$profileId] ?? null)
-            ? (array) $existingFamily['delivery_profiles'][$profileId]
+        $existingProfiles = $existingFamily !== null ? $existingFamily['delivery_profiles'] : [];
+        $existingProfile = is_array($existingProfiles[$profileId] ?? null)
+            ? (array) $existingProfiles[$profileId]
             : [];
         $existingFaces = $this->normalizeCatalogFaceList($existingProfile['faces'] ?? []);
         $mergedFaces = HostedImportSupport::mergeManifestFaces($existingFaces, $newFaces);
@@ -642,7 +643,7 @@ final class LocalUploadService
                     'imported_at' => current_time('mysql'),
                 ],
             ],
-            $existingFamily === null ? 'library_only' : (string) ($existingFamily['publish_state'] ?? 'published'),
+            $existingFamily === null ? 'library_only' : $this->stringValue($existingFamily, 'publish_state', 'library_only'),
             $existingFamily === null
         );
     }
@@ -668,5 +669,42 @@ final class LocalUploadService
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     * @return array<int|string, mixed>
+     */
+    private function arrayValue(array $values, string $key): array
+    {
+        $value = $values[$key] ?? null;
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function intValue(array $values, string $key, int $default = 0): int
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        return FontUtils::scalarIntValue($values[$key], $default);
     }
 }

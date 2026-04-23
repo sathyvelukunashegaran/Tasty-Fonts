@@ -313,7 +313,8 @@ HTACCESS;
      */
     private function deleteAdobeProjectTransient(array $settings): void
     {
-        $projectId = strtolower(trim((string) ($settings['adobe_project_id'] ?? '')));
+        $projectId = $settings['adobe_project_id'] ?? '';
+        $projectId = is_scalar($projectId) ? strtolower(trim((string) $projectId)) : '';
         $projectId = preg_replace('/[^a-z0-9]+/', '', $projectId) ?? '';
 
         if ($projectId === '') {

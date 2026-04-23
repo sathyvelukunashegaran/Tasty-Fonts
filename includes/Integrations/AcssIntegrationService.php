@@ -171,8 +171,8 @@ final class AcssIntegrationService
         $ver = '';
 
         if (is_array($style)) {
-            $url = trim((string) ($style['src'] ?? ''));
-            $ver = trim((string) ($style['ver'] ?? ''));
+            $url = trim($this->stringValue($style, 'src'));
+            $ver = trim($this->stringValue($style, 'ver'));
         }
 
         if (
@@ -310,5 +310,19 @@ final class AcssIntegrationService
         }
 
         return $registered;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        $value = $values[$key] ?? null;
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 }

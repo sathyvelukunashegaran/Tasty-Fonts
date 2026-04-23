@@ -13,7 +13,11 @@ defined('ABSPATH') || exit;
  * @phpstan-type AxesMap array<string, AxisDefinition>
  * @phpstan-type FormatAvailability array<string, array{label: string, available: bool, source_only: bool}>
  * @phpstan-type WeightRange array{0: int, 1: int}
- * @phpstan-type HostedAxis array<string, int|float|string>
+ * @phpstan-type HostedAxis array{tag?: mixed, start?: mixed, end?: mixed, min?: mixed, max?: mixed, default?: mixed}
+ * @phpstan-type FaceLike array{weight?: mixed, style?: mixed, unicode_range?: mixed, axes?: mixed, is_variable?: mixed}
+ * @phpstan-type ProfileLike array{format?: mixed, faces?: mixed}
+ * @phpstan-type FormatEntryLike array{label?: mixed, available?: mixed, source_only?: mixed}
+ * @phpstan-type FormatAvailabilityEntryMap array<string, FormatEntryLike>
  */
 final class FontUtils
 {
@@ -252,16 +256,17 @@ final class FontUtils
      */
     public static function resolveFaceUnicodeRange(array $face, array $settings): string
     {
-        $mode = self::normalizeUnicodeRangeMode((string) ($settings['unicode_range_mode'] ?? self::UNICODE_RANGE_MODE_OFF));
+        $mode = self::normalizeUnicodeRangeMode(self::stringValue($settings, 'unicode_range_mode', self::UNICODE_RANGE_MODE_OFF));
+        $customRange = self::stringValue($settings, 'unicode_range_custom_value');
 
         return match ($mode) {
             self::UNICODE_RANGE_MODE_LATIN_BASIC => self::UNICODE_RANGE_PRESET_LATIN_BASIC,
             self::UNICODE_RANGE_MODE_LATIN_EXTENDED => self::UNICODE_RANGE_PRESET_LATIN_EXTENDED,
             self::UNICODE_RANGE_MODE_OFF => '',
-            self::UNICODE_RANGE_MODE_CUSTOM => self::unicodeRangeValueIsValid((string) ($settings['unicode_range_custom_value'] ?? ''))
-                ? self::normalizeUnicodeRangeValue((string) ($settings['unicode_range_custom_value'] ?? ''))
+            self::UNICODE_RANGE_MODE_CUSTOM => self::unicodeRangeValueIsValid($customRange)
+                ? self::normalizeUnicodeRangeValue($customRange)
                 : '',
-            default => trim((string) ($face['unicode_range'] ?? '')),
+            default => trim(self::stringValue($face, 'unicode_range')),
         };
     }
 
@@ -483,7 +488,7 @@ final class FontUtils
      */
     public static function resolveProfileFormat(array $profile): string
     {
-        $format = strtolower(trim((string) ($profile['format'] ?? '')));
+        $format = strtolower(trim(self::stringValue($profile, 'format')));
 
         if (in_array($format, ['static', 'variable'], true)) {
             return $format;
@@ -500,11 +505,7 @@ final class FontUtils
     {
         $formats = [];
 
-        foreach ((array) ($entry['formats'] ?? []) as $key => $value) {
-            if (!is_string($key) || !is_array($value)) {
-                continue;
-            }
-
+        foreach (self::formatEntryMap($entry['formats'] ?? []) as $key => $value) {
             $normalizedKey = strtolower(trim($key));
 
             if (!in_array($normalizedKey, ['static', 'variable'], true)) {
@@ -512,7 +513,7 @@ final class FontUtils
             }
 
             $formats[$normalizedKey] = [
-                'label' => sanitize_text_field((string) ($value['label'] ?? ucfirst($normalizedKey))),
+                'label' => sanitize_text_field(self::stringValue($value, 'label', ucfirst($normalizedKey))),
                 'available' => !empty($value['available']),
                 'source_only' => !empty($value['source_only']),
             ];
@@ -559,7 +560,7 @@ final class FontUtils
      * @param mixed $faces
      * @return list<array<string, mixed>>
      */
-    private static function normalizeFaceList(mixed $faces): array
+    public static function normalizeFaceList(mixed $faces): array
     {
         if (!is_array($faces)) {
             return [];
@@ -576,6 +577,126 @@ final class FontUtils
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param mixed $values
+     * @return array<string, string>
+     */
+    public static function normalizeStringMap(mixed $values): array
+    {
+        if (!is_array($values)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($values as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalizedValue = self::scalarStringValue($value);
+
+            if ($normalizedValue === '') {
+                continue;
+            }
+
+            $normalized[$key] = $normalizedValue;
+        }
+
+        return $normalized;
+    }
+
+    public static function scalarStringValue(mixed $value): string
+    {
+        return is_scalar($value) ? trim((string) $value) : '';
+    }
+
+    /**
+     * @return array{
+     *     method?: string,
+     *     timeout?: float,
+     *     redirection?: int,
+     *     httpversion?: string,
+     *     user-agent?: string,
+     *     reject_unsafe_urls?: bool,
+     *     blocking?: bool,
+     *     headers?: array<string, string>|string
+     * }
+     */
+    public static function normalizeHttpArgs(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        if (isset($value['method']) && is_string($value['method'])) {
+            $normalized['method'] = $value['method'];
+        }
+
+        if (isset($value['timeout']) && (is_int($value['timeout']) || is_float($value['timeout']))) {
+            $normalized['timeout'] = (float) $value['timeout'];
+        }
+
+        if (isset($value['redirection']) && is_int($value['redirection'])) {
+            $normalized['redirection'] = $value['redirection'];
+        }
+
+        if (isset($value['httpversion']) && is_string($value['httpversion'])) {
+            $normalized['httpversion'] = $value['httpversion'];
+        }
+
+        if (isset($value['user-agent']) && is_string($value['user-agent'])) {
+            $normalized['user-agent'] = $value['user-agent'];
+        }
+
+        if (isset($value['reject_unsafe_urls']) && is_bool($value['reject_unsafe_urls'])) {
+            $normalized['reject_unsafe_urls'] = $value['reject_unsafe_urls'];
+        }
+
+        if (isset($value['blocking']) && is_bool($value['blocking'])) {
+            $normalized['blocking'] = $value['blocking'];
+        }
+
+        if (isset($value['headers'])) {
+            if (is_string($value['headers'])) {
+                $normalized['headers'] = $value['headers'];
+            } elseif (is_array($value['headers'])) {
+                $headers = [];
+
+                foreach ($value['headers'] as $headerKey => $headerValue) {
+                    if (is_string($headerKey) && is_scalar($headerValue)) {
+                        $headers[$headerKey] = (string) $headerValue;
+                    }
+                }
+
+                $normalized['headers'] = $headers;
+            }
+        }
+
+        return $normalized;
+    }
+
+    public static function scalarIntValue(mixed $value, int $default = 0): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_float($value)) {
+            return (int) $value;
+        }
+
+        $normalized = self::scalarStringValue($value);
+
+        if ($normalized !== '' && preg_match('/^-?\d+$/', $normalized) === 1) {
+            return (int) $normalized;
+        }
+
+        return $default;
     }
 
     public static function weightNameSlug(string|int $weight): string
@@ -663,7 +784,7 @@ final class FontUtils
     public static function weightRangeFromFace(array $face): ?array
     {
         return self::weightRangeFromWeightAndAxes(
-            (string) ($face['weight'] ?? '400'),
+            self::stringValue($face, 'weight', '400'),
             $face['axes'] ?? []
         );
     }
@@ -728,15 +849,16 @@ final class FontUtils
      */
     public static function compareFacesByWeightAndStyle(array $left, array $right): int
     {
-        $weightCompare = self::weightSortValue($left['weight'] ?? '400') <=> self::weightSortValue($right['weight'] ?? '400');
+        $weightCompare = self::weightSortValue(self::stringValue($left, 'weight', '400'))
+            <=> self::weightSortValue(self::stringValue($right, 'weight', '400'));
 
         if ($weightCompare !== 0) {
             return $weightCompare;
         }
 
         return strcmp(
-            self::normalizeStyle((string) ($left['style'] ?? 'normal')),
-            self::normalizeStyle((string) ($right['style'] ?? 'normal'))
+            self::normalizeStyle(self::stringValue($left, 'style', 'normal')),
+            self::normalizeStyle(self::stringValue($right, 'style', 'normal'))
         );
     }
 
@@ -908,7 +1030,7 @@ final class FontUtils
     }
 
     /**
-     * @param list<array<string, mixed>> $axes
+     * @param list<mixed> $axes
      * @return AxesMap
      */
     public static function normalizeHostedAxisList(array $axes): array
@@ -916,7 +1038,11 @@ final class FontUtils
         $normalized = [];
 
         foreach ($axes as $axis) {
-            $tag = self::normalizeAxisTag((string) ($axis['tag'] ?? ''));
+            if (!is_array($axis)) {
+                continue;
+            }
+
+            $tag = self::normalizeAxisTag(self::stringValue($axis, 'tag'));
             $min = self::normalizeAxisValue($axis['start'] ?? $axis['min'] ?? '');
             $max = self::normalizeAxisValue($axis['end'] ?? $axis['max'] ?? '');
             $default = self::normalizeAxisValue($axis['default'] ?? '');
@@ -1038,5 +1164,49 @@ final class FontUtils
         $normalizedStyle = self::normalizeStyle($style);
 
         return $normalizedStyle === 'normal' ? '' : '-' . $normalizedStyle;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private static function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = $values[$key];
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
+            return (string) $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @return FormatAvailabilityEntryMap
+     */
+    private static function formatEntryMap(mixed $formats): array
+    {
+        if (!is_array($formats)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($formats as $key => $value) {
+            if (!is_string($key) || !is_array($value)) {
+                continue;
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
     }
 }

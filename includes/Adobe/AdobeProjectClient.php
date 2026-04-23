@@ -25,7 +25,17 @@ use WP_Error;
  *     state: string,
  *     message: string
  * }
- * @phpstan-type HttpArgs array<string, mixed>
+ * @phpstan-type HttpArgs array{
+ *     method?: string,
+ *     timeout?: float,
+ *     redirection?: int,
+ *     httpversion?: string,
+ *     user-agent?: string,
+ *     reject_unsafe_urls?: bool,
+ *     blocking?: bool,
+ *     headers?: array<string, string>|string,
+ *     ...
+ * }
  */
 final class AdobeProjectClient
 {
@@ -195,7 +205,7 @@ final class AdobeProjectClient
         $response = $this->remoteGet(
             $this->getStylesheetUrl($projectId),
             [
-                'timeout' => self::REQUEST_TIMEOUT,
+                'timeout' => (float) self::REQUEST_TIMEOUT,
                 'headers' => [
                     'Accept' => 'text/css,*/*;q=0.1',
                     'User-Agent' => FontUtils::MODERN_USER_AGENT,
@@ -284,7 +294,7 @@ final class AdobeProjectClient
 
         return [
             'project_id' => $projectId,
-            'stylesheet_url' => (string) $stylesheetUrl,
+            'stylesheet_url' => FontUtils::scalarStringValue($stylesheetUrl),
             'families' => $normalizedFamilies,
             'fetched_at' => time(),
         ];
@@ -301,11 +311,15 @@ final class AdobeProjectClient
     /**
      * @param HttpArgs $args
      */
-    private function remoteGet(string $url, array $args = []): mixed
+    /**
+     * @param HttpArgs $args
+     * @return array<string, mixed>|WP_Error
+     */
+    private function remoteGet(string $url, array $args = []): array|WP_Error
     {
         $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);
 
-        return wp_remote_get($url, is_array($filteredArgs) ? $filteredArgs : $args);
+        return wp_remote_get($url, FontUtils::normalizeHttpArgs(is_array($filteredArgs) ? $filteredArgs : $args));
     }
 
     private function transientKey(string $projectId): string

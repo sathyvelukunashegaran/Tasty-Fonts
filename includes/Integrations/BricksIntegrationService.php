@@ -12,8 +12,34 @@ use WP_Error;
 /**
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
- * @phpstan-type SyncState array<string, mixed>
+ * @phpstan-type SyncVariablesState array{applied: bool}
+ * @phpstan-type SyncThemeStylesState array{
+ *     applied: bool,
+ *     previous_styles: ThemeStyleMap,
+ *     target_mode: string,
+ *     target_style_id: string,
+ *     managed_style_created: bool
+ * }
+ * @phpstan-type SyncGoogleFontsState array{
+ *     applied: bool,
+ *     previous_disabled_google_fonts: bool|null
+ * }
+ * @phpstan-type SyncState array{
+ *     variables: SyncVariablesState,
+ *     theme_styles: SyncThemeStylesState,
+ *     google_fonts: SyncGoogleFontsState
+ * }
  * @phpstan-type RuntimeFamilyList list<CatalogFamily>
+ * @phpstan-type ReadState array{
+ *     available: bool,
+ *     enabled: bool,
+ *     configured: bool,
+ *     status: string,
+ *     selectors: array<string, mixed>,
+ *     builder_preview: array<string, mixed>,
+ *     theme_styles: array<string, mixed>,
+ *     google_fonts: array<string, mixed>
+ * }
  * @phpstan-type ThemeStyle array<string, mixed>
  * @phpstan-type ThemeStyleMap array<string, ThemeStyle>
  * @phpstan-type ThemeStyleChoiceMap array<string, string>
@@ -48,6 +74,9 @@ final class BricksIntegrationService
     public const TARGET_MODE_SELECTED = 'selected';
     public const TARGET_MODE_ALL = 'all';
     private const STATE_TEMPLATE = [
+        'variables' => [
+            'applied' => false,
+        ],
         'theme_styles' => [
             'applied' => false,
             'previous_styles' => [],
@@ -86,7 +115,7 @@ final class BricksIntegrationService
 
     /**
      * @param NormalizedSettings $settings
-     * @return SyncState
+     * @return ReadState
      */
     public function readState(array $settings): array
     {
@@ -101,8 +130,8 @@ final class BricksIntegrationService
             : $this->getTargetThemeStyleTypographyValues($targetStyleId);
         $themeStyleSummary = $this->getThemeStyleSummary($settings, $syncState);
         $googleFontsDisabled = $this->isGoogleFontsDisabled();
-        $themeStylesSynced = $this->normalizeThemeStyleTargetMode((string) ($syncState['theme_styles']['target_mode'] ?? '')) === $targetMode
-            && $this->normalizeThemeStyleTargetId((string) ($syncState['theme_styles']['target_style_id'] ?? '')) === $targetStyleId
+        $themeStylesSynced = $this->normalizeThemeStyleTargetMode($syncState['theme_styles']['target_mode']) === $targetMode
+            && $this->normalizeThemeStyleTargetId($syncState['theme_styles']['target_style_id']) === $targetStyleId
             && $this->managedThemeStylesMatchDesired($targetStyleId, $targetMode);
 
         return [
@@ -125,7 +154,7 @@ final class BricksIntegrationService
                 $masterEnabled,
                 $sitewideRolesEnabled,
                 $this->themeStylesSyncEnabled($settings),
-                !empty($syncState['theme_styles']['applied']),
+                $syncState['theme_styles']['applied'],
                 $themeStylesSynced,
                 $currentThemeStyles,
                 $this->desiredThemeStyleValues()
@@ -135,7 +164,7 @@ final class BricksIntegrationService
             'google_fonts' => [
                 'enabled' => $available && $masterEnabled && $this->disableGoogleFontsEnabled($settings),
                 'configured' => !empty($settings[self::FEATURE_DISABLE_GOOGLE_FONTS]),
-                'applied' => !empty($syncState['google_fonts']['applied']),
+                'applied' => $syncState['google_fonts']['applied'],
                 'status' => !$available
                     ? 'unavailable'
                     : (!$masterEnabled || !$this->disableGoogleFontsEnabled($settings)
@@ -192,7 +221,7 @@ final class BricksIntegrationService
         $syncState = $this->getSyncState();
         $targetStyleId = $this->resolveThemeStyleTargetId($settings, $syncState);
 
-        return !empty($syncState['theme_styles']['applied']) && $this->managedThemeStylesMatchDesired($targetStyleId, $this->resolveThemeStyleTargetMode($settings, $syncState));
+        return $syncState['theme_styles']['applied'] && $this->managedThemeStylesMatchDesired($targetStyleId, $this->resolveThemeStyleTargetMode($settings, $syncState));
     }
 
     /**
@@ -206,7 +235,7 @@ final class BricksIntegrationService
 
         $syncState = $this->getSyncState();
 
-        return !empty($syncState['theme_styles']['applied']);
+        return $syncState['theme_styles']['applied'];
     }
 
     /**
@@ -292,7 +321,11 @@ final class BricksIntegrationService
         }
 
         $styles = [];
-        $bodyFamily = $this->managedFamilyName($settings['typography']['typographyBody']['font-family'] ?? '', $runtimeLookup);
+        $typography = $this->themeStyleTypography($settings);
+        $bodyFamily = $this->managedFamilyName(
+            $this->themeStyleTypographyValue($typography, 'typographyBody', 'font-family'),
+            $runtimeLookup
+        );
 
         if ($bodyFamily !== '') {
             $styles[] = $this->buildEditorRule('body', $bodyFamily);
@@ -300,7 +333,7 @@ final class BricksIntegrationService
 
         foreach (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'] as $headingLevel) {
             $familyName = $this->managedFamilyName(
-                $settings['typography']['typographyHeading' . $headingLevel]['font-family'] ?? '',
+                $this->themeStyleTypographyValue($typography, 'typographyHeading' . $headingLevel, 'font-family'),
                 $runtimeLookup
             );
 
@@ -382,21 +415,15 @@ final class BricksIntegrationService
 
         $state = $this->getSyncState();
 
-        if (!empty($state['theme_styles']['applied'])) {
+        if ($state['theme_styles']['applied']) {
             $styles = $this->getThemeStyles();
-            $backups = is_array($state['theme_styles']['previous_styles'] ?? null)
-                ? (array) $state['theme_styles']['previous_styles']
-                : [];
+            $backups = $state['theme_styles']['previous_styles'];
 
             foreach ($backups as $styleId => $style) {
-                if (!is_array($style)) {
-                    continue;
-                }
-
                 $styles[(string) $styleId] = $style;
             }
 
-            if (!empty($state['theme_styles']['managed_style_created']) && !isset($backups[self::MANAGED_THEME_STYLE_ID])) {
+            if ($state['theme_styles']['managed_style_created'] && !isset($backups[self::MANAGED_THEME_STYLE_ID])) {
                 unset($styles[self::MANAGED_THEME_STYLE_ID]);
             }
 
@@ -427,7 +454,7 @@ final class BricksIntegrationService
         $state = $this->getSyncState();
         $globalSettings = $this->getGlobalSettings();
 
-        if (!array_key_exists('previous_disabled_google_fonts', $state['google_fonts']) || $state['google_fonts']['previous_disabled_google_fonts'] === null) {
+        if ($state['google_fonts']['previous_disabled_google_fonts'] === null) {
             $state['google_fonts']['previous_disabled_google_fonts'] = isset($globalSettings['disableGoogleFonts']);
         }
 
@@ -454,7 +481,7 @@ final class BricksIntegrationService
 
         $state = $this->getSyncState();
         $globalSettings = $this->getGlobalSettings();
-        $previousDisabled = $state['google_fonts']['previous_disabled_google_fonts'] ?? null;
+        $previousDisabled = $state['google_fonts']['previous_disabled_google_fonts'];
 
         if ($previousDisabled) {
             $globalSettings['disableGoogleFonts'] = true;
@@ -566,18 +593,28 @@ final class BricksIntegrationService
             $state = [];
         }
 
-        $state = array_replace_recursive(self::STATE_TEMPLATE, $state);
-        $state['variables']['applied'] = !empty($state['variables']['applied']);
-        $state['theme_styles']['applied'] = !empty($state['theme_styles']['applied']);
-        $state['theme_styles']['target_mode'] = $this->normalizeThemeStyleTargetMode((string) ($state['theme_styles']['target_mode'] ?? ''));
-        $state['theme_styles']['target_style_id'] = $this->normalizeThemeStyleTargetId((string) ($state['theme_styles']['target_style_id'] ?? ''));
-        $state['theme_styles']['managed_style_created'] = !empty($state['theme_styles']['managed_style_created']);
-        $state['google_fonts']['applied'] = !empty($state['google_fonts']['applied']);
-        $state['google_fonts']['previous_disabled_google_fonts'] = array_key_exists('previous_disabled_google_fonts', $state['google_fonts'])
-            ? (($state['google_fonts']['previous_disabled_google_fonts'] ?? null) === null ? null : !empty($state['google_fonts']['previous_disabled_google_fonts']))
-            : null;
+        $variables = $this->optionMap($state['variables'] ?? []);
+        $themeStyles = $this->optionMap($state['theme_styles'] ?? []);
+        $googleFonts = $this->optionMap($state['google_fonts'] ?? []);
 
-        return $state;
+        return [
+            'variables' => [
+                'applied' => !empty($variables['applied']),
+            ],
+            'theme_styles' => [
+                'applied' => !empty($themeStyles['applied']),
+                'previous_styles' => $this->normalizeThemeStyleMap($themeStyles['previous_styles'] ?? []),
+                'target_mode' => $this->normalizeThemeStyleTargetMode($this->stringValue($themeStyles, 'target_mode')),
+                'target_style_id' => $this->normalizeThemeStyleTargetId($this->stringValue($themeStyles, 'target_style_id')),
+                'managed_style_created' => !empty($themeStyles['managed_style_created']),
+            ],
+            'google_fonts' => [
+                'applied' => !empty($googleFonts['applied']),
+                'previous_disabled_google_fonts' => array_key_exists('previous_disabled_google_fonts', $googleFonts)
+                    ? ($googleFonts['previous_disabled_google_fonts'] === null ? null : !empty($googleFonts['previous_disabled_google_fonts']))
+                    : null,
+            ],
+        ];
     }
 
     /**
@@ -699,11 +736,11 @@ final class BricksIntegrationService
     private function resolveThemeStyleTargetMode(array $settings, array $syncState): string
     {
         if (array_key_exists('bricks_theme_style_target_mode', $settings)) {
-            return $this->normalizeThemeStyleTargetMode((string) ($settings['bricks_theme_style_target_mode'] ?? ''));
+            return $this->normalizeThemeStyleTargetMode($this->stringValue($settings, 'bricks_theme_style_target_mode'));
         }
 
-        if (!empty($syncState['theme_styles']['applied'])) {
-            return $this->normalizeThemeStyleTargetMode((string) ($syncState['theme_styles']['target_mode'] ?? ''));
+        if ($syncState['theme_styles']['applied']) {
+            return $this->normalizeThemeStyleTargetMode($syncState['theme_styles']['target_mode']);
         }
 
         return self::TARGET_MODE_MANAGED;
@@ -726,7 +763,7 @@ final class BricksIntegrationService
 
         if ($hasRequestedTarget) {
             $requestedTargetId = $this->resolveRequestedThemeStyleTargetId(
-                (string) ($settings['bricks_theme_style_target_id'] ?? ''),
+                $this->stringValue($settings, 'bricks_theme_style_target_id'),
                 $styles,
                 $targetMode
             );
@@ -736,9 +773,9 @@ final class BricksIntegrationService
             }
         }
 
-        if (!empty($syncState['theme_styles']['applied'])) {
+        if ($syncState['theme_styles']['applied']) {
             $appliedTargetId = $this->resolveRequestedThemeStyleTargetId(
-                (string) ($syncState['theme_styles']['target_style_id'] ?? ''),
+                $syncState['theme_styles']['target_style_id'],
                 $styles,
                 $targetMode
             );
@@ -788,7 +825,7 @@ final class BricksIntegrationService
      */
     private function themeStyleLabel(array $style, string $styleId): string
     {
-        $label = trim((string) ($style['label'] ?? ''));
+        $label = trim($this->stringValue($style, 'label'));
 
         return $label !== '' ? $label : $styleId;
     }
@@ -814,7 +851,7 @@ final class BricksIntegrationService
         $values = [];
 
         foreach ($this->getGlobalVariables() as $variable) {
-            $name = trim((string) ($variable['name'] ?? ''));
+            $name = trim($this->stringValue($variable, 'name'));
 
             if ($name === '') {
                 continue;
@@ -829,7 +866,7 @@ final class BricksIntegrationService
                 continue;
             }
 
-            $values[$name] = trim((string) ($variable['value'] ?? ''));
+            $values[$name] = trim($this->stringValue($variable, 'value'));
         }
 
         ksort($values, SORT_STRING);
@@ -853,7 +890,7 @@ final class BricksIntegrationService
         return array_values(
             array_filter(
                 $variables,
-                static fn (array $variable): bool => !in_array(trim((string) ($variable['name'] ?? '')), $managedNames, true)
+                fn (array $variable): bool => !in_array(trim($this->stringValue($variable, 'name')), $managedNames, true)
             )
         );
     }
@@ -867,7 +904,7 @@ final class BricksIntegrationService
         return array_values(
             array_filter(
                 $categories,
-                static fn (array $category): bool => trim((string) ($category['id'] ?? '')) !== self::VARIABLE_CATEGORY_ID
+                fn (array $category): bool => trim($this->stringValue($category, 'id')) !== self::VARIABLE_CATEGORY_ID
             )
         );
     }
@@ -915,11 +952,10 @@ final class BricksIntegrationService
      */
     private function applyManagedTypographyToStyle(array $style, bool $ensureDefaultConditions = false): array
     {
-        $settings = is_array($style['settings'] ?? null) ? $style['settings'] : [];
-        $typography = is_array($settings['typography'] ?? null) ? $settings['typography'] : [];
-        $settings['typography'] = $this->applyManagedTypographyToMap($typography);
+        $settings = $this->normalizeThemeStyleSettings($style['settings'] ?? []);
+        $settings['typography'] = $this->applyManagedTypographyToMap($this->themeStyleTypography($settings));
 
-        if ($ensureDefaultConditions && !is_array($settings['conditions'] ?? null)) {
+        if ($ensureDefaultConditions && !isset($settings['conditions'])) {
             $settings['conditions'] = $this->defaultManagedThemeStyleConditions();
         }
 
@@ -954,9 +990,7 @@ final class BricksIntegrationService
      */
     private function captureThemeStyleRestoreState(array $state, array $styles, string $targetMode, string $targetStyleId): array
     {
-        $backups = is_array($state['theme_styles']['previous_styles'] ?? null)
-            ? (array) $state['theme_styles']['previous_styles']
-            : [];
+        $backups = $state['theme_styles']['previous_styles'];
 
         if ($targetMode === self::TARGET_MODE_ALL) {
             if ($styles === []) {
@@ -993,13 +1027,13 @@ final class BricksIntegrationService
     private function getTargetThemeStyleTypographyValues(string $targetStyleId): array
     {
         $settings = $this->getTargetThemeStyleSettings($targetStyleId);
-        $typography = is_array($settings['typography'] ?? null) ? $settings['typography'] : [];
+        $typography = $this->themeStyleTypography($settings);
 
         return [
-            'body_family' => (string) (($typography['typographyBody']['font-family'] ?? '')),
-            'body_weight' => (string) (($typography['typographyBody']['font-weight'] ?? '')),
-            'heading_family' => (string) (($typography['typographyHeadingH1']['font-family'] ?? ($typography['typographyHeadings']['font-family'] ?? ''))),
-            'heading_weight' => (string) (($typography['typographyHeadingH1']['font-weight'] ?? ($typography['typographyHeadings']['font-weight'] ?? ''))),
+            'body_family' => $this->themeStyleTypographyValue($typography, 'typographyBody', 'font-family'),
+            'body_weight' => $this->themeStyleTypographyValue($typography, 'typographyBody', 'font-weight'),
+            'heading_family' => $this->firstThemeStyleTypographyValue($typography, ['typographyHeadingH1', 'typographyHeadings'], 'font-family'),
+            'heading_weight' => $this->firstThemeStyleTypographyValue($typography, ['typographyHeadingH1', 'typographyHeadings'], 'font-weight'),
         ];
     }
 
@@ -1030,7 +1064,7 @@ final class BricksIntegrationService
             $styleValues = $this->getTargetThemeStyleTypographyValues((string) $styleId);
 
             foreach ($values as $key => $collected) {
-                $value = trim((string) ($styleValues[$key] ?? ''));
+                $value = trim($styleValues[$key] ?? '');
 
                 if ($value !== '') {
                     $values[$key][$value] = true;
@@ -1052,15 +1086,15 @@ final class BricksIntegrationService
     private function getTargetThemeStyleSettings(string $targetStyleId): array
     {
         if (!$this->isAvailable()) {
-            return [];
+            return ['typography' => []];
         }
 
         $styles = $this->getThemeStyles();
         $targetStyleId = $this->normalizeThemeStyleTargetId($targetStyleId);
 
-        return is_array($styles[$targetStyleId]['settings'] ?? null)
-            ? $styles[$targetStyleId]['settings']
-            : [];
+        return isset($styles[$targetStyleId])
+            ? $this->normalizeThemeStyleSettings($styles[$targetStyleId]['settings'] ?? [])
+            : ['typography' => []];
     }
 
     /**
@@ -1068,29 +1102,22 @@ final class BricksIntegrationService
      */
     private function themeStyleMatchesDesired(array $style): bool
     {
-        $typography = $style['settings']['typography'] ?? [];
-
-        if (!is_array($typography)) {
-            return false;
-        }
+        $settings = $this->normalizeThemeStyleSettings($style['settings'] ?? []);
+        $typography = $this->themeStyleTypography($settings);
 
         foreach (self::BODY_TYPOGRAPHY_KEYS as $key) {
-            $entry = is_array($typography[$key] ?? null) ? $typography[$key] : [];
-
             if (
-                (string) ($entry['font-family'] ?? '') !== self::DESIRED_BODY_VALUE
-                || (string) ($entry['font-weight'] ?? '') !== self::DESIRED_BODY_WEIGHT_VALUE
+                $this->themeStyleTypographyValue($typography, $key, 'font-family') !== self::DESIRED_BODY_VALUE
+                || $this->themeStyleTypographyValue($typography, $key, 'font-weight') !== self::DESIRED_BODY_WEIGHT_VALUE
             ) {
                 return false;
             }
         }
 
         foreach (self::HEADING_TYPOGRAPHY_KEYS as $key) {
-            $entry = is_array($typography[$key] ?? null) ? $typography[$key] : [];
-
             if (
-                (string) ($entry['font-family'] ?? '') !== self::DESIRED_HEADING_VALUE
-                || (string) ($entry['font-weight'] ?? '') !== self::DESIRED_HEADING_WEIGHT_VALUE
+                $this->themeStyleTypographyValue($typography, $key, 'font-family') !== self::DESIRED_HEADING_VALUE
+                || $this->themeStyleTypographyValue($typography, $key, 'font-weight') !== self::DESIRED_HEADING_WEIGHT_VALUE
             ) {
                 return false;
             }
@@ -1107,11 +1134,7 @@ final class BricksIntegrationService
         $styles = [];
 
         foreach ($this->getOptionArray(defined('BRICKS_DB_THEME_STYLES') ? (string) constant('BRICKS_DB_THEME_STYLES') : 'bricks_theme_styles') as $styleId => $style) {
-            if (!is_array($style)) {
-                continue;
-            }
-
-            $styles[(string) $styleId] = $style;
+            $styles[(string) $styleId] = $this->normalizeThemeStyle($style);
         }
 
         return $styles;
@@ -1133,9 +1156,7 @@ final class BricksIntegrationService
         $variables = [];
 
         foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES') ? (string) constant('BRICKS_DB_GLOBAL_VARIABLES') : self::OPTION_GLOBAL_VARIABLES) as $variable) {
-            if (is_array($variable)) {
-                $variables[] = $variable;
-            }
+            $variables[] = $this->normalizeVariableEntry($variable);
         }
 
         return $variables;
@@ -1157,9 +1178,7 @@ final class BricksIntegrationService
         $categories = [];
 
         foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES') ? (string) constant('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES') : self::OPTION_GLOBAL_VARIABLE_CATEGORIES) as $category) {
-            if (is_array($category)) {
-                $categories[] = $category;
-            }
+            $categories[] = $this->normalizeVariableCategoryEntry($category);
         }
 
         return $categories;
@@ -1232,6 +1251,187 @@ final class BricksIntegrationService
     }
 
     /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private function optionMap(mixed $value): array
+    {
+        return $this->normalizeOptionMap($value);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        $value = $values[$key] ?? null;
+
+        return is_scalar($value) ? trim((string) $value) : $default;
+    }
+
+    /**
+     * @param mixed $style
+     * @return ThemeStyle
+     */
+    private function normalizeThemeStyle(mixed $style): array
+    {
+        $normalized = $this->optionMap($style);
+        $normalized['label'] = $this->stringValue($normalized, 'label');
+        $normalized['settings'] = $this->normalizeThemeStyleSettings($normalized['settings'] ?? []);
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $value
+     * @return ThemeStyleMap
+     */
+    private function normalizeThemeStyleMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $styleId => $style) {
+            $normalized[(string) $styleId] = $this->normalizeThemeStyle($style);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $settings
+     * @return array<string, mixed>
+     */
+    private function normalizeThemeStyleSettings(mixed $settings): array
+    {
+        $normalized = $this->optionMap($settings);
+        $normalized['typography'] = $this->normalizeTypographyMap($normalized['typography'] ?? []);
+
+        if (array_key_exists('conditions', $normalized) && !is_array($normalized['conditions'])) {
+            unset($normalized['conditions']);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return TypographyMap
+     */
+    private function themeStyleTypography(array $settings): array
+    {
+        return $this->normalizeTypographyMap($settings['typography'] ?? []);
+    }
+
+    /**
+     * @param mixed $typography
+     * @return TypographyMap
+     */
+    private function normalizeTypographyMap(mixed $typography): array
+    {
+        if (!is_array($typography)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($typography as $key => $entry) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalized[$key] = $this->normalizeTypographyEntry($entry);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $entry
+     * @return array<string, mixed>
+     */
+    private function normalizeTypographyEntry(mixed $entry): array
+    {
+        $normalized = $this->optionMap($entry);
+
+        if (array_key_exists('font-family', $normalized)) {
+            $normalized['font-family'] = $this->stringValue($normalized, 'font-family');
+        }
+
+        if (array_key_exists('font-weight', $normalized)) {
+            $normalized['font-weight'] = $this->stringValue($normalized, 'font-weight');
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param TypographyMap $typography
+     * @param 'font-family'|'font-weight' $valueKey
+     */
+    private function themeStyleTypographyValue(array $typography, string $entryKey, string $valueKey): string
+    {
+        $entry = $this->optionMap($typography[$entryKey] ?? []);
+
+        return $this->stringValue($entry, $valueKey);
+    }
+
+    /**
+     * @param TypographyMap $typography
+     * @param list<string> $entryKeys
+     * @param 'font-family'|'font-weight' $valueKey
+     */
+    private function firstThemeStyleTypographyValue(array $typography, array $entryKeys, string $valueKey): string
+    {
+        foreach ($entryKeys as $entryKey) {
+            $value = $this->themeStyleTypographyValue($typography, $entryKey, $valueKey);
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param mixed $variable
+     * @return VariableEntry
+     */
+    private function normalizeVariableEntry(mixed $variable): array
+    {
+        $normalized = $this->optionMap($variable);
+
+        if (array_key_exists('name', $normalized)) {
+            $normalized['name'] = $this->stringValue($normalized, 'name');
+        }
+
+        if (array_key_exists('value', $normalized)) {
+            $normalized['value'] = $this->stringValue($normalized, 'value');
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $category
+     * @return array<string, mixed>
+     */
+    private function normalizeVariableCategoryEntry(mixed $category): array
+    {
+        $normalized = $this->optionMap($category);
+
+        if (array_key_exists('id', $normalized)) {
+            $normalized['id'] = $this->stringValue($normalized, 'id');
+        }
+
+        return $normalized;
+    }
+
+    /**
      * @param NormalizedSettings $settings
      */
     private function masterEnabled(array $settings): bool
@@ -1265,7 +1465,7 @@ final class BricksIntegrationService
         $lookup = [];
 
         foreach ($runtimeFamilies as $family) {
-            $name = trim((string) ($family['family'] ?? ''));
+            $name = is_scalar($family['family'] ?? null) ? trim((string) $family['family']) : '';
 
             if ($name === '') {
                 continue;

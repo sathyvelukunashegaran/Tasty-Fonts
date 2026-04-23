@@ -25,7 +25,7 @@ use WP_Error;
  * @phpstan-type RestDecoded array<int|string, mixed>
  * @phpstan-type BlockEditorFamilySettings array{name: string, slug: string, fontFamily: string}
  * @phpstan-type BlockEditorFaceSettings array{fontFamily: string, src: list<string>, fontWeight: string, fontStyle: string, fontDisplay: string, unicodeRange?: string, fontVariationSettings?: string}
- * @phpstan-type RestRequestArgs array<string, mixed>
+ * @phpstan-type RestRequestArgs array{method?: string, timeout?: float, headers?: array<string, string>, body?: array<string, string>}
  * @phpstan-type IntegrationsLogAction array<string, string>
  */
 final class BlockEditorFontLibraryService
@@ -77,7 +77,7 @@ final class BlockEditorFontLibraryService
             return;
         }
 
-        $familyName = trim((string) ($family['family'] ?? ($result['family'] ?? '')));
+        $familyName = trim($this->stringValue($family, 'family', $this->stringValue($result, 'family')));
 
         if ($familyName === '') {
             return;
@@ -97,7 +97,7 @@ final class BlockEditorFontLibraryService
         }
 
         $existingFamily = $this->findExistingFontFamily($familyPayload['slug']);
-        $familyId = $existingFamily['id'] ?? null;
+        $familyId = $existingFamily !== null ? $this->intValue($existingFamily, 'id') : null;
 
         if ($familyId === null) {
             $createdFamily = $this->createFontFamily($familyPayload);
@@ -107,7 +107,7 @@ final class BlockEditorFontLibraryService
                 return;
             }
 
-            $familyId = isset($createdFamily['id']) ? (int) $createdFamily['id'] : null;
+            $familyId = $this->intValue($createdFamily, 'id');
         } else {
             $updatedFamily = $this->updateFontFamily($familyId, $familyPayload);
 
@@ -161,13 +161,14 @@ final class BlockEditorFontLibraryService
 
         $managedSlug = self::MANAGED_SLUG_PREFIX . FontUtils::slugify($familySlug);
         $existingFamily = $this->findExistingFontFamily($managedSlug);
+        $familyId = $existingFamily !== null ? $this->intValue($existingFamily, 'id') : null;
 
-        if ($existingFamily === null || empty($existingFamily['id'])) {
+        if ($familyId === null || $familyId <= 0) {
             return;
         }
 
         $response = wp_remote_request(
-            add_query_arg('force', 'true', trailingslashit($this->restBaseUrl()) . (int) $existingFamily['id']),
+            add_query_arg('force', 'true', trailingslashit($this->restBaseUrl()) . $familyId),
             $this->restRequestArgs(['method' => 'DELETE'])
         );
         $decoded = $this->decodeRestResponse($response);
@@ -188,8 +189,8 @@ final class BlockEditorFontLibraryService
     public function deleteAllSyncedFamilies(bool $force = false): void
     {
         foreach ($this->imports->allFamilies() as $family) {
-            $familySlug = (string) ($family['slug'] ?? '');
-            $familyName = (string) ($family['family'] ?? '');
+            $familySlug = $family['slug'];
+            $familyName = $family['family'];
 
             if ($familySlug === '') {
                 continue;
@@ -231,10 +232,10 @@ final class BlockEditorFontLibraryService
     private function resolveFamilyRecord(array $result): ?array
     {
         if (is_array($result['family_record'] ?? null)) {
-            return $result['family_record'];
+            return $this->normalizeRestEntity($result['family_record']);
         }
 
-        $familyName = trim((string) ($result['family'] ?? ''));
+        $familyName = trim($this->stringValue($result, 'family'));
 
         if ($familyName === '') {
             return null;
@@ -250,22 +251,22 @@ final class BlockEditorFontLibraryService
      */
     private function resolveSyncProfile(array $family, array $result): ?array
     {
-        $profiles = is_array($family['delivery_profiles'] ?? null) ? $family['delivery_profiles'] : [];
-        $deliveryId = (string) ($family['active_delivery_id'] ?? '');
+        $profiles = $this->profileMap($family['delivery_profiles'] ?? []);
+        $deliveryId = $this->stringValue($family, 'active_delivery_id');
 
-        if ($deliveryId !== '' && is_array($profiles[$deliveryId] ?? null)) {
+        if ($deliveryId !== '' && isset($profiles[$deliveryId])) {
             return $profiles[$deliveryId];
         }
 
-        $resultDeliveryId = (string) ($result['delivery_id'] ?? '');
+        $resultDeliveryId = $this->stringValue($result, 'delivery_id');
 
-        if ($resultDeliveryId !== '' && is_array($profiles[$resultDeliveryId] ?? null)) {
+        if ($resultDeliveryId !== '' && isset($profiles[$resultDeliveryId])) {
             return $profiles[$resultDeliveryId];
         }
 
         $firstProfile = reset($profiles);
 
-        return is_array($firstProfile) ? $firstProfile : null;
+        return $firstProfile === false ? null : $firstProfile;
     }
 
     /**
@@ -275,7 +276,7 @@ final class BlockEditorFontLibraryService
      */
     private function buildFamilySettings(array $family, array $profile, string $familyName): array
     {
-        $familySlug = FontUtils::slugify((string) ($family['slug'] ?? $familyName));
+        $familySlug = FontUtils::slugify($this->stringValue($family, 'slug', $familyName));
 
         return [
             'name' => $familyName,
@@ -296,11 +297,7 @@ final class BlockEditorFontLibraryService
         $quotedFamily = '"' . FontUtils::escapeFontFamily($familyName) . '"';
         $variableFontsEnabled = !empty($settings['variable_fonts_enabled']);
 
-        foreach ((array) ($profile['faces'] ?? []) as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
+        foreach (FontUtils::normalizeFaceList($profile['faces'] ?? []) as $face) {
             if (!$variableFontsEnabled && FontUtils::faceIsVariable($face)) {
                 continue;
             }
@@ -311,11 +308,12 @@ final class BlockEditorFontLibraryService
                 continue;
             }
 
+            $axes = $this->normalizeAxes($face['axes'] ?? []);
             $payload = [
                 'fontFamily' => $quotedFamily,
                 'src' => $src,
-                'fontWeight' => $this->blockEditorFontWeight((string) ($face['weight'] ?? '400'), (array) ($face['axes'] ?? [])),
-                'fontStyle' => FontUtils::normalizeStyle((string) ($face['style'] ?? 'normal')),
+                'fontWeight' => $this->blockEditorFontWeight($this->stringValue($face, 'weight', '400'), $axes),
+                'fontStyle' => FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')),
                 'fontDisplay' => $fontDisplay,
             ];
 
@@ -327,7 +325,7 @@ final class BlockEditorFontLibraryService
 
             if ($variableFontsEnabled) {
                 $variationSettings = FontUtils::buildFontVariationSettings(
-                    FontUtils::faceLevelVariationDefaults($face['variation_defaults'] ?? [], $face['axes'] ?? [])
+                    FontUtils::faceLevelVariationDefaults($face['variation_defaults'] ?? [], $axes)
                 );
 
                 if ($variationSettings !== 'normal') {
@@ -356,8 +354,8 @@ final class BlockEditorFontLibraryService
     private function buildFaceSources(array $face): array
     {
         $sources = [];
-        $files = is_array($face['files'] ?? null) ? $face['files'] : [];
-        $paths = is_array($face['paths'] ?? null) ? $face['paths'] : [];
+        $files = FontUtils::normalizeStringMap($face['files'] ?? []);
+        $paths = FontUtils::normalizeStringMap($face['paths'] ?? []);
 
         foreach (self::SUPPORTED_FILE_FORMATS as $format) {
             $value = $files[$format] ?? $paths[$format] ?? null;
@@ -401,7 +399,7 @@ final class BlockEditorFontLibraryService
      */
     private function resolveFallback(array $profile): string
     {
-        $category = strtolower(trim((string) (($profile['meta']['category'] ?? ''))));
+        $category = strtolower(trim($this->profileMetaString($profile, 'category')));
 
         return match ($category) {
             'serif' => 'serif',
@@ -414,8 +412,8 @@ final class BlockEditorFontLibraryService
     private function resolveFontDisplay(string $familyName): string
     {
         $settings = $this->settings->getSettings();
-        $familyDisplays = is_array($settings['family_font_displays'] ?? null) ? $settings['family_font_displays'] : [];
-        $display = strtolower(trim((string) ($familyDisplays[$familyName] ?? ($settings['font_display'] ?? 'swap'))));
+        $familyDisplays = FontUtils::normalizeStringMap($settings['family_font_displays'] ?? []);
+        $display = strtolower(trim($familyDisplays[$familyName] ?? $this->stringValue($settings, 'font_display', 'swap')));
 
         return in_array($display, self::SUPPORTED_DISPLAY_VALUES, true)
             ? $display
@@ -449,7 +447,7 @@ final class BlockEditorFontLibraryService
             return null;
         }
 
-        return $decoded[0];
+        return $this->normalizeRestEntity($decoded[0]);
     }
 
     /**
@@ -463,7 +461,7 @@ final class BlockEditorFontLibraryService
             $this->restRequestArgs(
                 [
                     'body' => [
-                        'font_family_settings' => wp_json_encode($settings),
+                        'font_family_settings' => $this->jsonBodyString($settings),
                         'theme_json_version' => (string) self::THEME_JSON_VERSION,
                     ],
                 ]
@@ -484,7 +482,7 @@ final class BlockEditorFontLibraryService
             $this->restRequestArgs(
                 [
                     'body' => [
-                        'font_family_settings' => wp_json_encode($settings),
+                        'font_family_settings' => $this->jsonBodyString($settings),
                         'theme_json_version' => (string) self::THEME_JSON_VERSION,
                     ],
                 ]
@@ -535,7 +533,7 @@ final class BlockEditorFontLibraryService
             $this->restRequestArgs(
                 [
                     'body' => [
-                        'font_face_settings' => wp_json_encode($settings),
+                        'font_face_settings' => $this->jsonBodyString($settings),
                         'theme_json_version' => (string) self::THEME_JSON_VERSION,
                     ],
                 ]
@@ -568,11 +566,18 @@ final class BlockEditorFontLibraryService
             return $response;
         }
 
-        $status = (int) wp_remote_retrieve_response_code($response);
+        if (!is_array($response)) {
+            return new WP_Error(
+                'tasty_fonts_block_editor_font_library_sync_failed',
+                __('Block Editor Font Library request did not return a valid REST response.', 'tasty-fonts')
+            );
+        }
+
+        $status = wp_remote_retrieve_response_code($response);
         $body = json_decode((string) wp_remote_retrieve_body($response), true);
 
         if ($status < 200 || $status >= 300) {
-            $message = is_array($body) ? trim((string) ($body['message'] ?? '')) : '';
+            $message = is_array($body) ? trim($this->stringValue($body, 'message')) : '';
 
             return new WP_Error(
                 'tasty_fonts_block_editor_font_library_sync_failed',
@@ -647,7 +652,7 @@ final class BlockEditorFontLibraryService
         }
 
         $defaults = [
-            'timeout' => self::REQUEST_TIMEOUT,
+            'timeout' => (float) self::REQUEST_TIMEOUT,
             'headers' => $headers,
         ];
 
@@ -663,13 +668,19 @@ final class BlockEditorFontLibraryService
                 continue;
             }
 
-            $name = (string) constant($cookieConstant);
+            $name = FontUtils::scalarStringValue(constant($cookieConstant));
 
-            if (!isset($_COOKIE[$name])) {
+            if ($name === '' || !isset($_COOKIE[$name])) {
                 continue;
             }
 
-            $cookies[] = rawurlencode($name) . '=' . rawurlencode((string) $_COOKIE[$name]);
+            $cookieValue = FontUtils::scalarStringValue($_COOKIE[$name]);
+
+            if ($cookieValue === '') {
+                continue;
+            }
+
+            $cookies[] = rawurlencode($name) . '=' . rawurlencode($cookieValue);
         }
 
         return implode('; ', $cookies);
@@ -734,5 +745,106 @@ final class BlockEditorFontLibraryService
                 admin_url('admin.php')
             ),
         ];
+    }
+
+    /**
+     * @param mixed $profiles
+     * @return array<string, DeliveryProfile>
+     */
+    private function profileMap(mixed $profiles): array
+    {
+        if (!is_array($profiles)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($profiles as $profileId => $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $id = $this->stringValue($profile, 'id', is_string($profileId) ? $profileId : '');
+
+            if ($id === '') {
+                continue;
+            }
+
+            $normalized[$id] = $profile;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return AxesMap
+     */
+    private function normalizeAxes(mixed $axes): array
+    {
+        return is_array($axes) ? FontUtils::normalizeAxesMap($axes) : [];
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    private function profileMetaString(array $profile, string $key): string
+    {
+        $meta = $profile['meta'] ?? null;
+
+        if (!is_array($meta)) {
+            return '';
+        }
+
+        return $this->stringValue($meta, $key);
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     */
+    private function jsonBodyString(array $settings): string
+    {
+        $encoded = wp_json_encode($settings);
+
+        return is_string($encoded) ? $encoded : '{}';
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function intValue(array $values, string $key): ?int
+    {
+        if (!array_key_exists($key, $values)) {
+            return null;
+        }
+
+        $value = $values[$key];
+
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '' && preg_match('/^-?\d+$/', $value) === 1) {
+            return (int) $value;
+        }
+
+        if (is_float($value)) {
+            return (int) $value;
+        }
+
+        return null;
     }
 }

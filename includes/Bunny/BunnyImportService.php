@@ -162,7 +162,7 @@ final class BunnyImportService
                 'format' => 'static',
                 'label' => __('Self-hosted (Bunny import)', 'tasty-fonts'),
                 'meta' => [
-                    'category' => (string) ($metadata['category'] ?? ''),
+                    'category' => $this->stringValue($metadata, 'category'),
                     'imported_at' => current_time('mysql'),
                 ],
             ],
@@ -206,7 +206,7 @@ final class BunnyImportService
                 'format' => 'static',
                 'label' => __('Bunny CDN', 'tasty-fonts'),
                 'meta' => [
-                    'category' => (string) ($metadata['category'] ?? ''),
+                    'category' => $this->stringValue($metadata, 'category'),
                     'saved_at' => current_time('mysql'),
                 ],
             ],
@@ -238,7 +238,7 @@ final class BunnyImportService
     {
         return [
             'type' => 'bunny',
-            'category' => (string) ($metadata['category'] ?? ''),
+            'category' => $this->stringValue($metadata, 'category'),
             'variants' => $variants,
         ];
     }
@@ -264,9 +264,10 @@ final class BunnyImportService
     private function resolveProfileId(?array $family, string $deliveryMode): string
     {
         $existing = $this->findDeliveryProfile($family, 'bunny', $deliveryMode);
+        $existingId = $this->stringValue($existing, 'id');
 
-        if (is_array($existing) && trim((string) ($existing['id'] ?? '')) !== '') {
-            return (string) $existing['id'];
+        if ($existingId !== '') {
+            return $existingId;
         }
 
         return $this->profileId($deliveryMode);
@@ -296,5 +297,17 @@ final class BunnyImportService
             'write_failed_code' => 'tasty_fonts_bunny_write_failed',
             'write_failed_message' => __('The imported font file could not be written to uploads/fonts.', 'tasty-fonts'),
         ];
+    }
+
+    /**
+     * @param array<string, mixed>|null $values
+     */
+    private function stringValue(?array $values, string $key, string $default = ''): string
+    {
+        if ($values === null) {
+            return $default;
+        }
+
+        return FontUtils::scalarStringValue($values[$key] ?? $default);
     }
 }

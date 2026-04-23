@@ -16,7 +16,17 @@ use WP_Error;
  * @phpstan-type FamilyRecord array<string, mixed>
  * @phpstan-type FamilySearchResultList list<FamilyRecord>
  * @phpstan-type VariantTokenList list<string>
- * @phpstan-type HttpArgs array<string, mixed>
+ * @phpstan-type HttpArgs array{
+ *   method?: string,
+ *   timeout?: float,
+ *   redirection?: int,
+ *   httpversion?: string,
+ *   user-agent?: string,
+ *   reject_unsafe_urls?: bool,
+ *   blocking?: bool,
+ *   headers?: array<string, string>|string,
+ *   ...
+ * }
  */
 final class BunnyFontsClient
 {
@@ -102,7 +112,7 @@ final class BunnyFontsClient
         $response = $this->remoteGet(
             $url,
             [
-                'timeout' => self::REQUEST_TIMEOUT,
+                'timeout' => (float) self::REQUEST_TIMEOUT,
                 'headers' => [
                     'Accept' => 'text/css,*/*;q=0.1',
                     'User-Agent' => FontUtils::MODERN_USER_AGENT,
@@ -194,8 +204,8 @@ final class BunnyFontsClient
                 continue;
             }
 
-            $slug = trim((string) ($entry['slug'] ?? ''));
-            $family = trim((string) ($entry['family'] ?? ''));
+            $slug = trim(FontUtils::scalarStringValue($entry['slug'] ?? null));
+            $family = trim(FontUtils::scalarStringValue($entry['family'] ?? null));
 
             if ($slug === '' || $family === '') {
                 continue;
@@ -224,8 +234,10 @@ final class BunnyFontsClient
         $transientKey = $this->familyTransientKey($slug);
         $cached = get_transient($transientKey);
 
-        if ($this->isCachedFamilyRecord($cached)) {
-            return $cached;
+        $cachedFamily = $this->normalizeCachedFamilyRecord($cached);
+
+        if ($cachedFamily !== null) {
+            return $cachedFamily;
         }
 
         $response = $this->request(
@@ -260,7 +272,7 @@ final class BunnyFontsClient
         return $this->remoteGet(
             $url,
             [
-                'timeout' => self::REQUEST_TIMEOUT,
+                'timeout' => (float) self::REQUEST_TIMEOUT,
                 'headers' => [
                     'Accept' => $accept,
                     'User-Agent' => FontUtils::MODERN_USER_AGENT,
@@ -272,11 +284,15 @@ final class BunnyFontsClient
     /**
      * @param HttpArgs $args
      */
-    private function remoteGet(string $url, array $args = []): mixed
+    /**
+     * @param HttpArgs $args
+     * @return array<string, mixed>|WP_Error
+     */
+    private function remoteGet(string $url, array $args = []): array|WP_Error
     {
         $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $url);
 
-        return wp_remote_get($url, is_array($filteredArgs) ? $filteredArgs : $args);
+        return wp_remote_get($url, FontUtils::normalizeHttpArgs(is_array($filteredArgs) ? $filteredArgs : $args));
     }
 
     /**
@@ -506,6 +522,26 @@ final class BunnyFontsClient
         ];
     }
 
+    /**
+     * @return FamilyRecord|null
+     */
+    private function normalizeCachedFamilyRecord(mixed $cached): ?array
+    {
+        if (!$this->isCachedFamilyRecord($cached) || !is_array($cached)) {
+            return null;
+        }
+
+        $normalized = [];
+
+        foreach ($cached as $key => $value) {
+            if (is_string($key)) {
+                $normalized[$key] = $value;
+            }
+        }
+
+        return $normalized;
+    }
+
     private function isCachedFamilyRecord(mixed $cached): bool
     {
         if (!is_array($cached)) {
@@ -517,7 +553,7 @@ final class BunnyFontsClient
         $axisTags = is_array($cached['axis_tags'] ?? null)
             ? array_filter(
                 $cached['axis_tags'],
-                static fn ($tag): bool => preg_match('/^[A-Z0-9]{4}$/i', (string) $tag) === 1
+                static fn ($tag): bool => is_scalar($tag) && preg_match('/^[A-Z0-9]{4}$/i', (string) $tag) === 1
             )
             : [];
 
@@ -567,4 +603,5 @@ final class BunnyFontsClient
         return ($family !== '' && str_contains($family, $query))
             || ($slug !== '' && str_contains($slug, $query));
     }
+
 }

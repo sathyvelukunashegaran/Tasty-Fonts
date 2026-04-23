@@ -142,7 +142,7 @@ PHP);
         $lookup = [];
 
         foreach ($runtimeFamilies as $family) {
-            $name = trim((string) ($family['family'] ?? ''));
+            $name = isset($family['family']) && is_scalar($family['family']) ? trim((string) $family['family']) : '';
 
             if ($name === '') {
                 continue;
