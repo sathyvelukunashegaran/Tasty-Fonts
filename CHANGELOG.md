@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.0-beta.4] - 2026-04-24
+
 ### Added
 
 - Added editable Heading, Body, and Monospace role fallback controls in Studio so fallback-only roles can use intentional stacks without selecting a library family.
