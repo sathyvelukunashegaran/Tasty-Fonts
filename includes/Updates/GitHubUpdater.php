@@ -484,18 +484,14 @@ final class GitHubUpdater
         $packageUrl = $this->findPackageUrl($version, $release['assets'] ?? []);
         $checksumUrl = $this->findChecksumUrl($version, $release['assets'] ?? []);
 
-        if ($version === '' || $channel === '' || $packageUrl === '' || $checksumUrl === '') {
-            return null;
-        }
-
-        return [
-            'version' => $version,
-            'channel' => $channel,
-            'package_url' => $packageUrl,
-            'checksum_url' => $checksumUrl,
-            'body' => (string) ($release['body'] ?? ''),
-            'published_at' => (string) ($release['published_at'] ?? ''),
-        ];
+        return $this->buildNormalizedRelease(
+            $version,
+            $channel,
+            $packageUrl,
+            $checksumUrl,
+            $release['body'] ?? '',
+            $release['published_at'] ?? ''
+        );
     }
 
     private function findPackageUrl(string $version, mixed $assets): string
@@ -709,11 +705,27 @@ final class GitHubUpdater
             return null;
         }
 
-        $version = trim((string) ($release['version'] ?? ''));
-        $channel = trim((string) ($release['channel'] ?? ''));
-        $packageUrl = trim((string) ($release['package_url'] ?? ''));
-        $checksumUrl = trim((string) ($release['checksum_url'] ?? ''));
+        return $this->buildNormalizedRelease(
+            trim((string) ($release['version'] ?? '')),
+            trim((string) ($release['channel'] ?? '')),
+            trim((string) ($release['package_url'] ?? '')),
+            trim((string) ($release['checksum_url'] ?? '')),
+            $release['body'] ?? '',
+            $release['published_at'] ?? ''
+        );
+    }
 
+    /**
+     * @return NormalizedRelease|null
+     */
+    private function buildNormalizedRelease(
+        string $version,
+        string $channel,
+        string $packageUrl,
+        string $checksumUrl,
+        mixed $body,
+        mixed $publishedAt
+    ): ?array {
         if ($version === '' || $channel === '' || $packageUrl === '' || $checksumUrl === '') {
             return null;
         }
@@ -723,8 +735,8 @@ final class GitHubUpdater
             'channel' => $channel,
             'package_url' => $packageUrl,
             'checksum_url' => $checksumUrl,
-            'body' => (string) ($release['body'] ?? ''),
-            'published_at' => (string) ($release['published_at'] ?? ''),
+            'body' => (string) $body,
+            'published_at' => (string) $publishedAt,
         ];
     }
 
