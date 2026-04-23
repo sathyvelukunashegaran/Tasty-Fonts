@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.0-beta.3] - 2026-04-23
+
 ### Added
 
 - Added `jscpd` duplicate-code scanning to the quality workflow alongside a committed `.jscpd.json` baseline.
