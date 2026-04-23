@@ -635,14 +635,15 @@ final class RuntimeAssetPlanner
 
     private function isSameOriginFontUrl(string $url): bool
     {
-        $host = (string) (parse_url($url, PHP_URL_HOST) ?: '');
+        $host = FontUtils::scalarStringValue(parse_url($url, PHP_URL_HOST) ?: '');
 
         if ($host === '') {
             return !str_starts_with($url, '//');
         }
 
-        $uploadBaseUrl = (string) (wp_get_upload_dir()['baseurl'] ?? '');
-        $uploadHost = (string) (parse_url($uploadBaseUrl, PHP_URL_HOST) ?: '');
+        $uploads = FontUtils::normalizeStringKeyedMap(wp_get_upload_dir());
+        $uploadBaseUrl = FontUtils::scalarStringValue($uploads['baseurl'] ?? '');
+        $uploadHost = FontUtils::scalarStringValue(parse_url($uploadBaseUrl, PHP_URL_HOST) ?: '');
 
         if ($uploadHost === '') {
             return false;
@@ -745,7 +746,7 @@ final class RuntimeAssetPlanner
     {
         $delivery = $family['active_delivery'] ?? null;
 
-        return is_array($delivery) ? $delivery : [];
+        return FontUtils::normalizeStringKeyedMap($delivery);
     }
 
     /**
@@ -756,21 +757,7 @@ final class RuntimeAssetPlanner
     {
         $faces = $family['faces'] ?? null;
 
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeFaceList($faces);
     }
 
     /**
@@ -840,21 +827,7 @@ final class RuntimeAssetPlanner
     {
         $faces = $delivery['faces'] ?? null;
 
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeFaceList($faces);
     }
 
     /**

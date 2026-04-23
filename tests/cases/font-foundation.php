@@ -75,6 +75,47 @@ $tests['font_utils_detects_remote_urls'] = static function (): void {
     assertSameValue(false, FontUtils::isRemoteUrl('google/inter/inter-400-normal.woff2'), 'Remote URL detection should treat relative storage paths as local.');
 };
 
+$tests['font_utils_normalizes_string_keyed_maps_and_lists'] = static function (): void {
+    assertSameValue(
+        ['family' => 'Inter', 'provider' => ['name' => 'google']],
+        FontUtils::normalizeStringKeyedMap(['family' => 'Inter', 0 => 'skip', 'provider' => ['name' => 'google']]),
+        'String-keyed map normalization should discard non-string keys while preserving nested values.'
+    );
+
+    assertSameValue(
+        [
+            ['family' => 'Inter'],
+            ['family' => 'Satoshi', 'weight' => '700'],
+        ],
+        FontUtils::normalizeListOfStringKeyedMaps([
+            ['family' => 'Inter', 0 => 'skip'],
+            'ignore',
+            ['family' => 'Satoshi', 'weight' => '700'],
+            [0 => 'skip-only'],
+        ]),
+        'List normalization should keep only rows that still have string-keyed data after normalization.'
+    );
+};
+
+$tests['font_utils_normalizes_face_lists_and_scalar_floats'] = static function (): void {
+    assertSameValue(
+        [
+            ['family' => 'Inter', 'weight' => '400'],
+            ['family' => 'Satoshi', 'weight' => '700'],
+        ],
+        FontUtils::normalizeFaceList([
+            ['family' => 'Inter', 'weight' => '400', 0 => 'skip'],
+            'ignore',
+            ['family' => 'Satoshi', 'weight' => '700'],
+        ]),
+        'Face-list normalization should reuse the shared string-keyed list contract.'
+    );
+
+    assertSameValue(1.5, FontUtils::scalarFloatValue('1.5'), 'scalarFloatValue should convert numeric strings to floats.');
+    assertSameValue(2.0, FontUtils::scalarFloatValue(2), 'scalarFloatValue should accept integer values.');
+    assertSameValue(3.25, FontUtils::scalarFloatValue('bogus', 3.25), 'scalarFloatValue should fall back to the provided default for non-numeric input.');
+};
+
 $tests['hosted_import_support_builds_variants_from_faces'] = static function (): void {
     $variants = HostedImportSupport::variantsFromFaces([
         ['weight' => '400', 'style' => 'normal'],

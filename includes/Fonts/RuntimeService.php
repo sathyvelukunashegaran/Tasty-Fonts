@@ -11,6 +11,7 @@ use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use WP_Theme_JSON_Data;
 
 /**
@@ -881,7 +882,7 @@ JS;
 
     private function preloadLinkDeliveryMode(): string
     {
-        $mode = strtolower(trim((string) apply_filters('tasty_fonts_preload_link_delivery_mode', 'html')));
+        $mode = strtolower(trim(FontUtils::scalarStringValue(apply_filters('tasty_fonts_preload_link_delivery_mode', 'html'))));
 
         return in_array($mode, ['html', 'headers', 'both'], true) ? $mode : 'html';
     }

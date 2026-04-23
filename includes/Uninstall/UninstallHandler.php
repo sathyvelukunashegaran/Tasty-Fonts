@@ -125,13 +125,23 @@ final class UninstallHandler
                 AdminController::NOTICE_TRANSIENT_PREFIX,
             ] as $prefix
         ) {
-            $scopedPrefix = TransientKey::prefixForSite($prefix);
-            $transientPattern = $wpdb->esc_like('_transient_' . $scopedPrefix) . '%';
-            $timeoutPattern = $wpdb->esc_like('_transient_timeout_' . $scopedPrefix) . '%';
+            $scopedPrefix = \TastyFonts\Support\FontUtils::scalarStringValue(TransientKey::prefixForSite($prefix));
+
+            if ($scopedPrefix === '') {
+                continue;
+            }
+
+            $transientPattern = \TastyFonts\Support\FontUtils::scalarStringValue($wpdb->esc_like('_transient_' . $scopedPrefix)) . '%';
+            $timeoutPattern = \TastyFonts\Support\FontUtils::scalarStringValue($wpdb->esc_like('_transient_timeout_' . $scopedPrefix)) . '%';
+            $optionsTable = \TastyFonts\Support\FontUtils::scalarStringValue($wpdb->options);
+
+            if ($optionsTable === '') {
+                continue;
+            }
 
             $wpdb->query(
                 $wpdb->prepare(
-                    "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+                    "DELETE FROM {$optionsTable} WHERE option_name LIKE %s OR option_name LIKE %s",
                     $transientPattern,
                     $timeoutPattern
                 )

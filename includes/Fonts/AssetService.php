@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use TastyFonts\Support\TransientKey;
 
@@ -113,7 +114,7 @@ final class AssetService
             : $this->settings->getRoles($catalog);
 
         $this->css = $this->cssBuilder->build($localCatalog, $roles, $settings, $variableFamilies);
-        $this->css = (string) apply_filters('tasty_fonts_generated_css', $this->css, $localCatalog, $roles, $settings);
+        $this->css = FontUtils::scalarStringValue(apply_filters('tasty_fonts_generated_css', $this->css, $localCatalog, $roles, $settings));
         $this->hash = $this->hashContents($this->css);
 
         set_transient(TransientKey::forSite(self::TRANSIENT_CSS), $this->css, DAY_IN_SECONDS);
@@ -430,13 +431,13 @@ final class AssetService
 
     private function shouldUsePluginInlineStyleNonceStrategy(string $handle, string $css, string $context): bool
     {
-        $strategy = strtolower(trim((string) apply_filters(
+        $strategy = strtolower(trim(FontUtils::scalarStringValue(apply_filters(
             'tasty_fonts_inline_style_nonce_strategy',
             'auto',
             $handle,
             $context,
             $css
-        )));
+        ))));
 
         if (in_array($strategy, ['off', 'disabled', 'none', 'core'], true)) {
             return false;

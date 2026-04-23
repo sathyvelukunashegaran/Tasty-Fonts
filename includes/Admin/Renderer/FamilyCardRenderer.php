@@ -425,21 +425,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      */
     private function normalizeFaceList(mixed $faces): array
     {
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeFaceList($faces);
     }
 
     /**

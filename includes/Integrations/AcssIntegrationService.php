@@ -305,7 +305,7 @@ final class AcssIntegrationService
                     continue;
                 }
 
-                $registered[(string) $handle] = $style;
+                $registered[(string) $handle] = \TastyFonts\Support\FontUtils::normalizeStringKeyedMap($style);
             }
         }
 

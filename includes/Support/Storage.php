@@ -42,8 +42,16 @@ final class Storage
             return null;
         }
 
-        $rootDir = wp_normalize_path(trailingslashit($uploads['basedir']) . 'fonts');
-        $rootUrlFull = untrailingslashit($uploads['baseurl']) . '/fonts';
+        $uploads = FontUtils::normalizeStringKeyedMap($uploads);
+        $baseDir = FontUtils::scalarStringValue($uploads['basedir'] ?? '');
+        $baseUrl = FontUtils::scalarStringValue($uploads['baseurl'] ?? '');
+
+        if ($baseDir === '' || $baseUrl === '') {
+            return null;
+        }
+
+        $rootDir = wp_normalize_path(trailingslashit($baseDir) . 'fonts');
+        $rootUrlFull = untrailingslashit($baseUrl) . '/fonts';
         $rootUrl = wp_make_link_relative($rootUrlFull);
         $googleDir = wp_normalize_path(trailingslashit($rootDir) . 'google');
         $googleUrl = $rootUrl . '/google';
@@ -221,15 +229,26 @@ final class Storage
 
         global $wp_filesystem;
 
+        if (
+            !is_object($wp_filesystem)
+            || !method_exists($wp_filesystem, 'is_dir')
+            || !method_exists($wp_filesystem, 'mkdir')
+            || !method_exists($wp_filesystem, 'put_contents')
+        ) {
+            return false;
+        }
+
+        $filesystem = $wp_filesystem;
+
         $directory = dirname($path);
         $directoryPermissions = $this->directoryPermissions();
         $filePermissions = $this->filePermissions();
 
-        if (!$wp_filesystem->is_dir($directory) && !$wp_filesystem->mkdir($directory, $directoryPermissions)) {
+        if (!$filesystem->is_dir($directory) && !$filesystem->mkdir($directory, $directoryPermissions)) {
             return false;
         }
 
-        return (bool) $wp_filesystem->put_contents($path, $contents, $filePermissions);
+        return (bool) $filesystem->put_contents($path, $contents, $filePermissions);
     }
 
     public function copyAbsoluteFile(string $sourcePath, string $targetPath): bool
@@ -286,6 +305,16 @@ final class Storage
 
         global $wp_filesystem;
 
+        if (
+            !is_object($wp_filesystem)
+            || !method_exists($wp_filesystem, 'exists')
+            || !method_exists($wp_filesystem, 'delete')
+        ) {
+            return false;
+        }
+
+        $filesystem = $wp_filesystem;
+
         $deleted = true;
         $directories = [];
 
@@ -299,11 +328,11 @@ final class Storage
 
             $directories[] = dirname($absolutePath);
 
-            if (!$wp_filesystem->exists($absolutePath)) {
+            if (!$filesystem->exists($absolutePath)) {
                 continue;
             }
 
-            if (!(bool) $wp_filesystem->delete($absolutePath, false, 'f')) {
+            if (!(bool) $filesystem->delete($absolutePath, false, 'f')) {
                 $deleted = false;
             }
         }
@@ -331,7 +360,13 @@ final class Storage
 
         global $wp_filesystem;
 
-        $deleted = (bool) $wp_filesystem->delete($absolutePath, true, 'd');
+        if (!is_object($wp_filesystem) || !method_exists($wp_filesystem, 'delete')) {
+            return false;
+        }
+
+        $filesystem = $wp_filesystem;
+
+        $deleted = (bool) $filesystem->delete($absolutePath, true, 'd');
 
         if ($deleted) {
             $this->cleanupEmptyDirectories([dirname($absolutePath)]);
@@ -355,7 +390,13 @@ final class Storage
         if ($this->initializeFilesystem(dirname($path))) {
             global $wp_filesystem;
 
-            $deleted = (bool) $wp_filesystem->delete($path, is_dir($path), is_dir($path) ? 'd' : 'f');
+            if (!is_object($wp_filesystem) || !method_exists($wp_filesystem, 'delete')) {
+                return false;
+            }
+
+            $filesystem = $wp_filesystem;
+
+            $deleted = (bool) $filesystem->delete($path, is_dir($path), is_dir($path) ? 'd' : 'f');
 
             if ($deleted) {
                 $this->cleanupEmptyDirectories([dirname($path)]);
@@ -488,8 +529,8 @@ final class Storage
             return wp_normalize_path($root);
         }
 
-        $uploads = wp_get_upload_dir();
-        $baseDir = (string) ($uploads['basedir'] ?? '');
+        $uploads = FontUtils::normalizeStringKeyedMap(wp_get_upload_dir());
+        $baseDir = FontUtils::scalarStringValue($uploads['basedir'] ?? '');
 
         if ($baseDir !== '') {
             return wp_normalize_path($baseDir);

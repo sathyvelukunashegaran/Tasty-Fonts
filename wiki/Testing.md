@@ -45,7 +45,7 @@ composer install
 composer phpstan
 ```
 
-This runs the repo's WordPress-aware static analysis against `plugin.php` and `includes/`. The initial config excludes `includes/Admin/Renderer/templates/*`, which are treated as injected-scope view templates.
+This runs the repo's WordPress-aware PHPStan level 10 analysis against `plugin.php` and `includes/`. The config excludes `includes/Admin/Renderer/templates/*`, which are treated as injected-scope view templates.
 
 ### 5. Run All Checks Together
 

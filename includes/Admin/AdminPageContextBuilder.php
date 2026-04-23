@@ -1158,7 +1158,7 @@ final class AdminPageContextBuilder
                 continue;
             }
 
-            $label = trim((string) ($roleConfig['name'] ?? ''));
+            $label = trim(FontUtils::scalarStringValue($roleConfig['name'] ?? ''));
             $count = (int) ($userCountsByRole[$value] ?? 0);
             $isImplicitAdminRole = $value === AdminAccessService::IMPLICIT_ROLE;
 
@@ -1268,9 +1268,9 @@ final class AdminPageContextBuilder
 
     private function buildAdminAccessUserLabel(object $user): string
     {
-        $userId = absint($user->ID ?? 0);
-        $displayName = trim((string) ($user->display_name ?? ''));
-        $userLogin = trim((string) ($user->user_login ?? ''));
+        $userId = absint(FontUtils::scalarStringValue($user->ID ?? 0));
+        $displayName = trim(FontUtils::scalarStringValue($user->display_name ?? ''));
+        $userLogin = trim(FontUtils::scalarStringValue($user->user_login ?? ''));
         $label = $displayName;
 
         if ($userLogin !== '') {
@@ -1531,7 +1531,7 @@ final class AdminPageContextBuilder
                 continue;
             }
 
-            $label = trim((string) ($roleConfig['name'] ?? ''));
+            $label = trim(FontUtils::scalarStringValue($roleConfig['name'] ?? ''));
             $labels[$normalizedSlug] = $label !== '' ? $label : ucfirst(str_replace('_', ' ', $normalizedSlug));
         }
 

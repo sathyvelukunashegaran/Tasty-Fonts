@@ -654,21 +654,7 @@ final class LocalUploadService
      */
     private function normalizeCatalogFaceList(mixed $faces): array
     {
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeFaceList($faces);
     }
 
     /**

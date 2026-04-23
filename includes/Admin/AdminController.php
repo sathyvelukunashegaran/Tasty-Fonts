@@ -1007,7 +1007,11 @@ final class AdminController
             return $result;
         }
 
-        $settings = is_array($result['settings'] ?? null) ? $result['settings'] : $this->settings->getSettings();
+        $settings = FontUtils::normalizeStringKeyedMap($result['settings'] ?? null);
+
+        if ($settings === []) {
+            $settings = $this->settings->getSettings();
+        }
         $messages = [];
 
         $acssMessage = $this->syncAcssIntegrationForRuntimeState($settings, true);
@@ -1099,14 +1103,10 @@ final class AdminController
             ['current_page' => self::PAGE_LIBRARY]
         );
         $view = (new AdminPageViewBuilder($this->storage))->build($context);
-        $catalog = is_array($view['catalog'] ?? null) ? $view['catalog'] : [];
+        $catalog = FontUtils::normalizeListOfStringKeyedMaps($view['catalog'] ?? []);
         $family = null;
 
         foreach ($catalog as $candidate) {
-            if (!is_array($candidate)) {
-                continue;
-            }
-
             $candidateSlug = $this->stringValue($candidate, 'slug', $this->stringValue($candidate, 'family'));
 
             if (FontUtils::slugify($candidateSlug) !== $familySlug) {
@@ -1128,21 +1128,21 @@ final class AdminController
         $renderer->setTrainingWheelsOff(!empty($view['trainingWheelsOff']));
 
         $viewRoles = $this->sanitizeRoleValues(
-            is_array($view['roles'] ?? null) ? $view['roles'] : []
+            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['roles'] ?? null))
         );
 
         ob_start();
         $renderer->renderFamilyCardDetails(
-            $family,
+            $this->payloadMapValue($family),
             $viewRoles,
             $this->stringMapValue($view['familyFallbacks'] ?? []),
             $this->stringMapValue($view['familyFontDisplays'] ?? []),
             $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
             $this->stringValue($view, 'previewText'),
             $this->stringMapValue($view['categoryAliasOwners'] ?? []),
-            is_array($view['extendedVariableOptions'] ?? null) ? $view['extendedVariableOptions'] : [],
+            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['extendedVariableOptions'] ?? null)),
             !empty($view['monospaceRoleEnabled']),
-            is_array($view['classOutputOptions'] ?? null) ? $view['classOutputOptions'] : []
+            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['classOutputOptions'] ?? null))
         );
         $html = (string) ob_get_clean();
 
@@ -1330,7 +1330,7 @@ final class AdminController
         check_admin_referer(self::ACTION_IMPORT_SITE_TRANSFER_BUNDLE);
 
         $uploadedFile = is_array($_FILES[self::IMPORT_SITE_TRANSFER_FILE_FIELD] ?? null)
-            ? $_FILES[self::IMPORT_SITE_TRANSFER_FILE_FIELD]
+            ? $this->payloadMapValue($_FILES[self::IMPORT_SITE_TRANSFER_FILE_FIELD])
             : [];
         $stageToken = $this->getPostedText(self::IMPORT_SITE_TRANSFER_STAGE_TOKEN_FIELD);
         $freshGoogleApiKey = $this->getPostedText(self::IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD);
@@ -2643,7 +2643,7 @@ final class AdminController
 
         $family = $catalog[$familyName] ?? null;
 
-        return is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+        return FontUtils::normalizeStringKeyedMap($family['active_delivery'] ?? null);
     }
 
     private function normalizeFormatMode(string $formatMode): string
@@ -2741,7 +2741,13 @@ final class AdminController
             $result = $this->payloadMapValue($result);
         }
 
-        set_transient($cacheKey, $result, self::SEARCH_CACHE_TTL);
+        if (!is_array($result) && !is_wp_error($result)) {
+            return new WP_Error(
+                'tasty_fonts_invalid_search_response',
+                __('The provider returned an invalid search response.', 'tasty-fonts')
+            );
+        }
+
         set_transient(
             $cooldownKey,
             [
@@ -2751,6 +2757,15 @@ final class AdminController
             ],
             self::SEARCH_COOLDOWN_TRANSIENT_TTL
         );
+
+        if (is_array($result)) {
+            $normalizedResult = $this->payloadMapValue($result);
+            set_transient($cacheKey, $normalizedResult, self::SEARCH_CACHE_TTL);
+
+            return $normalizedResult;
+        }
+
+        set_transient($cacheKey, $result, self::SEARCH_CACHE_TTL);
 
         return $result;
     }
@@ -2766,7 +2781,20 @@ final class AdminController
             return $cooldownError;
         }
 
-        return $resolver();
+        $result = $resolver();
+
+        if (is_array($result)) {
+            return $this->payloadMapValue($result);
+        }
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        return new WP_Error(
+            'tasty_fonts_invalid_action_response',
+            __('The action returned an invalid response.', 'tasty-fonts')
+        );
     }
 
     /**
@@ -3046,7 +3074,7 @@ final class AdminController
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<int|string, array{name: string, type: string, tmp_name: string, error: int, size: int}>
      */
     private function normalizeUploadedFiles(mixed $rawFiles): array
     {
@@ -3138,7 +3166,7 @@ final class AdminController
             return [];
         }
 
-        $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+        $activeDelivery = $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($family['active_delivery'] ?? null));
         $availableAxes = $this->profileVariationAxes($activeDelivery);
 
         if ($availableAxes === []) {
@@ -3154,7 +3182,7 @@ final class AdminController
             }
 
             $axis = $availableAxes[$tag];
-            $numericValue = (float) $value;
+            $numericValue = FontUtils::scalarFloatValue($value);
             $axisMin = $this->floatValue($axis, 'min');
             $axisMax = $this->floatValue($axis, 'max');
 
@@ -3162,7 +3190,7 @@ final class AdminController
                 continue;
             }
 
-            $filtered[$tag] = (string) $value;
+            $filtered[$tag] = FontUtils::scalarStringValue($value);
         }
 
         return $filtered;
@@ -3202,7 +3230,7 @@ final class AdminController
         $familyFallbacks = $this->stringMapValue($settings['family_fallbacks'] ?? []);
 
         foreach ($catalog as $familyName => $family) {
-            $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+            $activeDelivery = $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($family['active_delivery'] ?? null));
             $deliveryId = sanitize_text_field($this->stringValue($activeDelivery, 'id'));
 
             if ($deliveryId === '') {
@@ -3241,7 +3269,7 @@ final class AdminController
         }
 
         $family = $catalog[trim($familyName)] ?? null;
-        $profile = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+        $profile = $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($family['active_delivery'] ?? null));
 
         if ($profile === [] || $this->profileHasWeightAxis($profile)) {
             return '';
@@ -4165,21 +4193,7 @@ final class AdminController
      */
     private function normalizePayloadList(mixed $value): array
     {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-            $normalized[] = $item;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeListOfStringKeyedMaps($value);
     }
 
     /**
@@ -4188,17 +4202,7 @@ final class AdminController
      */
     private function payloadMapValue(array $values): array
     {
-        $normalized = [];
-
-        foreach ($values as $key => $value) {
-            if (!is_string($key)) {
-                continue;
-            }
-
-            $normalized[$key] = $value;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeStringKeyedMap($values);
     }
 
     /**
@@ -4324,12 +4328,12 @@ final class AdminController
 
     private function startRateLimitedActionCooldown(string $action): bool|WP_Error
     {
-        $window = (float) apply_filters(
+        $window = FontUtils::scalarFloatValue(apply_filters(
             'tasty_fonts_rest_action_cooldown_window',
             self::ACTION_COOLDOWN_DEFAULT_WINDOW_SECONDS,
             $action,
             max(0, (int) get_current_user_id())
-        );
+        ));
 
         if ($window <= 0) {
             return true;

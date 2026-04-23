@@ -246,21 +246,7 @@ final class AdminPageRenderer extends AbstractSectionRenderer
      */
     private function normalizeToastList(mixed $value): array
     {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $toast) {
-            if (!is_array($toast)) {
-                continue;
-            }
-
-            $normalized[] = $toast;
-        }
-
-        return $normalized;
+        return \TastyFonts\Support\FontUtils::normalizeListOfStringKeyedMaps($value);
     }
 
     /**

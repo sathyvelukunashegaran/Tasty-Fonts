@@ -656,7 +656,34 @@ final class BlockEditorFontLibraryService
             'headers' => $headers,
         ];
 
-        return array_replace_recursive($defaults, $args);
+        $normalized = FontUtils::normalizeStringKeyedMap(array_replace_recursive($defaults, $args));
+        $requestArgs = [];
+
+        $method = FontUtils::scalarStringValue($normalized['method'] ?? '');
+
+        if ($method !== '') {
+            $requestArgs['method'] = $method;
+        }
+
+        $timeout = FontUtils::scalarFloatValue($normalized['timeout'] ?? self::REQUEST_TIMEOUT, (float) self::REQUEST_TIMEOUT);
+
+        if ($timeout > 0) {
+            $requestArgs['timeout'] = $timeout;
+        }
+
+        $headers = FontUtils::normalizeStringMap($normalized['headers'] ?? []);
+
+        if ($headers !== []) {
+            $requestArgs['headers'] = $headers;
+        }
+
+        $body = FontUtils::normalizeStringMap($normalized['body'] ?? []);
+
+        if ($body !== []) {
+            $requestArgs['body'] = $body;
+        }
+
+        return $requestArgs;
     }
 
     private function buildAuthCookieHeader(): string
@@ -770,7 +797,7 @@ final class BlockEditorFontLibraryService
                 continue;
             }
 
-            $normalized[$id] = $profile;
+            $normalized[$id] = FontUtils::normalizeStringKeyedMap($profile);
         }
 
         return $normalized;

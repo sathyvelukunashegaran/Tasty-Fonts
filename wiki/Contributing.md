@@ -40,7 +40,7 @@ node --test tests/js/*.test.cjs
 
 What each command covers:
 
-- `composer phpstan` runs PHPStan with the repo's WordPress-aware static-analysis config.
+- `composer phpstan` runs the repo's WordPress-aware PHPStan level 10 configuration.
 - `php -l` catches PHP syntax errors across the repository.
 - `php tests/run.php` runs the self-contained PHP harness for repository, import, runtime, admin, and updater behavior.
 - `node --test tests/js/*.test.cjs` runs the JavaScript contract tests for shared admin and canvas helpers.

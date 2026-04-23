@@ -91,15 +91,16 @@ PHP);
             return [];
         }
 
-        $settings = ct_get_global_settings();
+        $settings = FontUtils::normalizeStringKeyedMap(ct_get_global_settings());
+        $fonts = FontUtils::normalizeStringKeyedMap($settings['fonts'] ?? []);
         $styles = [];
-        $bodyFamily = $this->managedFamilyName($settings['fonts']['Text'] ?? '', $runtimeLookup);
+        $bodyFamily = $this->managedFamilyName($fonts['Text'] ?? '', $runtimeLookup);
 
         if ($bodyFamily !== '') {
             $styles[] = $this->buildEditorRule('body', $bodyFamily);
         }
 
-        $displayFamily = $this->managedFamilyName($settings['fonts']['Display'] ?? '', $runtimeLookup);
+        $displayFamily = $this->managedFamilyName($fonts['Display'] ?? '', $runtimeLookup);
 
         if ($displayFamily !== '') {
             $styles[] = $this->buildEditorRule('body :is(h1, h2, h3, h4, h5, h6, .editor-post-title)', $displayFamily);

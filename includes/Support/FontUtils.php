@@ -562,18 +562,52 @@ final class FontUtils
      */
     public static function normalizeFaceList(mixed $faces): array
     {
-        if (!is_array($faces)) {
+        return self::normalizeListOfStringKeyedMaps($faces);
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    public static function normalizeStringKeyedMap(mixed $value): array
+    {
+        if (!is_array($value)) {
             return [];
         }
 
         $normalized = [];
 
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
+        foreach ($value as $key => $item) {
+            if (!is_string($key)) {
                 continue;
             }
 
-            $normalized[] = $face;
+            $normalized[$key] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $value
+     * @return list<array<string, mixed>>
+     */
+    public static function normalizeListOfStringKeyedMaps(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            $normalizedItem = self::normalizeStringKeyedMap($item);
+
+            if ($normalizedItem === []) {
+                continue;
+            }
+
+            $normalized[] = $normalizedItem;
         }
 
         return $normalized;
@@ -697,6 +731,17 @@ final class FontUtils
         }
 
         return $default;
+    }
+
+    public static function scalarFloatValue(mixed $value, float $default = 0.0): float
+    {
+        if (is_float($value) || is_int($value)) {
+            return (float) $value;
+        }
+
+        $normalized = self::scalarStringValue($value);
+
+        return is_numeric($normalized) ? (float) $normalized : $default;
     }
 
     public static function weightNameSlug(string|int $weight): string

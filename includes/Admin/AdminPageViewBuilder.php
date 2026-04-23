@@ -816,9 +816,7 @@ final class AdminPageViewBuilder
      */
     private function mapValue(array $values, string $key): array
     {
-        $value = $values[$key] ?? null;
-
-        return is_array($value) ? $value : [];
+        return FontUtils::normalizeStringKeyedMap($values[$key] ?? null);
     }
 
     /**
@@ -857,11 +855,13 @@ final class AdminPageViewBuilder
         $normalized = [];
 
         foreach ($catalog as $familyName => $family) {
-            if (!is_array($family)) {
+            $normalizedFamily = FontUtils::normalizeStringKeyedMap($family);
+
+            if ($normalizedFamily === []) {
                 continue;
             }
 
-            $normalized[$familyName] = $family;
+            $normalized[$familyName] = $normalizedFamily;
         }
 
         return $normalized;
@@ -908,23 +908,7 @@ final class AdminPageViewBuilder
      */
     private function listOfMapsValue(array $values, string $key): array
     {
-        $items = $values[$key] ?? [];
-
-        if (!is_array($items)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-            $normalized[] = $item;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeListOfStringKeyedMaps($values[$key] ?? []);
     }
 
     /**

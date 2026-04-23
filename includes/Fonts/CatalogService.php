@@ -1118,7 +1118,7 @@ final class CatalogService
                 continue;
             }
 
-            $normalized[$id] = $profile;
+            $normalized[$id] = FontUtils::normalizeStringKeyedMap($profile);
         }
 
         return $normalized;
@@ -1132,7 +1132,7 @@ final class CatalogService
     {
         $value = $values[$key] ?? null;
 
-        return is_array($value) ? $value : [];
+        return FontUtils::normalizeStringKeyedMap($value);
     }
 
     /**
@@ -1175,11 +1175,13 @@ final class CatalogService
         $normalized = [];
 
         foreach ($availableDeliveries as $profile) {
-            if (!is_array($profile)) {
+            $normalizedProfile = FontUtils::normalizeStringKeyedMap($profile);
+
+            if ($normalizedProfile === []) {
                 continue;
             }
 
-            $normalized[] = $profile;
+            $normalized[] = $normalizedProfile;
         }
 
         return $normalized;
@@ -1191,21 +1193,7 @@ final class CatalogService
      */
     private function normalizeCatalogFaceList(mixed $faces): array
     {
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeFaceList($faces);
     }
 
     /**
@@ -1338,17 +1326,14 @@ final class CatalogService
         $normalized = [];
 
         foreach ($families as $family) {
-            if (!is_array($family)) {
-                continue;
-            }
-
-            $familyName = $this->stringValue($family, 'family');
+            $normalizedFamily = FontUtils::normalizeStringKeyedMap($family);
+            $familyName = $this->stringValue($normalizedFamily, 'family');
 
             if ($familyName === '') {
                 continue;
             }
 
-            $normalized[$familyName] = $family;
+            $normalized[$familyName] = $normalizedFamily;
         }
 
         return $normalized;

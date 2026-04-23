@@ -601,7 +601,7 @@ final class GoogleFontsClient
                 continue;
             }
 
-            $normalized[] = $item;
+            $normalized[] = FontUtils::normalizeStringKeyedMap($item);
         }
 
         return $normalized;
@@ -624,7 +624,7 @@ final class GoogleFontsClient
                 continue;
             }
 
-            $normalized[$slug] = $item;
+            $normalized[$slug] = FontUtils::normalizeStringKeyedMap($item);
         }
 
         return $normalized;
@@ -734,7 +734,7 @@ final class GoogleFontsClient
                 continue;
             }
 
-            $normalized[$slug] = $item;
+            $normalized[$slug] = FontUtils::normalizeStringKeyedMap($item);
         }
 
         return $normalized;
@@ -812,7 +812,7 @@ final class GoogleFontsClient
 
         $decoded = json_decode($payload, true);
 
-        return is_array($decoded) ? $decoded : [];
+        return FontUtils::normalizeStringKeyedMap($decoded);
     }
 
     /**

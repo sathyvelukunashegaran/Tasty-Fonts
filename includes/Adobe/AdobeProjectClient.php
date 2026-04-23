@@ -285,7 +285,7 @@ final class AdobeProjectClient
                 continue;
             }
 
-            $normalizedFamilies[] = $family;
+            $normalizedFamilies[] = FontUtils::normalizeStringKeyedMap($family);
         }
 
         if ($normalizedFamilies === []) {

@@ -186,12 +186,12 @@ final class SettingsRepository
         }
 
         $storedSettings = $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS);
-        $settings = wp_parse_args(
+        $settings = $this->normalizeInputMap(wp_parse_args(
             $storedSettings,
             self::DEFAULT_SETTINGS
-        );
+        ));
         $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions($settings));
-        $settings = array_replace($settings, $this->normalizeClassOutputSettings($storedSettings, $settings));
+        $settings = array_replace($settings, $this->normalizeClassOutputSettings($this->normalizeInputMap($storedSettings), $settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
         $settings['font_display'] = $this->normalizeFontDisplay($this->stringValue($settings, 'font_display', 'swap'));
         $settings['unicode_range_mode'] = FontUtils::normalizeUnicodeRangeMode(
@@ -598,7 +598,7 @@ final class SettingsRepository
             $storedAppliedRoles = $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES);
         }
 
-        return $this->normalizeRoleSet($storedAppliedRoles, $catalog);
+        return $this->normalizeRoleSet($this->normalizeInputMap($storedAppliedRoles), $catalog);
     }
 
     /**
@@ -613,7 +613,7 @@ final class SettingsRepository
             : [];
 
         if ($storedAppliedRoles !== [] || empty($settings['auto_apply_roles'])) {
-            return $this->normalizeRoleSet($storedAppliedRoles, $catalog);
+            return $this->normalizeRoleSet($this->normalizeInputMap($storedAppliedRoles), $catalog);
         }
 
         $currentRoles = $this->getRoles($catalog);
@@ -1039,7 +1039,7 @@ final class SettingsRepository
     {
         $settings = $this->withoutGoogleApiKeyData($settings);
         $hasAdminAccessCustomEnabled = array_key_exists('admin_access_custom_enabled', $settings);
-        $settings = wp_parse_args($settings, self::DEFAULT_SETTINGS);
+        $settings = $this->normalizeInputMap(wp_parse_args($settings, self::DEFAULT_SETTINGS));
         $settings['acss_font_role_sync_applied'] = false;
         $settings['acss_font_role_sync_previous_heading_font_family'] = '';
         $settings['acss_font_role_sync_previous_text_font_family'] = '';
@@ -1390,7 +1390,7 @@ final class SettingsRepository
                 continue;
             }
 
-            $userId = absint($user->ID);
+            $userId = absint(FontUtils::scalarStringValue($user->ID));
             $userRoles = array_values(
                 array_filter(
                     array_map(
@@ -1796,8 +1796,8 @@ final class SettingsRepository
      */
     private function normalizeGoogleApiKeyData(mixed $value): array
     {
-        $googleApiKeyData = is_array($value) ? $value : [];
-        $googleApiKeyData = wp_parse_args($googleApiKeyData, self::DEFAULT_GOOGLE_API_KEY_DATA);
+        $googleApiKeyData = $this->normalizeInputMap($value);
+        $googleApiKeyData = $this->normalizeInputMap(wp_parse_args($googleApiKeyData, self::DEFAULT_GOOGLE_API_KEY_DATA));
         $plaintextApiKey = trim(sanitize_text_field($this->stringValue($googleApiKeyData, 'google_api_key')));
         $encryptedApiKey = trim(sanitize_text_field($this->stringValue($googleApiKeyData, self::GOOGLE_API_KEY_ENCRYPTED_FIELD)));
 
@@ -2245,16 +2245,6 @@ final class SettingsRepository
      */
     private function normalizeInputMap(mixed $value): array
     {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $key => $item) {
-            $normalized[(string) $key] = $item;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeStringKeyedMap($value);
     }
 }

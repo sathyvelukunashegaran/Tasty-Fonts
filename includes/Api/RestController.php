@@ -173,7 +173,7 @@ final class RestController
 
         return $this->restResult(
             $this->admin->stageSiteTransferBundle(
-                is_array($rawFiles['bundle'] ?? null) ? $rawFiles['bundle'] : []
+                FontUtils::normalizeStringKeyedMap($rawFiles['bundle'] ?? null)
             )
         );
     }
@@ -187,7 +187,7 @@ final class RestController
             $this->admin->uploadLocalFontRows(
                 $this->admin->prepareUploadRows(
                     $this->normalizePostedUploadRows($postedRows),
-                    is_array($rawFiles['files'] ?? null) ? $rawFiles['files'] : []
+                    FontUtils::normalizeStringKeyedMap($rawFiles['files'] ?? null)
                 )
             )
         );
@@ -723,7 +723,7 @@ final class RestController
         $normalized = [];
 
         foreach ($value as $key => $row) {
-            $normalized[$key] = is_array($row) ? $row : [];
+            $normalized[$key] = FontUtils::normalizeStringKeyedMap($row);
         }
 
         return $normalized;

@@ -1133,7 +1133,7 @@ final class BricksIntegrationService
     {
         $styles = [];
 
-        foreach ($this->getOptionArray(defined('BRICKS_DB_THEME_STYLES') ? (string) constant('BRICKS_DB_THEME_STYLES') : 'bricks_theme_styles') as $styleId => $style) {
+        foreach ($this->getOptionArray(defined('BRICKS_DB_THEME_STYLES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_THEME_STYLES')) : 'bricks_theme_styles') as $styleId => $style) {
             $styles[(string) $styleId] = $this->normalizeThemeStyle($style);
         }
 
@@ -1145,7 +1145,7 @@ final class BricksIntegrationService
      */
     private function saveThemeStyles(array $styles): void
     {
-        update_option(defined('BRICKS_DB_THEME_STYLES') ? (string) constant('BRICKS_DB_THEME_STYLES') : 'bricks_theme_styles', $styles, false);
+        update_option(defined('BRICKS_DB_THEME_STYLES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_THEME_STYLES')) : 'bricks_theme_styles', $styles, false);
     }
 
     /**
@@ -1155,7 +1155,7 @@ final class BricksIntegrationService
     {
         $variables = [];
 
-        foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES') ? (string) constant('BRICKS_DB_GLOBAL_VARIABLES') : self::OPTION_GLOBAL_VARIABLES) as $variable) {
+        foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES')) : self::OPTION_GLOBAL_VARIABLES) as $variable) {
             $variables[] = $this->normalizeVariableEntry($variable);
         }
 
@@ -1167,7 +1167,7 @@ final class BricksIntegrationService
      */
     private function saveGlobalVariables(array $variables): void
     {
-        update_option(defined('BRICKS_DB_GLOBAL_VARIABLES') ? (string) constant('BRICKS_DB_GLOBAL_VARIABLES') : self::OPTION_GLOBAL_VARIABLES, $variables, false);
+        update_option(defined('BRICKS_DB_GLOBAL_VARIABLES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES')) : self::OPTION_GLOBAL_VARIABLES, $variables, false);
     }
 
     /**
@@ -1177,7 +1177,7 @@ final class BricksIntegrationService
     {
         $categories = [];
 
-        foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES') ? (string) constant('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES') : self::OPTION_GLOBAL_VARIABLE_CATEGORIES) as $category) {
+        foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES')) : self::OPTION_GLOBAL_VARIABLE_CATEGORIES) as $category) {
             $categories[] = $this->normalizeVariableCategoryEntry($category);
         }
 
@@ -1190,7 +1190,7 @@ final class BricksIntegrationService
     private function saveGlobalVariableCategories(array $categories): void
     {
         $optionName = defined('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES')
-            ? (string) constant('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES')
+            ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES'))
             : self::OPTION_GLOBAL_VARIABLE_CATEGORIES;
 
         if ($categories === []) {

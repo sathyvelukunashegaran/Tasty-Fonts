@@ -577,8 +577,8 @@ final class ImportRepository
         $normalized = [];
 
         foreach ($faces as $face) {
-            $files = is_array($face['files'] ?? null) ? $face['files'] : [];
-            $paths = is_array($face['paths'] ?? null) ? $face['paths'] : [];
+            $files = FontUtils::normalizeStringKeyedMap($face['files'] ?? null);
+            $paths = FontUtils::normalizeStringKeyedMap($face['paths'] ?? null);
             $axes = FontUtils::normalizeAxesMap($face['axes'] ?? []);
 
             if ($files === [] && $paths === []) {
@@ -594,7 +594,7 @@ final class ImportRepository
                 'unicode_range' => sanitize_text_field($this->stringValue($face, 'unicode_range')),
                 'files' => $this->normalizeStringMap($files),
                 'paths' => $this->normalizeStringMap($paths),
-                'provider' => is_array($face['provider'] ?? null) ? $face['provider'] : [],
+                'provider' => FontUtils::normalizeStringKeyedMap($face['provider'] ?? null),
                 'is_variable' => !empty($face['is_variable']) || $axes !== [],
                 'axes' => $axes,
                 'variation_defaults' => FontUtils::normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
@@ -735,21 +735,7 @@ final class ImportRepository
      */
     private function normalizeFaceList(mixed $faces): array
     {
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeFaceList($faces);
     }
 
     /**

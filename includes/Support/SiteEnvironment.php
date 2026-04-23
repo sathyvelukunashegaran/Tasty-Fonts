@@ -28,11 +28,11 @@ final class SiteEnvironment
     public static function currentEnvironmentType(): string
     {
         if (function_exists('wp_get_environment_type')) {
-            return strtolower(trim((string) wp_get_environment_type()));
+            return strtolower(trim(FontUtils::scalarStringValue(wp_get_environment_type())));
         }
 
         if (defined('WP_ENVIRONMENT_TYPE')) {
-            return strtolower(trim((string) constant('WP_ENVIRONMENT_TYPE')));
+            return strtolower(trim(FontUtils::scalarStringValue(constant('WP_ENVIRONMENT_TYPE'))));
         }
 
         return '';

@@ -15,6 +15,7 @@ use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
@@ -294,13 +295,23 @@ HTACCESS;
                 continue;
             }
 
-            $scopedPrefix = TransientKey::prefixForSite($prefix);
-            $transientPattern = $wpdb->esc_like('_transient_' . $scopedPrefix) . '%';
-            $timeoutPattern = $wpdb->esc_like('_transient_timeout_' . $scopedPrefix) . '%';
+            $scopedPrefix = FontUtils::scalarStringValue(TransientKey::prefixForSite($prefix));
+
+            if ($scopedPrefix === '') {
+                continue;
+            }
+
+            $transientPattern = FontUtils::scalarStringValue($wpdb->esc_like('_transient_' . $scopedPrefix)) . '%';
+            $timeoutPattern = FontUtils::scalarStringValue($wpdb->esc_like('_transient_timeout_' . $scopedPrefix)) . '%';
+            $optionsTable = FontUtils::scalarStringValue($wpdb->options);
+
+            if ($optionsTable === '') {
+                continue;
+            }
 
             $wpdb->query(
                 $wpdb->prepare(
-                    "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+                    "DELETE FROM {$optionsTable} WHERE option_name LIKE %s OR option_name LIKE %s",
                     $transientPattern,
                     $timeoutPattern
                 )

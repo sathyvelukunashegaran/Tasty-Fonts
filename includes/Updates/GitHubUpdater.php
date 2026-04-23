@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\AdminAccessService;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
 use stdClass;
@@ -448,7 +449,7 @@ final class GitHubUpdater
                 continue;
             }
 
-            $normalized = $this->normalizeRelease($release);
+            $normalized = $this->normalizeRelease(FontUtils::normalizeStringKeyedMap($release));
 
             if ($normalized === null) {
                 continue;
@@ -647,7 +648,7 @@ final class GitHubUpdater
             'Accept' => $accept,
             'User-Agent' => 'Tasty-Custom-Fonts/' . TASTY_FONTS_VERSION,
         ];
-        $token = trim((string) apply_filters('tasty_fonts_github_api_token', ''));
+        $token = trim(FontUtils::scalarStringValue(apply_filters('tasty_fonts_github_api_token', '')));
 
         if ($token !== '') {
             $headers['Authorization'] = 'Bearer ' . $token;

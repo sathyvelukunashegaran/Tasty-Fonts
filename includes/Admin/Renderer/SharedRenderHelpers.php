@@ -803,20 +803,6 @@ trait SharedRenderHelpers
      */
     private function listOfMaps(mixed $value): array
     {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-            $normalized[] = $item;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeListOfStringKeyedMaps($value);
     }
 }

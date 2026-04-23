@@ -949,21 +949,7 @@ final class SiteTransferService
      */
     private function normalizeStringKeyedMap(mixed $value): array
     {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $key => $item) {
-            if (!is_string($key)) {
-                continue;
-            }
-
-            $normalized[$key] = $item;
-        }
-
-        return $normalized;
+        return FontUtils::normalizeStringKeyedMap($value);
     }
 
     /**
@@ -995,7 +981,7 @@ final class SiteTransferService
      */
     private function normalizeRoleSet(mixed $value): array
     {
-        $roles = is_array($value) ? $value : [];
+        $roles = $this->normalizeStringKeyedMap($value);
 
         return [
             'heading' => $this->scalarStringValue($roles, 'heading'),
