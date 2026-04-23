@@ -7,6 +7,7 @@ namespace TastyFonts\Admin;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\FontTypeHelper;
+use TastyFonts\Admin\Renderer\ToolsSectionRenderer;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
@@ -168,6 +169,7 @@ final class AdminPageContextBuilder
             'class_output_category_serif_enabled' => !empty($settings['class_output_category_serif_enabled']),
             'class_output_category_mono_enabled' => !empty($settings['class_output_category_mono_enabled']),
             'class_output_families_enabled' => !empty($settings['class_output_families_enabled']),
+            'class_output_role_styles_enabled' => !empty($settings['class_output_role_styles_enabled']),
             'minify_css_output' => !empty($settings['minify_css_output']),
             'role_usage_font_weight_enabled' => !empty($settings['role_usage_font_weight_enabled']),
             'per_variant_font_variables_enabled' => !empty($settings['per_variant_font_variables_enabled']),
@@ -434,7 +436,10 @@ final class AdminPageContextBuilder
             $this->cssBuilder->buildRoleUsageSnippet($snippetRoles, $includeMonospace, $catalog, $settings),
             $minifyOutput
         );
-        $usageDisplayValue = $this->cssBuilder->buildRoleUsageSnippet($snippetRoles, $includeMonospace, $catalog, $settings, true);
+        $usageDisplayValue = $this->annotateClassesOnlyRootDisplay(
+            $settings,
+            $this->cssBuilder->buildRoleUsageSnippet($snippetRoles, $includeMonospace, $catalog, $settings, true)
+        );
         $variablesValue = $this->cssBuilder->formatOutput(
             $this->cssBuilder->buildRoleVariableDeclarationsSnippet($snippetRoles, $includeMonospace, $catalog, $settings),
             $minifyOutput
@@ -492,18 +497,56 @@ final class AdminPageContextBuilder
     public function buildGeneratedCssPanel(array $settings): array
     {
         $download = $this->buildGeneratedCssDownloadData($settings);
+        $value = !empty($download['downloadable'])
+            ? trim((string) ($download['content'] ?? ''))
+            : __('Not generated while sitewide delivery is off.', 'tasty-fonts');
 
         return [
             'key' => 'generated',
             'label' => __('Generated CSS', 'tasty-fonts'),
             'target' => 'tasty-fonts-output-generated',
-            'value' => !empty($download['downloadable'])
-                ? trim((string) ($download['content'] ?? ''))
-                : __('Not generated while sitewide delivery is off.', 'tasty-fonts'),
+            'value' => $value,
+            'readable_display_value' => $this->buildGeneratedCssReadableDisplayValue($settings, $value),
             'download_url' => !empty($download['downloadable']) ? (string) ($download['url'] ?? '') : '',
             'download_filename' => (string) ($download['filename'] ?? 'tasty-fonts.css'),
             'active' => false,
         ];
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function buildGeneratedCssReadableDisplayValue(array $settings, string $value): string
+    {
+        $toolsRenderer = new ToolsSectionRenderer($this->storage);
+        $formatted = $toolsRenderer->formatSnippetForDisplay($value);
+
+        return $this->annotateClassesOnlyRootDisplay($settings, $formatted);
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function annotateClassesOnlyRootDisplay(array $settings, string $formatted): string
+    {
+        if (
+            $this->stringValue($settings, 'output_quick_mode_preference') !== 'classes'
+            || !str_contains($formatted, ':root')
+        ) {
+            return $formatted;
+        }
+
+        $comment = '  /* Still kept in Classes only for Automatic.css sync, Gutenberg editor parity, Etch canvas parity, and Bricks/Oxygen bridges. */';
+
+        if (str_contains($formatted, ":root {\n")) {
+            return preg_replace('/^:root \{\n/', ":root {\n" . $comment . "\n", $formatted, 1) ?? $formatted;
+        }
+
+        if (str_contains($formatted, ':root{')) {
+            return preg_replace('/^:root\{/', ":root {\n" . $comment . "\n", $formatted, 1) ?? $formatted;
+        }
+
+        return $formatted;
     }
 
     /**
@@ -1965,7 +2008,7 @@ final class AdminPageContextBuilder
 
     private function defaultRoleFallback(string $roleKey): string
     {
-        return $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
+        return $roleKey === 'monospace' ? 'monospace' : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
     }
 
     /**

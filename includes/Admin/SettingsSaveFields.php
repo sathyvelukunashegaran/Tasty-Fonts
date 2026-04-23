@@ -58,6 +58,7 @@ final class SettingsSaveFields
             ['name' => 'class_output_category_serif_enabled', 'kind' => 'toggle'],
             ['name' => 'class_output_category_mono_enabled', 'kind' => 'toggle'],
             ['name' => 'class_output_families_enabled', 'kind' => 'toggle'],
+            ['name' => 'class_output_role_styles_enabled', 'kind' => 'toggle'],
             ['name' => 'per_variant_font_variables_enabled', 'kind' => 'toggle'],
             ['name' => 'minimal_output_preset_enabled', 'kind' => 'toggle'],
             ['name' => 'role_usage_font_weight_enabled', 'kind' => 'toggle'],

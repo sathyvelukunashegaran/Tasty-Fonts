@@ -142,6 +142,19 @@ final class CssBuilder
 
     /**
      * @param array<int|string, mixed> $roles
+     * @param NormalizedSettings $settings
+     */
+    public function buildRoleUsageRulesOnlySnippet(
+        array $roles,
+        bool $includeMonospace = false,
+        array $settings = [],
+        bool $includeComments = false
+    ): string {
+        return $this->buildRoleUsageRulesSnippet($roles, $includeMonospace, $settings, $includeComments);
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
      * @param VariableFamilyMap $variableFamilies
      * @param NormalizedSettings $settings
      */
@@ -232,16 +245,33 @@ final class CssBuilder
         $blocks = [];
 
         if ($this->classOutputRoleEnabled($settings, 'heading')) {
-            $blocks[] = $this->buildClassRule('.font-heading', $this->roleStringValue($roles, 'heading'), $this->resolveRoleFallback('heading', $roles, $settings, $families));
+            $blocks[] = $this->buildRoleClassRule(
+                '.font-heading',
+                'heading',
+                $roles,
+                $settings,
+                $this->roleStringValue($roles, 'heading'),
+                $this->resolveRoleFallback('heading', $roles, $settings, $families)
+            );
         }
 
         if ($this->classOutputRoleEnabled($settings, 'body')) {
-            $blocks[] = $this->buildClassRule('.font-body', $this->roleStringValue($roles, 'body'), $this->resolveRoleFallback('body', $roles, $settings, $families));
+            $blocks[] = $this->buildRoleClassRule(
+                '.font-body',
+                'body',
+                $roles,
+                $settings,
+                $this->roleStringValue($roles, 'body'),
+                $this->resolveRoleFallback('body', $roles, $settings, $families)
+            );
         }
 
         if ($includeMonospace && $this->classOutputRoleEnabled($settings, 'monospace')) {
-            $blocks[] = $this->buildClassRule(
+            $blocks[] = $this->buildRoleClassRule(
                 '.font-monospace',
+                'monospace',
+                $roles,
+                $settings,
                 $this->roleStringValue($roles, 'monospace'),
                 $this->resolveRoleFallback('monospace', $roles, $settings, $families)
             );
@@ -618,10 +648,6 @@ final class CssBuilder
             return '';
         }
 
-        if (trim($this->roleStringValue($roles, 'heading')) === '' || trim($this->roleStringValue($roles, 'body')) === '') {
-            return '';
-        }
-
         $includeExtendedVariables = $this->extendedVariableOutputEnabled($settings);
         $includeWeightTokens = $this->extendedVariableWeightTokensEnabled($settings);
         $includeRoleFontWeights = $this->roleUsageFontWeightEnabled($settings);
@@ -779,13 +805,8 @@ final class CssBuilder
         $roleAliasDeclarations = [];
         $weightDeclarations = [];
 
-        if ($headingFamily !== '') {
-            $roleDeclarations['--font-heading'] = FontUtils::buildFontStack($headingFamily, $headingFallback);
-        }
-
-        if ($bodyFamily !== '') {
-            $roleDeclarations['--font-body'] = FontUtils::buildFontStack($bodyFamily, $bodyFallback);
-        }
+        $roleDeclarations['--font-heading'] = FontUtils::buildFontStack($headingFamily, $headingFallback);
+        $roleDeclarations['--font-body'] = FontUtils::buildFontStack($bodyFamily, $bodyFallback);
 
         if ($includeMonospace) {
             $roleDeclarations['--font-monospace'] = FontUtils::buildFontStack($monospaceFamily, $monospaceFallback);
@@ -1246,15 +1267,15 @@ final class CssBuilder
         $monospaceFallback = $this->resolveRoleFallback('monospace', $roles, $settings, $families);
 
         if ($bodyFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'interface')) {
-            $blocks[] = $this->buildClassRule('.font-interface', $bodyFamily, $bodyFallback);
+            $blocks[] = $this->buildRoleClassRule('.font-interface', 'body', $roles, $settings, $bodyFamily, $bodyFallback);
         }
 
         if ($bodyFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'ui')) {
-            $blocks[] = $this->buildClassRule('.font-ui', $bodyFamily, $bodyFallback);
+            $blocks[] = $this->buildRoleClassRule('.font-ui', 'body', $roles, $settings, $bodyFamily, $bodyFallback);
         }
 
         if ($includeMonospace && $monospaceFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'code')) {
-            $blocks[] = $this->buildClassRule('.font-code', $monospaceFamily, $monospaceFallback);
+            $blocks[] = $this->buildRoleClassRule('.font-code', 'monospace', $roles, $settings, $monospaceFamily, $monospaceFallback);
         }
 
         return implode("\n\n", array_filter($blocks, static fn (string $block): bool => $block !== ''));
@@ -1302,6 +1323,15 @@ final class CssBuilder
                 !array_key_exists('class_output_families_enabled', $settings)
                 || !empty($settings['class_output_families_enabled'])
             );
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function classOutputRoleStylesEnabled(array $settings): bool
+    {
+        return $this->classOutputEnabled($settings)
+            && !empty($settings['class_output_role_styles_enabled']);
     }
 
     /**
@@ -1374,6 +1404,40 @@ final class CssBuilder
                 '}',
             ]
         );
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     * @param NormalizedSettings $settings
+     */
+    private function buildRoleClassRule(
+        string $selector,
+        string $roleKey,
+        array $roles,
+        array $settings,
+        string $family,
+        string $fallback
+    ): string {
+        $lines = [
+            $selector . ' {',
+            '  font-family: ' . FontUtils::buildFontStack($family, $fallback) . ';',
+        ];
+
+        if ($this->classOutputRoleStylesEnabled($settings)) {
+            $weight = $this->resolveRoleUsageWeightValue($roles, $roleKey);
+            $preferRawWeight = $this->roleUsageWeightComesFromAxis($roles, $roleKey);
+            $weightDeclaration = $this->buildRoleWeightDeclaration($weight, false, false, $preferRawWeight);
+
+            if ($weightDeclaration !== '') {
+                $lines[] = '  font-weight: ' . $weightDeclaration . ';';
+            }
+
+            $lines[] = '  font-variation-settings: var(--font-' . $roleKey . '-settings);';
+        }
+
+        $lines[] = '}';
+
+        return implode("\n", $lines);
     }
 
     /**

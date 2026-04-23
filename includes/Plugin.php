@@ -154,6 +154,7 @@ final class Plugin
         $this->runtime = new RuntimeService(
             $this->planner,
             $this->assets,
+            $this->cssBuilder,
             $this->adobe,
             $this->settings,
             $this->acssIntegration,
@@ -265,6 +266,7 @@ final class Plugin
         add_action(GoogleFontsClient::ACTION_REVALIDATE_API_KEY, [$this, 'handleGoogleApiKeyRevalidation']);
         add_action('wp_enqueue_scripts', [$this->runtime, 'enqueueFrontend']);
         add_action('wp_enqueue_scripts', [$this->runtime, 'enqueueBricksFrontendOverride'], 1000);
+        add_action('wp_enqueue_scripts', [$this->runtime, 'enqueueEtchFrontendOverride'], 1000);
         add_action('wp_enqueue_scripts', [$this->runtime, 'enqueueBricksBuilder'], 100);
         add_action('wp_head', [$this->runtime, 'outputPreloadHints'], 1);
         add_action('etch/canvas/enqueue_assets', [$this->runtime, 'enqueueEtchCanvas']);

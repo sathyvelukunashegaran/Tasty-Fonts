@@ -67,12 +67,12 @@ Advanced output controls also cover:
 
 The quick preset selector is the fastest way to choose the overall output model:
 
-- `Minimal`: emit only `--font-heading` and `--font-body`
+- `Minimal`: emit only the core role variables by default
 - `Variables only`: emit the variable layer without utility classes
 - `Classes only`: emit the utility class layer without the larger variable surface
 - `Custom`: open the detailed controls and manage each output feature directly
 
-Use `Minimal` when your theme or builder only needs the core role variables and you want the plugin to keep the runtime output surface as small as possible.
+Use `Minimal` when your theme or builder only needs the core role variables and you want the plugin to keep the runtime output surface as small as possible. On Etch frontends, Tasty also adds a small live role bridge so the applied Heading and Body roles still map onto the rendered page.
 
 #### Emit Role Font Weights
 
@@ -167,6 +167,8 @@ On local development environments, TLS certificate trust issues commonly block t
 When enabled, Tasty Fonts maps Automatic.css heading and text font-family settings to `var(--font-heading)` and `var(--font-body)`.
 
 This keeps ACSS aligned with the plugin's live role model instead of splitting font ownership across two different systems.
+
+When sitewide role delivery is active and Automatic.css is installed, Tasty also mirrors the live ACSS runtime stylesheet into Gutenberg and supported builder canvases for editor parity. That runtime mirror still happens when this sync toggle is off, but in that state Tasty does not rewrite Automatic.css typography settings. Turning the sync toggle on adds the direct ACSS font-family mapping layer on top of the mirrored runtime stylesheet.
 
 #### Bricks Builder
 

@@ -1467,6 +1467,28 @@ $tests['settings_repository_persists_variables_and_classes_quick_modes_when_sett
     assertSameValue(true, !empty($saved['class_output_enabled']), 'Classes-only should keep class output enabled.');
     assertSameValue(false, !empty($saved['per_variant_font_variables_enabled']), 'Classes-only should keep variable output disabled.');
     assertSameValue(false, !empty($saved['role_usage_font_weight_enabled']), 'Classes-only should keep role font-weight output disabled.');
+
+    $saved = $settings->saveSettings([
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'classes',
+        'class_output_enabled' => '1',
+        'class_output_role_heading_enabled' => '1',
+        'class_output_role_body_enabled' => '1',
+        'class_output_role_monospace_enabled' => '1',
+        'class_output_role_alias_interface_enabled' => '1',
+        'class_output_role_alias_ui_enabled' => '1',
+        'class_output_role_alias_code_enabled' => '1',
+        'class_output_category_sans_enabled' => '1',
+        'class_output_category_serif_enabled' => '1',
+        'class_output_category_mono_enabled' => '1',
+        'class_output_families_enabled' => '1',
+        'class_output_role_styles_enabled' => '1',
+        'per_variant_font_variables_enabled' => '0',
+        'role_usage_font_weight_enabled' => '0',
+    ]);
+
+    assertSameValue(true, !empty($saved['class_output_role_styles_enabled']), 'Role class styles should persist when the opt-in toggle is enabled.');
+    assertSameValue('classes', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Opting role classes into weights and variation settings should keep the quick-mode preference on classes.');
 };
 
 $tests['settings_repository_defaults_block_editor_font_library_sync_on_by_default'] = static function (): void {
@@ -1642,8 +1664,8 @@ $tests['settings_repository_defaults_and_persists_optional_monospace_role_settin
     assertSameValue(false, $defaults['monospace_role_enabled'], 'The optional monospace role should default to disabled.');
     assertSameValue('', $defaultRoles['heading'], 'Draft roles should default the heading family to fallback-only mode.');
     assertSameValue('', $defaultRoles['body'], 'Draft roles should default the body family to fallback-only mode.');
-    assertSameValue('sans-serif', $defaultRoles['heading_fallback'], 'Draft roles should default the heading fallback stack to sans-serif.');
-    assertSameValue('sans-serif', $defaultRoles['body_fallback'], 'Draft roles should default the body fallback stack to sans-serif.');
+    assertSameValue('system-ui, sans-serif', $defaultRoles['heading_fallback'], 'Draft roles should default the heading fallback stack to a modern system sans stack.');
+    assertSameValue('system-ui, sans-serif', $defaultRoles['body_fallback'], 'Draft roles should default the body fallback stack to a modern system sans stack.');
     assertSameValue('', $defaultRoles['monospace'], 'Draft roles should default the monospace family to fallback-only mode.');
     assertSameValue('monospace', $defaultRoles['monospace_fallback'], 'Draft roles should default the monospace fallback stack to the generic monospace keyword.');
 
@@ -1663,6 +1685,45 @@ $tests['settings_repository_defaults_and_persists_optional_monospace_role_settin
     assertSameValue(true, $settings->getSettings()['monospace_role_enabled'], 'The monospace role toggle should persist in plugin settings.');
     assertSameValue('', $savedRoles['monospace'], 'Saving monospace roles should not force a family selection when fallback-only mode is chosen.');
     assertSameValue('monospace', $savedRoles['monospace_fallback'], 'Blank monospace fallback input should normalize back to the generic monospace fallback.');
+};
+
+$tests['settings_repository_migrates_legacy_fallback_only_role_defaults_once'] = static function (): void {
+    resetTestState();
+
+    update_option(
+        SettingsRepository::OPTION_ROLES,
+        [
+            'heading' => '',
+            'body' => '',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        false
+    );
+    update_option(
+        SettingsRepository::OPTION_SETTINGS,
+        [
+            'auto_apply_roles' => true,
+            'applied_roles' => [
+                'heading' => '',
+                'body' => '',
+                'heading_fallback' => 'sans-serif',
+                'body_fallback' => 'sans-serif',
+            ],
+        ],
+        false
+    );
+
+    $settings = new SettingsRepository();
+    $draftRoles = $settings->getRoles([]);
+    $appliedRoles = $settings->getAppliedRoles([]);
+    $savedSettings = $settings->getSettings();
+
+    assertSameValue('system-ui, sans-serif', $draftRoles['heading_fallback'], 'Legacy fallback-only heading defaults should migrate to the new system fallback stack once the role fallback UI becomes editable.');
+    assertSameValue('system-ui, sans-serif', $draftRoles['body_fallback'], 'Legacy fallback-only body defaults should migrate to the new system fallback stack once the role fallback UI becomes editable.');
+    assertSameValue('system-ui, sans-serif', $appliedRoles['heading_fallback'], 'Legacy applied heading fallbacks should migrate alongside draft roles.');
+    assertSameValue('system-ui, sans-serif', $appliedRoles['body_fallback'], 'Legacy applied body fallbacks should migrate alongside draft roles.');
+    assertSameValue(true, !empty($savedSettings['role_fallback_defaults_migrated']), 'Legacy role fallback default migration should mark itself complete after running once.');
 };
 
 $tests['settings_repository_reenables_monospace_class_outputs_when_the_role_is_first_enabled'] = static function (): void {
@@ -2427,6 +2488,36 @@ $tests['admin_controller_recovers_legacy_acss_detection_state_when_acss_is_activ
     assertSameValue('var(--font-body)', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Recovering the legacy Automatic.css detection state should apply the body role variable.');
 };
 
+$tests['admin_controller_does_not_reenable_explicitly_disabled_acss_sync_after_restoring_defaults'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => '',
+        'text-font-family' => '',
+        'heading-weight' => '',
+        'text-font-weight' => '',
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'acss_font_role_sync_enabled' => '0',
+        'acss_font_role_sync_opted_out' => '1',
+    ]);
+
+    invokePrivateMethod($services['controller'], 'initializeDetectedIntegrations');
+
+    $saved = $services['settings']->getSettings();
+
+    assertSameValue(false, $saved['acss_font_role_sync_enabled'], 'Explicitly disabled Automatic.css sync should stay disabled after its managed values were cleared back to defaults.');
+    assertSameValue(false, $saved['acss_font_role_sync_applied'], 'Explicitly disabled Automatic.css sync should remain unapplied after initialization runs.');
+    assertSameValue('', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Initialization should leave restored Automatic.css heading defaults untouched after an explicit opt-out.');
+    assertSameValue('', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Initialization should leave restored Automatic.css body defaults untouched after an explicit opt-out.');
+};
+
 $tests['admin_controller_preserves_unavailable_integration_detection_state_on_settings_save'] = static function (): void {
     resetTestState();
 
@@ -2458,6 +2549,35 @@ $tests['admin_controller_preserves_unavailable_integration_detection_state_on_se
     assertSameValue(null, $result['settings']['bricks_integration_enabled'], 'Saving settings while Bricks is unavailable should preserve its unconfigured detection state so later installs can still auto-enable it.');
     assertSameValue(null, $result['settings']['oxygen_integration_enabled'], 'Saving settings while Oxygen is unavailable should preserve its unconfigured detection state so later installs can still auto-enable it.');
     assertSameValue(null, $result['settings']['acss_font_role_sync_enabled'], 'Saving settings while Automatic.css is unavailable should preserve its unconfigured detection state so later installs can still auto-enable it.');
+};
+
+$tests['admin_controller_clears_stale_acss_managed_values_when_sync_is_off_without_backups'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => 'var(--font-heading)',
+        'text-font-family' => 'var(--font-body)',
+        'heading-weight' => 'var(--font-heading-weight)',
+        'text-font-weight' => 'var(--font-body-weight)',
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+
+    $result = $services['controller']->saveSettingsValues([
+        'acss_font_role_sync_enabled' => '0',
+    ]);
+
+    assertSameValue('', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Saving Automatic.css sync off without stored backups should clear stale managed heading values so Automatic.css can fall back to its defaults.');
+    assertSameValue('', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Saving Automatic.css sync off without stored backups should clear stale managed body values so Automatic.css can fall back to its defaults.');
+    assertSameValue('', (string) ($automaticCssSettings['heading-weight'] ?? ''), 'Saving Automatic.css sync off without stored backups should clear stale managed heading weights so Automatic.css can fall back to its defaults.');
+    assertSameValue('', (string) ($automaticCssSettings['text-font-weight'] ?? ''), 'Saving Automatic.css sync off without stored backups should clear stale managed body weights so Automatic.css can fall back to its defaults.');
+    assertSameValue(false, (bool) ($result['settings']['acss_font_role_sync_applied'] ?? true), 'Saving Automatic.css sync off without stored backups should keep the sync marked unapplied.');
+    assertContainsValue('use its defaults again', (string) ($result['message'] ?? ''), 'Saving Automatic.css sync off without stored backups should explain that stale managed values were cleared.');
 };
 
 $tests['admin_controller_restores_previous_acss_font_values_when_sitewide_roles_are_disabled'] = static function (): void {
@@ -2607,6 +2727,37 @@ $tests['runtime_service_exposes_acss_inline_weight_styles_to_etch_canvas'] = sta
     assertContainsValue('font-family:var(--font-heading);font-weight:var(--font-heading-weight);', $combinedInlineCss, 'Etch canvas runtime data should include the ACSS-managed heading weight bridge CSS.');
 };
 
+$tests['runtime_service_exposes_generic_role_bridge_styles_to_etch_canvas_when_minimal_output_is_active'] = static function (): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $localizedScripts;
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $currentUserCapabilities['edit_posts'] = true;
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => '',
+            'body' => '',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        []
+    );
+    $services['settings']->setAutoApplyRoles(true);
+    $_GET['etch'] = '1';
+
+    $services['runtime']->enqueueFrontend();
+    $canvasInlineCss = (array) ($localizedScripts['tasty-fonts-canvas']['data']['inlineCss'] ?? []);
+    $combinedInlineCss = implode("\n", $canvasInlineCss);
+
+    assertContainsValue('body {', $combinedInlineCss, 'Etch canvas runtime data should expose the generic body role bridge when Minimal output keeps the generated stylesheet variable-only.');
+    assertContainsValue('font-family: var(--font-body) !important;', $combinedInlineCss, 'Etch canvas runtime data should bridge the live body role variable into the canvas preview.');
+    assertContainsValue('font-family: var(--font-heading) !important;', $combinedInlineCss, 'Etch canvas runtime data should bridge the live heading role variable into the canvas preview.');
+};
+
 $tests['runtime_service_exposes_acss_runtime_stylesheet_to_etch_canvas_when_sync_is_active'] = static function (): void {
     resetTestState();
 
@@ -2638,6 +2789,40 @@ $tests['runtime_service_exposes_acss_runtime_stylesheet_to_etch_canvas_when_sync
         true,
         in_array('https://example.test/wp-content/uploads/automatic-css/automatic.css', $canvasStylesheetUrls, true),
         'Etch canvas runtime data should include the Automatic.css runtime stylesheet when Tasty manages the ACSS font mapping.'
+    );
+};
+
+$tests['runtime_service_exposes_acss_runtime_stylesheet_to_etch_canvas_when_sync_is_inactive_but_acss_is_available'] = static function (): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $localizedScripts;
+    global $registeredStyles;
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+
+    $registeredStyles[AcssIntegrationService::RUNTIME_STYLESHEET_HANDLE] = [
+        'src' => 'https://example.test/wp-content/uploads/automatic-css/automatic.css',
+        'deps' => [],
+        'ver' => '1775939707',
+    ];
+
+    $services = makeServiceGraph();
+    $currentUserCapabilities['edit_posts'] = true;
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings([
+        'acss_font_role_sync_enabled' => false,
+    ]);
+    $_GET['etch'] = '1';
+
+    $services['runtime']->enqueueFrontend();
+    $canvasStylesheetUrls = (array) ($localizedScripts['tasty-fonts-canvas']['data']['stylesheetUrls'] ?? []);
+
+    assertSameValue(
+        true,
+        in_array('https://example.test/wp-content/uploads/automatic-css/automatic.css', $canvasStylesheetUrls, true),
+        'Etch canvas runtime data should mirror the live Automatic.css runtime stylesheet even when Tasty ACSS sync is off.'
     );
 };
 
@@ -2861,6 +3046,73 @@ $tests['runtime_service_enqueues_acss_runtime_stylesheet_for_gutenberg_iframe_wh
         '1775939707',
         (string) ($enqueuedStyles['tasty-fonts-acss-runtime-editor-content']['ver'] ?? ''),
         'Gutenberg iframe styles should preserve the Automatic.css runtime stylesheet version for cache-busting.'
+    );
+};
+
+$tests['runtime_service_enqueues_acss_runtime_stylesheet_for_gutenberg_iframe_when_sync_is_inactive_but_acss_is_available'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $isAdminRequest;
+    global $registeredStyles;
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $registeredStyles[AcssIntegrationService::RUNTIME_STYLESHEET_HANDLE] = [
+        'src' => 'https://example.test/wp-content/uploads/automatic-css/automatic.css',
+        'deps' => [],
+        'ver' => '1775939707',
+    ];
+
+    $services = makeServiceGraph();
+    $isAdminRequest = true;
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings([
+        'acss_font_role_sync_enabled' => false,
+    ]);
+
+    $services['runtime']->enqueueBlockEditorContent();
+
+    assertSameValue(
+        'https://example.test/wp-content/uploads/automatic-css/automatic.css',
+        (string) ($enqueuedStyles['tasty-fonts-acss-runtime-editor-content']['src'] ?? ''),
+        'Gutenberg iframe styles should mirror the live Automatic.css runtime stylesheet even when Tasty ACSS sync is off.'
+    );
+    assertSameValue(
+        '1775939707',
+        (string) ($enqueuedStyles['tasty-fonts-acss-runtime-editor-content']['ver'] ?? ''),
+        'Gutenberg iframe styles should preserve the Automatic.css runtime stylesheet version when mirroring ACSS for editor parity.'
+    );
+};
+
+$tests['runtime_service_does_not_enqueue_acss_runtime_stylesheet_for_gutenberg_iframe_when_sitewide_roles_are_off'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $isAdminRequest;
+    global $registeredStyles;
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $registeredStyles[AcssIntegrationService::RUNTIME_STYLESHEET_HANDLE] = [
+        'src' => 'https://example.test/wp-content/uploads/automatic-css/automatic.css',
+        'deps' => [],
+        'ver' => '1775939707',
+    ];
+
+    $services = makeServiceGraph();
+    $isAdminRequest = true;
+    $services['settings']->saveSettings([
+        'auto_apply_roles' => false,
+        'acss_font_role_sync_enabled' => false,
+    ]);
+
+    $services['runtime']->enqueueBlockEditorContent();
+
+    assertSameValue(
+        false,
+        isset($enqueuedStyles['tasty-fonts-acss-runtime-editor-content']),
+        'Gutenberg iframe styles should not mirror the Automatic.css runtime stylesheet while sitewide role delivery remains off.'
     );
 };
 
@@ -4597,6 +4849,97 @@ $tests['runtime_service_enqueues_bricks_variable_fix_script_for_frontend_and_bui
     );
 };
 
+$tests['runtime_service_enqueues_etch_frontend_override_when_minimal_output_preset_is_active'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $inlineStyles;
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => '',
+            'body' => '',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        []
+    );
+    $services['settings']->setAutoApplyRoles(true);
+    $services['runtime']->enqueueEtchFrontendOverride();
+
+    assertSameValue(
+        true,
+        isset($enqueuedStyles['tasty-fonts-etch-runtime-override']),
+        'Minimal output on Etch frontends should enqueue a late runtime override so live sitewide role variables are actually consumed on the frontend.'
+    );
+
+    $css = (string) ($inlineStyles['tasty-fonts-etch-runtime-override'] ?? '');
+
+    assertContainsValue(
+        "body {\n  font-family: var(--font-body) !important;\n  font-variation-settings: var(--font-body-settings) !important;\n}",
+        $css,
+        'The Etch frontend override should map the live body typography back to the Tasty body role variable.'
+    );
+    assertContainsValue(
+        "h1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading) !important;\n  font-variation-settings: var(--font-heading-settings) !important;\n}",
+        $css,
+        'The Etch frontend override should map live heading typography back to the Tasty heading role variable.'
+    );
+};
+
+$tests['runtime_service_appends_generic_editor_role_bridge_when_minimal_output_preset_is_active'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => '',
+            'body' => '',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        []
+    );
+    $services['settings']->setAutoApplyRoles(true);
+
+    $settings = $services['runtime']->filterBlockEditorSettings([], null);
+    $css = (string) ($settings['styles'][0]['css'] ?? '');
+
+    assertContainsValue('body{font-family:var(--font-body)!important;font-variation-settings:var(--font-body-settings)!important;}', preg_replace('/\s+/', '', $css) ?? $css, 'The block editor should receive a generic body role bridge when Minimal output keeps the runtime stylesheet variable-only.');
+    assertContainsValue('.editor-post-title', $css, 'The block editor bridge should cover editor post title selectors.');
+    assertContainsValue('font-family: var(--font-heading) !important;', $css, 'The block editor bridge should map live heading typography back to the Tasty heading role variable.');
+};
+
+$tests['runtime_service_does_not_append_editor_role_bridge_when_sitewide_roles_are_off'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveRoles(
+        [
+            'heading' => '',
+            'body' => '',
+            'heading_fallback' => 'system-ui, sans-serif',
+            'body_fallback' => 'system-ui, sans-serif',
+        ],
+        []
+    );
+    $services['settings']->saveSettings([
+        'auto_apply_roles' => false,
+        'minimal_output_preset_enabled' => true,
+    ]);
+
+    $settings = $services['runtime']->filterBlockEditorSettings([], null);
+
+    assertSameValue(
+        false,
+        isset($settings['styles']),
+        'The block editor should stay untouched by the generic Tasty role bridge while role changes are still saved-only and not applied sitewide.'
+    );
+};
+
 $tests['runtime_service_appends_builder_editor_styles_for_managed_bricks_and_oxygen_fonts'] = static function (): void {
     resetTestState();
 
@@ -4695,6 +5038,27 @@ $tests['runtime_service_appends_acss_editor_styles_when_font_role_sync_is_active
     assertContainsValue('body{font-family:var(--font-body);font-weight:var(--font-body-weight);}', $css, 'Automatic.css editor styles should mirror the managed body font-family and weight variables into Gutenberg.');
     assertContainsValue('body :is(h1, h2, h3, h4, h5, h6, .editor-post-title, .wp-block-post-title){font-family:var(--font-heading);font-weight:var(--font-heading-weight);}', $css, 'Automatic.css editor styles should mirror the managed heading font-family and weight variables into Gutenberg, including the post title.');
     assertNotContainsValue('font-variation-settings', $css, 'Automatic.css editor styles should stay focused on the same direct font-family mapping used by the main ACSS sync.');
+};
+
+$tests['runtime_service_does_not_append_acss_editor_styles_when_sync_is_inactive_and_minimal_output_is_disabled'] = static function (): void {
+    resetTestState();
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'auto_apply_roles' => true,
+        'minimal_output_preset_enabled' => false,
+        'acss_font_role_sync_enabled' => false,
+    ]);
+
+    $settings = $services['runtime']->filterBlockEditorSettings([], null);
+
+    assertSameValue(
+        false,
+        isset($settings['styles']),
+        'When Automatic.css sync is off and Minimal output is not using the generic role bridge, Gutenberg should not receive extra editor-only CSS from Tasty beyond the mirrored ACSS runtime stylesheet.'
+    );
 };
 
 $tests['oxygen_compatibility_shim_returns_only_runtime_family_names'] = static function (): void {

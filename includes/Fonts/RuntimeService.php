@@ -18,6 +18,7 @@ use WP_Theme_JSON_Data;
  * @phpstan-import-type CatalogFamily from CatalogService
  * @phpstan-import-type RuntimeFamilyList from RuntimeAssetPlanner
  * @phpstan-import-type StylesheetDescriptor from RuntimeAssetPlanner
+ * @phpstan-import-type NormalizedSettings from SettingsRepository
  * @phpstan-type EditorSettings array<string, mixed>
  * @phpstan-type StylesheetList list<StylesheetDescriptor>
  * @phpstan-type CssLineList list<string>
@@ -36,6 +37,7 @@ final class RuntimeService
     public function __construct(
         private readonly RuntimeAssetPlanner $planner,
         private readonly AssetService $assets,
+        private readonly CssBuilder $cssBuilder,
         private readonly AdobeProjectClient $adobe,
         private readonly SettingsRepository $settings,
         private readonly AcssIntegrationService $acssIntegration,
@@ -87,6 +89,22 @@ final class RuntimeService
         wp_register_style('tasty-fonts-bricks-runtime-override', false, [], TASTY_FONTS_VERSION);
         wp_enqueue_style('tasty-fonts-bricks-runtime-override');
         wp_add_inline_style('tasty-fonts-bricks-runtime-override', $css);
+    }
+
+    public function enqueueEtchFrontendOverride(): void
+    {
+        if (is_admin()) {
+            return;
+        }
+
+        $css = $this->buildRoleBridgeCss('frontend');
+        if ($css === '') {
+            return;
+        }
+
+        wp_register_style('tasty-fonts-etch-runtime-override', false, [], TASTY_FONTS_VERSION);
+        wp_enqueue_style('tasty-fonts-etch-runtime-override');
+        wp_add_inline_style('tasty-fonts-etch-runtime-override', $css);
     }
 
     public function enqueueBricksBuilder(): void
@@ -255,12 +273,13 @@ final class RuntimeService
     {
         $styles = [];
         $runtimeFamilies = $this->planner->getRuntimeFamilies();
+        $settings = $this->settings->getSettings();
 
         if ($this->hasManagedAcssRuntimeMapping()) {
             $styles = array_merge($styles, $this->acssIntegration->getManagedEditorStyles());
         }
 
-        if ($this->bricksIntegration->managedEditorStylesActive($this->settings->getSettings())) {
+        if ($this->bricksIntegration->managedEditorStylesActive($settings)) {
             $styles = array_merge($styles, $this->bricksIntegration->getManagedEditorStyles());
         } elseif ($this->bricksSelectorEnabled() && $this->bricksIntegration->isAvailable()) {
             $styles = array_merge($styles, $this->bricksIntegration->getEditorStyles($runtimeFamilies));
@@ -268,6 +287,10 @@ final class RuntimeService
 
         if ($this->builderIntegrationEnabled('oxygen') && $this->oxygenIntegration->isAvailable()) {
             $styles = array_merge($styles, $this->oxygenIntegration->getEditorStyles($runtimeFamilies));
+        }
+
+        if ($styles === [] && $this->shouldBuildEditorRoleBridge($settings)) {
+            $styles[] = $this->buildRoleBridgeCss('editor');
         }
 
         $styles = array_values(array_unique(array_filter($styles, static fn (string $style): bool => $style !== '')));
@@ -696,7 +719,7 @@ JS;
 
     private function enqueueAcssRuntimeStylesheet(string $handleSuffix): void
     {
-        $stylesheet = $this->getManagedAcssRuntimeStylesheet();
+        $stylesheet = $this->getEditorParityAcssRuntimeStylesheet();
 
         if ($stylesheet === []) {
             return;
@@ -735,7 +758,7 @@ JS;
             }
         }
 
-        $acssStylesheet = $this->getManagedAcssRuntimeStylesheet();
+        $acssStylesheet = $this->getEditorParityAcssRuntimeStylesheet();
 
         if ($acssStylesheet !== []) {
             $urls[] = $acssStylesheet['url'];
@@ -749,23 +772,45 @@ JS;
      */
     private function getCanvasInlineCss(): array
     {
-        if (!$this->hasManagedAcssRuntimeMapping()) {
-            return [];
+        $styles = [];
+
+        if ($this->hasManagedAcssRuntimeMapping()) {
+            $styles = array_merge($styles, $this->acssIntegration->getManagedEditorStyles());
         }
 
-        return array_values(array_unique(array_filter($this->acssIntegration->getManagedEditorStyles(), static fn (string $style): bool => $style !== '')));
+        $roleBridgeCss = $this->buildRoleBridgeCss('canvas');
+
+        if ($roleBridgeCss !== '') {
+            $styles[] = $roleBridgeCss;
+        }
+
+        return array_values(array_unique(array_filter($styles, static fn (string $style): bool => $style !== '')));
     }
 
     /**
-     * Resolve the Automatic.css runtime stylesheet when Tasty manages the ACSS font mapping.
+     * Mirror the live Automatic.css runtime stylesheet into editor surfaces when sitewide role
+     * delivery is active and Automatic.css is available.
      *
-     * @since 1.10.0
+     * This stays intentionally narrow:
+     * - it reuses the same live ACSS runtime stylesheet instead of generating editor-only CSS
+     * - it runs only while sitewide roles are applied, so saved-only drafts do not affect Gutenberg
+     * - it does not take ownership of ACSS typography settings when the sync toggle is off
+     *
+     * When sync is active, the managed ACSS editor style bridge still layers on top for the final
+     * font-family handoff. When sync is inactive, this mirror exists only to keep Gutenberg and
+     * builder canvases closer to the live ACSS runtime cascade.
      *
      * @return array{handle:string,url:string,ver:string}|array{}
      */
-    private function getManagedAcssRuntimeStylesheet(): array
+    private function getEditorParityAcssRuntimeStylesheet(): array
     {
-        if (!$this->hasManagedAcssRuntimeMapping()) {
+        if ($this->hasManagedAcssRuntimeMapping()) {
+            return $this->acssIntegration->getRuntimeStylesheet();
+        }
+
+        $settings = $this->settings->getSettings();
+
+        if (empty($settings['auto_apply_roles']) || !$this->acssIntegration->isAvailable()) {
             return [];
         }
 
@@ -780,6 +825,69 @@ JS;
             && ($settings['acss_font_role_sync_enabled'] ?? null) === true
             && !empty($settings['acss_font_role_sync_applied'])
             && $this->acssIntegration->isAvailable();
+    }
+
+    private function etchIntegrationAvailable(): bool
+    {
+        $available = class_exists(\Etch\Services\StylesheetService::class);
+
+        if (function_exists('apply_filters')) {
+            $available = (bool) apply_filters('tasty_fonts_etch_integration_available', $available);
+        }
+
+        return $available;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function shouldBuildMinimalRoleBridge(array $settings): bool
+    {
+        return !empty($settings['auto_apply_roles'])
+            && !empty($settings['minimal_output_preset_enabled'])
+            && !$this->hasManagedAcssRuntimeMapping();
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function shouldBuildEditorRoleBridge(array $settings): bool
+    {
+        return $this->shouldBuildMinimalRoleBridge($settings);
+    }
+
+    private function buildRoleBridgeCss(string $context): string
+    {
+        $settings = $this->settings->getSettings();
+
+        if (!$this->shouldBuildMinimalRoleBridge($settings)) {
+            return '';
+        }
+
+        if (in_array($context, ['frontend', 'canvas'], true) && !$this->etchIntegrationAvailable()) {
+            return '';
+        }
+
+        $css = $this->cssBuilder->buildRoleUsageRulesOnlySnippet(
+            $this->settings->getAppliedRoles($this->planner->getRuntimeFamilies()),
+            !empty($settings['monospace_role_enabled']),
+            array_replace($settings, ['minimal_output_preset_enabled' => false])
+        );
+
+        if ($css === '') {
+            return '';
+        }
+
+        if ($context === 'editor') {
+            $css = str_replace(
+                'h1, h2, h3, h4, h5, h6 {',
+                'body :is(h1, h2, h3, h4, h5, h6, .editor-post-title, .wp-block-post-title) {',
+                $css
+            );
+            $css = str_replace('code, pre {', 'body :is(code, pre) {', $css);
+        }
+
+        return preg_replace('/(font-(?:family|variation-settings|weight):\s*[^;]+);/', '$1 !important;', $css) ?? $css;
     }
 
     /**

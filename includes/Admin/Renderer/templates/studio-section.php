@@ -242,7 +242,7 @@
                                             'copy_label' => $headingFamily !== ''
                                                 ? sprintf(__('Heading family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $headingFamilyVariable, $headingVariable, $headingStack)
                                                 : sprintf(__('Heading uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $headingStack, $headingVariable),
-                                            'description' => __('Choose the saved family used for headings. Configure its fallback in the Font Library.', 'tasty-fonts'),
+                                            'description' => __('Choose the saved family used for headings. Leave it on fallback only to use the stack below directly. Saved families still use their Library fallback.', 'tasty-fonts'),
                                             'family_input_name' => 'tasty_fonts_heading_font',
                                             'family_select_id' => 'tasty_fonts_heading_font',
                                             'clear_family_label' => __('Clear Heading Family', 'tasty-fonts'),
@@ -260,7 +260,7 @@
                                             'copy_label' => $bodyFamily !== ''
                                                 ? sprintf(__('Body family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $bodyFamilyVariable, $bodyVariable, $bodyStack)
                                                 : sprintf(__('Body uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $bodyStack, $bodyVariable),
-                                            'description' => __('Choose the saved family used for body copy. Configure its fallback in the Font Library.', 'tasty-fonts'),
+                                            'description' => __('Choose the saved family used for body copy. Leave it on fallback only to use the stack below directly. Saved families still use their Library fallback.', 'tasty-fonts'),
                                             'family_input_name' => 'tasty_fonts_body_font',
                                             'family_select_id' => 'tasty_fonts_body_font',
                                             'clear_family_label' => __('Clear Body Family', 'tasty-fonts'),
@@ -281,7 +281,7 @@
                                             'copy_label' => $monospaceFamily !== ''
                                                 ? sprintf(__('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $monospaceFamilyVariable, $monospaceVariable, $monospaceStack)
                                                 : sprintf(__('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $monospaceStack, $monospaceVariable),
-                                            'description' => __('Choose the saved family used for monospace text. Configure its fallback in the Font Library.', 'tasty-fonts'),
+                                            'description' => __('Choose the saved family used for monospace text. Leave it on fallback only to use the stack below directly. Saved families still use their Library fallback.', 'tasty-fonts'),
                                             'family_input_name' => 'tasty_fonts_monospace_font',
                                             'family_select_id' => 'tasty_fonts_monospace_font',
                                             'clear_family_label' => __('Clear Monospace Family', 'tasty-fonts'),

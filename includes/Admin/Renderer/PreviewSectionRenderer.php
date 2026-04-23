@@ -544,6 +544,6 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
             return $fallback;
         }
 
-        return $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
+        return $roleKey === 'monospace' ? 'monospace' : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
     }
 }

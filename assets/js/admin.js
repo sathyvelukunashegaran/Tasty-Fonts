@@ -263,6 +263,16 @@
         ? (outputQuickModePreferenceInput.getAttribute('data-output-quick-mode-saved-preference') || '')
         : '';
     const outputQuickModeNotice = document.querySelector('[data-output-quick-mode-notice]');
+    const outputRoleClassStylesOption = document.querySelector('[data-output-role-class-styles-option]');
+    const outputDetailGroups = {
+        sitewide: document.querySelector('[data-output-detail-group="sitewide"]'),
+        classes: document.querySelector('[data-output-detail-group="classes"]'),
+        variables: document.querySelector('[data-output-detail-group="variables"]'),
+    };
+    const outputLayerMasterRows = {
+        classes: document.querySelector('[data-output-layer-master-row="classes"]'),
+        variables: document.querySelector('[data-output-layer-master-row="variables"]'),
+    };
     const developerConfirmForms = Array.from(document.querySelectorAll('[data-developer-confirm-message]'));
     const developerToolForms = Array.from(document.querySelectorAll('[data-developer-tool-form]'));
     const developerDirtyNotices = Array.from(document.querySelectorAll('[data-developer-dirty-notice]'));
@@ -786,7 +796,7 @@
     }
 
     function defaultRoleFallback(roleKey) {
-        return roleKey === 'monospace' ? 'monospace' : 'sans-serif';
+        return roleKey === 'monospace' ? 'monospace' : 'system-ui, sans-serif';
     }
 
     function resolveRoleFallbackValue(roleKey, input = {}) {
@@ -1652,7 +1662,9 @@
             'class_output_category_serif_enabled',
             'class_output_category_mono_enabled',
             'class_output_families_enabled',
+            'class_output_role_styles_enabled',
             'per_variant_font_variables_enabled',
+            'extended_variable_role_weight_vars_enabled',
             'extended_variable_weight_tokens_enabled',
             'extended_variable_role_aliases_enabled',
             'extended_variable_category_sans_enabled',
@@ -2992,8 +3004,8 @@
         const snapshot = {
             heading: getElementValue(roleHeading, ''),
             body: getElementValue(roleBody, ''),
-            headingFallback: getElementValue(roleHeadingFallback, 'sans-serif'),
-            bodyFallback: getElementValue(roleBodyFallback, 'sans-serif'),
+            headingFallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
+            bodyFallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
             headingWeight: getElementValue(roleWeightSelects.heading, ''),
             bodyWeight: getElementValue(roleWeightSelects.body, ''),
             headingAxes: roleAxisFieldValues('heading'),
@@ -3026,11 +3038,11 @@
         renderAllRoleWeightEditors(snapshot);
 
         if (roleHeadingFallback) {
-            roleHeadingFallback.value = snapshot.headingFallback || 'sans-serif';
+            roleHeadingFallback.value = snapshot.headingFallback || defaultRoleFallback('heading');
         }
 
         if (roleBodyFallback) {
-            roleBodyFallback.value = snapshot.bodyFallback || 'sans-serif';
+            roleBodyFallback.value = snapshot.bodyFallback || defaultRoleFallback('body');
         }
 
         if (monospaceRoleEnabled && roleMonospace) {
@@ -5664,8 +5676,8 @@
             heading: getElementValue(roleHeading, ''),
             body: getElementValue(roleBody, ''),
             monospace: monospaceRoleEnabled ? getElementValue(roleMonospace, '') : '',
-            headingFallback: getElementValue(roleHeadingFallback, 'sans-serif'),
-            bodyFallback: getElementValue(roleBodyFallback, 'sans-serif'),
+            headingFallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
+            bodyFallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
             monospaceFallback: monospaceRoleEnabled ? getElementValue(roleMonospaceFallback, 'monospace') : 'monospace',
             headingWeight: getElementValue(roleWeightSelects.heading, ''),
             bodyWeight: getElementValue(roleWeightSelects.body, ''),
@@ -5681,8 +5693,8 @@
             heading: getElementValue(roleHeading, ''),
             body: getElementValue(roleBody, ''),
             monospace: monospaceRoleEnabled ? getElementValue(roleMonospace, '') : '',
-            headingFallback: getElementValue(roleHeadingFallback, 'sans-serif'),
-            bodyFallback: getElementValue(roleBodyFallback, 'sans-serif'),
+            headingFallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
+            bodyFallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
             monospaceFallback: monospaceRoleEnabled ? getElementValue(roleMonospaceFallback, 'monospace') : 'monospace',
             headingWeight: getElementValue(roleWeightSelects.heading, ''),
             bodyWeight: getElementValue(roleWeightSelects.body, ''),
@@ -6065,11 +6077,11 @@
         });
 
         roleHeadingPreviewNames.forEach((element) => {
-            element.textContent = previewRoleName(data.heading, data.headingFallback, 'sans-serif', true);
+            element.textContent = previewRoleName(data.heading, data.headingFallback, defaultRoleFallback('heading'), true);
         });
 
         roleBodyPreviewNames.forEach((element) => {
-            element.textContent = previewRoleName(data.body, data.bodyFallback, 'sans-serif', true);
+            element.textContent = previewRoleName(data.body, data.bodyFallback, defaultRoleFallback('body'), true);
         });
 
         roleMonospacePreviewNames.forEach((element) => {
@@ -6105,11 +6117,11 @@
         }
 
         if (roleHeadingFallback) {
-            roleHeadingFallback.value = state.headingFallback || 'sans-serif';
+            roleHeadingFallback.value = state.headingFallback || defaultRoleFallback('heading');
         }
 
         if (roleBodyFallback) {
-            roleBodyFallback.value = state.bodyFallback || 'sans-serif';
+            roleBodyFallback.value = state.bodyFallback || defaultRoleFallback('body');
         }
 
         if (monospaceRoleEnabled && roleMonospace) {
@@ -6999,6 +7011,8 @@
             const requestBody = {
                 heading: getElementValue(roleHeading, ''),
                 body: getElementValue(roleBody, ''),
+                heading_fallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
+                body_fallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
                 heading_weight: getElementValue(roleWeightSelects.heading, ''),
                 body_weight: getElementValue(roleWeightSelects.body, ''),
                 heading_axes: roleAxisFieldValues('heading'),
@@ -7007,6 +7021,7 @@
 
             if (monospaceRoleEnabled) {
                 requestBody.monospace = getElementValue(roleMonospace, '');
+                requestBody.monospace_fallback = getElementValue(roleMonospaceFallback, defaultRoleFallback('monospace'));
                 requestBody.monospace_weight = getElementValue(roleWeightSelects.monospace, '');
                 requestBody.monospace_axes = roleAxisFieldValues('monospace');
             }
@@ -7030,8 +7045,8 @@
                 heading: typeof roles.heading === 'string' ? roles.heading : getElementValue(roleHeading, ''),
                 body: typeof roles.body === 'string' ? roles.body : getElementValue(roleBody, ''),
                 monospace: typeof roles.monospace === 'string' ? roles.monospace : getElementValue(roleMonospace, ''),
-                headingFallback: typeof roles.heading_fallback === 'string' ? roles.heading_fallback : getElementValue(roleHeadingFallback, 'sans-serif'),
-                bodyFallback: typeof roles.body_fallback === 'string' ? roles.body_fallback : getElementValue(roleBodyFallback, 'sans-serif'),
+                headingFallback: typeof roles.heading_fallback === 'string' ? roles.heading_fallback : getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
+                bodyFallback: typeof roles.body_fallback === 'string' ? roles.body_fallback : getElementValue(roleBodyFallback, defaultRoleFallback('body')),
                 monospaceFallback: typeof roles.monospace_fallback === 'string' ? roles.monospace_fallback : getElementValue(roleMonospaceFallback, 'monospace'),
                 headingWeight: roles.heading_weight || '',
                 bodyWeight: roles.body_weight || '',
@@ -7061,8 +7076,8 @@
                 heading: typeof roles.heading === 'string' ? roles.heading : getElementValue(roleHeading, ''),
                 body: typeof roles.body === 'string' ? roles.body : getElementValue(roleBody, ''),
                 monospace: typeof roles.monospace === 'string' ? roles.monospace : getElementValue(roleMonospace, ''),
-                headingFallback: typeof roles.heading_fallback === 'string' ? roles.heading_fallback : getElementValue(roleHeadingFallback, 'sans-serif'),
-                bodyFallback: typeof roles.body_fallback === 'string' ? roles.body_fallback : getElementValue(roleBodyFallback, 'sans-serif'),
+                headingFallback: typeof roles.heading_fallback === 'string' ? roles.heading_fallback : getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
+                bodyFallback: typeof roles.body_fallback === 'string' ? roles.body_fallback : getElementValue(roleBodyFallback, defaultRoleFallback('body')),
                 monospaceFallback: typeof roles.monospace_fallback === 'string' ? roles.monospace_fallback : getElementValue(roleMonospaceFallback, 'monospace'),
                 headingWeight: roles.heading_weight || '',
                 bodyWeight: roles.body_weight || '',
@@ -10925,6 +10940,7 @@
 
     function outputVariableFlagInputs() {
         return Array.from(document.querySelectorAll(
+            'input[type="checkbox"][name="extended_variable_role_weight_vars_enabled"], ' +
             'input[type="checkbox"][name="extended_variable_weight_tokens_enabled"], ' +
             'input[type="checkbox"][name="extended_variable_role_aliases_enabled"], ' +
             'input[type="checkbox"][name="extended_variable_category_sans_enabled"], ' +
@@ -11035,6 +11051,26 @@
         outputAdvancedPanel.hidden = !expanded;
     }
 
+    function setOutputDetailGroupState(groupKey, visible) {
+        const group = outputDetailGroups[groupKey];
+
+        if (!group) {
+            return;
+        }
+
+        group.hidden = !visible;
+    }
+
+    function setOutputLayerMasterRowState(layerKey, visible) {
+        const row = outputLayerMasterRows[layerKey];
+
+        if (!row) {
+            return;
+        }
+
+        row.hidden = !visible;
+    }
+
     function syncOutputQuickModeUi() {
         syncOutputQuickModePreferenceFromState();
 
@@ -11043,7 +11079,30 @@
         outputQuickModeInputs.forEach((input) => {
             input.checked = input.value === mode;
         });
-        setOutputAdvancedPanelState(mode === 'custom');
+        if (mode === 'custom') {
+            if (outputMasterInputs.classes) {
+                outputMasterInputs.classes.checked = true;
+            }
+            if (outputMasterInputs.variables) {
+                outputMasterInputs.variables.checked = true;
+            }
+            setOutputPanelState(outputPanels.classes, true);
+            setOutputPanelState(outputPanels.variables, true);
+        }
+        setOutputAdvancedPanelState(mode === 'custom' || mode === 'classes' || mode === 'variables');
+        if (outputAdvancedPanel) {
+            outputAdvancedPanel.classList.toggle('is-classes-only', mode === 'classes');
+            outputAdvancedPanel.classList.toggle('is-variables-only', mode === 'variables');
+        }
+        setOutputDetailGroupState('sitewide', mode === 'custom');
+        setOutputDetailGroupState('classes', mode === 'custom' || mode === 'classes');
+        setOutputDetailGroupState('variables', mode === 'custom' || mode === 'variables');
+        setOutputLayerMasterRowState('classes', false);
+        setOutputLayerMasterRowState('variables', false);
+        if (outputRoleClassStylesOption) {
+            const classOutputEnabled = !!(outputMasterInputs.classes && outputMasterInputs.classes.checked);
+            outputRoleClassStylesOption.hidden = !(mode === 'classes' || (mode === 'custom' && classOutputEnabled));
+        }
         syncPillOptionUi();
     }
 
@@ -11078,7 +11137,7 @@
 
         variableFlags.forEach((input) => {
             if (!input.disabled) {
-                input.checked = enableVariableFlags;
+                input.checked = enableVariableFlags || (minimalMode && input.name === 'extended_variable_role_weight_vars_enabled');
             }
         });
 

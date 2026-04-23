@@ -1946,7 +1946,8 @@ function makeServiceGraph(): array
     $google = new GoogleFontsClient($settings);
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
     $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe);
-    $assets = new AssetService($storage, $catalog, $settings, new CssBuilder(), $planner, $log);
+    $cssBuilder = new CssBuilder();
+    $assets = new AssetService($storage, $catalog, $settings, $cssBuilder, $planner, $log);
     $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings);
     $localUpload = new LocalUploadService(
         $storage,
@@ -1992,7 +1993,7 @@ function makeServiceGraph(): array
         $assets,
         $library,
         $localUpload,
-        new CssBuilder(),
+        $cssBuilder,
         $adobe,
         $bunny,
         $bunnyImport,
@@ -2007,7 +2008,7 @@ function makeServiceGraph(): array
         $adminAccess
     );
     $rest = new RestController($controller, $adminAccess);
-    $runtime = new RuntimeService($planner, $assets, $adobe, $settings, $acssIntegration, $bricksIntegration, $oxygenIntegration);
+    $runtime = new RuntimeService($planner, $assets, $cssBuilder, $adobe, $settings, $acssIntegration, $bricksIntegration, $oxygenIntegration);
 
     return [
         'storage' => $storage,

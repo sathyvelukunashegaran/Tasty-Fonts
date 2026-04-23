@@ -132,6 +132,7 @@ final class AdminPageViewBuilder
             || !empty($context['class_output_category_mono_enabled']);
         $classOutputFamiliesEnabled = !array_key_exists('class_output_families_enabled', $context)
             || !empty($context['class_output_families_enabled']);
+        $classOutputRoleStylesEnabled = !empty($context['class_output_role_styles_enabled']);
         $minifyCssOutput = !empty($context['minify_css_output']);
         $roleUsageFontWeightEnabled = !empty($context['role_usage_font_weight_enabled']);
         $perVariantFontVariablesEnabled = !array_key_exists('per_variant_font_variables_enabled', $context)
@@ -290,7 +291,11 @@ final class AdminPageViewBuilder
             $extendedVariableOptions,
             $roleUsageFontWeightEnabled
         );
-        $advancedOutputControlsExpanded = $outputQuickMode === 'custom';
+        if ($outputQuickMode === 'custom') {
+            $classOutputEnabled = true;
+            $perVariantFontVariablesEnabled = true;
+        }
+        $advancedOutputControlsExpanded = in_array($outputQuickMode, ['variables', 'classes', 'custom'], true);
 
         $view = get_defined_vars();
         unset($view['context']);

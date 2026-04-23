@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added editable Heading, Body, and Monospace role fallback controls in Studio so fallback-only roles can use intentional stacks without selecting a library family.
+- Added an opt-in Role Weights in Classes setting so `.font-heading`, `.font-body`, `.font-monospace`, and related role alias classes can include role weights and variation settings.
+- Added Minimal-output role bridges for Etch frontends, Etch canvas data, and Gutenberg editor styles so variable-only runtime output can still apply live sitewide roles in those surfaces.
+- Added editor-parity mirroring for the live Automatic.css runtime stylesheet when sitewide roles are active, even if direct Tasty-to-ACSS font-setting sync is off.
+
+### Changed
+
+- Reworked Output Settings into focused Minimal, Variables only, Classes only, and Custom flows with grouped disclosure controls for class and variable subfeatures.
+- Changed default Heading and Body fallback-only stacks from `sans-serif` to `system-ui, sans-serif`, with a one-time migration for legacy fallback-only role defaults.
+- Kept Classes only generated CSS previews annotated with a display-only note explaining why the retained `:root` role variables still exist for integrations and editor parity.
+- Updated Automatic.css sync opt-out handling so explicitly disabled sync stays disabled and stale Tasty-managed ACSS font values can be cleared back to ACSS defaults when no restore backup exists.
+- Updated caching/font-loading and settings docs to describe Minimal output behavior, Etch role bridging, and Automatic.css editor-parity mirroring.
+
+### Fixed
+
+- Fixed fallback-only role output so generated role variables and sitewide usage rules still emit when Heading, Body, or Monospace use only a fallback stack.
+- Fixed role save/autosave requests to preserve fallback values for Heading, Body, and Monospace roles.
+- Fixed local admin asset version checks to clear PHP's stat cache before reading local file mtimes and hashes.
+- Fixed generated CSS panel display preparation so preformatted readable snippets are preserved instead of being reformatted unconditionally.
+
 ## [1.13.0-beta.3] - 2026-04-23
 
 ### Added

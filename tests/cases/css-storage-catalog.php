@@ -676,6 +676,51 @@ $tests['css_builder_keeps_role_font_weights_when_variable_output_is_disabled'] =
     assertNotContainsValue('--weight-400', $css, 'Disabling variable output should continue to suppress global weight tokens.');
 };
 
+$tests['css_builder_emits_role_usage_rules_for_fallback_only_roles_when_sitewide_output_is_enabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => '',
+        'body' => '',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'minimal_output_preset_enabled' => false,
+    ];
+
+    $css = $builder->build([], $roles, $settings, []);
+
+    assertContainsValue("body {\n  font-family: var(--font-body);\n  font-variation-settings: var(--font-body-settings);\n}", $css, 'Fallback-only body roles should still emit the live sitewide usage rule so generic stacks apply on the frontend.');
+    assertContainsValue("h1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading);\n  font-variation-settings: var(--font-heading-settings);\n}", $css, 'Fallback-only heading roles should still emit the live sitewide usage rule so generic stacks apply on the frontend.');
+};
+
+$tests['css_builder_emits_role_variables_for_fallback_only_roles_when_variable_output_is_enabled'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => '',
+        'body' => '',
+        'monospace' => '',
+        'heading_fallback' => 'system-ui, sans-serif',
+        'body_fallback' => 'Georgia, serif',
+        'monospace_fallback' => 'ui-monospace',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'minify_css_output' => false,
+        'minimal_output_preset_enabled' => false,
+        'monospace_role_enabled' => true,
+        'per_variant_font_variables_enabled' => true,
+    ];
+
+    $css = $builder->build([], $roles, $settings, []);
+
+    assertContainsValue('--font-heading: system-ui, sans-serif;', $css, 'Fallback-only heading roles should still define the heading role variable when variable output is enabled.');
+    assertContainsValue('--font-body: Georgia, serif;', $css, 'Fallback-only body roles should still define the body role variable when variable output is enabled.');
+    assertContainsValue('--font-monospace: ui-monospace;', $css, 'Fallback-only monospace roles should continue to define the monospace role variable when variable output is enabled.');
+};
+
 $tests['css_builder_infers_family_variable_fallbacks_from_catalog_category'] = static function (): void {
     $builder = new CssBuilder();
     $catalog = [

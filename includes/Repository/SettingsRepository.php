@@ -85,6 +85,7 @@ final class SettingsRepository
         'class_output_category_serif_enabled',
         'class_output_category_mono_enabled',
         'class_output_families_enabled',
+        'class_output_role_styles_enabled',
     ];
     private const MONOSPACE_CLASS_OUTPUT_FIELDS = [
         'class_output_role_monospace_enabled',
@@ -111,6 +112,7 @@ final class SettingsRepository
         'class_output_category_serif_enabled' => true,
         'class_output_category_mono_enabled' => true,
         'class_output_families_enabled' => true,
+        'class_output_role_styles_enabled' => false,
         'minify_css_output' => true,
         'role_usage_font_weight_enabled' => false,
         'per_variant_font_variables_enabled' => true,
@@ -140,11 +142,13 @@ final class SettingsRepository
         'admin_access_role_slugs' => [],
         'admin_access_user_ids' => [],
         'acss_font_role_sync_enabled' => null,
+        'acss_font_role_sync_opted_out' => false,
         'acss_font_role_sync_applied' => false,
         'acss_font_role_sync_previous_heading_font_family' => '',
         'acss_font_role_sync_previous_text_font_family' => '',
         'acss_font_role_sync_previous_heading_font_weight' => '',
         'acss_font_role_sync_previous_text_font_weight' => '',
+        'role_fallback_defaults_migrated' => false,
         'preview_sentence' => 'The quick brown fox jumps over the lazy dog. 1234567890',
         'adobe_enabled' => false,
         'adobe_project_id' => '',
@@ -167,8 +171,8 @@ final class SettingsRepository
         'google_api_key_checked_at',
     ];
     private const DEFAULT_ROLE_FALLBACKS = [
-        'heading_fallback' => 'sans-serif',
-        'body_fallback' => 'sans-serif',
+        'heading_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+        'body_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
         'monospace_fallback' => 'monospace',
     ];
     private const ROLE_WEIGHT_KEYS = ['heading_weight', 'body_weight', 'monospace_weight'];
@@ -202,6 +206,7 @@ final class SettingsRepository
         );
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
+        $settings['class_output_role_styles_enabled'] = !empty($settings['class_output_role_styles_enabled']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
         $settings['minimal_output_preset_enabled'] = $this->resolveMinimalOutputPresetEnabled($storedSettings, $settings);
         $settings['extended_variable_role_weight_vars_enabled'] = !empty($settings['extended_variable_role_weight_vars_enabled']);
@@ -236,7 +241,9 @@ final class SettingsRepository
             $settings
         );
         $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($settings['acss_font_role_sync_enabled'] ?? null);
+        $settings['acss_font_role_sync_opted_out'] = !empty($settings['acss_font_role_sync_opted_out']);
         $settings['acss_font_role_sync_applied'] = !empty($settings['acss_font_role_sync_applied']);
+        $settings['role_fallback_defaults_migrated'] = !empty($settings['role_fallback_defaults_migrated']);
         $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_family'] ?? '');
         $settings['acss_font_role_sync_previous_text_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_text_font_family'] ?? '');
         $settings['acss_font_role_sync_previous_heading_font_weight'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_weight'] ?? '');
@@ -341,6 +348,11 @@ final class SettingsRepository
 
         if (array_key_exists('role_usage_font_weight_enabled', $input)) {
             $settings['role_usage_font_weight_enabled'] = !empty($input['role_usage_font_weight_enabled']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('class_output_role_styles_enabled', $input)) {
+            $settings['class_output_role_styles_enabled'] = !empty($input['class_output_role_styles_enabled']);
             $settingsChanged = true;
         }
 
@@ -472,6 +484,11 @@ final class SettingsRepository
             $settingsChanged = true;
         }
 
+        if (array_key_exists('acss_font_role_sync_opted_out', $input)) {
+            $settings['acss_font_role_sync_opted_out'] = !empty($input['acss_font_role_sync_opted_out']);
+            $settingsChanged = true;
+        }
+
         if (isset($input['preview_sentence'])) {
             $settings['preview_sentence'] = $this->sanitizePreviewSentence($input['preview_sentence']);
             $settingsChanged = true;
@@ -517,6 +534,8 @@ final class SettingsRepository
      */
     public function getRoles(array $catalog): array
     {
+        $this->ensureLegacyRoleFallbackDefaultsMigrated($catalog);
+
         return $this->normalizeRoleSet(
             $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES),
             $catalog
@@ -589,6 +608,7 @@ final class SettingsRepository
      */
     public function getAppliedRoles(array $catalog): array
     {
+        $this->ensureLegacyRoleFallbackDefaultsMigrated($catalog);
         $settings = $this->getSettings();
         $storedAppliedRoles = is_array($settings['applied_roles'] ?? null)
             ? $settings['applied_roles']
@@ -795,6 +815,7 @@ final class SettingsRepository
         $settings['bricks_disable_google_fonts_enabled'] = false;
         $settings['oxygen_integration_enabled'] = null;
         $settings['acss_font_role_sync_enabled'] = null;
+        $settings['acss_font_role_sync_opted_out'] = false;
         $settings['acss_font_role_sync_applied'] = false;
         $settings['acss_font_role_sync_previous_heading_font_family'] = '';
         $settings['acss_font_role_sync_previous_text_font_family'] = '';
@@ -1040,6 +1061,7 @@ final class SettingsRepository
         $settings = $this->withoutGoogleApiKeyData($settings);
         $hasAdminAccessCustomEnabled = array_key_exists('admin_access_custom_enabled', $settings);
         $settings = $this->normalizeInputMap(wp_parse_args($settings, self::DEFAULT_SETTINGS));
+        $settings['acss_font_role_sync_opted_out'] = false;
         $settings['acss_font_role_sync_applied'] = false;
         $settings['acss_font_role_sync_previous_heading_font_family'] = '';
         $settings['acss_font_role_sync_previous_text_font_family'] = '';
@@ -1078,6 +1100,7 @@ final class SettingsRepository
         );
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
+        $settings['class_output_role_styles_enabled'] = !empty($settings['class_output_role_styles_enabled']);
         $settings['per_variant_font_variables_enabled'] = !empty($settings['per_variant_font_variables_enabled']);
         $settings['minimal_output_preset_enabled'] = !empty($settings['minimal_output_preset_enabled']);
         $settings['extended_variable_role_weight_vars_enabled'] = !empty($settings['extended_variable_role_weight_vars_enabled']);
@@ -1112,6 +1135,7 @@ final class SettingsRepository
         );
         $settings['admin_access_user_ids'] = [];
         $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($settings['acss_font_role_sync_enabled'] ?? null);
+        $settings['acss_font_role_sync_opted_out'] = !empty($settings['acss_font_role_sync_opted_out']);
         $settings['acss_font_role_sync_applied'] = false;
         $settings['acss_font_role_sync_previous_heading_font_family'] = '';
         $settings['acss_font_role_sync_previous_text_font_family'] = '';
@@ -1166,8 +1190,8 @@ final class SettingsRepository
         $normalizedRoles['heading_delivery_id'] = '';
         $normalizedRoles['body_delivery_id'] = '';
         $normalizedRoles['monospace_delivery_id'] = '';
-        $normalizedRoles['heading_fallback'] = $this->normalizeRoleFallback($normalizedRoles['heading_fallback'] ?? '', 'sans-serif');
-        $normalizedRoles['body_fallback'] = $this->normalizeRoleFallback($normalizedRoles['body_fallback'] ?? '', 'sans-serif');
+        $normalizedRoles['heading_fallback'] = $this->normalizeRoleFallback($normalizedRoles['heading_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $normalizedRoles['body_fallback'] = $this->normalizeRoleFallback($normalizedRoles['body_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
         $normalizedRoles['monospace_fallback'] = $this->normalizeRoleFallback($normalizedRoles['monospace_fallback'] ?? '', 'monospace');
         $normalizedRoles['heading_weight'] = $this->normalizeRoleWeight($normalizedRoles['heading_weight'] ?? '');
         $normalizedRoles['body_weight'] = $this->normalizeRoleWeight($normalizedRoles['body_weight'] ?? '');
@@ -1257,6 +1281,68 @@ final class SettingsRepository
         }
 
         return FontUtils::sanitizeFallback($rawValue);
+    }
+
+    /**
+     * @param array<int|string, mixed> $catalog
+     */
+    private function ensureLegacyRoleFallbackDefaultsMigrated(array $catalog): void
+    {
+        $settings = $this->getSettings();
+
+        if (!empty($settings['role_fallback_defaults_migrated'])) {
+            return;
+        }
+
+        $draftRoles = $this->normalizeRoleSet(
+            $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES),
+            $catalog
+        );
+        $draftChanged = false;
+        $draftRoles = $this->migrateLegacyFallbackOnlyRoleDefaults($draftRoles, $draftChanged);
+
+        $storedAppliedRoles = is_array($settings['applied_roles'] ?? null)
+            ? $settings['applied_roles']
+            : [];
+        $hasStoredAppliedRoles = $storedAppliedRoles !== [];
+        $appliedRoles = $hasStoredAppliedRoles
+            ? $this->normalizeRoleSet($this->normalizeInputMap($storedAppliedRoles), $catalog)
+            : $draftRoles;
+        $appliedChanged = false;
+        $appliedRoles = $this->migrateLegacyFallbackOnlyRoleDefaults($appliedRoles, $appliedChanged);
+
+        if ($draftChanged) {
+            update_option(self::OPTION_ROLES, $draftRoles, false);
+        }
+
+        if ($hasStoredAppliedRoles) {
+            $settings['applied_roles'] = $appliedRoles;
+        }
+
+        $settings['role_fallback_defaults_migrated'] = true;
+        $this->persistSettings($settings);
+    }
+
+    /**
+     * @param RoleSet $roles
+     * @return RoleSet
+     */
+    private function migrateLegacyFallbackOnlyRoleDefaults(array $roles, bool &$changed): array
+    {
+        foreach (['heading', 'body'] as $roleKey) {
+            $fallbackKey = $roleKey . '_fallback';
+            $familyName = trim($roles[$roleKey]);
+            $fallback = trim($roles[$fallbackKey]);
+
+            if ($familyName !== '' || strtolower($fallback) !== 'sans-serif') {
+                continue;
+            }
+
+            $roles[$fallbackKey] = FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
+            $changed = true;
+        }
+
+        return $roles;
     }
 
     private function sanitizeTextValue(mixed $value): string
@@ -1492,6 +1578,7 @@ final class SettingsRepository
         $settings['role_usage_font_weight_enabled'] = false;
         $settings['per_variant_font_variables_enabled'] = true;
         $settings['extended_variable_role_weight_vars_enabled'] = true;
+        $settings['class_output_role_styles_enabled'] = false;
 
         return $settings;
     }

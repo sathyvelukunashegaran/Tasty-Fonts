@@ -689,7 +689,8 @@ $tests['admin_page_renderer_renders_extended_variable_submenu_controls'] = stati
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('Variable Controls', $output, 'Output Settings should render a nested submenu for variable controls.');
+    assertContainsValue('CSS Variable Groups', $output, 'Output Settings should render grouped variable controls.');
+    assertContainsValue('Role Weight Variables', $output, 'The submenu should include the role weight variable group.');
     assertContainsValue('Global Weight Tokens', $output, 'The submenu should include a granular weight-token toggle.');
     assertContainsValue('Role Alias Variables', $output, 'The submenu should include a granular role-alias toggle.');
     assertContainsValue('Sans Alias', $output, 'The submenu should include a granular sans-category toggle.');
@@ -802,9 +803,119 @@ $tests['admin_page_renderer_renders_unified_output_controls'] = static function 
     assertContainsValue('name="output_quick_mode_preference"', $output, 'The output quick-mode preference should submit through the shared settings form.');
     assertContainsValue('data-output-quick-mode-notice', $output, 'The output quick-mode section should render the zero-output guard notice.');
     assertContainsValue('name="class_output_enabled"', $output, 'The class output master toggle should submit through the shared settings form.');
-    assertContainsValue('Family Classes', $output, 'Output Settings should group the per-family class toggle under its own submenu heading.');
+    assertContainsValue('data-output-detail-group="classes"', $output, 'Output Settings should render the class output detail group.');
+    assertContainsValue('data-output-detail-group="variables"', $output, 'Output Settings should render the variable output detail group.');
+    assertContainsValue('data-output-detail-group="sitewide"', $output, 'Output Settings should render the sitewide output detail group.');
+    assertContainsValue('Utility Class Groups', $output, 'Output Settings should render grouped utility class controls.');
+    assertContainsValue('Family Classes', $output, 'Output Settings should group the per-family class toggle under its own disclosure.');
     assertContainsValue('name="class_output_families_enabled"', $output, 'The granular family class toggle should submit through the shared settings form.');
-    assertContainsValue('Emit Font Utility Classes', $output, 'Output Settings should render the class output master toggle.');
+    assertContainsValue('name="class_output_role_styles_enabled"', $output, 'The role class style toggle should submit through the shared settings form.');
+    assertContainsValue('Role Styling', $output, 'Output Settings should surface the shared role class styling section.');
+    assertContainsValue('Role Weights in Classes', $output, 'Output Settings should explain the opt-in role class styling toggle.');
+    assertContainsValue('Different from', $output, 'Output Settings should explain how role class styling differs from sitewide role weight output.');
+    assertContainsValue('Sitewide Role Weights', $output, 'Output Settings should render the sitewide role weight setting.');
+    assertContainsValue('Utility Classes', $output, 'Output Settings should render the class output master toggle.');
+    assertContainsValue('CSS Variables', $output, 'Output Settings should render the variable output master toggle.');
+};
+
+$tests['admin_page_renderer_scopes_output_groups_to_quick_mode'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $render = static function (array $overrides) use ($renderer): string {
+        ob_start();
+        try {
+            $renderer->renderPage($overrides + [
+                'storage' => ['root' => '/tmp/uploads/fonts'],
+                'catalog' => [],
+                'available_families' => [],
+                'roles' => [],
+                'logs' => [],
+                'activity_actor_options' => [],
+                'family_fallbacks' => [],
+                'family_font_displays' => [],
+                'family_font_display_options' => [],
+                'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+                'preview_size' => 32,
+                'font_display' => 'optional',
+                'font_display_options' => [],
+                'minify_css_output' => true,
+                'preload_primary_fonts' => true,
+                'remote_connection_hints' => true,
+                'block_editor_font_library_sync_enabled' => false,
+                'training_wheels_off' => false,
+                'delete_uploaded_files_on_uninstall' => false,
+                'diagnostic_items' => [],
+                'overview_metrics' => [],
+                'output_panels' => [],
+                'generated_css_panel' => [],
+                'preview_panels' => [],
+                'local_environment_notice' => [],
+                'toasts' => [],
+                'apply_everywhere' => false,
+                'role_deployment' => [],
+            ]);
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            throw $e;
+        }
+
+        return (string) ob_get_clean();
+    };
+
+    $variablesOutput = $render([
+        'output_quick_mode_preference' => 'variables',
+        'class_output_enabled' => false,
+        'per_variant_font_variables_enabled' => true,
+        'minimal_output_preset_enabled' => false,
+        'extended_variable_role_weight_vars_enabled' => true,
+        'extended_variable_weight_tokens_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_sans_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'role_usage_font_weight_enabled' => false,
+    ]);
+
+    assertSameValue(1, preg_match('/tasty-fonts-output-settings-advanced-panel[^"]*is-variables-only/', $variablesOutput), 'Variables-only should render the focused variables layout before JS runs.');
+    assertSameValue(1, preg_match('/data-output-detail-group="variables"(?![^>]*hidden)/', $variablesOutput), 'Variables-only should show the variables group.');
+    assertSameValue(1, preg_match('/data-output-detail-group="classes"[^>]*hidden/', $variablesOutput), 'Variables-only should hide the classes group.');
+    assertSameValue(1, preg_match('/data-output-detail-group="sitewide"[^>]*hidden/', $variablesOutput), 'Variables-only should hide the sitewide group.');
+    assertSameValue(1, preg_match('/<label[^>]*data-output-layer-master-row="variables"[^>]*hidden[^>]*>.*?CSS Variables/s', $variablesOutput), 'Variables-only should hide the redundant variable layer master toggle.');
+
+    $classesOutput = $render([
+        'output_quick_mode_preference' => 'classes',
+        'class_output_enabled' => true,
+        'class_output_role_heading_enabled' => true,
+        'class_output_role_body_enabled' => true,
+        'class_output_role_alias_interface_enabled' => true,
+        'class_output_role_alias_ui_enabled' => true,
+        'class_output_category_sans_enabled' => true,
+        'class_output_category_serif_enabled' => true,
+        'class_output_families_enabled' => true,
+        'per_variant_font_variables_enabled' => false,
+        'minimal_output_preset_enabled' => false,
+        'role_usage_font_weight_enabled' => false,
+    ]);
+
+    assertSameValue(1, preg_match('/tasty-fonts-output-settings-advanced-panel[^"]*is-classes-only/', $classesOutput), 'Classes-only should render the focused classes layout before JS runs.');
+    assertSameValue(1, preg_match('/data-output-detail-group="classes"(?![^>]*hidden)/', $classesOutput), 'Classes-only should show the classes group.');
+    assertSameValue(1, preg_match('/data-output-detail-group="variables"[^>]*hidden/', $classesOutput), 'Classes-only should hide the variables group.');
+    assertSameValue(1, preg_match('/data-output-detail-group="sitewide"[^>]*hidden/', $classesOutput), 'Classes-only should hide the sitewide group.');
+    assertSameValue(1, preg_match('/<label[^>]*data-output-layer-master-row="classes"[^>]*hidden[^>]*>.*?Utility Classes/s', $classesOutput), 'Classes-only should hide the redundant class layer master toggle.');
+
+    $customOutput = $render([
+        'output_quick_mode_preference' => 'custom',
+        'class_output_enabled' => true,
+        'per_variant_font_variables_enabled' => true,
+        'minimal_output_preset_enabled' => false,
+        'role_usage_font_weight_enabled' => true,
+    ]);
+
+    assertSameValue(1, preg_match('/data-output-detail-group="sitewide"(?![^>]*hidden)/', $customOutput), 'Custom should show the sitewide group.');
+    assertSameValue(1, preg_match('/data-output-detail-group="classes"(?![^>]*hidden)/', $customOutput), 'Custom should show the classes group.');
+    assertSameValue(1, preg_match('/data-output-detail-group="variables"(?![^>]*hidden)/', $customOutput), 'Custom should show the variables group.');
+    assertSameValue(1, preg_match('/<label[^>]*data-output-layer-master-row="classes"[^>]*hidden[^>]*>.*?Utility Classes/s', $customOutput), 'Custom should hide the class layer master toggle because the grouped options carry the visible choice.');
+    assertSameValue(1, preg_match('/<label[^>]*data-output-layer-master-row="variables"[^>]*hidden[^>]*>.*?CSS Variables/s', $customOutput), 'Custom should hide the variable layer master toggle because the grouped options carry the visible choice.');
 };
 
 $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_sets'] = static function (): void {
@@ -887,6 +998,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             [
                 'enabled' => true,
                 'minimal' => false,
+                'role_weight_vars' => true,
                 'weight_tokens' => true,
                 'role_aliases' => true,
                 'category_sans' => true,
@@ -896,6 +1008,35 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
         ]
     );
     assertSameValue('variables', $variablesMode, 'Quick mode should resolve to variables only when the full preset baseline remains intact.');
+
+    $customVariablesMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            'variables',
+            [
+                'enabled' => false,
+                'role_heading' => false,
+                'role_body' => false,
+                'role_alias_interface' => false,
+                'role_alias_ui' => false,
+                'category_sans' => false,
+                'category_serif' => false,
+                'families' => false,
+            ],
+            [
+                'enabled' => true,
+                'minimal' => false,
+                'role_weight_vars' => false,
+                'weight_tokens' => true,
+                'role_aliases' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+            ],
+            false,
+        ]
+    );
+    assertSameValue('custom', $customVariablesMode, 'Quick mode should resolve to custom when a variables-only subgroup is disabled.');
 
     $classesMode = invokePrivateMethod(
         $builder,
@@ -924,6 +1065,35 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
         ]
     );
     assertSameValue('classes', $classesMode, 'Quick mode should resolve to classes only when the full preset baseline remains intact.');
+
+    $styledClassesMode = invokePrivateMethod(
+        $builder,
+        'deriveOutputQuickMode',
+        [
+            '',
+            [
+                'enabled' => true,
+                'role_heading' => true,
+                'role_body' => true,
+                'role_alias_interface' => true,
+                'role_alias_ui' => true,
+                'category_sans' => true,
+                'category_serif' => true,
+                'families' => true,
+                'role_styles' => true,
+            ],
+            [
+                'enabled' => false,
+                'minimal' => false,
+                'weight_tokens' => false,
+                'role_aliases' => false,
+                'category_sans' => false,
+                'category_serif' => false,
+            ],
+            false,
+        ]
+    );
+    assertSameValue('classes', $styledClassesMode, 'Quick mode should stay classes only when the preset-specific role class styling option is enabled.');
 
     $customMode = invokePrivateMethod(
         $builder,
@@ -1094,6 +1264,46 @@ $tests['admin_page_view_builder_prefers_saved_custom_output_quick_mode_on_reload
 
     assertSameValue('custom', (string) ($view['outputQuickMode'] ?? ''), 'A saved custom quick-mode preference should remain selected on reload even when the current booleans match variables-only.');
     assertSameValue(true, !empty($view['advancedOutputControlsExpanded']), 'A saved custom quick-mode preference should keep the advanced output controls expanded on reload.');
+    assertSameValue(true, !empty($view['classOutputEnabled']), 'Custom should treat the class layer as enabled because the visible grouped controls now own the choice.');
+    assertSameValue(true, !empty($view['perVariantFontVariablesEnabled']), 'Custom should treat the variable layer as enabled because the visible grouped controls now own the choice.');
+
+    $variablesView = $builder->build([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'output_quick_mode_preference' => 'variables',
+        'class_output_enabled' => false,
+        'per_variant_font_variables_enabled' => true,
+        'minimal_output_preset_enabled' => false,
+        'extended_variable_role_weight_vars_enabled' => true,
+        'extended_variable_weight_tokens_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_sans_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'role_usage_font_weight_enabled' => false,
+    ]);
+    assertSameValue('variables', (string) ($variablesView['outputQuickMode'] ?? ''), 'A saved variables-only quick-mode preference should remain selected when its grouped controls match.');
+    assertSameValue(true, !empty($variablesView['advancedOutputControlsExpanded']), 'Variables-only should expand its grouped output controls on initial render.');
+
+    $classesView = $builder->build([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+        'output_quick_mode_preference' => 'classes',
+        'class_output_enabled' => true,
+        'class_output_role_heading_enabled' => true,
+        'class_output_role_body_enabled' => true,
+        'class_output_role_alias_interface_enabled' => true,
+        'class_output_role_alias_ui_enabled' => true,
+        'class_output_category_sans_enabled' => true,
+        'class_output_category_serif_enabled' => true,
+        'class_output_families_enabled' => true,
+        'per_variant_font_variables_enabled' => false,
+        'minimal_output_preset_enabled' => false,
+        'role_usage_font_weight_enabled' => false,
+    ]);
+    assertSameValue('classes', (string) ($classesView['outputQuickMode'] ?? ''), 'A saved classes-only quick-mode preference should remain selected when its grouped controls match.');
+    assertSameValue(true, !empty($classesView['advancedOutputControlsExpanded']), 'Classes-only should expand its grouped output controls on initial render.');
 };
 
 $tests['admin_page_renderer_balances_div_wrappers'] = static function (): void {
@@ -2559,7 +2769,7 @@ $tests['admin_page_renderer_keeps_dashboard_titles_and_buttons_in_title_case'] =
         'Minify Generated CSS',
         'Preload Primary Heading and Body Fonts',
         'Remote Connection Hints',
-        'Emit Font Utility Classes',
+        'Utility Classes',
         'Role Classes',
         'Delete Uploaded Fonts on Uninstall',
         'Your Library Is Empty',
@@ -4547,13 +4757,14 @@ $tests['admin_page_renderer_allows_fallback_only_heading_and_body_roles'] = stat
     assertContainsValue('name="tasty_fonts_body_weight"', $output, 'The role form should render the body weight selector shell.');
     assertContainsValue('name="tasty_fonts_heading_font" id="tasty_fonts_heading_font"', $output, 'The heading family selector should keep its expected id.');
     assertContainsValue('name="tasty_fonts_body_font" id="tasty_fonts_body_font"', $output, 'The body family selector should keep its expected id.');
+    assertContainsValue('name="tasty_fonts_heading_fallback"', $output, 'The role form should render the heading fallback combobox for fallback-only roles.');
+    assertContainsValue('name="tasty_fonts_body_fallback"', $output, 'The role form should render the body fallback combobox for fallback-only roles.');
     assertContainsValue('data-clear-target="tasty_fonts_heading_font"', $output, 'The heading family selector should render a clear button.');
+    assertContainsValue('data-clear-target="tasty_fonts_heading_fallback"', $output, 'The heading fallback combobox should render a clear button.');
     assertContainsValue('data-role-weight-editor="heading"', $output, 'The role form should render the heading weight editor shell.');
     assertContainsValue('data-role-weight-editor="body"', $output, 'The role form should render the body weight editor shell.');
     assertNotContainsValue('data-role-delivery-select="heading"', $output, 'The role form should not render a heading delivery selector once delivery is locked to the library.');
     assertNotContainsValue('data-role-delivery-select="body"', $output, 'The role form should not render a body delivery selector once delivery is locked to the library.');
-    assertNotContainsValue('name="tasty_fonts_heading_fallback"', $output, 'The role form should no longer render a heading fallback field once fallback management lives in the library.');
-    assertNotContainsValue('name="tasty_fonts_body_fallback"', $output, 'The role form should no longer render a body fallback field once fallback management lives in the library.');
     assertSameValue(true, substr_count($output, 'Use Fallback Only') >= 3, 'Heading, body, and preview selectors should all expose fallback-only choices.');
     assertContainsValue('Fallback only (sans-serif)', $output, 'Fallback-only heading selections should render a readable preview label.');
     assertContainsValue('Fallback only (serif)', $output, 'Fallback-only body selections should render a readable preview label.');

@@ -634,6 +634,7 @@ final class SiteTransferService
             $settings['applied_roles']
         );
 
+        $settings['acss_font_role_sync_opted_out'] = false;
         $settings['acss_font_role_sync_applied'] = false;
         $settings['acss_font_role_sync_previous_heading_font_family'] = '';
         $settings['acss_font_role_sync_previous_text_font_family'] = '';
@@ -990,8 +991,8 @@ final class SiteTransferService
             'heading_delivery_id' => $this->scalarStringValue($roles, 'heading_delivery_id'),
             'body_delivery_id' => $this->scalarStringValue($roles, 'body_delivery_id'),
             'monospace_delivery_id' => $this->scalarStringValue($roles, 'monospace_delivery_id'),
-            'heading_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'heading_fallback', 'sans-serif')),
-            'body_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'body_fallback', 'sans-serif')),
+            'heading_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'heading_fallback', FontUtils::DEFAULT_ROLE_SANS_FALLBACK)),
+            'body_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'body_fallback', FontUtils::DEFAULT_ROLE_SANS_FALLBACK)),
             'monospace_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'monospace_fallback', 'monospace')),
             'heading_weight' => $this->scalarStringValue($roles, 'heading_weight'),
             'body_weight' => $this->scalarStringValue($roles, 'body_weight'),

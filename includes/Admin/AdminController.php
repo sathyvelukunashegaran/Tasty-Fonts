@@ -668,6 +668,15 @@ final class AdminController
         $clearGoogleKey = !empty($submittedValues['tasty_fonts_clear_google_api_key']);
         $settingsInput = $this->buildSettingsSaveInput($submittedValues);
         $settingsInput = $this->preserveUnavailableIntegrationSettings($settingsInput);
+
+        if (array_key_exists('acss_font_role_sync_enabled', $settingsInput)) {
+            $settingsInput['acss_font_role_sync_opted_out'] = in_array(
+                $settingsInput['acss_font_role_sync_enabled'] ?? null,
+                [false, 0, '0'],
+                true
+            );
+        }
+
         $settingsInput = $this->applyBricksThemeStyleActions($settingsInput, $submittedValues);
 
         if (!empty($submittedValues['bricks_reset_integration'])) {
@@ -1509,10 +1518,10 @@ final class AdminController
                         'heading' => $this->getPostedText('tasty_fonts_heading_font'),
                         'body' => $this->getPostedText('tasty_fonts_body_font'),
                         'heading_fallback' => isset($_POST['tasty_fonts_heading_fallback'])
-                            ? $this->getPostedFallback('tasty_fonts_heading_fallback')
+                            ? $this->getPostedFallback('tasty_fonts_heading_fallback', FontUtils::DEFAULT_ROLE_SANS_FALLBACK)
                             : null,
                         'body_fallback' => isset($_POST['tasty_fonts_body_fallback'])
-                            ? $this->getPostedFallback('tasty_fonts_body_fallback')
+                            ? $this->getPostedFallback('tasty_fonts_body_fallback', FontUtils::DEFAULT_ROLE_SANS_FALLBACK)
                             : null,
                         'heading_weight' => isset($_POST['tasty_fonts_heading_weight']) ? $this->getPostedText('tasty_fonts_heading_weight') : null,
                         'body_weight' => isset($_POST['tasty_fonts_body_weight']) ? $this->getPostedText('tasty_fonts_body_weight') : null,
@@ -1751,8 +1760,13 @@ final class AdminController
         $toolsRenderer = new ToolsSectionRenderer($this->storage);
         $panelValue = $this->stringValue($panel, 'value');
 
-        $panel['display_value'] = $panelValue;
-        $panel['readable_display_value'] = $toolsRenderer->formatSnippetForDisplay($panelValue);
+        if (!array_key_exists('display_value', $panel)) {
+            $panel['display_value'] = $panelValue;
+        }
+
+        if (!array_key_exists('readable_display_value', $panel)) {
+            $panel['readable_display_value'] = $toolsRenderer->formatSnippetForDisplay($panelValue);
+        }
 
         return $panel;
     }
@@ -2037,6 +2051,7 @@ final class AdminController
                 'class_output_category_serif_enabled',
                 'class_output_category_mono_enabled',
                 'class_output_families_enabled',
+                'class_output_role_styles_enabled',
             ] as $field
         ) {
             if (!empty($before[$field]) !== !empty($after[$field])) {
@@ -2279,6 +2294,7 @@ final class AdminController
                 'class_output_category_serif_enabled',
                 'class_output_category_mono_enabled',
                 'class_output_families_enabled',
+                'class_output_role_styles_enabled',
                 'role_usage_font_weight_enabled',
                 'per_variant_font_variables_enabled',
                 'extended_variable_role_weight_vars_enabled',
@@ -2301,6 +2317,7 @@ final class AdminController
     {
         if ($relativePath !== '' && SiteEnvironment::isLikelyLocalEnvironment(rest_url(''), SiteEnvironment::currentEnvironmentType())) {
             $assetPath = TASTY_FONTS_DIR . ltrim($relativePath, '/');
+            clearstatcache(true, $assetPath);
             $modifiedAt = is_readable($assetPath) ? filemtime($assetPath) : false;
             $contentHash = is_readable($assetPath) ? md5_file($assetPath) : false;
 
@@ -2539,8 +2556,8 @@ final class AdminController
             'heading_delivery_id' => '',
             'body_delivery_id' => '',
             'monospace_delivery_id' => '',
-            'heading_fallback' => 'sans-serif',
-            'body_fallback' => 'sans-serif',
+            'heading_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+            'body_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
             'monospace_fallback' => 'monospace',
             'heading_weight' => '',
             'body_weight' => '',
@@ -2562,8 +2579,8 @@ final class AdminController
 
         foreach (
             [
-                'heading_fallback' => 'sans-serif',
-                'body_fallback' => 'sans-serif',
+                'heading_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+                'body_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
                 'monospace_fallback' => 'monospace',
             ] as $roleKey => $defaultFallback
         ) {
@@ -3481,7 +3498,8 @@ final class AdminController
      */
     private function shouldRecoverLegacyAcssDetectionState(array $settings, array $current): bool
     {
-        return ($settings['acss_font_role_sync_enabled'] ?? null) === false
+        return empty($settings['acss_font_role_sync_opted_out'])
+            && ($settings['acss_font_role_sync_enabled'] ?? null) === false
             && empty($settings['acss_font_role_sync_applied'])
             && trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family')) === ''
             && trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family')) === ''
@@ -3573,7 +3591,11 @@ final class AdminController
         $enabled = ($savedSettings['acss_font_role_sync_enabled'] ?? null) === true;
         $wasEnabled = ($previousSettings['acss_font_role_sync_enabled'] ?? null) === true;
 
-        if (!$enabled && !$wasEnabled) {
+        if (
+            !$enabled
+            && !$wasEnabled
+            && !$this->shouldRestoreAcssDefaultsWhenDisabled($savedSettings)
+        ) {
             return '';
         }
 
@@ -3888,6 +3910,7 @@ final class AdminController
         $enabled = ($settings['acss_font_role_sync_enabled'] ?? null) === true;
         $applied = !empty($settings['acss_font_role_sync_applied']);
         $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
+        $shouldRestoreDefaults = !$enabled && $this->shouldRestoreAcssDefaultsWhenDisabled($settings);
 
         if ($enabled && empty($settings['extended_variable_role_weight_vars_enabled'])) {
             $settings = $this->settings->saveSettings(['extended_variable_role_weight_vars_enabled' => '1']);
@@ -3896,6 +3919,12 @@ final class AdminController
         if (!$enabled) {
             if ($applied && $this->acssIntegration->isAvailable()) {
                 $restore = $this->restoreAcssIntegration($settings);
+
+                if (is_wp_error($restore)) {
+                    return $restore;
+                }
+            } elseif ($shouldRestoreDefaults) {
+                $restore = $this->restoreAcssDefaults();
 
                 if (is_wp_error($restore)) {
                     return $restore;
@@ -3913,7 +3942,9 @@ final class AdminController
 
             return $applied
                 ? __('Previous Automatic.css font settings were restored.', 'tasty-fonts')
-                : __('Automatic.css sync is off. Existing Automatic.css settings were left unchanged.', 'tasty-fonts');
+                : ($shouldRestoreDefaults
+                    ? __('Automatic.css sync is off. Tasty-managed font settings were cleared so Automatic.css can use its defaults again.', 'tasty-fonts')
+                    : __('Automatic.css sync is off. Existing Automatic.css settings were left unchanged.', 'tasty-fonts'));
         }
 
         if (!$this->acssIntegration->isAvailable()) {
@@ -4030,6 +4061,39 @@ final class AdminController
             $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
             $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
         );
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function shouldRestoreAcssDefaultsWhenDisabled(array $settings): bool
+    {
+        if ($this->hasAcssBackupValues($settings) || !$this->acssIntegration->isAvailable()) {
+            return false;
+        }
+
+        $state = $this->acssIntegration->readState(!empty($settings['auto_apply_roles']), false, false);
+
+        return !empty($state['synced']);
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function hasAcssBackupValues(array $settings): bool
+    {
+        return trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family')) !== ''
+            || trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family')) !== ''
+            || trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight')) !== ''
+            || trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')) !== '';
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    private function restoreAcssDefaults(): array|WP_Error
+    {
+        return $this->acssIntegration->restoreDefaultFontSettings();
     }
 
     private function buildFamilyFontDisplaySavedMessage(string $family, string $savedDisplay, string $effectiveDisplay): string

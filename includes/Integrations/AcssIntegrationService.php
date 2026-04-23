@@ -108,6 +108,30 @@ final class AcssIntegrationService
     }
 
     /**
+     * Clear Tasty-managed Automatic.css font settings so Automatic.css can fall back to its defaults.
+     *
+     * @return FontSettings|WP_Error
+     */
+    public function restoreDefaultFontSettings(): array|WP_Error
+    {
+        if (!$this->isAvailable()) {
+            return new WP_Error(
+                'tasty_fonts_acss_unavailable',
+                __('Automatic.css is not active, so its default font settings could not be restored.', 'tasty-fonts')
+            );
+        }
+
+        return $this->updateSettings(
+            [
+                self::OPTION_HEADING_FONT_FAMILY => '',
+                self::OPTION_TEXT_FONT_FAMILY => '',
+                self::OPTION_HEADING_FONT_WEIGHT => '',
+                self::OPTION_TEXT_FONT_WEIGHT => '',
+            ]
+        );
+    }
+
+    /**
      * @return array<string, string>
      */
     public function desiredSettings(): array

@@ -202,12 +202,14 @@ The output preset controls how much CSS the plugin generates. Less CSS = smaller
 
 | Preset | What it generates | Best for |
 |---|---|---|
-| `Minimal` | Only `--font-heading` and `--font-body` CSS variables | Most themes and builders that only need role variables |
+| `Minimal` | Core role variables, plus a small Etch frontend bridge when Etch is active | Most themes and builders that only need role variables |
 | `Variables only` | Full variable surface (roles, families, categories, aliases, weight tokens) | Builder/theme setups that use CSS variables extensively |
 | `Classes only` | Utility classes without the variable surface | Setups that apply font roles via class names instead of variables |
 | `Custom` | Exactly what you configure | Advanced setups that need precise control |
 
 **Performance tip:** start with `Minimal`. Switch to `Variables only` or `Custom` only if your theme or builder explicitly needs the additional variables or classes.
+
+When sitewide roles are active on a site that also uses Automatic.css, Tasty mirrors the live ACSS runtime stylesheet into Gutenberg and supported builder canvases so editor previews stay closer to the frontend cascade. This editor-parity mirror reuses the existing ACSS runtime file rather than generating a broader Tasty-only layout layer.
 
 ---
 

@@ -698,6 +698,19 @@ $tests['admin_controller_detects_which_setting_changes_require_asset_refresh'] =
         ),
         'Changing class output settings should trigger a generated CSS refresh because emitted CSS changes.'
     );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresAssetRefresh',
+            [
+                ['class_output_enabled' => true, 'class_output_role_styles_enabled' => false, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+                ['class_output_enabled' => true, 'class_output_role_styles_enabled' => true, 'font_display' => 'swap', 'css_delivery_mode' => 'file'],
+            ]
+        ),
+        'Toggling role class styles should trigger a generated CSS refresh because emitted class CSS changes.'
+    );
 };
 
 $tests['admin_controller_detects_which_setting_changes_require_reload'] = static function (): void {
@@ -1112,6 +1125,7 @@ $tests['admin_controller_exposes_class_output_settings_in_page_context'] = stati
         'class_output_category_serif_enabled' => '0',
         'class_output_category_mono_enabled' => '0',
         'class_output_families_enabled' => '1',
+        'class_output_role_styles_enabled' => '1',
     ]);
 
     $context = invokePrivateMethod($services['controller'], 'buildPageContext', []);
@@ -1120,6 +1134,7 @@ $tests['admin_controller_exposes_class_output_settings_in_page_context'] = stati
     assertSameValue(false, !empty($context['class_output_role_heading_enabled']), 'Page context should expose granular role class toggles.');
     assertSameValue(false, !empty($context['class_output_category_serif_enabled']), 'Page context should expose granular category class toggles.');
     assertSameValue(true, !empty($context['class_output_families_enabled']), 'Page context should expose the family class toggle.');
+    assertSameValue(true, !empty($context['class_output_role_styles_enabled']), 'Page context should expose the role class style toggle.');
 };
 
 $tests['admin_controller_exposes_css_delivery_mode_in_page_context'] = static function (): void {
@@ -1393,6 +1408,94 @@ $tests['admin_controller_marks_top_level_generated_css_panel_unavailable_when_si
         (string) ($panel['value'] ?? ''),
         'The top-level Generated CSS panel should explain that there is no live sitewide output while sitewide delivery is off.'
     );
+};
+
+$tests['admin_controller_adds_classes_only_generated_css_note_to_readable_preview_only'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings([
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'classes',
+        'class_output_enabled' => '1',
+        'class_output_role_heading_enabled' => '1',
+        'class_output_role_body_enabled' => '1',
+        'class_output_role_monospace_enabled' => '1',
+        'class_output_role_alias_interface_enabled' => '1',
+        'class_output_role_alias_ui_enabled' => '1',
+        'class_output_role_alias_code_enabled' => '1',
+        'class_output_category_sans_enabled' => '1',
+        'class_output_category_serif_enabled' => '1',
+        'class_output_category_mono_enabled' => '1',
+        'class_output_families_enabled' => '1',
+        'per_variant_font_variables_enabled' => '0',
+        'role_usage_font_weight_enabled' => '0',
+    ]);
+
+    $panel = invokePrivateMethod(
+        $services['controller'],
+        'buildGeneratedCssPanel',
+        [$services['settings']->getSettings()]
+    );
+
+    assertContainsValue(':root', (string) ($panel['value'] ?? ''), 'Classes-only generated CSS should still include the core root block in the real stylesheet value.');
+    assertNotContainsValue('Still kept in Classes only', (string) ($panel['value'] ?? ''), 'The real generated CSS value should stay unchanged by the display-only classes-only note.');
+    assertContainsValue('Still kept in Classes only', (string) ($panel['readable_display_value'] ?? ''), 'Classes-only generated CSS should explain the retained root variables in the readable preview.');
+    assertContainsValue('Automatic.css sync', (string) ($panel['readable_display_value'] ?? ''), 'The readable preview should explain that Automatic.css sync depends on the retained root variables.');
+    assertContainsValue('Gutenberg editor parity', (string) ($panel['readable_display_value'] ?? ''), 'The readable preview should explain that Gutenberg editor parity depends on the retained root variables.');
+    assertContainsValue('Etch canvas parity', (string) ($panel['readable_display_value'] ?? ''), 'The readable preview should explain that Etch canvas parity depends on the retained root variables.');
+};
+
+$tests['admin_controller_adds_classes_only_note_to_site_snippet_display_only'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveAppliedRoles([
+        'heading' => '',
+        'body' => '',
+        'heading_fallback' => 'system-ui, sans-serif',
+        'body_fallback' => 'system-ui, sans-serif',
+    ], []);
+    $settings = $services['settings']->saveSettings([
+        'auto_apply_roles' => '1',
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'classes',
+        'class_output_enabled' => '1',
+        'class_output_role_heading_enabled' => '1',
+        'class_output_role_body_enabled' => '1',
+        'class_output_role_monospace_enabled' => '1',
+        'class_output_role_alias_interface_enabled' => '1',
+        'class_output_role_alias_ui_enabled' => '1',
+        'class_output_role_alias_code_enabled' => '1',
+        'class_output_category_sans_enabled' => '1',
+        'class_output_category_serif_enabled' => '1',
+        'class_output_category_mono_enabled' => '1',
+        'class_output_families_enabled' => '1',
+        'per_variant_font_variables_enabled' => '0',
+        'role_usage_font_weight_enabled' => '0',
+    ]);
+
+    $panels = invokePrivateMethod(
+        $services['controller'],
+        'buildOutputPanels',
+        [$services['settings']->getRoles($services['catalog']->getCatalog()), $settings, $services['catalog']->getCatalog(), $services['settings']->getAppliedRoles($services['catalog']->getCatalog())]
+    );
+
+    $usagePanel = null;
+
+    foreach ($panels as $panel) {
+        if (($panel['key'] ?? '') === 'usage') {
+            $usagePanel = $panel;
+            break;
+        }
+    }
+
+    assertSameValue(true, is_array($usagePanel), 'The Site Snippet output panel should still be present in Classes-only mode.');
+    assertContainsValue(':root', (string) ($usagePanel['value'] ?? ''), 'The Site Snippet real output should still include the retained root block in Classes-only mode.');
+    assertNotContainsValue('Still kept in Classes only', (string) ($usagePanel['value'] ?? ''), 'The Site Snippet real output should stay unchanged by the display-only Classes-only note.');
+    assertContainsValue('Still kept in Classes only', (string) ($usagePanel['display_value'] ?? ''), 'The Site Snippet display output should explain why the retained root variables remain in Classes-only mode.');
+    assertContainsValue('Automatic.css sync', (string) ($usagePanel['display_value'] ?? ''), 'The Site Snippet display output should explain that Automatic.css sync depends on the retained root variables.');
 };
 
 $tests['admin_controller_reuses_cached_search_results_during_search_cooldown'] = static function (): void {
@@ -2073,6 +2176,38 @@ $tests['rest_controller_settings_preserves_variables_and_classes_output_presets'
     assertSameValue(true, !empty($data['settings']['class_output_enabled']), 'Classes-only should keep class output enabled.');
     assertSameValue(false, !empty($data['settings']['per_variant_font_variables_enabled']), 'Classes-only should keep variable output disabled.');
     assertSameValue(false, !empty($data['settings']['role_usage_font_weight_enabled']), 'Classes-only should keep role font-weight output disabled.');
+};
+
+$tests['rest_controller_settings_keeps_role_class_styles_in_classes_output'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'classes',
+        'class_output_enabled' => '1',
+        'class_output_role_heading_enabled' => '1',
+        'class_output_role_body_enabled' => '1',
+        'class_output_role_monospace_enabled' => '1',
+        'class_output_role_alias_interface_enabled' => '1',
+        'class_output_role_alias_ui_enabled' => '1',
+        'class_output_role_alias_code_enabled' => '1',
+        'class_output_category_sans_enabled' => '1',
+        'class_output_category_serif_enabled' => '1',
+        'class_output_category_mono_enabled' => '1',
+        'class_output_families_enabled' => '1',
+        'class_output_role_styles_enabled' => '1',
+        'per_variant_font_variables_enabled' => '0',
+        'role_usage_font_weight_enabled' => '0',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response->get_data();
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Styled role class autosave should return a native REST response.');
+    assertSameValue(true, !empty($data['settings']['class_output_role_styles_enabled']), 'The settings autosave route should persist the role class style toggle.');
+    assertSameValue('classes', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Opting role classes into weights and settings should keep the output preset on classes only.');
 };
 
 $tests['rest_controller_settings_rejects_invalid_custom_unicode_range'] = static function (): void {

@@ -242,7 +242,7 @@
     }
 
     function defaultRoleFallback(roleKey) {
-        return roleKey === 'monospace' ? 'monospace' : 'sans-serif';
+        return roleKey === 'monospace' ? 'monospace' : 'system-ui, sans-serif';
     }
 
     function resolveRoleFallback(roleKey, input = {}, options = {}) {

@@ -698,6 +698,8 @@ trait SharedRenderHelpers
     public function renderRoleSelectionCard(array $config, array $roles, array $availableFamilyOptions, string $roleFormId): void
     {
         $roleKey = $this->stringValue($config, 'role_key');
+        $fallbackInputId = 'tasty_fonts_' . $roleKey . '_fallback';
+        $fallbackValue = $this->scalarStringValue($roles[$roleKey . '_fallback'] ?? '', $this->defaultRoleFallback($roleKey));
         ?>
         <section class="tasty-fonts-studio-card tasty-fonts-role-box">
             <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
@@ -732,6 +734,22 @@ trait SharedRenderHelpers
                         </select>
                         <?php $this->renderClearSelectButton($this->stringValue($config, 'clear_family_label'), $this->stringValue($config, 'family_select_id')); ?>
                     </span>
+                </label>
+                <label class="tasty-fonts-stack-field">
+                    <?php $this->renderFieldLabel(__('Fallback', 'tasty-fonts')); ?>
+                    <?php
+                    $this->renderFallbackInput(
+                        $fallbackInputId,
+                        $fallbackValue,
+                        [
+                            'id' => $fallbackInputId,
+                            'form' => $roleFormId,
+                            'clear_value' => $this->defaultRoleFallback($roleKey),
+                            'clear_label' => sprintf(__('Reset %s fallback', 'tasty-fonts'), $this->stringValue($config, 'title')),
+                            'placeholder' => __('Example: system-ui, sans-serif', 'tasty-fonts'),
+                        ]
+                    );
+                    ?>
                 </label>
             </div>
             <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="<?php echo esc_attr($roleKey); ?>" hidden>
@@ -775,6 +793,11 @@ trait SharedRenderHelpers
             <option value="<?php echo esc_attr($familyName); ?>" <?php selected($selectedFamily, $familyName); ?>><?php echo esc_html($familyLabel); ?></option>
             <?php
         }
+    }
+
+    private function defaultRoleFallback(string $roleKey): string
+    {
+        return $roleKey === 'monospace' ? 'monospace' : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
     }
 
     /**

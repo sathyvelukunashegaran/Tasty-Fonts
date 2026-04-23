@@ -323,8 +323,8 @@ test('admin contracts restore live weight and axes when a role is reassigned bac
             heading: 'Raleway',
             body: 'Inter',
             monospace: '',
-            headingFallback: 'sans-serif',
-            bodyFallback: 'sans-serif',
+            headingFallback: 'system-ui, sans-serif',
+            bodyFallback: 'system-ui, sans-serif',
             monospaceFallback: 'monospace',
             headingWeight: '700',
             bodyWeight: '',
@@ -354,9 +354,19 @@ test('admin contracts derive exact output quick modes from explicit output shape
             classOutputEnabled: false,
             variableOutputEnabled: true,
             roleUsageFontWeightEnabled: false,
-            variableFlags: [true, true, true, true],
+            variableFlags: [true, true, true, true, true],
         }),
         'variables'
+    );
+    assert.equal(
+        deriveExactOutputQuickMode({
+            minimalEnabled: false,
+            classOutputEnabled: false,
+            variableOutputEnabled: true,
+            roleUsageFontWeightEnabled: false,
+            variableFlags: [false, true, true, true, true],
+        }),
+        'custom'
     );
     assert.equal(
         deriveExactOutputQuickMode({
@@ -374,7 +384,7 @@ test('admin contracts derive exact output quick modes from explicit output shape
             classOutputEnabled: false,
             variableOutputEnabled: true,
             roleUsageFontWeightEnabled: true,
-            variableFlags: [true, true, true, true],
+            variableFlags: [true, true, true, true, true],
         }),
         'custom'
     );
@@ -386,7 +396,7 @@ test('admin contracts keep custom sticky and coerce stale non-custom preferences
         classOutputEnabled: false,
         variableOutputEnabled: true,
         roleUsageFontWeightEnabled: false,
-        variableFlags: [true, true, true, true],
+        variableFlags: [true, true, true, true, true],
     };
 
     assert.equal(normalizeOutputQuickModePreference('', variableOnlyState), 'variables');
@@ -395,7 +405,7 @@ test('admin contracts keep custom sticky and coerce stale non-custom preferences
     assert.equal(
         normalizeOutputQuickModePreference('variables', {
             ...variableOnlyState,
-            variableFlags: [true, false, true, true],
+            variableFlags: [true, false, true, true, true],
         }),
         'custom'
     );
