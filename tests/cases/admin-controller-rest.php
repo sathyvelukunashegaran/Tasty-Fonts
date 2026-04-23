@@ -3069,6 +3069,32 @@ $tests['admin_controller_builds_transfer_context_from_filtered_activity_entries'
     );
 };
 
+$tests['admin_controller_build_page_context_formats_activity_log_times_in_site_timezone'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore['date_format'] = 'Y-m-d';
+    $optionStore['time_format'] = 'H:i:s';
+    $optionStore['timezone_string'] = 'Asia/Kuala_Lumpur';
+    $optionStore[TastyFonts\Repository\LogRepository::OPTION_LOG] = [[
+        'time' => '2026-04-23 13:55:04',
+        'message' => 'Fonts rescanned.',
+        'actor' => 'System',
+    ]];
+
+    $services = makeServiceGraph();
+    $context = invokePrivateMethod($services['controller'], 'buildPageContext');
+    $logs = $context['logs'] ?? [];
+    $firstLog = is_array($logs[0] ?? null) ? $logs[0] : [];
+
+    assertSameValue(
+        '2026-04-23 21:55:04',
+        (string) ($firstLog['time'] ?? ''),
+        'Activity log entries should render in the configured site timezone instead of raw UTC.'
+    );
+};
+
 $tests['admin_controller_maps_legacy_diagnostics_tabs_to_the_diagnostics_page'] = static function (): void {
     resetTestState();
 

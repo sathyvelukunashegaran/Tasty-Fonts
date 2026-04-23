@@ -76,7 +76,8 @@ final class AdminPageContextBuilder
         $storage = $this->storage->get();
         $settings = $this->settings->getSettings();
         $catalog = $this->catalog->getCatalog();
-        $logs = $this->log->all();
+        $rawLogs = $this->log->all();
+        $logs = $this->normalizeActivityLogEntries($rawLogs);
         $counts = $this->catalog->getCounts();
         $assetStatus = $this->assets->getStatus();
         $familyFallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
@@ -105,7 +106,7 @@ final class AdminPageContextBuilder
         $adminAccessUserOptions = $this->buildAdminAccessUserOptions();
         $adminAccessImplicitAdminLabels = $this->buildAdminAccessImplicitAdminLabels();
         $adminAccessSummary = $this->buildAdminAccessSummary($adminAccessRoleSlugs, $adminAccessUserIds, $adminAccessRoleOptions, $adminAccessImplicitAdminLabels);
-        $developerToolStatuses = $this->buildDeveloperToolStatuses($logs, $assetStatus, $counts);
+        $developerToolStatuses = $this->buildDeveloperToolStatuses($rawLogs, $assetStatus, $counts);
         $previewBaselineSource = $applyEverywhere ? 'live_sitewide' : 'draft';
         $previewBaselineLabel = $applyEverywhere
             ? __('Live sitewide', 'tasty-fonts')
@@ -834,6 +835,22 @@ final class AdminPageContextBuilder
     }
 
     /**
+     * @param list<ActivityLogEntry> $logs
+     * @return list<ActivityLogEntry>
+     */
+    private function normalizeActivityLogEntries(array $logs): array
+    {
+        $entries = [];
+
+        foreach ($logs as $entry) {
+            $entry['time'] = $this->formatLogTimestamp($this->stringValue($entry, 'time'));
+            $entries[] = $entry;
+        }
+
+        return $entries;
+    }
+
+    /**
      * @param ActivityLogEntry $entry
      */
     private function isTransferLogEntry(array $entry): bool
@@ -1486,7 +1503,15 @@ final class AdminPageContextBuilder
             return '';
         }
 
-        return gmdate('M j, Y g:i a', $unix) . ' UTC';
+        $format = trim($this->dateTimeFormat());
+
+        if ($format === '') {
+            $format = 'M j, Y g:i a';
+        }
+
+        $formatted = wp_date($format, $unix);
+
+        return is_string($formatted) ? $formatted : '';
     }
 
     /**

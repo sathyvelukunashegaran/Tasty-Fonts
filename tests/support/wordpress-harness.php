@@ -399,11 +399,35 @@ if (!function_exists('size_format')) {
 }
 
 if (!function_exists('wp_date')) {
-    function wp_date(string $format, ?int $timestamp = null): string
+    function wp_date(string $format, ?int $timestamp = null, ?DateTimeZone $timezone = null): string
     {
         $timestamp = is_int($timestamp) ? $timestamp : time();
+        $timezone = $timezone ?? wp_timezone();
 
-        return gmdate($format, $timestamp);
+        return (new DateTimeImmutable('@' . $timestamp))
+            ->setTimezone($timezone)
+            ->format($format);
+    }
+}
+
+if (!function_exists('wp_timezone')) {
+    function wp_timezone(): DateTimeZone
+    {
+        $timezone = trim((string) get_option('timezone_string', ''));
+
+        if ($timezone !== '') {
+            try {
+                return new DateTimeZone($timezone);
+            } catch (Exception) {
+            }
+        }
+
+        $offset = (float) get_option('gmt_offset', 0);
+        $hours = (int) $offset;
+        $minutes = (int) round(abs($offset - $hours) * 60);
+        $sign = $offset < 0 ? '-' : '+';
+
+        return new DateTimeZone(sprintf('%s%02d:%02d', $sign, abs($hours), $minutes));
     }
 }
 
@@ -697,7 +721,19 @@ if (!function_exists('wp_max_upload_size')) {
 if (!function_exists('current_time')) {
     function current_time(string $type, bool $gmt = false): string
     {
-        return '2026-04-03 10:00:00';
+        $reference = strtotime('2026-04-03 10:00:00 UTC');
+
+        if ($reference === false) {
+            return '2026-04-03 10:00:00';
+        }
+
+        $timezone = $gmt ? new DateTimeZone('UTC') : wp_timezone();
+        $dateTime = (new DateTimeImmutable('@' . $reference))->setTimezone($timezone);
+
+        return match ($type) {
+            'mysql' => $dateTime->format('Y-m-d H:i:s'),
+            default => (string) $dateTime->getTimestamp(),
+        };
     }
 }
 
