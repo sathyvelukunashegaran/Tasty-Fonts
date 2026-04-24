@@ -41,7 +41,7 @@ A Site Transfer bundle contains everything Tasty Fonts manages:
 Before you begin, confirm all of the following:
 
 1. **PHP's ZipArchive extension is installed and enabled** on both the source and destination servers. Most managed WordPress hosts include it by default. If the Transfer tab shows a warning about ZipArchive being unavailable, contact your host.
-2. **Both sites are running Tasty Custom Fonts 1.12.0-beta.2 or later.** Bundle schema compatibility is not guaranteed across major schema versions.
+2. **Both sites are running Tasty Custom Fonts 1.13.0 or later.** Bundle schema compatibility is not guaranteed across major schema versions.
 3. **You have admin-level access** on both the source site (to export) and the destination site (to import).
 4. **The destination site's `wp-content/uploads/fonts/` directory is writable** by the web server process.
 
@@ -53,7 +53,7 @@ Before you begin, confirm all of the following:
 2. Click the **Transfer** tab.
 3. In the **Export Site Transfer Bundle** card, confirm the export action is available (not greyed out). If it is greyed out, a ZipArchive error message will explain why.
 4. Click **Export Bundle**.
-5. Your browser downloads a ZIP file named something like `tasty-fonts-transfer-1.12.0-beta.2-20260412-221254.zip`.
+5. Your browser downloads a ZIP file named something like `tasty-fonts-transfer-1.13.0-20260424-100000.zip`.
 
 > **What's in the ZIP:** the archive contains a manifest file (`tasty-fonts-export.json`) plus your managed font files under a `fonts/` subdirectory. The manifest records your library state, settings, roles, and a checksum for every included file.
 
@@ -61,18 +61,32 @@ Keep this ZIP somewhere safe — it is your portable bundle.
 
 ---
 
-## Step 2 — Import On the Destination Site
+## Step 2 — Dry-Run the Bundle on the Destination Site
 
-> ⚠️ **Warning:** importing a bundle **replaces** the current Tasty Fonts library, settings, and role assignments on the destination site. This cannot be undone from within the plugin. Take a database backup before importing on a live production site.
+Before the destructive import can be armed, you must run a **dry-run validation**. This step checks the bundle for corruption, checksum mismatches, and compatibility issues without changing anything on the destination site.
 
 1. Go to `Tasty Fonts → Settings` on the **destination site**.
 2. Click the **Transfer** tab.
 3. In the **Import Site Transfer Bundle** card:
    - Click **Choose File** and select the ZIP you exported.
    - (Optional) If this destination site needs Google Fonts search access, paste a Google Fonts API key into the **Google Fonts API Key** field. See [Why Google API Keys Are Excluded](#why-google-fonts-api-keys-are-excluded) below.
-4. Click **Import Bundle**.
-5. When the destructive confirmation appears, use the two-step confirm button flow to arm the action and then click again to confirm. No typed confirmation phrase is required.
-6. The plugin validates the bundle, extracts and verifies font files, restores library data, applies settings and role assignments, and then rebuilds the generated CSS.
+4. Click **Dry Run Bundle**.
+5. The plugin validates the bundle and reports results in the Transfer activity log beneath the card. Any warnings or errors appear here.
+6. If the dry run passes with no errors, the **Import Bundle** button becomes available.
+
+> **If the dry run reports errors:** do not proceed to import. Review the activity log messages, fix any issues at the source (re-export with corrected settings), and run the dry run again with the new bundle.
+
+---
+
+## Step 3 — Import On the Destination Site
+
+> ⚠️ **Warning:** importing a bundle **replaces** the current Tasty Fonts library, settings, and role assignments on the destination site. This cannot be undone from within the plugin. Take a database backup before importing on a live production site.
+
+> **The Import Bundle button only becomes available after a successful dry run.** You cannot skip the dry-run step.
+
+1. After a successful dry run, click **Import Bundle**.
+2. When the destructive confirmation appears, use the two-step arm/confirm button flow to confirm. No typed confirmation phrase is required.
+3. The plugin extracts and verifies font files, restores library data, applies settings and role assignments, and then rebuilds the generated CSS.
 
 > **After a successful import:** you will see a success notice. The generated runtime stylesheet is rebuilt automatically. Your Tasty Fonts setup on the destination site now matches the source.
 
@@ -117,9 +131,13 @@ PHP's ZipArchive extension is not installed or not enabled on this server. You c
 
 **Fix:** contact your hosting provider and ask them to enable the `zip` PHP extension (sometimes called `php-zip`). Most managed WordPress hosts (WP Engine, Kinsta, Flywheel, etc.) include it by default.
 
-### The Import button is disabled or the card shows an error
+### The Import button is disabled
 
-If the Transfer tab shows an unavailability message on the Import card, the same ZipArchive requirement applies. Check the message text for details.
+The **Import Bundle** button only becomes available after a successful dry run. If you have not run a dry run yet, or the dry run reported errors, the button will remain disabled.
+
+**Fix:** select your bundle file and click **Dry Run Bundle** first. Resolve any reported errors before attempting the import.
+
+If the Transfer tab shows an unavailability message on the Import card, a ZipArchive requirement may also apply. Check the message text for details.
 
 ### Import fails or times out
 

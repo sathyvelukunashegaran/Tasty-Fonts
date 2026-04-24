@@ -235,7 +235,7 @@ Yes. The Bricks integration exposes published families in Bricks builder selecto
 <details>
 <summary><strong>Can I use variable fonts in WordPress with this plugin?</strong></summary>
 
-Yes. Enable variable font support from `Settings → Behavior → Enable Variable Fonts`. Once active, axis-aware controls unlock per role and the plugin tracks weight behavior for variable families correctly.
+Yes. Enable variable font support from `Settings → Output → Variable Font Support`. Once active, axis-aware controls unlock per role and the plugin tracks weight behavior for variable families correctly.
 
 </details>
 
@@ -253,15 +253,23 @@ All generated assets and imported files live under `wp-content/uploads/fonts/`, 
 
 </details>
 
+<details>
+<summary><strong>Can I give a non-administrator access to manage fonts?</strong></summary>
+
+Yes, since 1.13.0. Go to `Settings → Behavior → Admin Access`, toggle **Enable custom access**, and select additional roles or specific users. Administrator access is always preserved. Individual user grants are site-local and are stripped when a site transfer bundle is imported on a destination site.
+
+</details>
+
 ---
 
 ## What Tasty WP Is Actively Building
 
-The 2.0.0 stable release locks in the current foundation. Here is what comes next:
+`1.13.0` is the current stable release. Here is what comes next:
 
 - 🛠 **WP-CLI commands** for maintenance, cache management, CSS regeneration, rescans, and diagnostics — for agencies and power users who live in the terminal
-- 📦 **Portable export/import** — move settings and library metadata between sites securely with a single bundle
 - ⚡ **Bulk management for large libraries** — faster browsing, bulk actions, and broader search flows for high-volume workflows
+- 🔁 **Scheduled Adobe Fonts project refresh** — automatically sync web project changes without manual re-imports
+- 🔍 **Richer diagnostics** — deeper inspection tools for generated CSS, delivery planning, and integration state
 
 Have a workflow you want prioritized? Open a feature request on **[GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues)** — real-world agency, client, and editorial use cases shape the roadmap directly.
 

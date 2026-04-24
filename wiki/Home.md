@@ -10,12 +10,16 @@ These docs describe the current plugin behavior in full, covering the shipping f
 
 ---
 
-## What's New In 1.12.0 Beta
+## What's New In 1.13.0
 
-- **[Site Transfer](Site-Transfer)** — export your entire Tasty Fonts setup (library, settings, role assignments, and font files) as a portable ZIP bundle and import it on any other site running 1.12.0-beta.2 or later.
-- **Google Fonts API key encryption** — the API key is now stored in a dedicated encrypted WordPress option (`tasty_fonts_google_api_key_data`) that is isolated from the main settings record and never exported in transfer bundles.
-- **Variable font axis-default cleanup** — `font-variation-settings` is now omitted from generated CSS and Block Editor sync payloads when a role axis value matches the font's registered default, keeping output clean and non-redundant.
-- **CSS minification fix** — significant whitespace in generated output is now preserved correctly so minification no longer collapses rules in ways that could change browser behavior.
+- **[Admin Access Controls](Settings#admin-access)** — administrators can now delegate Tasty Fonts access to selected non-administrator roles and specific users from `Settings → Behavior → Admin Access`.
+- **[Dry-Run Transfer Validation](Site-Transfer#step-2-dry-run-the-bundle)** — the Transfer import flow now requires a successful dry-run validation before the destructive import step can be armed, protecting destination sites from bad bundles.
+- **[Fallback-Only Role Controls](Deploy-Fonts#set-per-role-fallback)** — Heading, Body, and Monospace roles now have editable fallback stack controls in Studio so a role can output an intentional font-family stack without forcing a library family.
+- **[Role Weights in Classes opt-in](Settings#role-weights-in-classes)** — a new setting lets `.font-heading`, `.font-body`, `.font-monospace`, and alias classes include role weight and variation settings in their output.
+- **[Output Presets reworked](Settings#output-preset)** — Output Settings now offer four focused presets: Minimal, Variables only, Classes only, and Custom, each with grouped disclosure sub-controls.
+- **[Show Activity Log behavior setting](Settings#show-activity-log)** — Advanced Tools can now hide the full diagnostics activity log by default while still recording events behind the scenes.
+- **Refreshed Tasty Foundry admin UI** — denser workspace treatment across library cards, import panels, Studio controls, and preview surfaces.
+- Default Heading and Body fallback stacks changed from `sans-serif` to `system-ui, sans-serif`.
 
 ---
 
