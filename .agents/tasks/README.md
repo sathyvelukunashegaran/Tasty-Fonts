@@ -1,5 +1,7 @@
 # Task Notes
 
+Related docs: [agent workspace](../README.md), [agent guide](../../AGENTS.md), [architecture](../../ARCHITECTURE.md), and [design system](../../DESIGN.md).
+
 Use `.agents/tasks/todo-(name).md` for larger or multi-step work when a persistent task note is useful.
 
 This is optional. Do not create a task note for every small edit.

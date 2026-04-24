@@ -13,6 +13,16 @@ Use this file as the shared repo-level instruction guide for AI coding agents wo
 - Tests: PHP harness via `tests/run.php`, JS contract tests via `tests/js/*.test.cjs`
 - Quality and release helpers: `bin/run-jscpd`, `bin/setup-git-hooks`, `bin/release`, `bin/nightly-version`, `tests/bin/release-scripts.test.sh`
 
+## Start Here
+
+- Use this file for repo-specific agent operating instructions.
+- Use [`.agents/README.md`](.agents/README.md) for the shared agent workspace index.
+- Use [`.agents/lessons.md`](.agents/lessons.md) for short-lived pitfalls and repeated lessons.
+- Use [`.agents/tasks/README.md`](.agents/tasks/README.md) before creating persistent task notes.
+- Use [`ARCHITECTURE.md`](ARCHITECTURE.md) for repo-local architecture orientation.
+- Use [`DESIGN.md`](DESIGN.md) for admin UI design-system guidance.
+- Use [`wiki/Architecture.md`](wiki/Architecture.md) for the full published architecture page.
+
 ## Principles
 
 - Read broadly before editing. Understand the surrounding service flow, not just one method.
@@ -136,6 +146,11 @@ wp i18n make-json languages/ languages/
 
 ## References
 
+- `ARCHITECTURE.md`
+- `DESIGN.md`
+- `.agents/README.md`
+- `.agents/lessons.md`
+- `.agents/tasks/README.md`
 - `wiki/Architecture.md`
 - `wiki/Testing.md`
 - `wiki/Local-Setup.md`
@@ -147,5 +162,6 @@ wp i18n make-json languages/ languages/
 ## Notes For Other Agent Systems
 
 - `CLAUDE.md` imports this file so Claude Code can reuse the same project instructions.
+- `.agents/` is the repo-local collaboration space for shared agent context.
 - `.agents/tasks/` is optional support for larger tasks, not a required workflow for every edit.
-- `.agents/lessons.md` is a short shared pitfalls file, not a replacement for deeper docs.
+- `.agents/lessons.md` is a short shared pitfalls file, not a replacement for [`ARCHITECTURE.md`](ARCHITECTURE.md), [`DESIGN.md`](DESIGN.md), or the wiki.

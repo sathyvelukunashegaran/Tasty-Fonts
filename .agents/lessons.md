@@ -1,5 +1,7 @@
 # Tasty Fonts Agent Lessons
 
+Related docs: [agent guide](../AGENTS.md), [architecture](../ARCHITECTURE.md), [design system](../DESIGN.md), and [task notes](tasks/README.md).
+
 - Do not assume Composer, npm, or a build pipeline exists here. Most verification runs directly from the checkout.
 - Use the existing harnesses first: `php tests/run.php`, `node --test tests/js/*.test.cjs`, and targeted script tests when release flow is involved.
 - Verify behavior in WordPress terms before changing code. A reported issue may be expected behavior or a publish-state/runtime mismatch.

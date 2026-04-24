@@ -206,8 +206,16 @@ MD
 # Agent Guide
 MD
 
+    cat > "${repo}/ARCHITECTURE.md" <<'MD'
+# Architecture
+MD
+
     cat > "${repo}/CLAUDE.md" <<'MD'
 # Claude Guide
+MD
+
+    cat > "${repo}/DESIGN.md" <<'MD'
+# Design
 MD
 
     cat > "${repo}/.editorconfig" <<'TXT'
@@ -225,6 +233,14 @@ SH
 
     cat > "${repo}/.agents/tasks/README.md" <<'MD'
 # Tasks
+MD
+
+    cat > "${repo}/.agents/README.md" <<'MD'
+# Agents
+MD
+
+    cat > "${repo}/.agents/lessons.md" <<'MD'
+# Lessons
 MD
 
     cat > "${repo}/assets/js/admin.js" <<'JS'
@@ -587,13 +603,17 @@ if [[ "${archive_entries}" != *"README.md"* \
     && "${archive_entries}" != *"SECURITY.md"* \
     && "${archive_entries}" != *"CONTRIBUTING.md"* \
     && "${archive_entries}" != *"AGENTS.md"* \
+    && "${archive_entries}" != *"ARCHITECTURE.md"* \
     && "${archive_entries}" != *"CLAUDE.md"* \
+    && "${archive_entries}" != *"DESIGN.md"* \
     && "${archive_entries}" != *"CODE_OF_CONDUCT.md"* \
     && "${archive_entries}" != *"readme.txt"* \
     && "${archive_entries}" != *"wiki/guide.md"* \
     && "${archive_entries}" != *"screenshots/.gitkeep"* \
     && "${archive_entries}" != *"languages/tasty-fonts.pot"* \
     && "${archive_entries}" != *".github/workflows/ci.yml"* \
+    && "${archive_entries}" != *".agents/README.md"* \
+    && "${archive_entries}" != *".agents/lessons.md"* \
     && "${archive_entries}" != *".agents/tasks/README.md"* \
     && "${archive_entries}" != *".githooks/pre-commit"* \
     && "${archive_entries}" != *".jscpd.json"* \

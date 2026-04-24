@@ -2,6 +2,8 @@
 
 Tasty Foundry is the admin design system for Tasty Custom Fonts. It is a WordPress-native workspace for managing font libraries, delivery profiles, role previews, diagnostics, and settings. The system borrows Stripe's product discipline: crisp typography, aligned work surfaces, precise borders, restrained depth, and compact controls. The visual accent is Tasty Blue from the logo, supported by quiet cyan edge lighting and neutral slate surfaces.
 
+Related docs: [`AGENTS.md`](AGENTS.md) for agent workflow, [`ARCHITECTURE.md`](ARCHITECTURE.md) for repo-local architecture, and [`.agents/README.md`](.agents/README.md) for shared agent context.
+
 ## Principles
 
 - **Font work first:** imported families, role pairings, delivery profiles, generated CSS, and diagnostics must stay easier to scan than the surrounding chrome.
