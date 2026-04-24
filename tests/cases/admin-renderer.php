@@ -4427,11 +4427,11 @@ $tests['admin_page_renderer_makes_copyable_diagnostic_values_click_to_copy'] = s
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('class="tasty-fonts-diagnostic-item tasty-fonts-diagnostic-item--copyable"', $output, 'Copyable diagnostic values should mark the card so the copy action can be positioned cleanly.');
-    assertContainsValue('class="button tasty-fonts-output-copy-button tasty-fonts-diagnostic-copy-button"', $output, 'Copyable diagnostic values should render an icon-only copy button in the diagnostics card.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--reference"', $output, 'Copyable diagnostic values should render inside the shared reference-row pattern.');
+    assertContainsValue('class="button tasty-fonts-output-copy-button tasty-fonts-diagnostic-copy-button"', $output, 'Copyable diagnostic values should render an icon-only copy button in the reference row.');
     assertContainsValue('data-copy-text="https://example.test/wp-content/uploads/fonts/tasty-fonts.css"', $output, 'Copyable diagnostic values should expose their full value for the shared clipboard handler.');
     assertContainsValue('data-copy-success="CSS Request URL copied."', $output, 'Copyable diagnostic values should report which field was copied in the shared toast message.');
-    assertContainsValue('<div class="tasty-fonts-diagnostic-value tasty-fonts-code">', $output, 'Diagnostic values should remain plain readable text instead of turning the whole field into a button.');
+    assertContainsValue('<span class="tasty-fonts-code">', $output, 'Diagnostic values should remain plain readable text instead of turning the whole field into a button.');
     assertNotContainsValue('data-copy-text="4 KB"', $output, 'Plain diagnostic values should not become copy controls.');
 };
 
@@ -4465,7 +4465,20 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
             'training_wheels_off' => false,
             'show_activity_log' => true,
             'delete_uploaded_files_on_uninstall' => false,
-            'diagnostic_items' => [],
+            'diagnostic_items' => [
+                [
+                    'label' => 'CSS Request URL',
+                    'value' => 'https://example.test/wp-content/uploads/fonts/tasty-fonts.css',
+                    'code' => true,
+                    'copyable' => true,
+                ],
+                [
+                    'label' => 'Stylesheet Size',
+                    'value' => '4 KB',
+                    'code' => false,
+                    'copyable' => false,
+                ],
+            ],
             'overview_metrics' => [
                 ['label' => 'Families', 'value' => '2'],
             ],
@@ -4495,6 +4508,47 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                 'value' => ':root{--font-body:sans-serif}',
                 'download_url' => 'https://example.test/wp-admin/admin.php?action=tasty_fonts_download_generated_css',
             ],
+            'advanced_tools' => [
+                'health_checks' => [
+                    [
+                        'slug' => 'generated_css',
+                        'title' => 'Generated CSS',
+                        'severity' => 'ok',
+                        'message' => 'The front-end stylesheet exists and can be served from the selected delivery mode.',
+                        'guidance' => 'Regenerate CSS after changing roles, delivery profiles, or output settings so the runtime file stays aligned with saved settings.',
+                        'help_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Advanced-Tools',
+                        'help_label' => 'Open knowledge base',
+                    ],
+                    [
+                        'slug' => 'block_editor_sync',
+                        'title' => 'Block Editor Sync',
+                        'severity' => 'warning',
+                        'message' => 'Block Editor Font Library sync is on while this site looks local or self-signed.',
+                        'guidance' => 'On local HTTPS sites, WordPress may reject REST font uploads if the certificate is not trusted. Disable sync locally or trust the certificate.',
+                        'evidence' => [
+                            ['label' => 'Sync', 'value' => 'On'],
+                            ['label' => 'Environment', 'value' => 'Local'],
+                        ],
+                        'help_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Settings',
+                        'help_label' => 'Open knowledge base',
+                    ],
+                    [
+                        'slug' => 'font_preload',
+                        'title' => 'Primary Font Preload',
+                        'severity' => 'info',
+                        'message' => 'Preloading is on, but no active same-origin WOFF2 font can be safely preloaded.',
+                        'guidance' => 'Preload only applies to local WOFF2 files used by published sitewide roles. Remote CSS, inactive families, and non-WOFF2 files are skipped on purpose.',
+                        'help_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Settings',
+                        'help_label' => 'Open knowledge base',
+                    ],
+                ],
+                'runtime_manifest' => [
+                    'families' => [],
+                    'preload_urls' => [],
+                    'preconnect_origins' => [],
+                    'external_stylesheets' => [],
+                ],
+            ],
             'preview_panels' => [],
             'toasts' => [],
             'apply_everywhere' => false,
@@ -4513,8 +4567,34 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('data-tab-heading-group="diagnostics"', $output, 'Advanced Tools should render contextual tab headings in the shared card header.');
     assertContainsValue('data-tab-heading="transfer"', $output, 'Advanced Tools should include the transfer contextual heading.');
     assertNotContainsValue('Command center for runtime inspection, maintenance, transfer, and activity review.', $output, 'Advanced Tools should avoid repeating the masthead copy inside the diagnostics card.');
-    assertContainsValue('System Details', $output, 'Overview should include the system details diagnostics.');
-    assertContainsValue('Runtime Inspector', $output, 'Overview should render the Phase 2 runtime manifest inspector without reintroducing redundant shortcut cards.');
+    assertContainsValue('Next Step', $output, 'Overview should start with an explicit next-step row.');
+    assertContainsValue('Fix Block Editor Sync', $output, 'Overview should name the specific health item that needs attention.');
+    assertContainsValue('attention /', $output, 'Overview should summarize remaining health work in the next-step header.');
+    assertNotContainsValue('Evidence', $output, 'Overview should not repeat low-level evidence in the next-step row.');
+    assertNotContainsValue('Sync: On / Environment: Local', $output, 'Overview should not duplicate facts that are already stated in the health message.');
+    assertContainsValue('Review Sync Settings', $output, 'Overview should send Block Editor Sync warnings to the settings panel that controls them.');
+    assertNotContainsValue('Review Health', $output, 'Overview should not render a vague anchor button for the health section.');
+    assertContainsValue('class="tasty-fonts-health-board tasty-fonts-overview-next-step-board"', $output, 'Overview should render the recommendation with the same board pattern as health.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--warning"', $output, 'Overview should tone the recommendation row from the highest-priority health state.');
+    assertContainsValue('class="tasty-fonts-health-board"', $output, 'Overview should present health checks in one consistent board.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--info"', $output, 'Overview should render advisory checks with the same row pattern as other health checks.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--ok"', $output, 'Overview should render verified checks with the same row pattern as other health checks.');
+    assertContainsValue('Verified', $output, 'Overview should label passing checks as verified evidence instead of unexplained pills.');
+    assertContainsValue('The front-end stylesheet exists and can be served from the selected delivery mode.', $output, 'Passing checks should include a short explanation of what passed.');
+    assertContainsValue('Regenerate CSS after changing roles, delivery profiles, or output settings so the runtime file stays aligned with saved settings.', $output, 'Passing checks should include practical guidance, not just a status label.');
+    assertContainsValue('href="https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Advanced-Tools"', $output, 'Health checks should expose a knowledge-base link.');
+    assertContainsValue('On local HTTPS sites, WordPress may reject REST font uploads if the certificate is not trusted.', $output, 'Warnings should explain the risk in plain language.');
+    assertContainsValue('Preload only applies to local WOFF2 files used by published sitewide roles.', $output, 'Advisories should explain why the result appears.');
+    assertNotContainsValue('tasty-fonts-overview-pass-strip', $output, 'Overview should not render the old unexplained passing-pill strip.');
+    assertContainsValue('Runtime Details', $output, 'Overview should group runtime output under a clear debugging detail section.');
+    assertContainsValue('Active Output', $output, 'Overview should label runtime facts as active output details.');
+    assertContainsValue('class="tasty-fonts-health-board tasty-fonts-overview-reference-board"', $output, 'Runtime details should use the same board pattern as health.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--reference"', $output, 'Runtime details should use neutral reference rows instead of status colors.');
+    assertContainsValue('Copyable Paths', $output, 'Overview should keep exact debug paths without repeating status details.');
+    assertContainsValue('CSS Request URL', $output, 'Overview should include copyable runtime URLs for debugging.');
+    assertNotContainsValue('System Details', $output, 'Overview should avoid the old redundant system-details block.');
+    assertNotContainsValue('Runtime Inspector', $output, 'Overview should avoid the old redundant runtime-inspector block.');
+    assertNotContainsValue('Stylesheet Size', $output, 'Overview should leave non-copyable status facts out of Copyable Paths.');
     assertNotContainsValue('class="tasty-fonts-generated-css-toolbar"', $output, 'Generated CSS should use the shared contextual header instead of a detached panel title.');
     assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-panel-generated"[\s\S]*?Download Generated CSS/', $output), 'The generated CSS download action should live inside the generated CSS tab panel.');
     assertContainsValue('class="button tasty-fonts-output-download-button"', $output, 'Generated CSS should render the download action as an icon-only code panel control.');

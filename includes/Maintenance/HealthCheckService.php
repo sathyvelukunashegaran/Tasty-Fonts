@@ -22,6 +22,9 @@ use TastyFonts\Support\FontUtils;
  *     severity: 'ok'|'info'|'warning'|'critical',
  *     title: string,
  *     message: string,
+ *     guidance: string,
+ *     help_url: string,
+ *     help_label: string,
  *     evidence: list<HealthCheckEvidence>,
  *     action: HealthCheckAction|null,
  *     actions: list<HealthCheckAction>
@@ -29,6 +32,8 @@ use TastyFonts\Support\FontUtils;
  */
 final class HealthCheckService
 {
+    private const DOCS_BASE_URL = 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/';
+
     /**
      * @param AssetStatus $assetStatus
      * @param StorageState|null $storage
@@ -151,33 +156,38 @@ final class HealthCheckService
         $writeable = $writeDirectory !== '' && (!is_dir($writeDirectory) || is_writable($writeDirectory));
 
         $severity = 'ok';
-        $message = __('Generated CSS is available for runtime delivery.', 'tasty-fonts');
+        $message = __('The front-end stylesheet exists and can be served from the selected delivery mode.', 'tasty-fonts');
+        $guidance = __('Regenerate CSS after changing roles, delivery profiles, or output settings so the runtime file stays aligned with saved settings.', 'tasty-fonts');
         $action = null;
 
         if ($deliveryMode === 'file' && !$exists) {
             $severity = 'warning';
-            $message = __('Generated CSS file delivery is selected, but the stylesheet has not been written yet.', 'tasty-fonts');
+            $message = __('File delivery is selected, but the front-end stylesheet has not been written yet.', 'tasty-fonts');
+            $guidance = __('Run Regenerate CSS File. Until the file exists, visitors may not receive the current font variables and face rules.', 'tasty-fonts');
             $action = [
                 'slug' => 'regenerate_css',
                 'label' => __('Regenerate CSS File', 'tasty-fonts'),
             ];
         } elseif (!$isCurrent) {
             $severity = 'warning';
-            $message = __('Generated CSS exists, but it does not match the current runtime plan.', 'tasty-fonts');
+            $message = __('The stylesheet exists, but it was generated from an older runtime plan.', 'tasty-fonts');
+            $guidance = __('Regenerate the CSS file so the live stylesheet matches the latest saved fonts, roles, and output settings.', 'tasty-fonts');
             $action = [
                 'slug' => 'regenerate_css',
                 'label' => __('Regenerate CSS File', 'tasty-fonts'),
             ];
         } elseif (!$writeable) {
             $severity = 'warning';
-            $message = __('The generated stylesheet folder is not writable.', 'tasty-fonts');
+            $message = __('WordPress cannot write to the folder used for the generated stylesheet.', 'tasty-fonts');
+            $guidance = __('Fix folder permissions first, then rebuild caches so Tasty Fonts can replace stale runtime files.', 'tasty-fonts');
             $action = [
                 'slug' => 'clear_plugin_caches',
                 'label' => __('Clear Caches & Rebuild', 'tasty-fonts'),
             ];
         } elseif ($path === '' || $url === '') {
             $severity = 'warning';
-            $message = __('The generated stylesheet path or public URL is unavailable.', 'tasty-fonts');
+            $message = __('Tasty Fonts cannot resolve either the stylesheet file path or its public URL.', 'tasty-fonts');
+            $guidance = __('Rebuild caches to refresh upload paths. If this remains unavailable, check the WordPress uploads configuration.', 'tasty-fonts');
             $action = [
                 'slug' => 'clear_plugin_caches',
                 'label' => __('Clear Caches & Rebuild', 'tasty-fonts'),
@@ -198,7 +208,9 @@ final class HealthCheckService
                 ['label' => __('Current', 'tasty-fonts'), 'value' => $isCurrent ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
                 ['label' => __('Writable', 'tasty-fonts'), 'value' => $writeable ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
             ],
-            $action
+            $action,
+            $guidance,
+            $this->docsUrl('Advanced-Tools')
         );
     }
 
@@ -243,7 +255,11 @@ final class HealthCheckService
             [
                 ['label' => __('Missing files', 'tasty-fonts'), 'value' => $missing === [] ? '0' : implode(', ', array_slice($missing, 0, 3))],
             ],
-            $missing === [] ? null : ['slug' => 'clear_plugin_caches', 'label' => __('Clear Caches & Rebuild', 'tasty-fonts')]
+            $missing === [] ? null : ['slug' => 'clear_plugin_caches', 'label' => __('Clear Caches & Rebuild', 'tasty-fonts')],
+            $missing === []
+                ? __('This means the active local font files can be read from disk when the front end asks for them.', 'tasty-fonts')
+                : __('Rebuild caches first. If the same files remain missing, re-import or re-upload the affected family.', 'tasty-fonts'),
+            $this->docsUrl('Font-Library')
         );
     }
 
@@ -278,14 +294,18 @@ final class HealthCheckService
             $hasThirdPartyOrigins ? 'info' : 'ok',
             __('External Stylesheets', 'tasty-fonts'),
             $hasThirdPartyOrigins
-                ? __('Runtime delivery includes third-party stylesheet origins.', 'tasty-fonts')
-                : __('Runtime delivery is not using third-party stylesheet URLs.', 'tasty-fonts'),
+                ? __('At least one active family is loaded from a third-party stylesheet instead of a local file.', 'tasty-fonts')
+                : __('No active runtime family is using a third-party stylesheet URL.', 'tasty-fonts'),
             [
                 ['label' => __('Stylesheets', 'tasty-fonts'), 'value' => (string) count($stylesheets)],
                 ['label' => __('Connection hints', 'tasty-fonts'), 'value' => !empty($settings['remote_connection_hints']) ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts')],
                 ['label' => __('Origins', 'tasty-fonts'), 'value' => $origins === [] ? __('None', 'tasty-fonts') : implode(', ', array_values($origins))],
             ],
-            null
+            null,
+            $hasThirdPartyOrigins
+                ? __('This is expected for CDN delivery. Use self-hosted delivery when privacy, performance control, or offline availability matters.', 'tasty-fonts')
+                : __('All active runtime delivery is local or inline, so there are no third-party stylesheet requests to hint or audit here.', 'tasty-fonts'),
+            $this->docsUrl('Deploy-Fonts')
         );
     }
 
@@ -305,9 +325,11 @@ final class HealthCheckService
                 'runtime',
                 'ok',
                 __('Primary Font Preload', 'tasty-fonts'),
-                __('Primary font preloading is disabled.', 'tasty-fonts'),
+                __('Primary font preloading is off, so Tasty Fonts will not add preload tags.', 'tasty-fonts'),
                 [['label' => __('Preload URLs', 'tasty-fonts'), 'value' => '0']],
-                null
+                null,
+                __('Turn this on only when a sitewide heading or body font should be requested earlier by the browser.', 'tasty-fonts'),
+                $this->docsUrl('Settings')
             );
         }
 
@@ -317,10 +339,12 @@ final class HealthCheckService
             $preloadUrls === [] ? 'info' : 'ok',
             __('Primary Font Preload', 'tasty-fonts'),
             $preloadUrls === []
-                ? __('Primary font preloading is enabled, but no same-origin WOFF2 assets are currently preloadable.', 'tasty-fonts')
-                : __('Primary font preloading can emit same-origin WOFF2 assets.', 'tasty-fonts'),
+                ? __('Preloading is on, but no active same-origin WOFF2 font can be safely preloaded.', 'tasty-fonts')
+                : __('Preloading can add same-origin WOFF2 font files for active primary roles.', 'tasty-fonts'),
             [['label' => __('Preload URLs', 'tasty-fonts'), 'value' => (string) count($preloadUrls)]],
-            null
+            null,
+            __('Preload only applies to local WOFF2 files used by published sitewide roles. Remote CSS, inactive families, and non-WOFF2 files are skipped on purpose.', 'tasty-fonts'),
+            $this->docsUrl('Settings')
         );
     }
 
@@ -341,13 +365,17 @@ final class HealthCheckService
             $enabled && $isLocal ? 'warning' : 'ok',
             __('Block Editor Sync', 'tasty-fonts'),
             $enabled && $isLocal
-                ? __('Block Editor Font Library sync is enabled in a likely local or self-signed environment.', 'tasty-fonts')
-                : __('Block Editor sync state does not show a local loopback risk.', 'tasty-fonts'),
+                ? __('Block Editor Font Library sync is on while this site looks local or self-signed.', 'tasty-fonts')
+                : __('Block Editor sync does not show a local or self-signed REST risk.', 'tasty-fonts'),
             [
                 ['label' => __('Sync', 'tasty-fonts'), 'value' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts')],
                 ['label' => __('Environment', 'tasty-fonts'), 'value' => $isLocal ? __('Local', 'tasty-fonts') : __('Production-like', 'tasty-fonts')],
             ],
-            null
+            null,
+            $enabled && $isLocal
+                ? __('On local HTTPS sites, WordPress may reject REST font uploads if the certificate is not trusted. Disable sync locally or trust the certificate.', 'tasty-fonts')
+                : __('This check only warns when sync is enabled in an environment that is likely to block REST uploads.', 'tasty-fonts'),
+            $this->docsUrl('Settings')
         );
     }
 
@@ -364,16 +392,20 @@ final class HealthCheckService
         return $this->check(
             'google_fonts_api',
             'provider',
-            !$saved || $enabled ? 'ok' : 'warning',
+            !$saved ? 'info' : ($enabled ? 'ok' : 'warning'),
             __('Google Fonts API', 'tasty-fonts'),
             !$saved
-                ? __('Google search can use the bundled catalog until an API key is added.', 'tasty-fonts')
-                : ($enabled ? __('The saved Google Fonts API key can be used for search.', 'tasty-fonts') : __('The saved Google Fonts API key is not currently valid for search.', 'tasty-fonts')),
+                ? __('No Google Fonts API key is saved, so live Google search is using the bundled catalog only.', 'tasty-fonts')
+                : ($enabled ? __('The saved Google Fonts API key is valid for live Google search.', 'tasty-fonts') : __('The saved Google Fonts API key is present, but Google search cannot use it.', 'tasty-fonts')),
             [
                 ['label' => __('Key saved', 'tasty-fonts'), 'value' => $saved ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
                 ['label' => __('State', 'tasty-fonts'), 'value' => $state !== '' ? $state : __('Not checked', 'tasty-fonts')],
             ],
-            $saved && !$enabled ? ['slug' => 'reset_integration_detection_state', 'label' => __('Run Integration Scan', 'tasty-fonts')] : null
+            $saved && !$enabled ? ['slug' => 'reset_integration_detection_state', 'label' => __('Run Integration Scan', 'tasty-fonts')] : null,
+            !$saved
+                ? __('Add a key only when you need live Google search beyond the bundled catalog.', 'tasty-fonts')
+                : ($enabled ? __('Live search can call Google with the saved key when importing from the Google provider.', 'tasty-fonts') : __('Replace the key or run the integration scan after fixing API access in Google Cloud.', 'tasty-fonts')),
+            $this->docsUrl('Provider-Google-Fonts')
         );
     }
 
@@ -403,7 +435,9 @@ final class HealthCheckService
                 ['label' => __('Installed', 'tasty-fonts'), 'value' => FontUtils::scalarStringValue($updateChannelStatus['installed_version'] ?? '')],
                 ['label' => __('Latest', 'tasty-fonts'), 'value' => FontUtils::scalarStringValue($updateChannelStatus['latest_version'] ?? __('Unavailable', 'tasty-fonts'))],
             ],
-            null
+            null,
+            __('Use Settings to change the selected channel, then install available packages through the normal WordPress update flow.', 'tasty-fonts'),
+            $this->docsUrl('Settings')
         );
     }
 
@@ -419,9 +453,11 @@ final class HealthCheckService
                 'storage',
                 'critical',
                 __('Managed Storage', 'tasty-fonts'),
-                __('The managed fonts directory is unavailable.', 'tasty-fonts'),
+                __('Tasty Fonts cannot find the managed fonts directory.', 'tasty-fonts'),
                 [],
-                ['slug' => 'clear_plugin_caches', 'label' => __('Clear Caches & Rebuild', 'tasty-fonts')]
+                ['slug' => 'clear_plugin_caches', 'label' => __('Clear Caches & Rebuild', 'tasty-fonts')],
+                __('Confirm the WordPress uploads folder exists and is writable, then rebuild plugin caches.', 'tasty-fonts'),
+                $this->docsUrl('Advanced-Tools')
             );
         }
 
@@ -431,8 +467,8 @@ final class HealthCheckService
         $generatedWritable = $generatedDir !== '' && (!is_dir($generatedDir) || is_writable($generatedDir));
         $severity = $rootWritable && $generatedWritable ? 'ok' : 'warning';
         $message = $severity === 'ok'
-            ? __('Managed storage is writable.', 'tasty-fonts')
-            : __('Managed storage may not be writable for font files or generated CSS.', 'tasty-fonts');
+            ? __('WordPress can write to the managed fonts and generated CSS folders.', 'tasty-fonts')
+            : __('WordPress may not be able to write font files or generated CSS.', 'tasty-fonts');
 
         return $this->check(
             'storage_root',
@@ -444,7 +480,11 @@ final class HealthCheckService
                 ['label' => __('Root', 'tasty-fonts'), 'value' => $root !== '' ? $root : __('Not available', 'tasty-fonts')],
                 ['label' => __('Generated folder', 'tasty-fonts'), 'value' => $generatedDir !== '' ? $generatedDir : __('Not available', 'tasty-fonts')],
             ],
-            $severity === 'ok' ? null : ['slug' => 'clear_plugin_caches', 'label' => __('Clear Caches & Rebuild', 'tasty-fonts')]
+            $severity === 'ok' ? null : ['slug' => 'clear_plugin_caches', 'label' => __('Clear Caches & Rebuild', 'tasty-fonts')],
+            $severity === 'ok'
+                ? __('Imports, uploads, and generated stylesheet writes can use the expected plugin storage folders.', 'tasty-fonts')
+                : __('Fix filesystem permissions before importing fonts or regenerating CSS, then rebuild plugin caches.', 'tasty-fonts'),
+            $this->docsUrl('Advanced-Tools')
         );
     }
 
@@ -465,12 +505,16 @@ final class HealthCheckService
             $available ? 'ok' : 'warning',
             __('Site Transfer', 'tasty-fonts'),
             $available
-                ? __('Site transfer bundles can be exported and validated.', 'tasty-fonts')
+                ? __('This server can create and validate ZIP transfer bundles.', 'tasty-fonts')
                 : ($message !== '' ? $message : __('ZipArchive is unavailable, so site transfer bundles cannot run on this server.', 'tasty-fonts')),
             [
                 ['label' => __('ZipArchive', 'tasty-fonts'), 'value' => $available ? __('Available', 'tasty-fonts') : __('Unavailable', 'tasty-fonts')],
             ],
-            null
+            null,
+            $available
+                ? __('Transfer bundles include settings, library metadata, and managed font files, but exclude runtime caches and secrets.', 'tasty-fonts')
+                : __('Enable the PHP ZipArchive extension on this server before exporting or validating transfer bundles.', 'tasty-fonts'),
+            $this->docsUrl('Advanced-Tools')
         );
     }
 
@@ -490,13 +534,17 @@ final class HealthCheckService
             $severity,
             __('Library Inventory', 'tasty-fonts'),
             $families > 0
-                ? __('Managed font families are available.', 'tasty-fonts')
-                : __('No managed font families are currently available.', 'tasty-fonts'),
+                ? __('The managed library contains font families that Tasty Fonts can deploy.', 'tasty-fonts')
+                : __('The managed library is empty, so there are no fonts to deploy yet.', 'tasty-fonts'),
             [
                 ['label' => __('Families', 'tasty-fonts'), 'value' => (string) $families],
                 ['label' => __('Files', 'tasty-fonts'), 'value' => (string) $files],
             ],
-            null
+            null,
+            $families > 0
+                ? __('Use Deploy Fonts to assign library families to sitewide roles and publish them to the front end.', 'tasty-fonts')
+                : __('Import Google, Bunny, Adobe, or uploaded fonts before assigning sitewide roles.', 'tasty-fonts'),
+            $this->docsUrl('Font-Library')
         );
     }
 
@@ -513,7 +561,10 @@ final class HealthCheckService
         string $title,
         string $message,
         array $evidence = [],
-        ?array $action = null
+        ?array $action = null,
+        string $guidance = '',
+        string $helpUrl = '',
+        string $helpLabel = ''
     ): array {
         return [
             'slug' => $slug,
@@ -521,10 +572,18 @@ final class HealthCheckService
             'severity' => $severity,
             'title' => $title,
             'message' => $message,
+            'guidance' => $guidance,
+            'help_url' => $helpUrl,
+            'help_label' => $helpLabel !== '' ? $helpLabel : __('Open knowledge base', 'tasty-fonts'),
             'evidence' => $evidence,
             'action' => $action,
             'actions' => $action === null ? [] : [$action],
         ];
+    }
+
+    private function docsUrl(string $page): string
+    {
+        return self::DOCS_BASE_URL . rawurlencode($page);
     }
 
     private function isLocalRestUrl(): bool

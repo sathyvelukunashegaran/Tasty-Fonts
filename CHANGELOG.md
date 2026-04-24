@@ -7,7 +7,16 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Reworked Advanced Tools into a power-user command center with Overview, Generated CSS, Developer, Transfer, and Activity tabs while preserving existing guarded maintenance and transfer workflows.
-- Expanded Advanced Tools with runtime manifest inspection, richer health checks, and REST endpoints for refreshing diagnostics and running safe maintenance actions.
+- Redesigned the Advanced Tools Overview around consistent board-and-row patterns for next-step guidance, health status, runtime details, and copyable debug paths.
+- Moved generated CSS download controls into the Generated CSS panel and aligned diagnostics tab headers, spacing, typography, and button placement across the Advanced Tools dashboard.
+- Expanded Advanced Tools health checks with clearer status logic, plain-language guidance, knowledge-base links, and hover help so warnings, advisories, and verified checks are easier to scan.
+- Changed optional Google Fonts API readiness so a missing saved API key is reported as an advisory instead of a passing verified check.
+- Expanded Advanced Tools with runtime manifest inspection and REST endpoints for refreshing diagnostics and running safe maintenance actions.
+
+### Fixed
+
+- Removed redundant Advanced Tools overview content, duplicate evidence lines, and repeated status details so Overview, Health, Runtime Details, and Copyable Paths do not restate the same information.
+- Fixed legacy Settings links for Developer and Transfer so those workflows live under Advanced Tools instead of remaining duplicated under Settings.
 
 ## [1.13.0] - 2026-04-24
 

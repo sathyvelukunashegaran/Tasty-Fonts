@@ -2221,7 +2221,7 @@ h3.tasty-fonts-section-title {
     box-shadow: none;
 }
 
-.tasty-fonts-system-details-panel {
+.tasty-fonts-copyable-paths-panel {
     padding: var(--tasty-space-4) var(--tasty-layout-0) var(--tasty-layout-0);
     border: var(--tasty-layout-0);
     border-top: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
@@ -10653,9 +10653,10 @@ h3.tasty-fonts-section-title {
 #tasty-fonts-diagnostics-page .tasty-fonts-diagnostics-context-item h2 {
     margin: var(--tasty-layout-0);
     color: var(--tasty-text);
-    font-size: var(--tasty-type-panel-title-size);
+    font-size: var(--tasty-type-section-title-size);
+    font-weight: var(--tasty-font-weight-bold);
     letter-spacing: var(--tasty-type-letter-spacing-none);
-    line-height: var(--tasty-line-height-tight);
+    line-height: var(--tasty-type-section-title-line-height);
 }
 
 #tasty-fonts-diagnostics-page .tasty-fonts-diagnostics-context-item p {
@@ -10688,16 +10689,134 @@ h3.tasty-fonts-section-title {
     border-bottom: var(--tasty-layout-0);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-system-details-panel .tasty-fonts-output-settings-copy h3 {
-    display: block;
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief {
+    display: grid;
+    grid-template-columns: minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) minmax(var(--tasty-layout-320px), var(--tasty-layout-2fr));
+    gap: var(--tasty-space-3);
+    align-items: center;
+    padding: var(--tasty-layout-14px) var(--tasty-layout-16px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle-strong);
+    border-left-width: var(--tasty-layout-3px);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface);
+    box-shadow: var(--tasty-shadow-card);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief--warning {
+    border-color: var(--tasty-border-warning-soft);
+    background: var(--tasty-surface);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief--critical {
+    border-color: var(--tasty-border-danger-soft);
+    background: var(--tasty-surface);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief--info {
+    border-color: var(--tasty-border-accent-soft);
+    background: var(--tasty-surface);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-status {
+    display: grid;
+    gap: var(--tasty-space-1);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-status h3,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-status p,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-details,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-detail dt,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-detail dd {
     margin: var(--tasty-layout-0);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-kicker {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-label-micro-size);
+    font-weight: var(--tasty-font-weight-bold);
+    letter-spacing: var(--tasty-type-letter-spacing-step);
+    line-height: var(--tasty-line-height-control);
+    text-transform: uppercase;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-status h3 {
     color: var(--tasty-text);
-    font-size: var(--tasty-type-panel-title-size);
+    font-size: var(--tasty-type-body-large-size);
+    font-weight: var(--tasty-font-weight-bold);
     letter-spacing: var(--tasty-type-letter-spacing-none);
     line-height: var(--tasty-line-height-tight);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-system-details-panel .tasty-fonts-output-settings-copy > p {
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-status p {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-body);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-details {
+    display: grid;
+    gap: var(--tasty-space-1);
+    min-width: var(--tasty-layout-0);
+    width: var(--tasty-layout-100pct);
+    padding: var(--tasty-layout-10px) var(--tasty-layout-12px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface-muted);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-context {
+    display: flex;
+    align-items: center;
+    gap: var(--tasty-space-2);
+    min-width: var(--tasty-layout-0);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-detail {
+    display: flex;
+    align-items: baseline;
+    gap: var(--tasty-space-1);
+    min-width: var(--tasty-layout-0);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-detail dt {
+    flex: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-88px);
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-label-micro-size);
+    font-weight: var(--tasty-font-weight-bold);
+    letter-spacing: var(--tasty-type-letter-spacing-step);
+    line-height: var(--tasty-line-height-control);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-detail dd {
+    min-width: var(--tasty-layout-0);
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-caption-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-body);
+    overflow-wrap: anywhere;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-suggested-action {
+    min-height: var(--tasty-layout-32px);
+    padding-inline: var(--tasty-layout-12px);
+    font-size: var(--tasty-type-caption-size);
+    font-weight: var(--tasty-font-weight-semibold);
+    white-space: nowrap;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-surface .tasty-fonts-output-settings-copy h3 {
+    display: block;
+    margin: var(--tasty-layout-0);
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-body-large-size);
+    font-weight: var(--tasty-font-weight-bold);
+    letter-spacing: var(--tasty-type-letter-spacing-none);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-surface .tasty-fonts-output-settings-copy > p {
     margin: var(--tasty-space-1) var(--tasty-layout-0) var(--tasty-layout-0);
     color: var(--tasty-text-muted);
     font-size: var(--tasty-type-caption-size);
@@ -10759,14 +10878,175 @@ h3.tasty-fonts-section-title {
     line-height: var(--tasty-line-height-code);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-system-details-panel {
+#tasty-fonts-diagnostics-page .tasty-fonts-copyable-paths-panel {
     padding: var(--tasty-layout-0);
     border: var(--tasty-layout-0);
     border-radius: var(--tasty-layout-0);
     background: transparent;
     gap: var(--tasty-space-3);
 }
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-surface {
+    display: grid;
+    gap: var(--tasty-space-2);
+    padding: var(--tasty-layout-0);
+    border: var(--tasty-layout-0);
+    background: transparent;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-check-section {
+    display: grid;
+    gap: var(--tasty-space-2);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-check-section h4 {
+    margin: var(--tasty-layout-0);
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-label-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-empty-state {
+    display: grid;
+    gap: var(--tasty-space-1);
+    padding: var(--tasty-space-3);
+    border: var(--tasty-layout-1px) dashed var(--tasty-border-subtle);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-empty-state strong,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-empty-state span {
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-body);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-empty-state strong {
+    color: var(--tasty-text);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-empty-state span {
+    color: var(--tasty-text-muted);
+}
+
 #tasty-fonts-diagnostics-page .tasty-fonts-diagnostics-grid {
+    gap: var(--tasty-space-2);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-board {
+    display: grid;
+    overflow: hidden;
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle-strong);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface);
+    box-shadow: var(--tasty-shadow-card);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-group + .tasty-fonts-health-group {
+    border-top: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--tasty-space-2);
+    padding: var(--tasty-layout-10px) var(--tasty-layout-14px);
+    border-bottom: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    background: var(--tasty-surface);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-group-head h4 {
+    margin: var(--tasty-layout-0);
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-label-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-group-count {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-label-size);
+    font-weight: var(--tasty-font-weight-semibold);
+    line-height: var(--tasty-line-height-control);
+    white-space: nowrap;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-list {
+    display: grid;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row {
+    display: grid;
+    grid-template-columns: var(--tasty-layout-10px) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) auto;
+    gap: var(--tasty-space-3);
+    align-items: flex-start;
+    padding: var(--tasty-layout-12px) var(--tasty-layout-14px);
+    background: var(--tasty-surface);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row + .tasty-fonts-health-row {
+    border-top: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row-marker {
+    width: var(--tasty-layout-8px);
+    height: var(--tasty-layout-8px);
+    margin-top: var(--tasty-layout-5px);
+    border-radius: var(--tasty-radius-pill);
+    background: var(--tasty-success);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row--info .tasty-fonts-health-row-marker {
+    background: var(--tasty-accent);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row--warning .tasty-fonts-health-row-marker {
+    background: var(--tasty-warning);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row--critical .tasty-fonts-health-row-marker {
+    background: var(--tasty-danger);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row--reference .tasty-fonts-health-row-marker {
+    background: var(--tasty-text-muted);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row-copy {
+    display: grid;
+    gap: var(--tasty-space-1);
+    min-width: var(--tasty-layout-0);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row-title {
+    display: grid;
+    gap: var(--tasty-space-1);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row-title strong {
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-body-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row-title span {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-body);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row-title .tasty-fonts-code {
+    display: block;
+    color: var(--tasty-text);
+    overflow-wrap: anywhere;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-row-actions {
+    display: flex;
+    align-items: center;
     gap: var(--tasty-space-2);
 }
 
@@ -10786,9 +11066,12 @@ h3.tasty-fonts-section-title {
     box-shadow: var(--tasty-shadow-card);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card--critical,
 #tasty-fonts-diagnostics-page .tasty-fonts-health-check-card--warning {
-    border-color: rgba(var(--tasty-danger-rgb), var(--tasty-alpha-18));
+    border-color: var(--tasty-border-warning-soft);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card--critical {
+    border-color: var(--tasty-border-danger-soft);
 }
 
 #tasty-fonts-diagnostics-page .tasty-fonts-health-check-card-head {
@@ -10798,15 +11081,46 @@ h3.tasty-fonts-section-title {
     gap: var(--tasty-space-2);
 }
 
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card-actions,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-health-item-head {
+    display: flex;
+    align-items: center;
+    gap: var(--tasty-space-2);
+    min-width: var(--tasty-layout-0);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card-actions {
+    flex: var(--tasty-layout-0) var(--tasty-layout-0) auto;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-health-item-head {
+    justify-content: space-between;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-help-trigger {
+    --tasty-pill-current-height: var(--tasty-layout-22px);
+    --tasty-pill-current-padding-x: var(--tasty-layout-8px);
+    --tasty-pill-current-background: var(--tasty-surface);
+    --tasty-pill-current-border: var(--tasty-border-subtle-strong);
+    --tasty-pill-current-color: var(--tasty-text-muted);
+    --tasty-pill-current-font-size: var(--tasty-type-label-micro-size);
+    --tasty-pill-current-font-weight: var(--tasty-font-weight-bold);
+    --tasty-pill-current-letter-spacing: var(--tasty-type-letter-spacing-none);
+    --tasty-pill-current-text-transform: none;
+    flex: var(--tasty-layout-0) var(--tasty-layout-0) auto;
+    min-width: var(--tasty-layout-22px);
+    border-radius: var(--tasty-radius-pill);
+    text-decoration: none;
+}
+
 #tasty-fonts-diagnostics-page .tasty-fonts-health-check-card h4,
-#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card p,
-#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list,
-#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dt,
-#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dd {
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card h5,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card p {
     margin: var(--tasty-layout-0);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card h4 {
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card h4,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card h5 {
     color: var(--tasty-text);
     font-size: var(--tasty-type-body-size);
     font-weight: var(--tasty-font-weight-bold);
@@ -10837,35 +11151,164 @@ h3.tasty-fonts-section-title {
     color: var(--tasty-success);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-health-badge--warning,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-badge--warning {
+    background: var(--tasty-surface-warning);
+    color: var(--tasty-warning);
+}
+
 #tasty-fonts-diagnostics-page .tasty-fonts-health-badge--critical {
-    background: rgba(var(--tasty-danger-rgb), var(--tasty-alpha-10));
+    background: var(--tasty-surface-danger);
     color: var(--tasty-danger);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list {
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-debug-panel {
+    gap: var(--tasty-space-2);
+    padding-top: var(--tasty-space-3);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-subsection-head h4 {
+    margin: var(--tasty-layout-0);
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-label-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-control);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-advisory-list,
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-fact-row {
+    display: flex;
+    align-items: stretch;
+    gap: var(--tasty-space-2);
+    flex-wrap: wrap;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-advisory-item {
     display: grid;
     gap: var(--tasty-space-1);
+    flex: var(--tasty-layout-1) var(--tasty-layout-1) var(--tasty-layout-260px);
+    min-width: min(var(--tasty-layout-100pct), var(--tasty-layout-260px));
+    padding: var(--tasty-layout-10px) var(--tasty-layout-12px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-accent-soft);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list > div {
-    display: grid;
-    grid-template-columns: minmax(var(--tasty-layout-88px), max-content) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-advisory-item strong,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-advisory-item span {
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-body);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-advisory-item strong {
+    color: var(--tasty-accent);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-advisory-item span {
+    color: var(--tasty-text-muted);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-fact {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tasty-layout-28px);
+    border-radius: var(--tasty-radius-pill);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-fact {
     gap: var(--tasty-space-2);
+    padding: var(--tasty-layout-0) var(--tasty-layout-12px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    background: var(--tasty-surface);
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dt {
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-fact span {
     color: var(--tasty-text-muted);
     font-size: var(--tasty-type-label-micro-size);
     font-weight: var(--tasty-font-weight-bold);
     text-transform: uppercase;
 }
 
-#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dd {
-    min-width: var(--tasty-layout-0);
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-fact strong {
     color: var(--tasty-text);
+    font-size: var(--tasty-type-body-size);
+    line-height: var(--tasty-line-height-control);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-panel {
+    display: grid;
+    gap: var(--tasty-space-2);
+    padding: var(--tasty-layout-12px) var(--tasty-layout-14px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface-muted);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--tasty-space-3);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-header h4,
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-header p {
+    margin: var(--tasty-layout-0);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-header h4 {
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-label-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-header p {
+    margin-top: var(--tasty-space-1);
+    color: var(--tasty-text-muted);
     font-size: var(--tasty-type-caption-size);
-    overflow-wrap: anywhere;
+    line-height: var(--tasty-line-height-body);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tasty-layout-24px);
+    padding: var(--tasty-layout-0) var(--tasty-layout-10px);
+    border-radius: var(--tasty-radius-pill);
+    background: rgba(var(--tasty-success-rgb), var(--tasty-alpha-10));
+    color: var(--tasty-success);
+    font-size: var(--tasty-type-label-micro-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-control);
+    white-space: nowrap;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--tasty-layout-100pct), var(--tasty-layout-260px)), var(--tasty-layout-1fr)));
+    gap: var(--tasty-space-2);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-item {
+    display: grid;
+    gap: var(--tasty-space-1);
+    padding: var(--tasty-layout-10px) var(--tasty-layout-12px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-item strong {
+    color: var(--tasty-success);
+    font-size: var(--tasty-type-caption-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-item span {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-body);
 }
 
 #tasty-fonts-diagnostics-page .tasty-fonts-runtime-family-table {
@@ -11156,6 +11599,30 @@ h3.tasty-fonts-section-title {
     }
     #tasty-fonts-settings-page .tasty-fonts-integration-toolbar-header {
         align-items: stretch;
+    }
+    #tasty-fonts-diagnostics-page .tasty-fonts-overview-brief {
+        grid-template-columns: minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
+    }
+    #tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-context {
+        display: grid;
+    }
+    #tasty-fonts-diagnostics-page .tasty-fonts-overview-brief-detail {
+        display: grid;
+    }
+    #tasty-fonts-diagnostics-page .tasty-fonts-health-row {
+        grid-template-columns: var(--tasty-layout-10px) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
+    }
+    #tasty-fonts-diagnostics-page .tasty-fonts-health-row-actions {
+        grid-column: var(--tasty-layout-2);
+        justify-content: flex-start;
+    }
+    #tasty-fonts-diagnostics-page .tasty-fonts-overview-suggested-action,
+    #tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-count {
+        width: var(--tasty-layout-100pct);
+        justify-content: center;
+    }
+    #tasty-fonts-diagnostics-page .tasty-fonts-overview-pass-header {
+        flex-direction: column;
     }
 }
 

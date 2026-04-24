@@ -2245,12 +2245,17 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
 
     assertSameValue('generated_css', (string) ($checks[0]['slug'] ?? ''), 'Health checks should expose a stable generated CSS check slug.');
     assertSameValue('warning', (string) ($checks[0]['severity'] ?? ''), 'Missing generated CSS file delivery should be reported as a warning.');
+    assertContainsValue('Run Regenerate CSS File', (string) ($checks[0]['guidance'] ?? ''), 'Generated CSS warnings should explain the next practical step.');
+    assertContainsValue('Advanced-Tools', (string) ($checks[0]['help_url'] ?? ''), 'Generated CSS checks should link to the Advanced Tools knowledge base page.');
+    assertSameValue('Open knowledge base', (string) ($checks[0]['help_label'] ?? ''), 'Health checks should expose a consistent knowledge-base link label.');
     assertSameValue('storage_root', (string) ($checks[1]['slug'] ?? ''), 'Health checks should expose managed storage as a first-class check.');
     assertSameValue('critical', (string) ($checks[1]['severity'] ?? ''), 'Unavailable managed storage should be reported as critical.');
     $checksBySlug = [];
 
     foreach ($checks as $check) {
         $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+        assertSameValue(true, trim((string) ($check['guidance'] ?? '')) !== '', 'Every health check should explain what the result means or what to do next.');
+        assertSameValue(true, trim((string) ($check['help_url'] ?? '')) !== '', 'Every health check should expose a knowledge-base URL.');
     }
 
     assertSameValue(true, isset($checksBySlug['site_transfer']), 'Health checks should expose site transfer capability.');
@@ -2259,6 +2264,7 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
     assertSameValue(true, isset($checksBySlug['font_preload']), 'Health checks should expose preload readiness.');
     assertSameValue(true, isset($checksBySlug['block_editor_sync']), 'Health checks should expose editor sync risk.');
     assertSameValue(true, isset($checksBySlug['google_fonts_api']), 'Health checks should expose Google API readiness.');
+    assertSameValue('info', (string) ($checksBySlug['google_fonts_api']['severity'] ?? ''), 'Missing Google API keys should be advisory, not a passing verified check.');
     assertSameValue(true, isset($checksBySlug['update_channel']), 'Health checks should expose update channel readiness.');
     assertSameValue('critical', (string) ($summary['status'] ?? ''), 'Health summaries should elevate critical checks above warnings and notices.');
 };

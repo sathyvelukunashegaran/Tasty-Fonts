@@ -1,67 +1,157 @@
                     <?php
                     $diagnosticItems = isset($diagnosticItems) && is_array($diagnosticItems) ? $diagnosticItems : [];
-                    $overviewMetrics = isset($overviewMetrics) && is_array($overviewMetrics) ? $overviewMetrics : [];
                     $developerToolStatuses = isset($developerToolStatuses) && is_array($developerToolStatuses) ? $developerToolStatuses : [];
                     $generatedCssPanel = isset($generatedCssPanel) && is_array($generatedCssPanel) ? $generatedCssPanel : [];
                     $advancedTools = isset($advancedTools) && is_array($advancedTools) ? $advancedTools : [];
                     $healthChecks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
-                    $healthSummary = is_array($advancedTools['health_summary'] ?? null) ? $advancedTools['health_summary'] : [];
                     $runtimeManifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
                     $runtimeFamilies = is_array($runtimeManifest['families'] ?? null) ? $runtimeManifest['families'] : [];
-                    $runtimePreloadUrls = is_array($runtimeManifest['preload_urls'] ?? null) ? $runtimeManifest['preload_urls'] : [];
-                    $runtimePreconnectOrigins = is_array($runtimeManifest['preconnect_origins'] ?? null) ? $runtimeManifest['preconnect_origins'] : [];
-                    $runtimeExternalStylesheets = is_array($runtimeManifest['external_stylesheets'] ?? null) ? $runtimeManifest['external_stylesheets'] : [];
                     $siteTransfer = isset($siteTransfer) && is_array($siteTransfer) ? $siteTransfer : [];
                     $logs = isset($logs) && is_array($logs) ? $logs : [];
                     $activityActorOptions = isset($activityActorOptions) && is_array($activityActorOptions) ? $activityActorOptions : [];
                     $showSettingsDescriptions = empty($trainingWheelsOff);
                     $showActivityLog = !empty($showActivityLog);
-                    $generatedCssAvailable = trim((string) ($generatedCssPanel['value'] ?? '')) !== '';
                     $generatedCssDownloadUrl = trim((string) ($generatedCssPanel['download_url'] ?? ''));
-                    $systemIssueCount = 0;
+                    $attentionHealthChecks = [];
+                    $advisoryHealthChecks = [];
+                    $passingHealthChecks = [];
+                    $copyableDiagnosticItems = [];
+                    $criticalHealthCount = 0;
+                    $warningHealthCount = 0;
 
-                    foreach ($diagnosticItems as $item) {
-                        $value = strtolower(trim((string) ($item['value'] ?? '')));
-
-                        if ($value === '' || str_contains($value, 'not available') || str_contains($value, 'not generated')) {
-                            $systemIssueCount++;
+                    foreach ($healthChecks as $healthCheck) {
+                        if (!is_array($healthCheck)) {
+                            continue;
                         }
+
+                        $severity = (string) ($healthCheck['severity'] ?? 'ok');
+
+                        if ($severity === 'critical' || $severity === 'warning') {
+                            $attentionHealthChecks[] = $healthCheck;
+
+                            if ($severity === 'critical') {
+                                $criticalHealthCount++;
+                            } else {
+                                $warningHealthCount++;
+                            }
+
+                            continue;
+                        }
+
+                        if ($severity === 'info') {
+                            $advisoryHealthChecks[] = $healthCheck;
+                            continue;
+                        }
+
+                        $passingHealthChecks[] = $healthCheck;
                     }
 
-                    $healthSummaryLabel = trim((string) ($healthSummary['label'] ?? ''));
+                    foreach ($diagnosticItems as $item) {
+                        if (!is_array($item) || empty($item['copyable'])) {
+                            continue;
+                        }
 
-                    $commandCenterStats = [
-                        [
-                            'label' => __('Generated CSS', 'tasty-fonts'),
-                            'value' => $generatedCssAvailable ? __('Ready', 'tasty-fonts') : __('Unavailable', 'tasty-fonts'),
-                        ],
-                        [
-                            'label' => __('System Checks', 'tasty-fonts'),
-                            'value' => $healthSummaryLabel !== ''
-                                ? $healthSummaryLabel
-                                : ($systemIssueCount > 0
+                        $copyableDiagnosticItems[] = $item;
+                    }
+
+                    $attentionHealthCount = count($attentionHealthChecks);
+                    $advisoryHealthCount = count($advisoryHealthChecks);
+                    $runtimeFamilyCount = count($runtimeFamilies);
+                    $activityEventCount = count($logs);
+                    $advancedToolsPageUrl = add_query_arg(['page' => 'tasty-custom-fonts', 'tf_page' => 'diagnostics'], admin_url('admin.php'));
+                    $settingsPageUrl = add_query_arg(['page' => 'tasty-custom-fonts', 'tf_page' => 'settings'], admin_url('admin.php'));
+                    $deployFontsPageUrl = add_query_arg(['page' => 'tasty-custom-fonts'], admin_url('admin.php'));
+                    $overviewSuggestedActionLabel = __('Inspect Generated CSS', 'tasty-fonts');
+                    $overviewSuggestedActionUrl = add_query_arg('tf_studio', 'generated', $advancedToolsPageUrl);
+                    $overviewFeaturedCheck = $attentionHealthChecks[0] ?? ($advisoryHealthChecks[0] ?? null);
+                    $overviewBriefKicker = __('Next Step', 'tasty-fonts');
+                    $overviewStatusTone = 'ok';
+                    $overviewStatusTitle = __('No blocking work right now', 'tasty-fonts');
+                    $overviewStatusMessage = __('Use Generated CSS when you need to inspect the exact stylesheet Tasty Fonts is serving.', 'tasty-fonts');
+                    if ($criticalHealthCount > 0) {
+                        $overviewStatusTone = 'critical';
+                        $overviewStatusTitle = sprintf(
+                            /* translators: %d: number of critical checks */
+                            _n('%d critical check', '%d critical checks', $criticalHealthCount, 'tasty-fonts'),
+                            $criticalHealthCount
+                        );
+                        $overviewStatusMessage = __('Resolve this before relying on generated assets or transfer bundles.', 'tasty-fonts');
+                    } elseif ($warningHealthCount > 0) {
+                        $overviewStatusTone = 'warning';
+                        $overviewStatusTitle = sprintf(
+                            /* translators: %d: number of warning checks */
+                            _n('%d check needs attention', '%d checks need attention', $warningHealthCount, 'tasty-fonts'),
+                            $warningHealthCount
+                        );
+                        $overviewStatusMessage = __('Start here before tuning the rest of the dashboard.', 'tasty-fonts');
+                    } elseif ($runtimeFamilyCount === 0) {
+                        $overviewStatusTone = 'info';
+                        $overviewStatusTitle = __('Runtime idle', 'tasty-fonts');
+                        $overviewStatusMessage = __('No managed families are active on the front end yet.', 'tasty-fonts');
+                        $overviewSuggestedActionLabel = __('Deploy Fonts', 'tasty-fonts');
+                        $overviewSuggestedActionUrl = $deployFontsPageUrl;
+                    } elseif ($advisoryHealthCount > 0) {
+                        $overviewStatusTone = 'info';
+                        $overviewStatusTitle = sprintf(
+                            /* translators: %d: number of advisory checks */
+                            _n('%d advisory', '%d advisories', $advisoryHealthCount, 'tasty-fonts'),
+                            $advisoryHealthCount
+                        );
+                        $overviewStatusMessage = __('No blocking issues were found; review advisories when tuning runtime behavior.', 'tasty-fonts');
+                    }
+
+                    if (is_array($overviewFeaturedCheck)) {
+                        $featuredTitle = trim((string) ($overviewFeaturedCheck['title'] ?? ''));
+                        $featuredMessage = trim((string) ($overviewFeaturedCheck['message'] ?? ''));
+                        $featuredGuidance = trim((string) ($overviewFeaturedCheck['guidance'] ?? ''));
+                        $featuredSlug = sanitize_key((string) ($overviewFeaturedCheck['slug'] ?? ''));
+                        $featuredHelpUrl = trim((string) ($overviewFeaturedCheck['help_url'] ?? ''));
+                        $featuredSeverity = (string) ($overviewFeaturedCheck['severity'] ?? 'info');
+                        $featuredAction = is_array($overviewFeaturedCheck['action'] ?? null) ? $overviewFeaturedCheck['action'] : null;
+                        $featuredActionSlug = $featuredAction !== null ? sanitize_key((string) ($featuredAction['slug'] ?? '')) : '';
+                        if ($featuredTitle !== '') {
+                            $overviewBriefKicker = $featuredSeverity === 'info' ? __('Tuning Note', 'tasty-fonts') : __('Next Step', 'tasty-fonts');
+                            $overviewStatusTitle = $featuredSeverity === 'info'
                                 ? sprintf(
-                                    /* translators: %d: number of diagnostic warnings */
-                                    _n('%d warning', '%d warnings', $systemIssueCount, 'tasty-fonts'),
-                                    $systemIssueCount
+                                    /* translators: %s: advisory health check title */
+                                    __('Review %s', 'tasty-fonts'),
+                                    $featuredTitle
                                 )
-                                : __('Clear', 'tasty-fonts')),
-                        ],
-                        [
-                            'label' => __('Activity', 'tasty-fonts'),
-                            'value' => sprintf(
-                                /* translators: %d: number of activity log entries */
-                                _n('%d event', '%d events', count($logs), 'tasty-fonts'),
-                                count($logs)
-                            ),
-                        ],
-                    ];
+                                : sprintf(
+                                    /* translators: %s: health check title needing attention */
+                                    __('Fix %s', 'tasty-fonts'),
+                                    $featuredTitle
+                                );
+                        }
 
-                    foreach ($overviewMetrics as $metric) {
-                        $commandCenterStats[] = [
-                            'label' => (string) ($metric['label'] ?? ''),
-                            'value' => (string) ($metric['value'] ?? ''),
-                        ];
+                        if ($featuredGuidance !== '') {
+                            $overviewStatusMessage = $featuredGuidance;
+                        } elseif ($featuredMessage !== '') {
+                            $overviewStatusMessage = $featuredMessage;
+                        }
+
+                        if ($featuredActionSlug === 'clear_plugin_caches' || $featuredActionSlug === 'regenerate_css' || $featuredActionSlug === 'reset_integration_detection_state') {
+                            $overviewSuggestedActionLabel = __('Open Developer Tools', 'tasty-fonts');
+                            $overviewSuggestedActionUrl = add_query_arg('tf_studio', 'maintenance', $advancedToolsPageUrl);
+                        } elseif ($featuredSlug === 'block_editor_sync') {
+                            $overviewSuggestedActionLabel = __('Review Sync Settings', 'tasty-fonts');
+                            $overviewSuggestedActionUrl = add_query_arg('tf_studio', 'integrations', $settingsPageUrl);
+                        } elseif ($featuredSlug === 'font_preload') {
+                            $overviewSuggestedActionLabel = __('Open Output Settings', 'tasty-fonts');
+                            $overviewSuggestedActionUrl = add_query_arg('tf_studio', 'output-settings', $settingsPageUrl);
+                        } elseif ($featuredSlug === 'update_channel') {
+                            $overviewSuggestedActionLabel = __('Open Behavior Settings', 'tasty-fonts');
+                            $overviewSuggestedActionUrl = add_query_arg('tf_studio', 'plugin-behavior', $settingsPageUrl);
+                        } elseif ($featuredSlug === 'site_transfer') {
+                            $overviewSuggestedActionLabel = __('Open Transfer', 'tasty-fonts');
+                            $overviewSuggestedActionUrl = add_query_arg('tf_studio', 'transfer', $advancedToolsPageUrl);
+                        } elseif ($featuredSlug === 'library_inventory') {
+                            $overviewSuggestedActionLabel = __('Open Font Library', 'tasty-fonts');
+                            $overviewSuggestedActionUrl = add_query_arg(['page' => 'tasty-custom-fonts', 'tf_page' => 'library'], admin_url('admin.php'));
+                        } elseif ($featuredHelpUrl !== '') {
+                            $overviewSuggestedActionLabel = __('Open Knowledge Base', 'tasty-fonts');
+                            $overviewSuggestedActionUrl = $featuredHelpUrl;
+                        }
                     }
 
                     $developerToolGroups = [
@@ -235,109 +325,187 @@
                                 role="tabpanel"
                                 aria-labelledby="tasty-fonts-diagnostics-tab-overview"
                             >
-                                <div class="tasty-fonts-advanced-overview-grid">
-                                    <?php foreach ($commandCenterStats as $metric): ?>
-                                        <?php
-                                        $metricLabel = trim((string) ($metric['label'] ?? ''));
-                                        $metricValue = trim((string) ($metric['value'] ?? ''));
-
-                                        if ($metricLabel === '' || $metricValue === '') {
-                                            continue;
-                                        }
-                                        ?>
-                                        <div class="tasty-fonts-diagnostic-item">
-                                            <div class="tasty-fonts-diagnostic-label"><?php echo esc_html($metricLabel); ?></div>
-                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html($metricValue); ?></div>
+                                <div class="tasty-fonts-health-board tasty-fonts-overview-next-step-board">
+                                    <section class="tasty-fonts-health-group tasty-fonts-health-group--next-step" aria-label="<?php esc_attr_e('Next step', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php echo esc_html($overviewBriefKicker); ?></h4>
+                                            <span class="tasty-fonts-health-group-count">
+                                                <?php
+                                                echo esc_html(
+                                                    sprintf(
+                                                        /* translators: 1: attention count, 2: advisory count */
+                                                        __('%1$d attention / %2$d advisories', 'tasty-fonts'),
+                                                        $attentionHealthCount,
+                                                        $advisoryHealthCount
+                                                    )
+                                                );
+                                                ?>
+                                            </span>
                                         </div>
-                                    <?php endforeach; ?>
+                                        <div class="tasty-fonts-health-list">
+                                            <article class="tasty-fonts-health-row tasty-fonts-health-row--<?php echo esc_attr($overviewStatusTone); ?>">
+                                                <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+                                                <div class="tasty-fonts-health-row-copy">
+                                                    <div class="tasty-fonts-health-row-title">
+                                                        <strong><?php echo esc_html($overviewStatusTitle); ?></strong>
+                                                        <?php if ($showSettingsDescriptions): ?>
+                                                            <span><?php echo esc_html($overviewStatusMessage); ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                                <div class="tasty-fonts-health-row-actions">
+                                                    <a
+                                                        class="button button-secondary tasty-fonts-overview-suggested-action"
+                                                        href="<?php echo esc_url($overviewSuggestedActionUrl); ?>"
+                                                    >
+                                                        <?php echo esc_html($overviewSuggestedActionLabel); ?>
+                                                    </a>
+                                                </div>
+                                            </article>
+                                        </div>
+                                    </section>
                                 </div>
                                 <?php if ($healthChecks !== []): ?>
-                                    <div class="tasty-fonts-system-details-panel tasty-fonts-advanced-health-panel">
+                                    <div class="tasty-fonts-overview-surface tasty-fonts-advanced-health-panel" id="tasty-fonts-overview-health">
                                         <div class="tasty-fonts-output-settings-copy">
-                                            <h3><?php esc_html_e('Health Checks', 'tasty-fonts'); ?></h3>
+                                            <h3><?php esc_html_e('Health', 'tasty-fonts'); ?></h3>
                                             <?php if ($showSettingsDescriptions): ?>
-                                                <p><?php esc_html_e('Runtime readiness, storage, provider, integration, transfer, and update checks.', 'tasty-fonts'); ?></p>
+                                                <p><?php esc_html_e('One checklist for runtime, storage, provider, transfer, and update readiness.', 'tasty-fonts'); ?></p>
                                             <?php endif; ?>
                                         </div>
-                                        <div class="tasty-fonts-advanced-health-grid">
-                                            <?php foreach ($healthChecks as $healthCheck): ?>
+                                        <div class="tasty-fonts-health-board">
+                                            <?php
+                                            $overviewHealthGroups = [
+                                                [
+                                                    'slug' => 'attention',
+                                                    'title' => __('Needs Attention', 'tasty-fonts'),
+                                                    'checks' => $attentionHealthChecks,
+                                                    'summary' => sprintf(
+                                                        /* translators: %d: number of health checks needing attention */
+                                                        _n('%d item', '%d items', count($attentionHealthChecks), 'tasty-fonts'),
+                                                        count($attentionHealthChecks)
+                                                    ),
+                                                ],
+                                                [
+                                                    'slug' => 'advisory',
+                                                    'title' => __('Advisory', 'tasty-fonts'),
+                                                    'checks' => $advisoryHealthChecks,
+                                                    'summary' => sprintf(
+                                                        /* translators: %d: number of advisory health checks */
+                                                        _n('%d note', '%d notes', count($advisoryHealthChecks), 'tasty-fonts'),
+                                                        count($advisoryHealthChecks)
+                                                    ),
+                                                ],
+                                                [
+                                                    'slug' => 'verified',
+                                                    'title' => __('Verified', 'tasty-fonts'),
+                                                    'checks' => $passingHealthChecks,
+                                                    'summary' => sprintf(
+                                                        /* translators: %d: number of passing health checks */
+                                                        _n('%d passing', '%d passing', count($passingHealthChecks), 'tasty-fonts'),
+                                                        count($passingHealthChecks)
+                                                    ),
+                                                ],
+                                            ];
+                                            ?>
+                                            <?php foreach ($overviewHealthGroups as $healthGroup): ?>
                                                 <?php
-                                                if (!is_array($healthCheck)) {
+                                                $groupChecks = is_array($healthGroup['checks'] ?? null) ? $healthGroup['checks'] : [];
+
+                                                if ($groupChecks === []) {
                                                     continue;
                                                 }
 
-                                                $healthSeverity = sanitize_html_class((string) ($healthCheck['severity'] ?? 'ok'));
-                                                $healthTitle = trim((string) ($healthCheck['title'] ?? ''));
-                                                $healthMessage = trim((string) ($healthCheck['message'] ?? ''));
-                                                $healthEvidence = is_array($healthCheck['evidence'] ?? null) ? $healthCheck['evidence'] : [];
-
-                                                if ($healthTitle === '') {
-                                                    continue;
-                                                }
+                                                $healthGroupSlug = sanitize_html_class((string) ($healthGroup['slug'] ?? 'group'));
                                                 ?>
-                                                <article class="tasty-fonts-health-check-card tasty-fonts-health-check-card--<?php echo esc_attr($healthSeverity); ?>">
-                                                    <div class="tasty-fonts-health-check-card-head">
-                                                        <h4><?php echo esc_html($healthTitle); ?></h4>
-                                                        <span class="tasty-fonts-health-badge tasty-fonts-health-badge--<?php echo esc_attr($healthSeverity); ?>"><?php echo esc_html(ucfirst($healthSeverity)); ?></span>
+                                                <section class="tasty-fonts-health-group tasty-fonts-health-group--<?php echo esc_attr($healthGroupSlug); ?>" aria-label="<?php echo esc_attr((string) ($healthGroup['title'] ?? '')); ?>">
+                                                    <div class="tasty-fonts-health-group-head">
+                                                        <h4><?php echo esc_html((string) ($healthGroup['title'] ?? '')); ?></h4>
+                                                        <span class="tasty-fonts-health-group-count"><?php echo esc_html((string) ($healthGroup['summary'] ?? '')); ?></span>
                                                     </div>
-                                                    <?php if ($showSettingsDescriptions && $healthMessage !== ''): ?>
-                                                        <p><?php echo esc_html($healthMessage); ?></p>
-                                                    <?php endif; ?>
-                                                    <?php if ($healthEvidence !== []): ?>
-                                                        <dl class="tasty-fonts-health-evidence-list">
-                                                            <?php foreach (array_slice($healthEvidence, 0, 3) as $evidence): ?>
-                                                                <?php
-                                                                if (!is_array($evidence)) {
-                                                                    continue;
-                                                                }
+                                                    <div class="tasty-fonts-health-list">
+                                                        <?php foreach ($groupChecks as $healthCheck): ?>
+                                                            <?php
+                                                            if (!is_array($healthCheck)) {
+                                                                continue;
+                                                            }
 
-                                                                $evidenceLabel = trim((string) ($evidence['label'] ?? ''));
-                                                                $evidenceValue = trim((string) ($evidence['value'] ?? ''));
+                                                            $healthSeverity = sanitize_html_class((string) ($healthCheck['severity'] ?? 'ok'));
+                                                            $healthTitle = trim((string) ($healthCheck['title'] ?? ''));
+                                                            $healthMessage = trim((string) ($healthCheck['message'] ?? ''));
+                                                            $healthGuidance = trim((string) ($healthCheck['guidance'] ?? ''));
+                                                            $healthHelpUrl = trim((string) ($healthCheck['help_url'] ?? ''));
+                                                            $healthTooltip = trim($healthMessage . ' ' . $healthGuidance);
+                                                            $healthStatusLabel = match ($healthSeverity) {
+                                                                'critical' => __('Critical', 'tasty-fonts'),
+                                                                'warning' => __('Warning', 'tasty-fonts'),
+                                                                'info' => __('Advisory', 'tasty-fonts'),
+                                                                default => __('Verified', 'tasty-fonts'),
+                                                            };
 
-                                                                if ($evidenceLabel === '' || $evidenceValue === '') {
-                                                                    continue;
-                                                                }
-                                                                ?>
-                                                                <div>
-                                                                    <dt><?php echo esc_html($evidenceLabel); ?></dt>
-                                                                    <dd><?php echo esc_html($evidenceValue); ?></dd>
+                                                            if ($healthTitle === '') {
+                                                                continue;
+                                                            }
+                                                            ?>
+                                                            <article class="tasty-fonts-health-row tasty-fonts-health-row--<?php echo esc_attr($healthSeverity); ?>">
+                                                                <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+                                                                <div class="tasty-fonts-health-row-copy">
+                                                                    <div class="tasty-fonts-health-row-title">
+                                                                        <strong><?php echo esc_html($healthTitle); ?></strong>
+                                                                        <?php if ($showSettingsDescriptions && $healthMessage !== ''): ?>
+                                                                            <span><?php echo esc_html($healthMessage); ?></span>
+                                                                        <?php endif; ?>
+                                                                    </div>
                                                                 </div>
-                                                            <?php endforeach; ?>
-                                                        </dl>
-                                                    <?php endif; ?>
-                                                </article>
+                                                                <div class="tasty-fonts-health-row-actions">
+                                                                    <?php if ($healthHelpUrl !== ''): ?>
+                                                                        <a
+                                                                            class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-health-help-trigger"
+                                                                            href="<?php echo esc_url($healthHelpUrl); ?>"
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            aria-label="<?php echo esc_attr(sprintf(__('Open knowledge base for %s', 'tasty-fonts'), $healthTitle)); ?>"
+                                                                            <?php $this->renderPassiveHelpAttributes($healthTooltip); ?>
+                                                                        >
+                                                                            <?php esc_html_e('?', 'tasty-fonts'); ?>
+                                                                        </a>
+                                                                    <?php endif; ?>
+                                                                    <span class="tasty-fonts-health-badge tasty-fonts-health-badge--<?php echo esc_attr($healthSeverity); ?>"><?php echo esc_html($healthStatusLabel); ?></span>
+                                                                </div>
+                                                            </article>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </section>
                                             <?php endforeach; ?>
                                         </div>
                                     </div>
                                 <?php endif; ?>
-                                <div class="tasty-fonts-system-details-panel tasty-fonts-runtime-inspector-panel">
+                                <div class="tasty-fonts-overview-surface tasty-fonts-runtime-inspector-panel tasty-fonts-overview-debug-panel">
                                     <div class="tasty-fonts-output-settings-copy">
-                                        <h3><?php esc_html_e('Runtime Inspector', 'tasty-fonts'); ?></h3>
+                                        <h3><?php esc_html_e('Runtime Details', 'tasty-fonts'); ?></h3>
                                         <?php if ($showSettingsDescriptions): ?>
-                                            <p><?php esc_html_e('Active deliveries, connection hints, preloads, and external runtime stylesheets.', 'tasty-fonts'); ?></p>
+                                            <p><?php esc_html_e('Reference values for debugging the current front-end output.', 'tasty-fonts'); ?></p>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="tasty-fonts-advanced-overview-grid">
-                                        <div class="tasty-fonts-diagnostic-item">
-                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('Active Families', 'tasty-fonts'); ?></div>
-                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimeFamilies)); ?></div>
-                                        </div>
-                                        <div class="tasty-fonts-diagnostic-item">
-                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('Preloads', 'tasty-fonts'); ?></div>
-                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimePreloadUrls)); ?></div>
-                                        </div>
-                                        <div class="tasty-fonts-diagnostic-item">
-                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('Preconnects', 'tasty-fonts'); ?></div>
-                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimePreconnectOrigins)); ?></div>
-                                        </div>
-                                        <div class="tasty-fonts-diagnostic-item">
-                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('External CSS', 'tasty-fonts'); ?></div>
-                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimeExternalStylesheets)); ?></div>
-                                        </div>
-                                    </div>
-                                    <?php if ($runtimeFamilies !== []): ?>
-                                        <div class="tasty-fonts-runtime-family-table" role="table" aria-label="<?php esc_attr_e('Active runtime delivery profiles', 'tasty-fonts'); ?>">
-                                            <?php foreach ($runtimeFamilies as $runtimeFamily): ?>
+                                    <div class="tasty-fonts-health-board tasty-fonts-overview-reference-board">
+                                        <section class="tasty-fonts-health-group tasty-fonts-health-group--runtime" aria-label="<?php esc_attr_e('Active output', 'tasty-fonts'); ?>">
+                                            <div class="tasty-fonts-health-group-head">
+                                                <h4><?php esc_html_e('Active Output', 'tasty-fonts'); ?></h4>
+                                                <span class="tasty-fonts-health-group-count">
+                                                    <?php
+                                                    echo esc_html(
+                                                        sprintf(
+                                                            /* translators: %d: number of active runtime font families */
+                                                            _n('%d family', '%d families', $runtimeFamilyCount, 'tasty-fonts'),
+                                                            $runtimeFamilyCount
+                                                        )
+                                                    );
+                                                    ?>
+                                                </span>
+                                            </div>
+                                            <div class="tasty-fonts-health-list">
+                                                <?php if ($runtimeFamilies !== []): ?>
+                                                    <?php foreach ($runtimeFamilies as $runtimeFamily): ?>
                                                 <?php
                                                 if (!is_array($runtimeFamily)) {
                                                     continue;
@@ -352,67 +520,95 @@
                                                     continue;
                                                 }
                                                 ?>
-                                                <div class="tasty-fonts-runtime-family-row" role="row">
-                                                    <span role="cell"><?php echo esc_html($runtimeFamilyName); ?></span>
-                                                    <span role="cell"><?php echo esc_html($runtimeProvider !== '' ? $runtimeProvider : __('Local', 'tasty-fonts')); ?></span>
-                                                    <span role="cell"><?php echo esc_html($runtimeType !== '' ? $runtimeType : __('Default', 'tasty-fonts')); ?></span>
-                                                    <span role="cell">
+                                                        <article class="tasty-fonts-health-row tasty-fonts-health-row--reference">
+                                                            <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+                                                            <div class="tasty-fonts-health-row-copy">
+                                                                <div class="tasty-fonts-health-row-title">
+                                                                    <strong><?php echo esc_html($runtimeFamilyName); ?></strong>
+                                                                    <span>
+                                                                        <?php
+                                                                        echo esc_html(
+                                                                            sprintf(
+                                                                                /* translators: 1: provider label, 2: delivery type, 3: number of font faces */
+                                                                                __('%1$s / %2$s / %3$s', 'tasty-fonts'),
+                                                                                $runtimeProvider !== '' ? $runtimeProvider : __('Local', 'tasty-fonts'),
+                                                                                $runtimeType !== '' ? $runtimeType : __('Default', 'tasty-fonts'),
+                                                                                sprintf(
+                                                                                    /* translators: %d: number of font faces */
+                                                                                    _n('%d face', '%d faces', $runtimeFaces, 'tasty-fonts'),
+                                                                                    $runtimeFaces
+                                                                                )
+                                                                            )
+                                                                        );
+                                                                        ?>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </article>
+                                            <?php endforeach; ?>
+                                                <?php else: ?>
+                                                    <article class="tasty-fonts-health-row tasty-fonts-health-row--reference">
+                                                        <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+                                                        <div class="tasty-fonts-health-row-copy">
+                                                            <div class="tasty-fonts-health-row-title">
+                                                                <strong><?php esc_html_e('No active runtime families.', 'tasty-fonts'); ?></strong>
+                                                                <span><?php esc_html_e('Publish sitewide roles to emit managed families on the front end.', 'tasty-fonts'); ?></span>
+                                                            </div>
+                                                        </div>
+                                                    </article>
+                                                <?php endif; ?>
+                                            </div>
+                                        </section>
+                                        <?php if ($copyableDiagnosticItems !== []): ?>
+                                            <section class="tasty-fonts-health-group tasty-fonts-health-group--paths" aria-label="<?php esc_attr_e('Copyable paths', 'tasty-fonts'); ?>">
+                                                <div class="tasty-fonts-health-group-head">
+                                                    <h4><?php esc_html_e('Copyable Paths', 'tasty-fonts'); ?></h4>
+                                                    <span class="tasty-fonts-health-group-count">
                                                         <?php
                                                         echo esc_html(
                                                             sprintf(
-                                                                /* translators: %d: number of font faces */
-                                                                _n('%d face', '%d faces', $runtimeFaces, 'tasty-fonts'),
-                                                                $runtimeFaces
+                                                                /* translators: %d: number of copyable paths */
+                                                                _n('%d path', '%d paths', count($copyableDiagnosticItems), 'tasty-fonts'),
+                                                                count($copyableDiagnosticItems)
                                                             )
                                                         );
                                                         ?>
                                                     </span>
                                                 </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="tasty-fonts-system-details-panel">
-                                    <div class="tasty-fonts-output-settings-copy">
-                                        <h3><?php esc_html_e('System Details', 'tasty-fonts'); ?></h3>
-                                        <?php if ($showSettingsDescriptions): ?>
-                                            <p><?php esc_html_e('Copy exact runtime paths, URLs, and status values when debugging generated assets.', 'tasty-fonts'); ?></p>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="tasty-fonts-diagnostics-grid">
-                                        <?php foreach ($diagnosticItems as $item): ?>
-                                            <?php
-                                            $itemValue = (string) ($item['value'] ?? '');
-                                            $isCopyable = !empty($item['copyable']) && $itemValue !== '';
-                                            $valueClass = !empty($item['code'])
-                                                ? 'tasty-fonts-diagnostic-value tasty-fonts-code'
-                                                : 'tasty-fonts-diagnostic-value';
-                                            $itemClass = $isCopyable
-                                                ? 'tasty-fonts-diagnostic-item tasty-fonts-diagnostic-item--copyable'
-                                                : 'tasty-fonts-diagnostic-item';
-                                            $itemLabel = (string) ($item['label'] ?? 'value');
-                                            ?>
-                                            <div class="<?php echo esc_attr($itemClass); ?>">
-                                                <div class="tasty-fonts-diagnostic-label"><?php echo esc_html($itemLabel); ?></div>
-                                                <?php if ($isCopyable): ?>
-                                                    <div class="tasty-fonts-diagnostic-item-actions">
-                                                        <button
-                                                            type="button"
-                                                            class="button tasty-fonts-output-copy-button tasty-fonts-diagnostic-copy-button"
-                                                            data-copy-text="<?php echo esc_attr($itemValue); ?>"
-                                                            data-copy-success="<?php echo esc_attr(sprintf(__('%s copied.', 'tasty-fonts'), $itemLabel)); ?>"
-                                                            data-copy-static-label="1"
-                                                            aria-label="<?php echo esc_attr(sprintf(__('Copy %s', 'tasty-fonts'), $itemLabel)); ?>"
-                                                        >
-                                                            <span class="screen-reader-text"><?php echo esc_html(sprintf(__('Copy %s', 'tasty-fonts'), $itemLabel)); ?></span>
-                                                        </button>
-                                                    </div>
-                                                <?php endif; ?>
-                                                <div class="<?php echo esc_attr($valueClass); ?>">
-                                                    <?php echo esc_html($itemValue); ?>
+                                                <div class="tasty-fonts-health-list">
+                                                    <?php foreach ($copyableDiagnosticItems as $item): ?>
+                                                        <?php
+                                                        $itemValue = (string) ($item['value'] ?? '');
+                                                        $isCopyable = !empty($item['copyable']) && $itemValue !== '';
+                                                        $itemLabel = (string) ($item['label'] ?? 'value');
+                                                        ?>
+                                                        <article class="tasty-fonts-health-row tasty-fonts-health-row--reference">
+                                                            <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+                                                            <div class="tasty-fonts-health-row-copy">
+                                                                <div class="tasty-fonts-health-row-title">
+                                                                    <strong><?php echo esc_html($itemLabel); ?></strong>
+                                                                    <span class="tasty-fonts-code"><?php echo esc_html($itemValue); ?></span>
+                                                                </div>
+                                                            </div>
+                                                    <?php if ($isCopyable): ?>
+                                                                <div class="tasty-fonts-health-row-actions">
+                                                            <button
+                                                                type="button"
+                                                                class="button tasty-fonts-output-copy-button tasty-fonts-diagnostic-copy-button"
+                                                                data-copy-text="<?php echo esc_attr($itemValue); ?>"
+                                                                data-copy-success="<?php echo esc_attr(sprintf(__('%s copied.', 'tasty-fonts'), $itemLabel)); ?>"
+                                                                data-copy-static-label="1"
+                                                                aria-label="<?php echo esc_attr(sprintf(__('Copy %s', 'tasty-fonts'), $itemLabel)); ?>"
+                                                            >
+                                                                <span class="screen-reader-text"><?php echo esc_html(sprintf(__('Copy %s', 'tasty-fonts'), $itemLabel)); ?></span>
+                                                            </button>
+                                                                </div>
+                                                    <?php endif; ?>
+                                                        </article>
+                                                    <?php endforeach; ?>
                                                 </div>
-                                            </div>
-                                        <?php endforeach; ?>
+                                            </section>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </section>
