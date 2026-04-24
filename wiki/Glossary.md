@@ -7,6 +7,9 @@ Definitions for every key term used across the Tasty Custom Fonts documentation.
 **Active delivery profile**
 The delivery profile the plugin currently uses at runtime for a given font family. Only one profile per family can be active at a time. Switching the active profile changes what CSS the plugin generates without requiring a re-import.
 
+**Admin Access**
+An optional Behavior setting (added in 1.13.0) that lets administrators delegate Tasty Fonts access to selected non-administrator WordPress roles and specific users. When disabled (default), only administrators can open Tasty Fonts admin pages and REST endpoints. Role-level grants transfer with site bundles; individual user grants are site-local and stripped on bundle import.
+
 **Adobe Fonts**
 A hosted font service included with Adobe Creative Cloud subscriptions. The plugin connects to Adobe Fonts via a web project ID and enqueues the Adobe-hosted stylesheet at runtime. No font files are downloaded to your server.
 
@@ -52,6 +55,9 @@ A role assignment saved as a working selection that does not affect live output.
 **Draft/live separation**
 The design principle that separates "what you are experimenting with" from "what the site is currently serving." Draft roles are your working state; applied roles are what visitors see.
 
+**Dry Run (site transfer)**
+A non-destructive validation pass that checks a site-transfer bundle for corruption, checksum mismatches, and compatibility issues without making any changes to the destination site. Since 1.13.0, a successful dry run is required before the destructive import step can be armed.
+
 ## E
 
 **Etch (EtchWP)**
@@ -64,6 +70,9 @@ The storage model used since 1.12.0 for the Google Fonts API key. The key is sto
 
 **Fallback stack**
 A comma-separated list of font families the browser should try in order if the primary font is unavailable. Example: `Georgia, serif`. The plugin allows you to set a custom fallback stack per family.
+
+**Fallback-only role**
+A role (Heading, Body, or Monospace) configured without a library family selection. When a role is set to fallback-only, the plugin still generates role variables and sitewide usage rules using the configured fallback stack (e.g., `system-ui, sans-serif`) without binding a managed font family. Added in 1.13.0.
 
 **Family slug**
 A URL-safe identifier derived from the font family name. Used as a directory name under `wp-content/uploads/fonts/`. For example, `Inter` becomes `inter`.
@@ -156,6 +165,9 @@ A plugin action that scans `wp-content/uploads/fonts/` for font files that were 
 **Role variable**
 A CSS custom property output by the plugin representing a font role. The three role variables are `--font-heading`, `--font-body`, and `--font-monospace`.
 
+**Role Weights in Classes**
+An opt-in Output setting (added in 1.13.0) that adds role weight and variation settings to generated role utility classes (`.font-heading`, `.font-body`, `.font-monospace`, and their aliases). Useful when you want the utility class to carry both the font-family and the intended font-weight.
+
 **Runtime stylesheet**
 The generated CSS file produced by the plugin and served to the site's frontend, Gutenberg, and Etch. Canonical path: `wp-content/uploads/fonts/.generated/tasty-fonts.css`.
 
@@ -166,6 +178,9 @@ A button on the Deploy Fonts page that stores your current role selections witho
 
 **Self-hosted delivery**
 A delivery mode where downloaded font files live on your own server and are served from there. The plugin generates `@font-face` rules pointing to local file paths. Self-hosted delivery gives you full control over privacy, caching, and file availability.
+
+**Show Activity Log**
+A Behavior setting (added in 1.13.0) that controls whether the activity log panel is visible in Advanced Tools. When disabled, the panel is hidden by default but the plugin continues to record events. Re-enable to reveal past history.
 
 **Site Transfer**
 The portable bundle export and import feature in `Settings → Transfer` (added in 1.12.0). Use it to move the full Tasty Fonts setup — managed font files, library data, settings, and live role assignments — between WordPress sites with one ZIP bundle. Google Fonts API keys are excluded from bundles for security. See [Site Transfer](Site-Transfer) for the full guide.
@@ -182,7 +197,7 @@ A `font-display` value that shows a fallback font until the custom font loads, t
 The identifier used to namespace translatable strings in WordPress plugins. Tasty Custom Fonts uses the text domain `tasty-fonts`.
 
 **Transfer Bundle**
-Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.12.0-beta.2 or later.
+Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.13.0 or later.
 
 **Transfer Tab**
 The fifth tab in the Settings page, added in 1.12.0. Contains the Export and Import cards for the Site Transfer workflow.

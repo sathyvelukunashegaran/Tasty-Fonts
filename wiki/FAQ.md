@@ -102,9 +102,15 @@ Having multiple profiles on one family means you can switch between them without
 
 ### Can I move my font setup from one WordPress site to another?
 
-Yes. Use `Settings → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.12.0-beta.2 or later, and PHP's ZipArchive extension must be available on both servers.
+Yes. Use `Settings → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.13.0 or later, and PHP's ZipArchive extension must be available on both servers.
 
 See [Site Transfer](Site-Transfer) for the full step-by-step walkthrough.
+
+### What is the dry-run step in Site Transfer?
+
+Since 1.13.0, importing a transfer bundle requires a **dry-run validation** before the destructive import can proceed. After you select your bundle file, click **Dry Run Bundle** first. The plugin checks the archive for corruption, missing files, checksum mismatches, and version compatibility — without making any changes to the destination site. The activity log shows the results. If the dry run passes, the **Import Bundle** button becomes available.
+
+This two-phase approach prevents a bad bundle from overwriting your destination site's data before you know there is a problem.
 
 ### What does a Site Transfer bundle contain?
 
@@ -249,6 +255,23 @@ It turns on a third role slot for code and `pre` elements. When enabled, you can
 ### How is my Google Fonts API key stored?
 
 Since 1.12.0, the key is stored in a dedicated encrypted WordPress option (`tasty_fonts_google_api_key_data`) rather than in the main settings record. It is isolated from normal settings and never included in [Site Transfer](Site-Transfer) exports. If you supply a fresh key during a bundle import, it is stored using the same encrypted model as a key saved manually in `Settings → Output`.
+
+### Can I give non-administrator users access to Tasty Fonts?
+
+Yes, since 1.13.0. By default only WordPress administrators can open Tasty Fonts. To expand access:
+
+1. Go to `Settings → Behavior → Admin Access`.
+2. Toggle **Enable custom access**.
+3. Check the additional roles (e.g., `Editor`) or add specific users by name.
+4. Save. Access takes effect immediately.
+
+Administrator access is always preserved — you cannot accidentally lock yourself out. Individual user grants are site-local and are not included in site transfer bundles.
+
+### What does "Show Activity Log" do?
+
+`Show Activity Log` is in `Settings → Behavior`. When enabled (default on), the activity log panel is visible in Advanced Tools. When disabled, the panel is hidden — but the plugin continues to record events in the background. You can re-enable it at any time to review past activity.
+
+This is useful on production sites where you want a cleaner Advanced Tools page and only need the log occasionally.
 
 ---
 

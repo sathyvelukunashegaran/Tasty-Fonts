@@ -188,10 +188,31 @@ The `Behavior` tab controls plugin-level features that are not primarily about g
 
 Key controls include:
 
+- `Admin Access`
 - `Update Channel`
 - `Enable Monospace Role`
+- `Show Activity Log`
 - `Hide Onboarding Hints`
 - `Delete uploaded fonts on uninstall`
+
+#### Admin Access
+
+By default, only WordPress administrators can open the Tasty Fonts admin pages and REST endpoints. The Admin Access panel lets you expand that access to selected non-administrator roles and specific users.
+
+**How it works:**
+
+- Toggle **Enable custom access** to open the role and user selectors.
+- Under **Additional Roles**, check any non-administrator role whose members should have full Tasty Fonts access (for example, `Editor`).
+- Under **Specific Users**, search and add individual users by name. These grants are site-local and are never exported in transfer bundles.
+- Save changes. The access change takes effect immediately — no page reload required.
+
+**Important notes:**
+
+- Administrator access is always preserved. You cannot accidentally lock yourself out.
+- User-level grants added on the source site are stripped when a site transfer bundle is imported on a destination site. Role-level grants are retained.
+- Delegated users and roles can perform all Tasty Fonts tasks including applying sitewide roles, running developer maintenance actions, and exporting or importing transfer bundles.
+
+> **Beginner tip:** if you are managing a client site where the client needs to change fonts but should not be a site administrator, add the client's WordPress user under Specific Users instead of granting them admin access to the whole site.
 
 #### Update Channel
 
@@ -210,6 +231,12 @@ Turns on the third role slot (`Monospace`). When enabled, the role selector, out
 #### Delete Uploaded Fonts On Uninstall
 
 When enabled, uninstalling the plugin also removes plugin-managed font files from `wp-content/uploads/fonts/`. Disable this if you want to keep the files for use with other plugins or after reinstallation.
+
+#### Show Activity Log
+
+When enabled, the full diagnostics activity log is visible in Advanced Tools. When disabled, the activity log panel is hidden from the Advanced Tools page by default — but the plugin continues to record events in the background. Re-enable this setting to reveal the log whenever you need to review past activity.
+
+> **Tip:** turning this off keeps Advanced Tools cleaner on production sites where you do not need a persistent log view. Events are still recorded so you can turn it back on and inspect history at any time.
 
 ### 4. Use The Developer Tab Carefully
 
@@ -249,15 +276,25 @@ To export:
 
 #### Import Card
 
-> ⚠️ **Warning:** importing a bundle **replaces** the current Tasty Fonts library, settings, and role assignments on the destination site. Take a database backup before importing onto a live production site.
+> ⚠️ **Warning:** importing a bundle **replaces** the current Tasty Fonts library, settings, and role assignments on the destination site. This cannot be undone from within the plugin. Take a database backup before importing onto a live production site.
 
-To import on the destination site:
+The import flow is protected by a mandatory **dry-run validation step** before the destructive import can be armed. This two-phase approach lets the plugin verify the bundle before anything is changed.
+
+**Phase 1 — Dry Run:**
 
 1. Open the `Transfer` tab on the **destination site**.
 2. In the **Import Site Transfer Bundle** card, click the file picker and choose the ZIP you exported.
-3. (Optional) Paste a **Google Fonts API key** into the key field if this destination site needs Google catalog search. This key is stored encrypted and applies only to the destination.
-4. Click **Import Bundle** and confirm the destructive confirmation prompt.
-5. The plugin validates the bundle, restores font files, applies library data, settings, and role assignments, then rebuilds the generated CSS automatically.
+3. (Optional) Paste a **Google Fonts API key** into the key field if this destination site needs Google catalog search.
+4. Click **Dry Run Bundle**.
+5. The plugin validates the bundle, checks file checksums, and surfaces any warnings or errors in the Transfer activity log — without making any changes to your site.
+6. If the dry run passes, the **Import Bundle** button becomes available.
+
+**Phase 2 — Destructive Import (after a successful dry run):**
+
+1. Click **Import Bundle** and use the two-step arm/confirm button flow to confirm the destructive action.
+2. The plugin extracts and verifies font files, restores library data, applies settings and role assignments, and rebuilds the generated CSS.
+
+> **Why two phases?** The dry-run step catches problems like corrupted files, version mismatches, and oversized uploads before they touch your live database or font files. If the dry run reports any errors, fix them at the source and export a new bundle before retrying.
 
 #### Why Google API Keys Are Excluded
 

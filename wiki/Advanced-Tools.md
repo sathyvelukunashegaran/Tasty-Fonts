@@ -49,6 +49,9 @@ The activity log helps explain what the plugin has done recently, including:
 - settings changes
 - generated asset refreshes
 - Block Editor sync issues
+- site transfer dry-run results and import outcomes
+
+> **Note:** the activity log panel is only visible in Advanced Tools when **Show Activity Log** is enabled in `Settings → Behavior`. The plugin records events regardless of whether the panel is visible, so you can re-enable the setting at any time to view past history.
 
 ### 5. Know When To Use Developer Instead
 

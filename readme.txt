@@ -3,7 +3,7 @@ Tags: fonts, typography, google fonts, adobe fonts, bunny fonts
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.10.0
+Stable tag: 1.13.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,13 +43,11 @@ The plugin is designed for single-site activation and per-site activation inside
 
 = Release channels =
 
-The latest stable release is 1.10.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
+The latest stable release is 1.13.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
 
-= What is planned after 2.0.0 stable? =
+= What is planned after 1.13.0 stable? =
 
-The immediate post-2.0 line is aimed at power-user and agency workflows. That includes command-line maintenance tools, portable export/import flows, stronger bulk management for larger libraries, richer diagnostics, scheduled Adobe project refreshes, and more polished distribution surfaces such as plugin screenshots.
-
-The team is also planning deeper platform-alignment work, including Composer-based autoloading and evaluation of targeted Interactivity API adoption where it improves the admin experience without adding unnecessary complexity.
+The post-1.13.0 line continues with power-user and agency improvements: command-line maintenance tools, stronger bulk library management, richer diagnostics, scheduled Adobe project refreshes, and more polished distribution surfaces.
 
 If you want to help shape that roadmap, open a feature request or feedback issue on GitHub:
 
@@ -98,6 +96,35 @@ https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues
 4. Advanced Tools screen for generated CSS, diagnostics, and activity history.
 
 == Changelog ==
+
+= 1.13.0 =
+
+* Added optional admin-access controls so administrators can delegate plugin access to selected non-administrator roles and specific users.
+* Added a dry-run site-transfer validation flow that stages import bundles before the destructive import step and surfaces transfer activity in the Transfer tab.
+* Added editable fallback controls for Heading, Body, and Monospace roles in Studio so fallback-only roles can use intentional stacks without requiring a library family.
+* Added a Role Weights in Classes opt-in setting so role utility classes can include weight and variation settings alongside font-family declarations.
+* Added Minimal-output role bridges for Etch frontends, canvas data, and Gutenberg editor styles.
+* Added editor-parity mirroring for the live Automatic.css runtime stylesheet when sitewide roles are active.
+* Added a Show Activity Log behavior setting so Advanced Tools can hide the full diagnostics log by default while still recording events.
+* Reworked Output Settings into focused Minimal, Variables only, Classes only, and Custom presets with grouped sub-controls.
+* Changed default Heading and Body fallback stacks from `sans-serif` to `system-ui, sans-serif`.
+* Refreshed the admin UI token system, library cards, import panels, and preview surfaces with a denser Tasty Foundry workspace treatment.
+* Raised PHPStan enforcement to level 10.
+
+= 1.12.0 =
+
+* Added a portable Site Transfer workflow in Settings → Transfer to export and import bundles containing managed fonts, library data, settings, and live role assignments.
+* Moved Google Fonts API key material into dedicated encrypted option storage and excluded it from portable exports.
+* Fixed variable-font output so registered axis defaults are omitted from generated CSS when they would be redundant.
+* Fixed CSS minification to preserve significant whitespace where collapsing it would change browser behavior.
+* Renamed packaged plugin directory from `etch-fonts/` to `tasty-fonts/`.
+
+= 1.11.0 =
+
+* Added deep Bricks Builder typography integration with managed Theme Style sync, Theme Style target modes, and a Tasty-managed Bricks Theme Style workflow.
+* Added direct Bricks control over the native `disableGoogleFonts` setting.
+* Fixed Bricks frontend and builder canvas typography when Bricks quoted `var(...)` font-family values.
+* Added contributor scaffolding including a contributing guide, local setup docs, GitHub issue and PR templates, and a security policy.
 
 = 1.10.0 =
 
