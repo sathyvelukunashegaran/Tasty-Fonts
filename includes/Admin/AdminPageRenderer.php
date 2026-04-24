@@ -7,7 +7,6 @@ namespace TastyFonts\Admin;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\Renderer\AbstractSectionRenderer;
-use TastyFonts\Admin\Renderer\ActivitySectionRenderer;
 use TastyFonts\Admin\Renderer\DiagnosticsSectionRenderer;
 use TastyFonts\Admin\Renderer\FamilyCardRenderer;
 use TastyFonts\Admin\Renderer\LibrarySectionRenderer;
@@ -36,7 +35,6 @@ final class AdminPageRenderer extends AbstractSectionRenderer
     private readonly DiagnosticsSectionRenderer $diagnosticsRenderer;
     private readonly FamilyCardRenderer $familyCardRenderer;
     private readonly LibrarySectionRenderer $libraryRenderer;
-    private readonly ActivitySectionRenderer $activityRenderer;
 
     public function __construct(
         Storage $storage,
@@ -47,8 +45,7 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         ?SettingsSectionRenderer $settingsRenderer = null,
         ?DiagnosticsSectionRenderer $diagnosticsRenderer = null,
         ?FamilyCardRenderer $familyCardRenderer = null,
-        ?LibrarySectionRenderer $libraryRenderer = null,
-        ?ActivitySectionRenderer $activityRenderer = null
+        ?LibrarySectionRenderer $libraryRenderer = null
     ) {
         parent::__construct($storage);
         $this->viewBuilder = $viewBuilder ?? new AdminPageViewBuilder($storage);
@@ -59,7 +56,6 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         $this->familyCardRenderer = $familyCardRenderer ?? new FamilyCardRenderer($storage);
         $this->studioRenderer = $studioRenderer ?? new StudioSectionRenderer($storage, $this->previewRenderer, $this->toolsRenderer);
         $this->libraryRenderer = $libraryRenderer ?? new LibrarySectionRenderer($storage, $this->familyCardRenderer);
-        $this->activityRenderer = $activityRenderer ?? new ActivitySectionRenderer($storage);
     }
 
     /**
@@ -105,9 +101,6 @@ final class AdminPageRenderer extends AbstractSectionRenderer
 
         ob_start();
         $this->diagnosticsRenderer->render($view);
-        if (!empty($view['showActivityLog'])) {
-            $this->activityRenderer->render($view);
-        }
         $diagnosticsSection = (string) ob_get_clean();
         ?>
         <div class="wrap tasty-fonts-admin<?php echo $trainingWheelsOff ? ' is-training-wheels-off' : ''; ?>">

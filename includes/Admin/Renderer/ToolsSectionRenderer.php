@@ -54,6 +54,11 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
             && $this->looksLikeCssSnippet(trim($value))
             && $readableDisplayValue !== $displayValue;
         $readableTarget = $target !== '' ? $target . '-readable' : '';
+        $downloadUrl = trim($this->stringValue($options, 'download_url'));
+        $downloadLabelOption = trim($this->stringValue($options, 'download_label'));
+        $downloadLabel = $downloadLabelOption !== ''
+            ? $downloadLabelOption
+            : __('Download snippet', 'tasty-fonts');
         ?>
         <div class="tasty-fonts-code-panel-head">
             <span id="<?php echo esc_attr($headingId); ?>"><?php echo esc_html($label); ?></span>
@@ -70,6 +75,16 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
                     >
                         <?php esc_html_e('Readable Preview', 'tasty-fonts'); ?>
                     </button>
+                <?php endif; ?>
+                <?php if ($downloadUrl !== ''): ?>
+                    <a
+                        class="button tasty-fonts-output-download-button"
+                        href="<?php echo esc_url($downloadUrl); ?>"
+                        aria-label="<?php echo esc_attr($downloadLabel); ?>"
+                        title="<?php echo esc_attr($downloadLabel); ?>"
+                    >
+                        <span class="screen-reader-text"><?php echo esc_html($downloadLabel); ?></span>
+                    </a>
                 <?php endif; ?>
                 <button
                     type="button"

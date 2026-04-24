@@ -120,7 +120,7 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 - review **Block Editor sync** behavior on local or staging environments (it often needs to be turned off on local)
 - use the **Developer tab** when you need to reset caches or re-bootstrap integration detection during testing
 - enable **Variable Font Support** (in `Settings → Output`) if any of your families are variable fonts — this unlocks axis controls, per-role weight overrides, and `font-variation-settings` in the generated CSS
-- use **Site Transfer** (`Settings → Transfer`) when you need to replicate your fonts to a staging, production, or client site — export a bundle from the source site and import it on the destination
+- use **Site Transfer** (`Advanced Tools → Transfer`) when you need to replicate your fonts to a staging, production, or client site — export a bundle from the source site and import it on the destination
 
 ---
 

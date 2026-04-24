@@ -16,6 +16,7 @@ use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
+use TastyFonts\Maintenance\HealthCheckService;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -47,11 +48,13 @@ use TastyFonts\Updates\GitHubUpdater;
  * @phpstan-type StorageState array<string, mixed>
  * @phpstan-type AssetStatus array<string, mixed>
  * @phpstan-type IntegrationContext array<string, mixed>
+ * @phpstan-import-type HealthCheck from \TastyFonts\Maintenance\HealthCheckService
  */
 final class AdminPageContextBuilder
 {
     private const BASE_ROLE_KEYS = ['heading', 'body'];
     private const DOWNLOAD_ACTION = 'tasty_fonts_download_generated_css';
+    private readonly HealthCheckService $healthChecks;
 
     public function __construct(
         private readonly Storage $storage,
@@ -65,8 +68,10 @@ final class AdminPageContextBuilder
         private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration,
-        private readonly ?GitHubUpdater $updater = null
+        private readonly ?GitHubUpdater $updater = null,
+        ?HealthCheckService $healthCheckService = null
     ) {
+        $this->healthChecks = $healthCheckService ?? new HealthCheckService();
     }
 
     /**
@@ -108,6 +113,21 @@ final class AdminPageContextBuilder
         $adminAccessImplicitAdminLabels = $this->buildAdminAccessImplicitAdminLabels();
         $adminAccessSummary = $this->buildAdminAccessSummary($adminAccessRoleSlugs, $adminAccessUserIds, $adminAccessRoleOptions, $adminAccessImplicitAdminLabels);
         $developerToolStatuses = $this->buildDeveloperToolStatuses($rawLogs, $assetStatus, $counts);
+        $diagnosticItems = $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts);
+        $overviewMetrics = $this->buildOverviewMetrics($counts);
+        $generatedCssPanel = $this->buildGeneratedCssPanel($settings);
+        $healthChecks = $this->healthChecks->build($assetStatus, $storage, $settings, $counts);
+        $advancedTools = $this->buildAdvancedToolsContext(
+            $healthChecks,
+            $assetStatus,
+            $settings,
+            $counts,
+            $diagnosticItems,
+            $overviewMetrics,
+            $developerToolStatuses,
+            $generatedCssPanel,
+            $logs
+        );
         $previewBaselineSource = $applyEverywhere ? 'live_sitewide' : 'draft';
         $previewBaselineLabel = $applyEverywhere
             ? __('Live sitewide', 'tasty-fonts')
@@ -198,10 +218,11 @@ final class AdminPageContextBuilder
             'monospace_role_enabled' => !empty($settings['monospace_role_enabled']),
             'variable_fonts_enabled' => !empty($settings['variable_fonts_enabled']),
             'delete_uploaded_files_on_uninstall' => !empty($settings['delete_uploaded_files_on_uninstall']),
-            'diagnostic_items' => $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts),
-            'overview_metrics' => $this->buildOverviewMetrics($counts),
+            'advanced_tools' => $advancedTools,
+            'diagnostic_items' => $diagnosticItems,
+            'overview_metrics' => $overviewMetrics,
             'output_panels' => $this->buildOutputPanels($roles, $settings, $catalog, $appliedRoles),
-            'generated_css_panel' => $this->buildGeneratedCssPanel($settings),
+            'generated_css_panel' => $generatedCssPanel,
             'preview_panels' => $this->buildPreviewPanels(),
             'local_environment_notice' => $localEnvironmentNotice,
             'gutenberg_integration' => $gutenbergIntegration,
@@ -210,6 +231,77 @@ final class AdminPageContextBuilder
             'bricks_integration' => $bricksIntegration,
             'oxygen_integration' => $oxygenIntegration,
             'toasts' => $this->buildNoticeToasts(),
+        ];
+    }
+
+    /**
+     * @param list<HealthCheck> $healthChecks
+     * @param AssetStatus $assetStatus
+     * @param NormalizedSettings $settings
+     * @param CatalogCounts $counts
+     * @param list<DiagnosticItem> $diagnosticItems
+     * @param list<OverviewMetric> $overviewMetrics
+     * @param array<string, mixed> $developerToolStatuses
+     * @param GeneratedCssPanel $generatedCssPanel
+     * @param list<ActivityLogEntry> $logs
+     * @return array<string, mixed>
+     */
+    private function buildAdvancedToolsContext(
+        array $healthChecks,
+        array $assetStatus,
+        array $settings,
+        array $counts,
+        array $diagnosticItems,
+        array $overviewMetrics,
+        array $developerToolStatuses,
+        array $generatedCssPanel,
+        array $logs
+    ): array {
+        return [
+            'health_checks' => $healthChecks,
+            'health_summary' => $this->healthChecks->summarize($healthChecks),
+            'runtime_manifest' => $this->buildRuntimeManifestContext($assetStatus, $settings, $counts),
+            'diagnostic_items' => $diagnosticItems,
+            'overview_metrics' => $overviewMetrics,
+            'developer_tool_statuses' => $developerToolStatuses,
+            'generated_css_panel' => $generatedCssPanel,
+            'activity' => [
+                'entries' => $logs,
+                'count' => count($logs),
+            ],
+        ];
+    }
+
+    /**
+     * @param AssetStatus $assetStatus
+     * @param NormalizedSettings $settings
+     * @param CatalogCounts $counts
+     * @return array<string, mixed>
+     */
+    private function buildRuntimeManifestContext(array $assetStatus, array $settings, array $counts): array
+    {
+        return [
+            'generated_css' => [
+                'path' => $this->stringValue($assetStatus, 'path'),
+                'url' => $this->stringValue($assetStatus, 'url'),
+                'exists' => !empty($assetStatus['exists']),
+                'size' => $this->intValue($assetStatus, 'size'),
+                'last_modified' => $this->intValue($assetStatus, 'last_modified'),
+                'expected_hash' => $this->stringValue($assetStatus, 'expected_hash'),
+                'expected_version' => $this->stringValue($assetStatus, 'expected_version'),
+            ],
+            'delivery' => [
+                'css_delivery_mode' => $this->stringValue($settings, 'css_delivery_mode', 'file'),
+                'auto_apply_roles' => !empty($settings['auto_apply_roles']),
+                'font_display' => $this->stringValue($settings, 'font_display', 'swap'),
+            ],
+            'library' => [
+                'families' => $this->catalogCount($counts, 'families'),
+                'files' => $this->catalogCount($counts, 'files'),
+                'published_families' => $this->catalogCount($counts, 'published_families'),
+                'library_only_families' => $this->catalogCount($counts, 'library_only_families'),
+                'local_families' => $this->catalogCount($counts, 'local_families'),
+            ],
         ];
     }
 

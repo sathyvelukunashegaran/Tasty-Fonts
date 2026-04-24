@@ -4634,6 +4634,12 @@
         return tabPanelElements().filter((panel) => panel.getAttribute('data-tab-group') === group);
     }
 
+    function tabHeadingsForGroup(group) {
+        return Array.from(document.querySelectorAll('[data-tab-heading-group][data-tab-heading]')).filter(
+            (heading) => heading.getAttribute('data-tab-heading-group') === group
+        );
+    }
+
     function activeTabKeyForGroup(group) {
         const activeTab = tabButtonsForGroup(group).find((tab) => tab.classList.contains('is-active'));
 
@@ -4674,6 +4680,12 @@
             const isActive = panel.getAttribute('data-tab-panel') === key;
             panel.classList.toggle('is-active', isActive);
             panel.hidden = !isActive;
+        });
+
+        tabHeadingsForGroup(group).forEach((heading) => {
+            const isActive = heading.getAttribute('data-tab-heading') === key;
+            heading.classList.toggle('is-active', isActive);
+            heading.hidden = !isActive;
         });
 
         if (group === 'page' && key) {
@@ -9590,6 +9602,65 @@
         });
     }
 
+    function initActivityFiltering() {
+        const activityLists = Array.from(document.querySelectorAll('[data-activity-list]'));
+
+        activityLists.forEach((list) => {
+            const root = list.closest('.tasty-fonts-studio-panel, .tasty-fonts-activity-card, [data-log-filter-root]') || document;
+            const actorFilter = root.querySelector('[data-activity-actor-filter], [data-log-actor-filter]');
+            const search = root.querySelector('[data-activity-search], [data-log-search]');
+            const count = root.querySelector('[data-activity-count], [data-log-count]');
+            const filteredEmpty = root.querySelector('[data-activity-empty-filtered], #tasty-fonts-activity-empty-filtered, [data-log-empty-filtered]');
+            const entries = Array.from(list.querySelectorAll('[data-activity-entry]'));
+            const totalCount = entries.length;
+
+            if (entries.length === 0) {
+                return;
+            }
+
+            const applyActivityFilter = () => {
+                const actorFilterValue = actorFilter ? actorFilter.value : '';
+                const query = search ? search.value : '';
+                let visibleCount = 0;
+
+                entries.forEach((entry) => {
+                    const matches = logEntryMatchesFilters(
+                        entry.getAttribute('data-activity-actor') || '',
+                        entry.getAttribute('data-activity-search') || '',
+                        actorFilterValue,
+                        query
+                    );
+
+                    entry.hidden = !matches;
+
+                    if (matches) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (count) {
+                    count.textContent = formatActivityCount(visibleCount, totalCount);
+                }
+
+                if (filteredEmpty) {
+                    filteredEmpty.hidden = visibleCount !== 0;
+                }
+
+                list.hidden = visibleCount === 0;
+            };
+
+            if (actorFilter) {
+                actorFilter.addEventListener('change', applyActivityFilter);
+            }
+
+            if (search) {
+                search.addEventListener('input', applyActivityFilter);
+            }
+
+            applyActivityFilter();
+        });
+    }
+
     function getClearableSelectButtonTarget(button) {
         if (!button) {
             return null;
@@ -11562,6 +11633,7 @@
         initUploadRows();
         initLibraryFiltering();
         initLogFiltering();
+        initActivityFiltering();
         renderAllRoleWeightEditors();
         renderAllRoleAxisEditors();
         updatePreviewDynamicText();

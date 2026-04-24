@@ -1,80 +1,84 @@
 # Advanced Tools
 
-Inspect the generated stylesheet, review system details, and use built-in diagnostics.
+Inspect runtime output, run guarded maintenance, move site bundles, and review activity from one power-user command center.
 
-Advanced Tools is primarily for inspection and review. `Settings → Developer` is where you intentionally reset or rebuild state.
-
-> **Beginner context:** you do not need to use Advanced Tools during normal day-to-day font management. Come here when the site is not behaving as expected and you need to understand what the plugin is actually serving.
+> **Beginner context:** you do not need Advanced Tools for normal font management. Use it when you need to understand what Tasty Fonts is serving, repair stale output, or prepare a support/debug handoff.
 
 ## Use This Page When
 
 - you need to inspect what the plugin is actually serving
+- runtime output looks stale or different from the library state
 - you want storage and generated asset details without leaving WordPress
+- you need to clear caches, rebuild generated CSS, or re-run integration detection
+- you need to export, dry-run, or import a site transfer bundle
 - you need an audit trail of imports, settings changes, and runtime refreshes
 
-## Steps
+## Sections
 
-### 1. Review Generated CSS
+### Overview
 
-The `Generated CSS` panel shows the current runtime stylesheet output. Use it to:
-
-- confirm that sitewide delivery is producing the expected rules
-- inspect minified versus readable output
-- copy snippets for debugging
-
-If sitewide delivery is off, generated runtime CSS may not be available yet.
-
-### 2. Download Generated CSS
-
-Use the built-in download action when you want the current generated stylesheet as a file for review or comparison.
-
-### 3. Inspect System Details
-
-The `System Details` panel surfaces diagnostics such as:
+The overview summarizes generated CSS readiness, diagnostic warnings, activity count, and library metrics. It also includes copyable system diagnostics such as:
 
 - storage paths
 - generated CSS request URL
 - generated CSS size and timestamp
 - delivery mode and related runtime metadata
 
-Copyable diagnostic values can be copied directly from the UI.
+Use it as the first stop before drilling into a specific tool.
 
-### 4. Review Activity
+### Generated CSS
 
-The activity log helps explain what the plugin has done recently, including:
+The `Generated CSS` panel shows the current runtime stylesheet output. Use it to:
 
-- uploads and rescans
-- provider imports
-- delivery changes
-- settings changes
-- generated asset refreshes
-- Block Editor sync issues
-- site transfer dry-run results and import outcomes
+- confirm that sitewide delivery is producing the expected rules
+- inspect minified versus readable output
+- verify self-hosted `@font-face` rules point to your own uploads directory
+- copy snippets for debugging
+- download the generated stylesheet for review or comparison
 
-> **Note:** the activity log panel is only visible in Advanced Tools when **Show Activity Log** is enabled in `Settings → Behavior`. The plugin records events regardless of whether the panel is visible, so you can re-enable the setting at any time to view past history.
+If sitewide delivery is off, generated runtime CSS may not be available yet.
 
-### 5. Know When To Use Developer Instead
+### Developer
 
-If you need to change state rather than inspect it, move to `Settings -> Developer`.
+The `Developer` tab contains guarded maintenance actions that run immediately:
 
-That tab is now the home for:
+- clear plugin caches and rebuild assets
+- regenerate only the generated CSS file
+- re-run integration detection
+- restore dismissed notices
+- reset plugin settings while preserving the managed font library
+- wipe the managed font library during testing or support cleanup
 
-- clearing plugin caches and forcing generated asset rebuilds
-- resetting suppressed notices
-- resetting integration detection
-- restoring plugin settings defaults
-- wiping the managed font library during testing or support cleanup
+Destructive actions require typed confirmation. Save pending settings before running developer tools.
+
+### Transfer
+
+The `Transfer` tab contains portable site transfer workflows:
+
+- export a bundle containing settings, live roles, library metadata, and managed font files
+- dry-run an import bundle before replacement
+- import a validated bundle to replace the current Tasty Fonts state
+- review transfer-specific activity
+
+Google API keys, generated CSS, logs, and transient runtime state are excluded from transfer bundles.
+
+### Activity
+
+The `Activity` tab shows recent scans, imports, deletes, settings changes, generated asset refreshes, transfer dry-run results, import outcomes, and sync issues. The log can be searched and filtered when visible.
+
+If the Activity tab says the log is hidden, enable `Settings -> Behavior -> Show Activity Log`. The plugin records events regardless of whether the panel is visible, so you can re-enable the setting at any time to view past history.
 
 ## Notes
 
 - The generated stylesheet is normally written to `wp-content/uploads/fonts/.generated/tasty-fonts.css` when file delivery is available.
 - The plugin can fall back to inline CSS if file delivery is disabled or unavailable.
 - Diagnostics are especially useful when runtime output looks stale or provider imports appear correct in the library but not on the site.
-- Advanced Tools is read-only. Use `Settings → Developer` for actions that change state (cache clears, resets, library wipes).
+- Maintenance actions are guarded but can change state immediately.
 
 ## Related Docs
 
 - [Settings](Settings)
+- [Site Transfer](Site-Transfer)
 - [Generated CSS](Troubleshooting-Generated-CSS)
 - [Imports And Deliveries](Troubleshooting-Imports-and-Deliveries)
 - [FAQ](FAQ)

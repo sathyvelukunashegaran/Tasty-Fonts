@@ -151,13 +151,13 @@ Large bundles (many self-hosted font files) can take longer to validate and extr
 
 The plugin rebuilds generated CSS on import, but a caching layer may be serving a stale stylesheet.
 
-1. Go to `Settings → Developer` and use **Clear Plugin Caches** to force a regeneration.
+1. Go to `Advanced Tools → Developer` and use **Clear Plugin Caches** to force a regeneration.
 2. Purge any page-caching plugin (WP Rocket, W3 Total Cache, etc.) and any CDN cache in front of WordPress.
 3. Hard-refresh your browser (Ctrl+Shift+R or Cmd+Shift+R).
 
 ### The generated CSS file was not in my bundle
 
-This is expected. The `.generated/tasty-fonts.css` file is excluded by design because it is always regenerated from library data on import. If the stylesheet is missing on the destination, trigger a regeneration via `Settings → Developer → Clear Plugin Caches` or save any Output setting.
+This is expected. The `.generated/tasty-fonts.css` file is excluded by design because it is always regenerated from library data on import. If the stylesheet is missing on the destination, trigger a regeneration via `Advanced Tools → Developer → Clear Plugin Caches` or save any Output setting.
 
 ### Google Fonts search is not working after import
 
@@ -172,7 +172,7 @@ See [Google Fonts](Provider-Google-Fonts) for how to create an API key.
 
 ## Related Docs
 
-- [Settings](Settings) — full reference for the Transfer tab and all other settings
+- [Advanced Tools](Advanced-Tools) — full reference for Transfer, Developer, diagnostics, and activity tools
 - [Getting Started](Getting-Started) — first-run walkthrough including the Settings overview
 - [Troubleshooting: Imports and Deliveries](Troubleshooting-Imports-and-Deliveries) — provider import and delivery issues
 - [Google Fonts](Provider-Google-Fonts) — how to create and use a Google Fonts API key

@@ -61,7 +61,7 @@ Go to `Advanced Tools → Generated CSS` and confirm the runtime stylesheet cont
 - the correct `@font-face` rules for self-hosted families
 - the correct `--font-heading` and `--font-body` variable values
 
-If the CSS looks stale, go to `Settings → Developer` and use `Clear Cache` to force regeneration.
+If the CSS looks stale, go to `Advanced Tools → Developer` and use `Clear Cache` to force regeneration.
 
 ### 7. Check Runtime `font-display` Expectations
 
@@ -109,7 +109,7 @@ For live Google and Bunny CDN deliveries, the runtime planner promotes `optional
 **Cause:** the plugin rebuilds generated CSS automatically on import, but a page caching layer may be serving a stale stylesheet.
 
 **Fix:**
-1. Go to `Settings → Developer` and use **Clear Plugin Caches** to force the generated stylesheet to regenerate.
+1. Go to `Advanced Tools → Developer` and use **Clear Plugin Caches** to force the generated stylesheet to regenerate.
 2. Purge any page-caching plugin (WP Rocket, W3 Total Cache, LiteSpeed Cache, etc.) and any CDN cache in front of WordPress.
 3. Hard-refresh your browser (Ctrl+Shift+R or Cmd+Shift+R).
 

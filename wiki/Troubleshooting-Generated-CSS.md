@@ -54,9 +54,9 @@ Look for:
 - correct `--font-heading` and `--font-body` variable values in `:root {}`
 - the file having a recent `last modified` timestamp
 
-### 4. Check System Details
+### 4. Check Overview Diagnostics
 
-Use `Advanced Tools → System Details` to confirm:
+Use `Advanced Tools → Overview` to confirm:
 
 - **Request URL**: the URL the browser uses to load the generated file
 - **File size**: a file with zero bytes indicates a write issue
@@ -67,7 +67,7 @@ Use `Advanced Tools → System Details` to confirm:
 
 If the generated CSS looks stale or missing:
 
-1. Go to `Settings → Developer`.
+1. Go to `Advanced Tools → Developer`.
 2. Use **Clear Cache** to delete the cached stylesheet and transients.
 3. Then apply sitewide again (or save any Output setting) to trigger a fresh generation.
 

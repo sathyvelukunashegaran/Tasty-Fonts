@@ -41,7 +41,7 @@ This file is enqueued as a normal external stylesheet. The browser caches it usi
 
 **Performance benefit:** the stylesheet payload is paid once per browser, not once per page. Combine with a long `Cache-Control: max-age` from your host or CDN for the best result.
 
-**When it regenerates:** the file is rewritten any time you apply sitewide, change Output settings, or clear caches via `Settings → Developer`. Your page-caching plugin should be purged after each regeneration.
+**When it regenerates:** the file is rewritten any time you apply sitewide, change Output settings, or clear caches via `Advanced Tools → Developer`. Your page-caching plugin should be purged after each regeneration.
 
 ### Inline delivery
 
@@ -226,14 +226,14 @@ If you change font roles, output settings, or delivery profiles **without purgin
 ### Best practice
 
 1. After applying sitewide or changing Output settings: **purge your page cache** (WP Rocket, W3 Total Cache, LiteSpeed Cache, etc.)
-2. After clearing plugin caches via `Settings → Developer`: purge your page cache
+2. After clearing plugin caches via `Advanced Tools → Developer`: purge your page cache
 3. If your CDN (Cloudflare, Fastly, etc.) caches full HTML: purge that layer too
 
 Some page caching plugins offer hooks or automatic cache-bust triggers. Tasty Custom Fonts does not integrate with specific caching plugins — purge manually after significant font changes.
 
 ### Generated stylesheet caching
 
-The plugin caches the generated CSS content internally using WordPress transients (`tasty_fonts_css_v2` and `tasty_fonts_css_hash_v2`). The transient cache is invalidated automatically when font roles, library state, or Output settings change. You can manually force a cache clear via `Settings → Developer → Clear Plugin Caches`.
+The plugin caches the generated CSS content internally using WordPress transients (`tasty_fonts_css_v2` and `tasty_fonts_css_hash_v2`). The transient cache is invalidated automatically when font roles, library state, or Output settings change. You can manually force a cache clear via `Advanced Tools → Developer → Clear Plugin Caches`.
 
 ---
 

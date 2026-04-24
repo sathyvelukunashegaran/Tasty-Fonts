@@ -15,6 +15,7 @@ use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
+use TastyFonts\Maintenance\HealthCheckService;
 use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
@@ -2221,6 +2222,68 @@ $tests['admin_page_context_builder_uses_asset_status_metadata_for_generated_css_
 
     assertSameValue('2.0 KB', (string) ($items[2]['value'] ?? ''), 'Generated stylesheet diagnostics should use the provided asset status size instead of re-checking the filesystem path.');
     assertSameValue('2024-03-09 16:00:00', (string) ($items[3]['value'] ?? ''), 'Generated stylesheet diagnostics should use the provided asset status timestamp instead of calling filemtime on the path again.');
+};
+
+$tests['health_check_service_builds_structured_advanced_tools_statuses'] = static function (): void {
+    resetTestState();
+
+    $health = new HealthCheckService();
+    $checks = $health->build(
+        [
+            'path' => '/tmp/missing-generated.css',
+            'url' => 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css',
+            'exists' => false,
+            'size' => 0,
+            'last_modified' => 0,
+        ],
+        null,
+        ['css_delivery_mode' => 'file'],
+        ['families' => 0, 'files' => 0],
+        ['available' => false, 'message' => 'ZipArchive is unavailable.']
+    );
+    $summary = $health->summarize($checks);
+
+    assertSameValue('generated_css', (string) ($checks[0]['slug'] ?? ''), 'Health checks should expose a stable generated CSS check slug.');
+    assertSameValue('warning', (string) ($checks[0]['severity'] ?? ''), 'Missing generated CSS file delivery should be reported as a warning.');
+    assertSameValue('storage_root', (string) ($checks[1]['slug'] ?? ''), 'Health checks should expose managed storage as a first-class check.');
+    assertSameValue('critical', (string) ($checks[1]['severity'] ?? ''), 'Unavailable managed storage should be reported as critical.');
+    assertSameValue('site_transfer', (string) ($checks[2]['slug'] ?? ''), 'Health checks should expose site transfer capability.');
+    assertSameValue('critical', (string) ($summary['status'] ?? ''), 'Health summaries should elevate critical checks above warnings and notices.');
+};
+
+$tests['admin_page_context_builder_exposes_advanced_tools_context'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+
+    $context = $builder->build();
+    $advancedTools = is_array($context['advanced_tools'] ?? null) ? $context['advanced_tools'] : [];
+    $manifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
+    $healthChecks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
+    $healthSummary = is_array($advancedTools['health_summary'] ?? null) ? $advancedTools['health_summary'] : [];
+
+    assertSameValue(false, $advancedTools === [], 'The page context should expose a structured Advanced Tools payload.');
+    assertSameValue(false, $healthChecks === [], 'Advanced Tools should include structured health checks for power-user diagnostics.');
+    assertSameValue(false, $healthSummary === [], 'Advanced Tools should include a summarized health status.');
+    assertSameValue('file', (string) ($manifest['delivery']['css_delivery_mode'] ?? ''), 'The runtime manifest should expose the current generated CSS delivery mode.');
+    assertSameValue(
+        (int) ($context['overview_metrics'][0]['value'] ?? -1),
+        (int) ($manifest['library']['families'] ?? -2),
+        'The runtime manifest should keep library counts aligned with the existing overview metrics.'
+    );
 };
 
 $tests['admin_page_context_builder_reports_acss_sync_waiting_for_sitewide_roles'] = static function (): void {

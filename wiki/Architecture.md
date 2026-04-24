@@ -146,7 +146,7 @@ The admin UI operates entirely through a plugin REST API adapter (`Api/RestContr
 | Applied (live) roles | Stored under `applied_roles` within `tasty_fonts_settings`; used by `CssBuilder` at runtime |
 | Activity log | `get_option('tasty_fonts_log')` — see `Repository/LogRepository.php` |
 | Generated CSS cache | Transients: `tasty_fonts_css_v2` (stylesheet) and `tasty_fonts_css_hash_v2` (content hash) — see `AssetService::TRANSIENT_CSS` / `TRANSIENT_HASH` |
-| Integration detection | Stored in settings; reset via `Settings → Developer` |
+| Integration detection | Stored in settings; reset via `Advanced Tools → Developer` |
 
 ---
 

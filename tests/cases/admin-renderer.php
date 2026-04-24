@@ -427,11 +427,11 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
     assertSameValue(1, preg_match('/id="tasty-fonts-page-tab-library"[\s\S]*?tabindex="-1"/', $output), 'Inactive top-level page tabs should be removed from the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-integrations"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
     assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-plugin-behavior"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-transfer"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-settings-tab-developer"[\s\S]*?tabindex="-1"/', $output), 'Inactive Settings sub-tabs should use roving tabindex.');
+    assertNotContainsValue('id="tasty-fonts-settings-tab-transfer"', $output, 'Transfer should live under Advanced Tools instead of Settings.');
+    assertNotContainsValue('id="tasty-fonts-settings-tab-developer"', $output, 'Developer tools should live under Advanced Tools instead of Settings.');
     assertSameValue(1, preg_match('/id="tasty-fonts-preview-tab-code"[\s\S]*?tabindex="-1"/', $output), 'Inactive preview tabs should be removed from the normal keyboard tab order.');
     assertSameValue(1, preg_match('/id="tasty-fonts-add-font-tab-bunny"[\s\S]*?tabindex="-1"/', $output), 'Inactive add-font tabs should be removed from the normal keyboard tab order.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-tab-system"[\s\S]*?tabindex="-1"/', $output), 'Inactive diagnostics tabs should be removed from the normal keyboard tab order.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-tab-generated"[\s\S]*?tabindex="-1"/', $output), 'Inactive diagnostics tabs should be removed from the normal keyboard tab order.');
     assertSameValue(1, preg_match('/Version [0-9]+\.[0-9]+\.[0-9]+/', $output), 'The page heading should include the current plugin version for assistive technologies.');
     assertContainsValue('id="tasty-fonts-settings-form"', $output, 'The Settings tab should render one shared settings form for Output, Integrations, and Behavior.');
     assertContainsValue('data-settings-form="settings"', $output, 'The Settings tab should render shared explicit-save state tracking for the combined settings form.');
@@ -3833,11 +3833,11 @@ $tests['admin_page_renderer_keeps_deployment_and_role_selection_ahead_of_library
     $deploymentPosition = strpos($output, 'Workflow');
     $selectionPosition = strpos($output, 'Choose Families and Fallbacks.');
     $libraryPosition = strpos($output, 'id="tasty-fonts-library"');
-    $activityPosition = strpos($output, 'class="tasty-fonts-card tasty-fonts-activity-card"');
+    $activityPosition = strpos($output, 'id="tasty-fonts-diagnostics-panel-activity"');
 
     assertSameValue(true, $deploymentPosition !== false && $selectionPosition !== false && $deploymentPosition < $selectionPosition, 'Deployment controls should render before role selection.');
     assertSameValue(true, $selectionPosition !== false && $libraryPosition !== false && $selectionPosition < $libraryPosition, 'Role selection should render before the library section.');
-    assertSameValue(true, $libraryPosition !== false && $activityPosition !== false && $libraryPosition < $activityPosition, 'The library should render before the activity section.');
+    assertSameValue(true, $libraryPosition !== false && $activityPosition !== false && $libraryPosition < $activityPosition, 'The library should render before the Advanced Tools activity tab.');
 };
 
 $tests['admin_page_renderer_closes_the_shell_wrapper_after_rendering_sections'] = static function (): void {
@@ -4433,6 +4433,98 @@ $tests['admin_page_renderer_makes_copyable_diagnostic_values_click_to_copy'] = s
     assertContainsValue('data-copy-success="CSS Request URL copied."', $output, 'Copyable diagnostic values should report which field was copied in the shared toast message.');
     assertContainsValue('<div class="tasty-fonts-diagnostic-value tasty-fonts-code">', $output, 'Diagnostic values should remain plain readable text instead of turning the whole field into a button.');
     assertNotContainsValue('data-copy-text="4 KB"', $output, 'Plain diagnostic values should not become copy controls.');
+};
+
+$tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    try {
+        $renderer->renderPage([
+            'storage' => ['root' => '/tmp/uploads/fonts'],
+            'catalog' => [],
+            'available_families' => [],
+            'roles' => [],
+            'logs' => [
+                ['time' => '2026-04-07 09:20:40', 'actor' => 'root', 'message' => 'Generated CSS regenerated.'],
+            ],
+            'activity_actor_options' => ['root'],
+            'family_fallbacks' => [],
+            'family_font_displays' => [],
+            'family_font_display_options' => [],
+            'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+            'preview_size' => 32,
+            'font_display' => 'swap',
+            'font_display_options' => [],
+            'minify_css_output' => true,
+            'preload_primary_fonts' => true,
+            'remote_connection_hints' => true,
+            'block_editor_font_library_sync_enabled' => false,
+            'training_wheels_off' => false,
+            'show_activity_log' => true,
+            'delete_uploaded_files_on_uninstall' => false,
+            'diagnostic_items' => [],
+            'overview_metrics' => [
+                ['label' => 'Families', 'value' => '2'],
+            ],
+            'developer_tool_statuses' => [
+                'wipe_managed_font_library' => [
+                    'summary' => '2 managed font families in the library.',
+                    'last_run' => '',
+                ],
+            ],
+            'site_transfer' => [
+                'available' => true,
+                'message' => '',
+                'export_url' => 'https://example.test/wp-admin/admin.php?action=tasty_fonts_download_site_transfer_bundle',
+                'import_file_field' => 'tasty_fonts_site_transfer_bundle',
+                'import_stage_token_field' => 'tasty_fonts_site_transfer_stage_token',
+                'import_google_api_key_field' => 'tasty_fonts_import_google_api_key',
+                'import_action_field' => 'tasty_fonts_import_site_transfer_bundle',
+                'effective_upload_limit_label' => '32 MB',
+                'logs' => [],
+                'actor_options' => [],
+            ],
+            'output_panels' => [],
+            'generated_css_panel' => [
+                'key' => 'generated',
+                'label' => 'Generated CSS',
+                'target' => 'tasty-fonts-output-generated',
+                'value' => ':root{--font-body:sans-serif}',
+                'download_url' => 'https://example.test/wp-admin/admin.php?action=tasty_fonts_download_generated_css',
+            ],
+            'preview_panels' => [],
+            'toasts' => [],
+            'apply_everywhere' => false,
+            'role_deployment' => [],
+        ]);
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('id="tasty-fonts-diagnostics-tab-overview"', $output, 'Advanced Tools should render the command center overview tab.');
+    assertNotContainsValue('id="tasty-fonts-diagnostics-tab-system"', $output, 'Advanced Tools should fold system details into Overview instead of rendering a redundant tab.');
+    assertContainsValue('id="tasty-fonts-diagnostics-tab-maintenance"', $output, 'Advanced Tools should expose maintenance as a first-class tab.');
+    assertContainsValue('id="tasty-fonts-diagnostics-tab-transfer"', $output, 'Advanced Tools should expose transfer as a first-class tab.');
+    assertContainsValue('data-tab-heading-group="diagnostics"', $output, 'Advanced Tools should render contextual tab headings in the shared card header.');
+    assertContainsValue('data-tab-heading="transfer"', $output, 'Advanced Tools should include the transfer contextual heading.');
+    assertNotContainsValue('Command center for runtime inspection, maintenance, transfer, and activity review.', $output, 'Advanced Tools should avoid repeating the masthead copy inside the diagnostics card.');
+    assertContainsValue('System Details', $output, 'Overview should include the system details diagnostics.');
+    assertNotContainsValue('Runtime Inspector', $output, 'Overview should not render non-actionable shortcut cards for tabs that are already visible.');
+    assertNotContainsValue('class="tasty-fonts-generated-css-toolbar"', $output, 'Generated CSS should use the shared contextual header instead of a detached panel title.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-panel-generated"[\s\S]*?Download Generated CSS/', $output), 'The generated CSS download action should live inside the generated CSS tab panel.');
+    assertContainsValue('class="button tasty-fonts-output-download-button"', $output, 'Generated CSS should render the download action as an icon-only code panel control.');
+    assertNotContainsValue('class="button button-secondary" href="https://example.test/wp-admin/admin.php?action=tasty_fonts_download_generated_css"', $output, 'Generated CSS should not render a detached toolbar download button.');
+    assertContainsValue('Clear Caches &amp; Rebuild', $output, 'The maintenance tab should render existing guarded cache rebuild action.');
+    assertContainsValue('data-developer-confirm-input="WIPE LIBRARY"', $output, 'The maintenance tab should keep typed confirmation for destructive library wipes.');
+    assertContainsValue('Export Site Transfer Bundle', $output, 'The transfer tab should render the existing export workflow.');
+    assertContainsValue('data-site-transfer-form', $output, 'The transfer tab should keep the JS contract for dry-run imports.');
+    assertNotContainsValue('tasty-fonts-site-transfer-headline', $output, 'Transfer should use the shared contextual header instead of a separate panel headline.');
+    assertContainsValue('id="tasty-fonts-diagnostics-panel-activity"', $output, 'The activity log should now live inside the Advanced Tools command center.');
 };
 
 $tests['admin_page_renderer_renders_local_environment_notice_at_the_end_of_deploy_fonts_with_reminder_actions'] = static function (): void {

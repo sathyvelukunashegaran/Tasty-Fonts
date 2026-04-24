@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Reworked Advanced Tools into a power-user command center with Overview, Generated CSS, Developer, Transfer, and Activity tabs while preserving existing guarded maintenance and transfer workflows.
+
 ## [1.13.0] - 2026-04-24
 
 - Promoted the validated `1.13.0` beta line to stable.

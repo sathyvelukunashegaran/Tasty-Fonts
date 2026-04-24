@@ -155,7 +155,7 @@ Regardless of which delivery methods you use, document your font setup in your s
 ## Notes
 
 - Switching from CDN to self-hosted delivery requires a re-import of the affected family. The plugin cannot retroactively download files for families that were imported in CDN mode.
-- After switching delivery modes, go to `Settings → Developer → Clear Plugin Caches` to force the generated stylesheet to refresh.
+- After switching delivery modes, go to `Advanced Tools → Developer → Clear Plugin Caches` to force the generated stylesheet to refresh.
 - The plugin does not set any browser cookies or use local storage. Font delivery is purely HTTP request-based.
 - Block Editor Font Library Sync uses loopback requests from your server to itself — it does not contact any third-party service.
 

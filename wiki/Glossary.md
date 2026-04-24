@@ -183,7 +183,7 @@ A delivery mode where downloaded font files live on your own server and are serv
 A Behavior setting (added in 1.13.0) that controls whether the activity log panel is visible in Advanced Tools. When disabled, the panel is hidden by default but the plugin continues to record events. Re-enable to reveal past history.
 
 **Site Transfer**
-The portable bundle export and import feature in `Settings → Transfer` (added in 1.12.0). Use it to move the full Tasty Fonts setup — managed font files, library data, settings, and live role assignments — between WordPress sites with one ZIP bundle. Google Fonts API keys are excluded from bundles for security. See [Site Transfer](Site-Transfer) for the full guide.
+The portable bundle export and import feature in `Advanced Tools → Transfer`. Use it to move the full Tasty Fonts setup — managed font files, library data, settings, and live role assignments — between WordPress sites with one ZIP bundle. Google Fonts API keys are excluded from bundles for security. See [Site Transfer](Site-Transfer) for the full guide.
 
 **Site Transfer Bundle**
 A ZIP file produced by the Site Transfer export action. It contains a manifest (`tasty-fonts-export.json`) that records library state, settings, role assignments, and file checksums, plus all managed font files under a `fonts/` subdirectory. Imported on the destination site to replace the current Tasty Fonts setup.
@@ -200,7 +200,7 @@ The identifier used to namespace translatable strings in WordPress plugins. Tast
 Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.13.0 or later.
 
 **Transfer Tab**
-The fifth tab in the Settings page, added in 1.12.0. Contains the Export and Import cards for the Site Transfer workflow.
+The Transfer tab in Advanced Tools. Contains the Export and Import cards for the Site Transfer workflow.
 
 **TTF (TrueType Font)**
 An older cross-platform font format. Supported for local upload. Modern browsers prefer WOFF2, but TTF works as a fallback.

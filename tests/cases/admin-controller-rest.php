@@ -3155,8 +3155,8 @@ $tests['admin_controller_preserves_developer_studio_tab_in_redirect_urls'] = sta
     parse_str((string) ($parts['query'] ?? ''), $query);
 
     assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'Developer deep links should canonicalize to the single admin page.');
-    assertSameValue(AdminController::PAGE_SETTINGS, (string) ($query['tf_page'] ?? ''), 'Developer deep links should activate the Settings top-level tab.');
-    assertSameValue('developer', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the Developer tab selection when it is active.');
+    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Developer deep links should activate the Advanced Tools top-level tab.');
+    assertSameValue('maintenance', (string) ($query['tf_studio'] ?? ''), 'Legacy Developer links should resolve to the Advanced Tools developer panel.');
 };
 
 $tests['admin_controller_preserves_transfer_studio_tab_in_redirect_urls'] = static function (): void {
@@ -3175,8 +3175,23 @@ $tests['admin_controller_preserves_transfer_studio_tab_in_redirect_urls'] = stat
     parse_str((string) ($parts['query'] ?? ''), $query);
 
     assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'Transfer deep links should canonicalize to the single admin page.');
-    assertSameValue(AdminController::PAGE_SETTINGS, (string) ($query['tf_page'] ?? ''), 'Transfer deep links should activate the Settings top-level tab.');
+    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Transfer deep links should activate the Advanced Tools top-level tab.');
     assertSameValue('transfer', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the Transfer tab selection when it is active.');
+
+    $_GET = [
+        'page' => AdminController::MENU_SLUG,
+        'tf_page' => AdminController::PAGE_SETTINGS,
+        'tf_studio' => 'transfer',
+    ];
+
+    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
+    $parts = parse_url($url);
+    $query = [];
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+
+    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Old Settings Transfer URLs should redirect to Advanced Tools.');
+    assertSameValue('transfer', (string) ($query['tf_studio'] ?? ''), 'Old Settings Transfer URLs should preserve the Transfer panel.');
 };
 
 $tests['admin_controller_builds_site_transfer_download_urls_for_the_transfer_tab'] = static function (): void {
@@ -3185,7 +3200,7 @@ $tests['admin_controller_builds_site_transfer_download_urls_for_the_transfer_tab
     $controller = makeAdminControllerTestInstance();
     $url = (string) invokePrivateMethod($controller, 'buildSiteTransferDownloadUrl');
 
-    assertContainsValue('tf_page=settings', $url, 'Site transfer downloads should keep the Settings page active.');
+    assertContainsValue('tf_page=diagnostics', $url, 'Site transfer downloads should keep the Advanced Tools page active.');
     assertContainsValue('tf_studio=transfer', $url, 'Site transfer downloads should return to the Transfer tab.');
 };
 
@@ -3267,6 +3282,21 @@ $tests['admin_controller_maps_legacy_diagnostics_tabs_to_the_diagnostics_page'] 
     assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'Legacy diagnostics tabs should canonicalize to the single admin page.');
     assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Legacy diagnostics tabs should activate the Diagnostics top-level tab.');
     assertSameValue('generated', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the requested diagnostics tab.');
+
+    $_GET = [
+        'page' => AdminController::MENU_SLUG,
+        'tf_advanced' => '1',
+        'tf_studio' => 'system',
+    ];
+
+    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
+    $parts = parse_url($url);
+    $query = [];
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+
+    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Legacy System Details URLs should still land on Advanced Tools.');
+    assertSameValue('overview', (string) ($query['tf_studio'] ?? ''), 'Legacy System Details URLs should resolve to Overview because system details now live there.');
 };
 
 $tests['admin_controller_maps_snippets_disclosure_state_to_the_roles_page'] = static function (): void {

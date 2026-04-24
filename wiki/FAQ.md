@@ -102,7 +102,7 @@ Having multiple profiles on one family means you can switch between them without
 
 ### Can I move my font setup from one WordPress site to another?
 
-Yes. Use `Settings → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.13.0 or later, and PHP's ZipArchive extension must be available on both servers.
+Yes. Use `Advanced Tools → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.13.0 or later, and PHP's ZipArchive extension must be available on both servers.
 
 See [Site Transfer](Site-Transfer) for the full step-by-step walkthrough.
 
@@ -215,7 +215,7 @@ code { font-family: var(--font-monospace); }
 1. Confirm you clicked `Apply Sitewide` and not just `Save Draft`.
 2. Hard-refresh your browser (Ctrl+Shift+R or Cmd+Shift+R).
 3. Go to `Advanced Tools -> Generated CSS` and check that the stylesheet shows the updated font.
-4. If the stylesheet looks stale, go to `Settings -> Developer` and use `Clear Cache` to force a regeneration.
+4. If the stylesheet looks stale, go to `Advanced Tools -> Developer` and use `Clear Cache` to force a regeneration.
 5. If you use a caching plugin or CDN in front of WordPress, purge that cache as well.
 
 ---
@@ -295,13 +295,13 @@ wp-content/uploads/fonts/.generated/tasty-fonts.css
 
 The `.generated` directory starts with a dot, so some FTP clients hide it by default. If the file does not exist:
 
-1. Go to `Advanced Tools -> System Details` to confirm the delivery mode and generated file status.
+1. Go to `Advanced Tools -> Overview` to confirm the delivery mode and generated file status.
 2. Apply sitewide or trigger a settings save to force the plugin to write the file.
 3. Check that `wp-content/uploads/fonts/` is writable by the web server process.
 
 ### I switched from CDN to self-hosted but the frontend still loads from the CDN
 
-The generated stylesheet may not have been refreshed yet. Go to `Advanced Tools -> Generated CSS` and check that it reflects the new delivery mode. If it looks stale, go to `Settings -> Developer` and use `Clear Cache` to force a regeneration, or save any Output setting to trigger a refresh.
+The generated stylesheet may not have been refreshed yet. Go to `Advanced Tools -> Generated CSS` and check that it reflects the new delivery mode. If it looks stale, go to `Advanced Tools -> Developer` and use `Clear Cache` to force a regeneration, or save any Output setting to trigger a refresh.
 
 ### The wrong font is showing on my site even after applying sitewide
 

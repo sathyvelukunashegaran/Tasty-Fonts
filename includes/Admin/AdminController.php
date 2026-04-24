@@ -79,7 +79,8 @@ final class AdminController
     private const SEARCH_COOLDOWN_TRANSIENT_TTL = 1;
     public const ACTION_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_action_cooldown_';
     private const ACTION_COOLDOWN_DEFAULT_WINDOW_SECONDS = 2.0;
-    private const SETTINGS_STUDIO_TABS = ['output-settings', 'integrations', 'plugin-behavior', 'transfer', 'developer'];
+    private const SETTINGS_STUDIO_TABS = ['output-settings', 'integrations', 'plugin-behavior'];
+    private const DIAGNOSTICS_STUDIO_TABS = ['overview', 'generated', 'system', 'maintenance', 'developer', 'transfer', 'activity'];
     private readonly AdminPageRenderer $renderer;
     private readonly AdminPageContextBuilder $pageContextBuilder;
     private readonly AdminAccessService $adminAccess;
@@ -1711,13 +1712,13 @@ final class AdminController
                     self::PAGE_SETTINGS . '_behavior' => $this->buildPageUrl(self::PAGE_SETTINGS, [
                         'tf_studio' => 'plugin-behavior',
                     ]),
-                    self::PAGE_SETTINGS . '_transfer' => $this->buildPageUrl(self::PAGE_SETTINGS, [
+                    self::PAGE_DIAGNOSTICS => $this->buildPageUrl(self::PAGE_DIAGNOSTICS),
+                    self::PAGE_DIAGNOSTICS . '_transfer' => $this->buildPageUrl(self::PAGE_DIAGNOSTICS, [
                         'tf_studio' => 'transfer',
                     ]),
-                    self::PAGE_SETTINGS . '_developer' => $this->buildPageUrl(self::PAGE_SETTINGS, [
-                        'tf_studio' => 'developer',
+                    self::PAGE_DIAGNOSTICS . '_developer' => $this->buildPageUrl(self::PAGE_DIAGNOSTICS, [
+                        'tf_studio' => 'maintenance',
                     ]),
-                    self::PAGE_DIAGNOSTICS => $this->buildPageUrl(self::PAGE_DIAGNOSTICS),
                 ],
                 'site_transfer' => $this->buildSiteTransferContext($logs),
             ]
@@ -4587,7 +4588,7 @@ final class AdminController
         return add_query_arg(
             [
                 'page' => self::MENU_SLUG,
-                'tf_page' => self::PAGE_SETTINGS,
+                'tf_page' => self::PAGE_DIAGNOSTICS,
                 'tf_studio' => 'transfer',
                 self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE => '1',
                 '_wpnonce' => wp_create_nonce(self::ACTION_DOWNLOAD_SITE_TRANSFER_BUNDLE),
@@ -4665,8 +4666,12 @@ final class AdminController
             $args['tf_studio'] = $studio;
         }
 
-        if ($pageType === self::PAGE_DIAGNOSTICS && in_array($studio, ['generated', 'system', 'activity'], true)) {
-            $args['tf_studio'] = $studio;
+        if ($pageType === self::PAGE_DIAGNOSTICS && in_array($studio, self::DIAGNOSTICS_STUDIO_TABS, true)) {
+            $args['tf_studio'] = match ($studio) {
+                'developer' => 'maintenance',
+                'system' => 'overview',
+                default => $studio,
+            };
 
         }
 
@@ -4703,7 +4708,7 @@ final class AdminController
 
         return match ($key) {
             'tf_page' => in_array($value, [self::PAGE_ROLES, self::PAGE_LIBRARY, self::PAGE_SETTINGS, self::PAGE_DIAGNOSTICS], true) ? $value : '',
-            'tf_studio' => in_array($value, array_merge(['preview', 'snippets', 'generated', 'system', 'activity'], self::SETTINGS_STUDIO_TABS), true) ? $value : '',
+            'tf_studio' => in_array($value, array_merge(['preview', 'snippets'], self::DIAGNOSTICS_STUDIO_TABS, self::SETTINGS_STUDIO_TABS), true) ? $value : '',
             'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface', 'code'], true) ? $value : '',
             'tf_output' => in_array($value, ['usage', 'variables', 'stacks', 'names'], true) ? $value : '',
             'tf_source' => in_array($value, ['google', 'bunny', 'adobe', 'upload'], true) ? $value : '',
@@ -4721,6 +4726,13 @@ final class AdminController
     private function resolveRequestedPageType(): string
     {
         $pageSlug = $this->getCurrentPageSlug();
+        $studio = $this->getAllowedTrackedUiTabValue('tf_studio');
+
+        if ($studio === 'transfer' || $studio === 'developer') {
+            if ($pageSlug === self::MENU_SLUG_SETTINGS || $this->getAllowedTrackedUiTabValue('tf_page') === self::PAGE_SETTINGS) {
+                return self::PAGE_DIAGNOSTICS;
+            }
+        }
 
         if ($pageSlug !== self::MENU_SLUG) {
             return self::pageTypeForSlug($pageSlug);
@@ -4736,8 +4748,6 @@ final class AdminController
             return self::PAGE_LIBRARY;
         }
 
-        $studio = $this->getAllowedTrackedUiTabValue('tf_studio');
-
         if (in_array($studio, self::SETTINGS_STUDIO_TABS, true)) {
             return self::PAGE_SETTINGS;
         }
@@ -4746,7 +4756,7 @@ final class AdminController
             return self::PAGE_ROLES;
         }
 
-        if (in_array($studio, ['generated', 'system', 'activity'], true)) {
+        if (in_array($studio, self::DIAGNOSTICS_STUDIO_TABS, true)) {
             return self::PAGE_DIAGNOSTICS;
         }
 
