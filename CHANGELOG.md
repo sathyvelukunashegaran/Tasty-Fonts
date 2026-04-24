@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.0-beta.5] - 2026-04-24
+
+### Added
+
+- Added the Tasty Foundry admin design-system guide plus Stylelint and CSS-token audit coverage for the committed admin CSS.
+- Added a Show Activity Log behavior setting so Advanced Tools can hide the full diagnostics activity log by default while continuing to record events.
+
+### Changed
+
+- Refreshed the admin UI token system, shell, masthead, role workflow, library cards, import panels, integration rows, developer tools, and preview surfaces with a denser Tasty Foundry workspace treatment.
+- Shortened Studio, Library, import, integration, transfer, updater, and developer-tool labels and helper copy so operational controls are easier to scan.
+- Updated CI, local hook guidance, and contributor docs to run optional npm CSS lint tooling alongside PHPStan, JS contract tests, PHP syntax checks, and jscpd.
+
+### Fixed
+
+- Improved admin accessibility by removing misleading tooltip expanded states and adding explicit labels for detected upload metadata actions.
+
 ## [1.13.0-beta.4] - 2026-04-24
 
 ### Added

@@ -2,9 +2,9 @@
 
 Thanks for contributing to Tasty Custom Fonts.
 
-This project keeps its contributor workflow intentionally lightweight: there is no build step and no npm install step. Run `composer install` when you want the repo's dev tooling locally or want to match CI exactly.
+This project keeps its contributor workflow intentionally lightweight: there is no build step. Run `composer install` for PHP tooling and `npm ci` when you want the optional CSS lint tooling used by CI.
 
-If you run `bin/setup-git-hooks`, the shared pre-commit hook will validate commits with `composer phpstan` and `bin/run-jscpd`.
+If you run `bin/setup-git-hooks`, the shared pre-commit hook will validate commits with `composer phpstan`, `bin/run-jscpd`, and Stylelint when npm dependencies are installed.
 
 ## Prerequisites
 
@@ -32,7 +32,9 @@ Run these before you open a pull request:
 
 ```bash
 composer install
+npm ci
 composer phpstan
+npm run lint:css
 find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 php tests/run.php
 node --test tests/js/*.test.cjs
@@ -41,9 +43,10 @@ node --test tests/js/*.test.cjs
 What each command covers:
 
 - `composer phpstan` runs the repo's WordPress-aware PHPStan level 10 configuration.
+- `npm run lint:css` runs Stylelint against the committed admin CSS and design tokens.
 - `php -l` catches PHP syntax errors across the repository.
 - `php tests/run.php` runs the self-contained PHP harness for repository, import, runtime, admin, and updater behavior.
-- `node --test tests/js/*.test.cjs` runs the JavaScript contract tests for shared admin and canvas helpers.
+- `node --test tests/js/*.test.cjs` runs the JavaScript contract tests for shared admin and canvas helpers, including the CSS token reference audit.
 
 The PHP and JavaScript test harnesses do not require a full WordPress install, so you can run them directly from the repo checkout.
 

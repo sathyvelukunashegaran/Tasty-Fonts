@@ -61,7 +61,7 @@
                             <div class="tasty-fonts-empty-state tasty-fonts-empty-state--rich tasty-fonts-empty-state--activity tasty-fonts-activity-empty">
                                 <div class="tasty-fonts-empty-state-body">
                                     <h3 class="tasty-fonts-empty-state-title"><?php esc_html_e('No Activity Yet', 'tasty-fonts'); ?></h3>
-                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Scans, imports, deletes, and generated stylesheet refreshes will appear here after you start managing fonts.', 'tasty-fonts'); ?></p>
+                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Imports, deletes, scans, and CSS refreshes will appear here.', 'tasty-fonts'); ?></p>
                                 </div>
                             </div>
                         <?php else: ?>

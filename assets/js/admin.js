@@ -386,15 +386,15 @@
         bunnySearchEmpty: __('No Bunny Fonts families matched that search.', 'tasty-fonts'),
         selectFamily: __('Select a family from search results or type one manually.', 'tasty-fonts'),
         bunnySelectFamily: __('Type a Bunny Fonts family name before importing.', 'tasty-fonts'),
-        bunnyImportFamilyEmpty: __('Choose a Bunny family or type one manually.', 'tasty-fonts'),
-        importFamilyEmpty: __('Choose a Google family or type one manually.', 'tasty-fonts'),
-        importPreviewEmpty: __('Preview appears here after you choose a family.', 'tasty-fonts'),
+        bunnyImportFamilyEmpty: __('Choose or type a Bunny family.', 'tasty-fonts'),
+        importFamilyEmpty: __('Choose or type a Google family.', 'tasty-fonts'),
+        importPreviewEmpty: __('Choose a family to preview it.', 'tasty-fonts'),
         importing: __('Saving the selected Google delivery…', 'tasty-fonts'),
         importError: __('The Google Fonts import failed.', 'tasty-fonts'),
         bunnyImportError: __('The Bunny Fonts import failed.', 'tasty-fonts'),
         importNoVariants: __('Select at least one variant to import.', 'tasty-fonts'),
         bunnyImportSubmitting: __('Saving the selected Bunny delivery…', 'tasty-fonts'),
-        bunnyImportPreviewEmpty: __('Preview appears here after you choose a Bunny family.', 'tasty-fonts'),
+        bunnyImportPreviewEmpty: __('Choose a family to preview it.', 'tasty-fonts'),
         bunnyImportBusy: __('Importing Bunny Fonts…', 'tasty-fonts'),
         bunnyImportSuccess: __('Bunny Fonts imported successfully. Reloading…', 'tasty-fonts'),
         importButtonIdle: __('Add to Library', 'tasty-fonts'),
@@ -403,8 +403,8 @@
         saveDeliveryGoogleCdn: __('Add Google CDN', 'tasty-fonts'),
         saveDeliveryBunnyCdn: __('Add Bunny CDN', 'tasty-fonts'),
         importEstimateSize: __('Approx. +%1$s WOFF2', 'tasty-fonts'),
-        importSelectionSummaryEmpty: __('0 Variants Selected', 'tasty-fonts'),
-        importSelectionSummaryAvailable: __('%1$d of %2$d Variants Selected', 'tasty-fonts'),
+        importSelectionSummaryEmpty: __('0 selected', 'tasty-fonts'),
+        importSelectionSummaryAvailable: __('%1$d of %2$d selected', 'tasty-fonts'),
         importSelectionSummaryAvailableVariable: __('%1$d of %2$d Styles Selected', 'tasty-fonts'),
         uploadSubmitting: __('Uploading font files…', 'tasty-fonts'),
         uploadProgress: __('Uploading files… %1$d%%', 'tasty-fonts'),
@@ -477,7 +477,7 @@
         variableBadge: __('Variable', 'tasty-fonts'),
         staticBadge: __('Static', 'tasty-fonts'),
         variableSourceBadge: __('Variable Source', 'tasty-fonts'),
-        googleVariableImportNote: __('Variable import keeps the upstream axis ranges and stores a variable font file when Google serves one.', 'tasty-fonts'),
+        googleVariableImportNote: __('Variable imports keep upstream axis ranges when Google serves a variable file.', 'tasty-fonts'),
         bunnyVariableImportNote: __('Bunny Fonts doesn\'t deliver variable fonts through download or CDN. Use Upload Files to add a true variable font file.', 'tasty-fonts'),
         requestFailed: __('Request failed.', 'tasty-fonts'),
         dismissNotification: __('Dismiss notification', 'tasty-fonts'),
@@ -492,7 +492,7 @@
         monospaceFamilyVariableTitle: __('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'),
         monospaceFamilyFallbackTitle: __('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'),
         roleWeightDefault: __('Use Role Default (%1$s)', 'tasty-fonts'),
-        roleWeightSummary: __('Available static weights for %1$s. Choose one to override the default role weight when role font-weight output is enabled.', 'tasty-fonts'),
+        roleWeightSummary: __('Static weights for %1$s. Choose one to override role weight output.', 'tasty-fonts'),
         settingsUnsaved: __('Unsaved changes', 'tasty-fonts'),
         settingsLeaveWarning: __('You have unsaved settings changes.', 'tasty-fonts'),
         adminAccessRoleMetricSingle: __('%d role', 'tasty-fonts'),
@@ -1675,6 +1675,7 @@
             'block_editor_font_library_sync_enabled',
             'acss_font_role_sync_enabled',
             'delete_uploaded_files_on_uninstall',
+            'show_activity_log',
             'training_wheels_off',
             'monospace_role_enabled'
         ].forEach((field) => {
@@ -3575,7 +3576,7 @@
             return;
         }
 
-        selectedFamily.textContent = familyName || getString('importFamilyEmpty', 'Choose a Google family or type one manually.');
+        selectedFamily.textContent = familyName || getString('importFamilyEmpty', 'Choose or type a Google family.');
     }
 
     function currentGoogleImportFamily() {
@@ -4464,7 +4465,7 @@
 
             selectedFamilyPreview.textContent = hasFamily
                 ? previewText
-                : getString('importPreviewEmpty', 'Preview appears here after you choose a family.');
+                : getString('importPreviewEmpty', 'Choose a family to preview it.');
             selectedFamilyPreview.classList.toggle('is-placeholder', !hasFamily);
             selectedFamilyPreview.style.fontFamily = hasFamily ? `"${previewFamilyName}", ${fallback}` : '';
         }
@@ -4492,7 +4493,7 @@
                 importSelectionSummary.textContent = formatMessage(
                     isVariableMode
                         ? getString('importSelectionSummaryAvailableVariable', '%1$d of %2$d Styles Selected')
-                        : getString('importSelectionSummaryAvailable', '%1$d of %2$d Variants Selected'),
+                        : getString('importSelectionSummaryAvailable', '%1$d of %2$d selected'),
                     [variantCount, availableCount]
                 );
             } else if (variantCount > 0) {
@@ -4543,7 +4544,7 @@
         syncBunnyImportTerminology(isVariableMode);
 
         if (bunnySelectedFamily) {
-            bunnySelectedFamily.textContent = familyName || getString('bunnyImportFamilyEmpty', 'Choose a Bunny family or type one manually.');
+            bunnySelectedFamily.textContent = familyName || getString('bunnyImportFamilyEmpty', 'Choose or type a Bunny family.');
         }
 
         renderSelectedFamilyMeta(bunnySelectedFamilyMeta, bunnySelectedFamilyNote, hasFamily ? matchedFamily : null, 'bunny');
@@ -4553,7 +4554,7 @@
 
             bunnySelectedFamilyPreview.textContent = hasFamily
                 ? previewText
-                : getString('bunnyImportPreviewEmpty', 'Preview appears here after you choose a Bunny family.');
+                : getString('bunnyImportPreviewEmpty', 'Choose a family to preview it.');
             bunnySelectedFamilyPreview.classList.toggle('is-placeholder', !hasFamily);
             bunnySelectedFamilyPreview.style.fontFamily = hasFamily ? `"${previewFamilyName}", ${fallback}` : '';
         }
@@ -4572,7 +4573,7 @@
                 bunnyImportSelectionSummary.textContent = formatMessage(
                     isVariableMode
                         ? getString('importSelectionSummaryAvailableVariable', '%1$d of %2$d Styles Selected')
-                        : getString('importSelectionSummaryAvailable', '%1$d of %2$d Variants Selected'),
+                        : getString('importSelectionSummaryAvailable', '%1$d of %2$d selected'),
                     [variantCount, availableCount]
                 );
             } else if (variantCount > 0) {
@@ -5376,7 +5377,7 @@
         }
 
         if (activeHelpButton) {
-            activeHelpButton.setAttribute('aria-expanded', 'false');
+            activeHelpButton.removeAttribute('aria-expanded');
             restoreHelpTooltipDescription(activeHelpButton);
         }
 
@@ -5391,7 +5392,7 @@
             return;
         }
 
-        button.setAttribute('aria-expanded', 'false');
+        button.removeAttribute('aria-expanded');
         rememberHelpTooltipDescription(button);
     }
 
@@ -5462,12 +5463,12 @@
         }
 
         if (activeHelpButton && activeHelpButton !== button) {
-            activeHelpButton.setAttribute('aria-expanded', 'false');
+            activeHelpButton.removeAttribute('aria-expanded');
             restoreHelpTooltipDescription(activeHelpButton);
         }
 
         activeHelpButton = button;
-        activeHelpButton.setAttribute('aria-expanded', 'true');
+        activeHelpButton.removeAttribute('aria-expanded');
         applyHelpTooltipDescription(activeHelpButton);
         tooltipLayer.textContent = copy;
         tooltipLayer.hidden = false;
@@ -7236,31 +7237,31 @@
     function selectedGoogleVariantsLabel() {
         return currentGoogleFormatMode() === 'variable'
             ? getString('selectedStylesLabel', 'Styles to Import')
-            : getString('selectedVariantsLabel', 'Variants to Import');
+            : getString('selectedVariantsLabel', 'Selected Variants');
     }
 
     function selectedBunnyVariantsLabel() {
         return currentBunnyFormatMode() === 'variable'
             ? getString('selectedStylesLabel', 'Styles to Import')
-            : getString('selectedVariantsLabel', 'Variants to Import');
+            : getString('selectedVariantsLabel', 'Selected Variants');
     }
 
     function selectedGoogleManualVariantsLabel() {
         return currentGoogleFormatMode() === 'variable'
             ? getString('manualStylesLabel', 'Manual Styles')
-            : getString('manualVariantsLabel', 'Manual Variants');
+            : getString('manualVariantsLabel', 'Variants');
     }
 
     function selectedBunnyManualVariantsLabel() {
         return currentBunnyFormatMode() === 'variable'
             ? getString('manualStylesLabel', 'Manual Styles')
-            : getString('manualVariantsLabel', 'Manual Variants');
+            : getString('manualVariantsLabel', 'Variants');
     }
 
     function importSelectionStepTitle(isVariableMode) {
         return isVariableMode
             ? getString('importStepTitleVariable', 'Choose Styles and Delivery')
-            : getString('importStepTitle', 'Choose Variants and Delivery');
+            : getString('importStepTitle', 'Configure Import');
     }
 
     function selectionHelperCopy(isVariableMode) {
@@ -7271,14 +7272,14 @@
             )
             : getString(
                 'importVariantSelectionNote',
-                'Click chips or type a comma-separated list above. Both stay in sync.'
+                'Use chips or type a comma-separated list.'
             );
     }
 
     function selectionSummaryEmptyLabel(isVariableMode) {
         return isVariableMode
             ? getString('importSelectionSummaryEmptyVariable', '0 Styles Selected')
-            : getString('importSelectionSummaryEmpty', '0 Variants Selected');
+            : getString('importSelectionSummaryEmpty', '0 selected');
     }
 
     function manualSelectionPlaceholder(isVariableMode) {
@@ -8337,6 +8338,7 @@
         button.dataset.detectedVariable = detected.isVariable ? '1' : '0';
         button.dataset.detectedAxes = JSON.stringify(detected.axes || []);
         button.textContent = `${getString('uploadUseDetected', 'Use Detected Values')} · ${label}`;
+        button.setAttribute('aria-label', button.textContent);
 
         return detected;
     }

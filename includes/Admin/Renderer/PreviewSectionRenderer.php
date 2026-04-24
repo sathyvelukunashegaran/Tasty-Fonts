@@ -36,7 +36,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 ?>
                 <div class="tasty-fonts-preview-showcase">
                     <div class="tasty-fonts-preview-specimen-board">
-                        <aside class="tasty-fonts-preview-specimen-rail">
+                        <div class="tasty-fonts-preview-specimen-rail">
                             <div class="tasty-fonts-preview-specimen-glyph" data-role-preview="heading">Aa</div>
                             <div class="tasty-fonts-preview-specimen-key">
                                 <span class="tasty-fonts-preview-specimen-key-label"><?php esc_html_e('Heading Family', 'tasty-fonts'); ?></span>
@@ -52,7 +52,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                                     <strong class="tasty-fonts-preview-specimen-key-value" data-role-preview="monospace" data-role-preview-name="monospace"><?php echo esc_html($this->previewRoleName('monospace', $roles, $familyLabels)); ?></strong>
                                 </div>
                             <?php endif; ?>
-                        </aside>
+                        </div>
 
                         <div class="tasty-fonts-preview-specimen-scale">
                             <div class="tasty-fonts-preview-specimen-scale-item tasty-fonts-preview-specimen-scale-item--1" data-role-preview="heading"><?php esc_html_e('Heading 1', 'tasty-fonts'); ?></div>
@@ -221,14 +221,14 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                             <p data-role-preview="body"><?php esc_html_e('Apparently we had reached a great height in the atmosphere, for the sky was a dead black, and the stars had ceased to twinkle.', 'tasty-fonts'); ?></p>
                             <p data-role-preview="body"><?php esc_html_e('A strong reading font should stay calm across longer passages and still leave enough contrast for section headings and pull quotes.', 'tasty-fonts'); ?></p>
                         </div>
-                        <aside class="tasty-fonts-preview-reading-aside">
+                        <div class="tasty-fonts-preview-reading-aside">
                             <h4 class="tasty-fonts-preview-reading-aside-title" data-role-preview="heading"><?php esc_html_e('Checklist', 'tasty-fonts'); ?></h4>
                             <ul class="tasty-fonts-preview-reading-list" data-role-preview="body">
                                 <li><?php esc_html_e('Paragraph spacing', 'tasty-fonts'); ?></li>
                                 <li><?php esc_html_e('Line length at body sizes', 'tasty-fonts'); ?></li>
                                 <li><?php esc_html_e('Subheading emphasis', 'tasty-fonts'); ?></li>
                             </ul>
-                        </aside>
+                        </div>
                     </div>
                 </article>
                 <?php
@@ -373,7 +373,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         $blockPreviewHeadingId = 'tasty-fonts-preview-code-block-heading';
         ?>
         <div class="tasty-fonts-preview-code-workspace">
-            <aside class="tasty-fonts-preview-code-overview">
+            <div class="tasty-fonts-preview-code-overview">
                 <span class="tasty-fonts-preview-card-label" data-role-preview="body"><?php esc_html_e('Code Preview', 'tasty-fonts'); ?></span>
                 <h3 class="tasty-fonts-preview-code-title" data-role-preview="heading"><?php esc_html_e('Inspect How Your Code Reads in an Editor and Published Block', 'tasty-fonts'); ?></h3>
                 <p class="tasty-fonts-preview-code-copy" data-role-preview="body" data-preview-dynamic-text><?php echo esc_html($previewText); ?></p>
@@ -399,7 +399,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                     <span class="tasty-fonts-preview-code-chip"><?php echo esc_html($monospaceRoleEnabled ? __('Monospace Role Enabled', 'tasty-fonts') : __('Fallback Stack Preview', 'tasty-fonts')); ?></span>
                     <span class="tasty-fonts-preview-code-chip"><?php esc_html_e('Syntax Highlighting', 'tasty-fonts'); ?></span>
                 </div>
-            </aside>
+            </div>
 
             <div class="tasty-fonts-preview-code-surfaces">
                 <section class="tasty-fonts-preview-code-window">

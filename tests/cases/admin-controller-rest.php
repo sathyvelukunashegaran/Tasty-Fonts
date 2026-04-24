@@ -291,6 +291,7 @@ $tests['admin_controller_collects_only_allowlisted_posted_settings_fields'] = st
     $_POST = [
         'google_api_key' => " api-key\\with-slash ",
         'preload_primary_fonts' => '1',
+        'show_activity_log' => '1',
         'monospace_role_enabled' => '0',
         'admin_access_custom_enabled' => '1',
         'admin_access_role_slugs' => ['editor', '', ['nested']],
@@ -306,6 +307,7 @@ $tests['admin_controller_collects_only_allowlisted_posted_settings_fields'] = st
         [
             'google_api_key' => ' api-key\\with-slash ',
             'preload_primary_fonts' => '1',
+            'show_activity_log' => '1',
             'monospace_role_enabled' => '0',
             'admin_access_custom_enabled' => '1',
             'admin_access_role_slugs' => ['editor', ''],
@@ -500,6 +502,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
                 'extended_variable_weight_tokens_enabled' => true,
                 'preload_primary_fonts' => false,
                 'block_editor_font_library_sync_enabled' => false,
+                'show_activity_log' => false,
                 'training_wheels_off' => false,
                 'preview_sentence' => 'Alpha',
             ],
@@ -525,6 +528,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
                 'extended_variable_weight_tokens_enabled' => false,
                 'preload_primary_fonts' => true,
                 'block_editor_font_library_sync_enabled' => true,
+                'show_activity_log' => true,
                 'training_wheels_off' => true,
                 'preview_sentence' => 'Beta',
             ],
@@ -543,6 +547,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
     assertContainsValue('extended variable subsettings updated', $message, 'Settings save messages should explain granular extended-variable changes.');
     assertContainsValue('primary font preloads enabled', $message, 'Settings save messages should explain preload setting changes.');
     assertContainsValue('Block Editor Font Library sync enabled', $message, 'Settings save messages should explain editor sync changes.');
+    assertContainsValue('activity log shown', $message, 'Settings save messages should explain activity log visibility changes.');
     assertContainsValue('onboarding hints hidden', $message, 'Settings save messages should explain plugin behavior changes.');
     assertContainsValue('preview text updated', $message, 'Settings save messages should explain preview text changes.');
     assertContainsValue('Reload the page to apply this change.', $message, 'Settings save messages should mention reload-only behavior changes.');
@@ -729,6 +734,19 @@ $tests['admin_controller_detects_which_setting_changes_require_reload'] = static
             ]
         ),
         'Toggling onboarding hints should require a page reload because the admin shell only reads that state on boot.'
+    );
+
+    assertSameValue(
+        true,
+        invokePrivateMethod(
+            $controller,
+            'settingsChangeRequiresReload',
+            [
+                ['show_activity_log' => false],
+                ['show_activity_log' => true],
+            ]
+        ),
+        'Toggling the activity log should require a page reload because the diagnostics section is server-rendered.'
     );
 
     assertSameValue(

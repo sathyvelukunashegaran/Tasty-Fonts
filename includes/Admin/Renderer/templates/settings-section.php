@@ -211,9 +211,9 @@
                                                 >
                                                 <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                 <span class="tasty-fonts-toggle-copy">
-                                                    <span class="tasty-fonts-toggle-title"><?php esc_html_e('Preload Primary Heading and Body Fonts', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-toggle-title"><?php esc_html_e('Preload Primary Fonts', 'tasty-fonts'); ?></span>
                                                     <?php if ($showSettingsDescriptions): ?>
-                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Loads the active self-hosted heading and body fonts earlier for faster text rendering.', 'tasty-fonts'); ?></span>
+                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Loads active self-hosted heading and body fonts earlier for faster text rendering.', 'tasty-fonts'); ?></span>
                                                     <?php endif; ?>
                                                 </span>
                                             </label>
@@ -344,7 +344,7 @@
                                                                     <span class="tasty-fonts-toggle-copy">
                                                                         <span class="tasty-fonts-toggle-title"><?php esc_html_e('Role Weights in Classes', 'tasty-fonts'); ?></span>
                                                                         <?php if ($showSettingsDescriptions): ?>
-                                                                            <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds role weights and variation settings to .font-heading, .font-body, and aliases. Different from sitewide role weights.', 'tasty-fonts'); ?></span>
+                                                                            <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds role weights and variation settings to class output. Different from sitewide role weights.', 'tasty-fonts'); ?></span>
                                                                         <?php endif; ?>
                                                                     </span>
                                                                 </label>
@@ -701,30 +701,28 @@
                                 </div>
 
                                 <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list">
-                                    <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice">
+                                    <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice tasty-fonts-integration-row--readonly">
                                         <div class="tasty-fonts-output-settings-submenu-copy">
-                                            <h4 class="tasty-fonts-integration-heading">
+                                            <span class="tasty-fonts-toggle-title-line tasty-fonts-integration-heading">
                                                 <span class="tasty-fonts-integration-mark tasty-fonts-integration-mark--etch" aria-hidden="true"></span>
                                                 <span><?php echo esc_html((string) ($etchIntegration['title'] ?? __('Etch Canvas Bridge', 'tasty-fonts'))); ?></span>
-                                            </h4>
+                                                <?php if ($etchBadgeInteractive): ?>
+                                                    <button
+                                                        type="button"
+                                                        class="<?php echo esc_attr($etchBadgeClass); ?>"
+                                                        <?php $this->renderPassiveHelpAttributes($etchStatusHelp); ?>
+                                                        aria-label="<?php esc_attr_e('Etch integration status', 'tasty-fonts'); ?>"
+                                                    >
+                                                        <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
+                                                    </button>
+                                                <?php else: ?>
+                                                    <span class="<?php echo esc_attr($etchBadgeClass); ?>">
+                                                        <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </span>
                                             <?php if ($showSettingsDescriptions && (string) ($etchIntegration['description'] ?? '') !== ''): ?>
                                                 <p><?php echo esc_html((string) ($etchIntegration['description'] ?? '')); ?></p>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="tasty-fonts-output-quick-options">
-                                            <?php if ($etchBadgeInteractive): ?>
-                                                <button
-                                                    type="button"
-                                                    class="<?php echo esc_attr($etchBadgeClass); ?>"
-                                                    <?php $this->renderPassiveHelpAttributes($etchStatusHelp); ?>
-                                                    aria-label="<?php esc_attr_e('Etch integration status', 'tasty-fonts'); ?>"
-                                                >
-                                                    <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
-                                                </button>
-                                            <?php else: ?>
-                                                <span class="<?php echo esc_attr($etchBadgeClass); ?>">
-                                                    <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
-                                                </span>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -1083,9 +1081,6 @@
                                                 <div class="tasty-fonts-integration-details-body tasty-fonts-integration-details-body--two-column">
                                                     <section class="tasty-fonts-integration-group" aria-label="<?php esc_attr_e('Current Automatic.css values', 'tasty-fonts'); ?>">
                                                         <span class="tasty-fonts-integration-group-title"><?php esc_html_e('Current values', 'tasty-fonts'); ?></span>
-                                                        <div class="tasty-fonts-integration-inline-summary">
-                                                            <p><?php esc_html_e('Automatic.css is using these current values.', 'tasty-fonts'); ?></p>
-                                                        </div>
                                                         <dl class="tasty-fonts-integration-kv-list">
                                                             <div class="tasty-fonts-integration-kv">
                                                                 <dt><?php esc_html_e('Heading', 'tasty-fonts'); ?></dt>
@@ -1241,6 +1236,17 @@
                                                 <span class="tasty-fonts-toggle-title"><?php esc_html_e('Hide Onboarding Hints', 'tasty-fonts'); ?></span>
                                                 <?php if ($showSettingsDescriptions): ?>
                                                     <span class="tasty-fonts-toggle-description"><?php esc_html_e('Hides helper tips and info buttons.', 'tasty-fonts'); ?></span>
+                                                <?php endif; ?>
+                                            </span>
+                                        </label>
+                                        <input type="hidden" name="show_activity_log" value="0">
+                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="show_activity_log" value="1" <?php checked($showActivityLog); ?>>
+                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                            <span class="tasty-fonts-toggle-copy">
+                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Show Activity Log', 'tasty-fonts'); ?></span>
+                                                <?php if ($showSettingsDescriptions): ?>
+                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds the full activity log to Advanced Tools. Events are still recorded when hidden.', 'tasty-fonts'); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                         </label>
@@ -1511,7 +1517,7 @@
                                                         <div class="tasty-fonts-developer-tool-title-row">
                                                             <h4><?php esc_html_e('Dry Run Bundle', 'tasty-fonts'); ?></h4>
                                                         </div>
-                                                    <p class="tasty-fonts-site-transfer-intro-copy"><?php esc_html_e('Validate here first. Then use Import Bundle in the top-right corner to replace this site’s Tasty Fonts setup.', 'tasty-fonts'); ?></p>
+                                                    <p class="tasty-fonts-site-transfer-intro-copy"><?php esc_html_e('Validate first, then import to replace this site’s Tasty setup.', 'tasty-fonts'); ?></p>
                                                         <?php if (!$siteTransferAvailable && $siteTransferMessage !== ''): ?>
                                                             <p class="tasty-fonts-site-transfer-note tasty-fonts-site-transfer-note--muted"><?php echo esc_html($siteTransferMessage); ?></p>
                                                         <?php endif; ?>
@@ -1737,7 +1743,6 @@
                                 [
                                     'slug' => 'danger',
                                     'title' => __('Danger Zone', 'tasty-fonts'),
-                                    'description' => __('Destructive actions. Use with care.', 'tasty-fonts'),
                                     'group_class' => 'tasty-fonts-developer-tool-group--danger',
                                     'actions' => [
                                         [
@@ -1748,8 +1753,6 @@
                                             'action_name' => 'tasty_fonts_reset_plugin_settings',
                                             'button_label' => __('Reset Settings Only', 'tasty-fonts'),
                                             'button_class' => 'button button-small tasty-fonts-button-danger tasty-fonts-developer-action-button',
-                                            'badge' => __('Caution', 'tasty-fonts'),
-                                            'badge_class' => 'is-warning',
                                             'card_class' => 'tasty-fonts-developer-tool-card--danger',
                                             'confirm_message' => __('Reset plugin settings to defaults while keeping the font library and files?', 'tasty-fonts'),
                                             'confirm_phrase' => 'RESET SETTINGS',
@@ -1762,8 +1765,6 @@
                                             'action_name' => 'tasty_fonts_wipe_managed_font_library',
                                             'button_label' => __('Delete Managed Library', 'tasty-fonts'),
                                             'button_class' => 'button button-small tasty-fonts-button-danger tasty-fonts-developer-action-button',
-                                            'badge' => __('Destructive', 'tasty-fonts'),
-                                            'badge_class' => 'is-danger',
                                             'card_class' => 'tasty-fonts-developer-tool-card--danger',
                                             'confirm_message' => __('Wipe the managed font library, remove managed files, and rebuild empty storage?', 'tasty-fonts'),
                                             'confirm_phrase' => 'WIPE LIBRARY',
@@ -1777,7 +1778,8 @@
                                     <h3><?php esc_html_e('Developer Tools', 'tasty-fonts'); ?></h3>
                                 </div>
                                 <div class="tasty-fonts-page-notice tasty-fonts-inline-note tasty-fonts-developer-tools-note">
-                                    <span><?php esc_html_e('Developer tools run immediately. Save settings first.', 'tasty-fonts'); ?></span>
+                                    <strong><?php esc_html_e('Maintenance actions', 'tasty-fonts'); ?></strong>
+                                    <span><?php esc_html_e('These tools run immediately and do not use Save changes.', 'tasty-fonts'); ?></span>
                                 </div>
                                 <div class="tasty-fonts-page-notice tasty-fonts-inline-note tasty-fonts-inline-note--warning tasty-fonts-developer-tools-note" data-developer-dirty-notice hidden>
                                     <strong><?php esc_html_e('Save settings first', 'tasty-fonts'); ?></strong>
@@ -1808,8 +1810,6 @@
                                                     $developerToolStatus = $developerToolSlug !== '' && isset($developerToolStatuses[$developerToolSlug]) && is_array($developerToolStatuses[$developerToolSlug])
                                                         ? $developerToolStatuses[$developerToolSlug]
                                                         : [];
-                                                    $developerToolBadge = trim((string) ($developerToolAction['badge'] ?? ''));
-                                                    $developerToolBadgeClass = trim((string) ($developerToolAction['badge_class'] ?? ''));
                                                     $developerToolSummary = trim((string) ($developerToolStatus['summary'] ?? ''));
                                                     $developerToolLastRun = trim((string) ($developerToolStatus['last_run'] ?? ''));
                                                     $developerToolConfirmPhrase = trim((string) ($developerToolAction['confirm_phrase'] ?? ''));
@@ -1822,9 +1822,6 @@
                                                         <div class="tasty-fonts-developer-tool-card-copy">
                                                             <div class="tasty-fonts-developer-tool-title-row">
                                                                 <p class="tasty-fonts-developer-tool-card-title"><?php echo esc_html((string) $developerToolAction['title']); ?></p>
-                                                                <?php if ($developerToolBadge !== ''): ?>
-                                                                    <span class="tasty-fonts-badge<?php echo $developerToolBadgeClass !== '' ? ' ' . esc_attr($developerToolBadgeClass) : ''; ?>"><?php echo esc_html($developerToolBadge); ?></span>
-                                                                <?php endif; ?>
                                                             </div>
                                                             <?php if ($showSettingsDescriptions && !empty($developerToolAction['description'])): ?>
                                                                 <p><?php echo esc_html((string) $developerToolAction['description']); ?></p>

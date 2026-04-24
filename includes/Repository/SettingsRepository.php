@@ -135,6 +135,7 @@ final class SettingsRepository
         'bricks_theme_style_target_id' => 'managed',
         'bricks_disable_google_fonts_enabled' => false,
         'oxygen_integration_enabled' => null,
+        'show_activity_log' => false,
         'training_wheels_off' => false,
         'monospace_role_enabled' => false,
         'variable_fonts_enabled' => false,
@@ -231,6 +232,7 @@ final class SettingsRepository
         $settings['bricks_theme_style_target_id'] = $this->normalizeBricksThemeStyleTargetId($settings['bricks_theme_style_target_id'] ?? 'managed');
         $settings['bricks_disable_google_fonts_enabled'] = !empty($settings['bricks_disable_google_fonts_enabled']);
         $settings['oxygen_integration_enabled'] = $this->normalizeOptionalBoolean($settings['oxygen_integration_enabled'] ?? null);
+        $settings['show_activity_log'] = !empty($settings['show_activity_log']);
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
         $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);
@@ -464,6 +466,11 @@ final class SettingsRepository
 
         if (array_key_exists('delete_uploaded_files_on_uninstall', $input)) {
             $settings['delete_uploaded_files_on_uninstall'] = !empty($input['delete_uploaded_files_on_uninstall']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('show_activity_log', $input)) {
+            $settings['show_activity_log'] = !empty($input['show_activity_log']);
             $settingsChanged = true;
         }
 
@@ -1125,6 +1132,7 @@ final class SettingsRepository
         $settings['bricks_theme_style_target_id'] = $this->normalizeBricksThemeStyleTargetId($settings['bricks_theme_style_target_id'] ?? 'managed');
         $settings['bricks_disable_google_fonts_enabled'] = !empty($settings['bricks_disable_google_fonts_enabled']);
         $settings['oxygen_integration_enabled'] = $this->normalizeOptionalBoolean($settings['oxygen_integration_enabled'] ?? null);
+        $settings['show_activity_log'] = !empty($settings['show_activity_log']);
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
         $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);

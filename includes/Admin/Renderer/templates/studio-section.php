@@ -10,8 +10,8 @@
                                 <div class="tasty-fonts-studio-section tasty-fonts-role-command-deck">
                                     <div class="tasty-fonts-studio-section-summary tasty-fonts-role-command-summary">
                                         <div class="tasty-fonts-studio-section-summary-copy tasty-fonts-role-command-summary-copy">
-                                            <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Publish Workflow', 'tasty-fonts'); ?></span>
-                                            <h3 class="tasty-fonts-studio-section-title"><?php esc_html_e('Choose Fonts, Preview the Pairing, Then Publish When It Is Ready.', 'tasty-fonts'); ?></h3>
+                                            <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Workflow', 'tasty-fonts'); ?></span>
+                                            <h2 class="tasty-fonts-studio-section-title"><?php esc_html_e('Select Roles, Review, Publish.', 'tasty-fonts'); ?></h2>
                                         </div>
                                         <div class="tasty-fonts-role-command-summary-meta">
                                             <button
@@ -47,15 +47,15 @@
                                             <div class="tasty-fonts-studio-card-head tasty-fonts-role-command-card-head">
                                                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
                                                     <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Sitewide', 'tasty-fonts'); ?></span>
-                                                    <h4><?php esc_html_e('Control Live Font Delivery', 'tasty-fonts'); ?></h4>
+                                                    <h3><?php esc_html_e('Sitewide Delivery', 'tasty-fonts'); ?></h3>
                                                 </div>
                                             </div>
                                             <p class="tasty-fonts-studio-card-copy tasty-fonts-role-command-card-copy">
                                                 <?php
                                                 echo esc_html(
                                                     $applyEverywhere
-                                                        ? __('These roles are currently being served on the frontend, editor, and Etch.', 'tasty-fonts')
-                                                        : __('Keep the current pairing local until you are ready to serve it across every surface.', 'tasty-fonts')
+                                                        ? __('Live roles are active across the site, editors, and Etch.', 'tasty-fonts')
+                                                        : __('Keep role changes in draft until the pairing is ready.', 'tasty-fonts')
                                                 );
                                                 ?>
                                             </p>
@@ -68,7 +68,7 @@
                                                     form="<?php echo esc_attr($roleFormId); ?>"
                                                     <?php disabled($applyEverywhere); ?>
                                                 >
-                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Apply Sitewide', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Turn On Sitewide', 'tasty-fonts'); ?></span>
                                                 </button>
                                                 <button
                                                     type="submit"
@@ -78,7 +78,7 @@
                                                     form="<?php echo esc_attr($roleFormId); ?>"
                                                     <?php disabled(!$applyEverywhere); ?>
                                                 >
-                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Switch Off Sitewide', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Turn Off Sitewide', 'tasty-fonts'); ?></span>
                                                 </button>
                                             </div>
                                         </div>
@@ -86,11 +86,11 @@
                                         <div class="tasty-fonts-studio-card tasty-fonts-role-command-card tasty-fonts-role-command-card--actions">
                                             <div class="tasty-fonts-studio-card-head tasty-fonts-role-command-card-head">
                                                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
-                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Role Actions', 'tasty-fonts'); ?></span>
-                                                    <h4><?php esc_html_e('Save or Publish Role Changes', 'tasty-fonts'); ?></h4>
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Changes', 'tasty-fonts'); ?></span>
+                                                    <h3><?php esc_html_e('Save or Publish', 'tasty-fonts'); ?></h3>
                                                 </div>
                                             </div>
-                                            <p class="tasty-fonts-studio-card-copy tasty-fonts-role-command-card-copy"><?php esc_html_e('Publish Roles when the current selection is ready. Save Draft keeps the pairing as your working draft.', 'tasty-fonts'); ?></p>
+                                            <p class="tasty-fonts-studio-card-copy tasty-fonts-role-command-card-copy"><?php esc_html_e('Save drafts while testing. Publish when ready.', 'tasty-fonts'); ?></p>
                                             <div class="tasty-fonts-role-command-actions">
                                                 <div
                                                     class="tasty-fonts-role-command-action<?php echo !$hasPendingLiveRoleChanges ? ' has-disabled-reason' : ''; ?>"
@@ -129,10 +129,10 @@
                                             <div class="tasty-fonts-studio-card-head tasty-fonts-role-command-card-head">
                                                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
                                                     <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Review', 'tasty-fonts'); ?></span>
-                                                    <h4><?php esc_html_e('Preview the Pairing or Open Snippets', 'tasty-fonts'); ?></h4>
+                                                    <h3><?php esc_html_e('Preview and Snippets', 'tasty-fonts'); ?></h3>
                                                 </div>
                                             </div>
-                                            <p class="tasty-fonts-studio-card-copy tasty-fonts-role-command-card-copy"><?php esc_html_e('Use Preview for visual checks. Open Snippets when you need variables, stacks, and usage code.', 'tasty-fonts'); ?></p>
+                                            <p class="tasty-fonts-studio-card-copy tasty-fonts-role-command-card-copy"><?php esc_html_e('Review the pairing or copy variables, stacks, and class snippets.', 'tasty-fonts'); ?></p>
                                             <div class="tasty-fonts-role-command-actions">
                                                 <button
                                                     type="button"
@@ -172,8 +172,8 @@
                             <div class="tasty-fonts-studio-section tasty-fonts-role-selection">
                                 <div class="tasty-fonts-studio-section-summary tasty-fonts-role-selection-summary">
                                     <div class="tasty-fonts-studio-section-summary-copy tasty-fonts-role-selection-summary-copy">
-                                        <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Role Selection', 'tasty-fonts'); ?></span>
-                                        <h3 class="tasty-fonts-studio-section-title"><?php esc_html_e('Choose the Family and Fallback for Each Saved Role.', 'tasty-fonts'); ?></h3>
+                                        <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Roles', 'tasty-fonts'); ?></span>
+                                        <h2 class="tasty-fonts-studio-section-title"><?php esc_html_e('Choose Families and Fallbacks.', 'tasty-fonts'); ?></h2>
                                     </div>
                                     <div class="tasty-fonts-role-selection-summary-meta">
                                         <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--selection">
@@ -235,14 +235,14 @@
                                     $roleCards = [
                                         [
                                             'role_key' => 'heading',
-                                            'kicker' => __('Heading', 'tasty-fonts'),
-                                            'title' => __('Heading Font', 'tasty-fonts'),
+                                            'kicker' => __('Role', 'tasty-fonts'),
+                                            'title' => __('Heading', 'tasty-fonts'),
                                             'family_variable' => $headingFamilyVariable,
                                             'copy_success' => __('Heading family variable copied.', 'tasty-fonts'),
                                             'copy_label' => $headingFamily !== ''
                                                 ? sprintf(__('Heading family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $headingFamilyVariable, $headingVariable, $headingStack)
                                                 : sprintf(__('Heading uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $headingStack, $headingVariable),
-                                            'description' => __('Choose the saved family used for headings. Leave it on fallback only to use the stack below directly. Saved families still use their Library fallback.', 'tasty-fonts'),
+                                            'description' => __('Choose a heading family or use the fallback stack directly.', 'tasty-fonts'),
                                             'family_input_name' => 'tasty_fonts_heading_font',
                                             'family_select_id' => 'tasty_fonts_heading_font',
                                             'clear_family_label' => __('Clear Heading Family', 'tasty-fonts'),
@@ -253,14 +253,14 @@
                                         ],
                                         [
                                             'role_key' => 'body',
-                                            'kicker' => __('Body', 'tasty-fonts'),
-                                            'title' => __('Body Font', 'tasty-fonts'),
+                                            'kicker' => __('Role', 'tasty-fonts'),
+                                            'title' => __('Body', 'tasty-fonts'),
                                             'family_variable' => $bodyFamilyVariable,
                                             'copy_success' => __('Body family variable copied.', 'tasty-fonts'),
                                             'copy_label' => $bodyFamily !== ''
                                                 ? sprintf(__('Body family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $bodyFamilyVariable, $bodyVariable, $bodyStack)
                                                 : sprintf(__('Body uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $bodyStack, $bodyVariable),
-                                            'description' => __('Choose the saved family used for body copy. Leave it on fallback only to use the stack below directly. Saved families still use their Library fallback.', 'tasty-fonts'),
+                                            'description' => __('Choose a body family or use the fallback stack directly.', 'tasty-fonts'),
                                             'family_input_name' => 'tasty_fonts_body_font',
                                             'family_select_id' => 'tasty_fonts_body_font',
                                             'clear_family_label' => __('Clear Body Family', 'tasty-fonts'),
@@ -274,14 +274,14 @@
                                     if ($monospaceRoleEnabled) {
                                         $roleCards[] = [
                                             'role_key' => 'monospace',
-                                            'kicker' => __('Monospace', 'tasty-fonts'),
-                                            'title' => __('Monospace Font', 'tasty-fonts'),
+                                            'kicker' => __('Role', 'tasty-fonts'),
+                                            'title' => __('Monospace', 'tasty-fonts'),
                                             'family_variable' => $monospaceFamilyVariable,
                                             'copy_success' => __('Monospace value copied.', 'tasty-fonts'),
                                             'copy_label' => $monospaceFamily !== ''
                                                 ? sprintf(__('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $monospaceFamilyVariable, $monospaceVariable, $monospaceStack)
                                                 : sprintf(__('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $monospaceStack, $monospaceVariable),
-                                            'description' => __('Choose the saved family used for monospace text. Leave it on fallback only to use the stack below directly. Saved families still use their Library fallback.', 'tasty-fonts'),
+                                            'description' => __('Choose a monospace family or use the fallback stack directly.', 'tasty-fonts'),
                                             'family_input_name' => 'tasty_fonts_monospace_font',
                                             'family_select_id' => 'tasty_fonts_monospace_font',
                                             'clear_family_label' => __('Clear Monospace Family', 'tasty-fonts'),

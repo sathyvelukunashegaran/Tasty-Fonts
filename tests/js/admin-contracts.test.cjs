@@ -112,6 +112,8 @@ test('admin contracts serialize settings entries with array fields and empty sen
             ['admin_access_user_ids[]', '3'],
             ['training_wheels_off', '0'],
             ['training_wheels_off', '1'],
+            ['show_activity_log', '0'],
+            ['show_activity_log', '1'],
             ['font_display', 'swap'],
         ], {
             ignoredKeys: ['_wpnonce'],
@@ -120,6 +122,7 @@ test('admin contracts serialize settings entries with array fields and empty sen
             admin_access_role_slugs: ['editor', 'author'],
             admin_access_user_ids: ['3'],
             training_wheels_off: '1',
+            show_activity_log: '1',
             font_display: 'swap',
         }
     );

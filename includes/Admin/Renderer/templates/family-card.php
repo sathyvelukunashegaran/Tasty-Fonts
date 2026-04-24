@@ -109,8 +109,8 @@
                                     data-active-label="<?php echo esc_attr__('Heading selected', 'tasty-fonts'); ?>"
                                     data-idle-label="<?php echo esc_attr__('Select heading', 'tasty-fonts'); ?>"
                                     data-active-help="<?php echo esc_attr__('This family is currently selected for the heading role.', 'tasty-fonts'); ?>"
-                                    data-idle-help="<?php echo esc_attr__('Assign this family to the heading role and save the updated roles immediately. Apply sitewide when you want the live CSS updated.', 'tasty-fonts'); ?>"
-                                    <?php $this->renderPassiveHelpAttributes($isHeading ? __('This family is currently selected for the heading role.', 'tasty-fonts') : __('Assign this family to the heading role and save the updated roles immediately. Apply sitewide when you want the live CSS updated.', 'tasty-fonts')); ?>
+                                    data-idle-help="<?php echo esc_attr__('Assign this family to Heading and save the draft roles.', 'tasty-fonts'); ?>"
+                                    <?php $this->renderPassiveHelpAttributes($isHeading ? __('This family is currently selected for the heading role.', 'tasty-fonts') : __('Assign this family to Heading and save the draft roles.', 'tasty-fonts')); ?>
                                     aria-label="<?php echo esc_attr($isHeading ? __('Heading selected', 'tasty-fonts') : __('Select heading', 'tasty-fonts')); ?>"
                                     aria-pressed="<?php echo esc_attr($isHeading ? 'true' : 'false'); ?>"
                                 >
@@ -124,8 +124,8 @@
                                     data-active-label="<?php echo esc_attr__('Body selected', 'tasty-fonts'); ?>"
                                     data-idle-label="<?php echo esc_attr__('Select body', 'tasty-fonts'); ?>"
                                     data-active-help="<?php echo esc_attr__('This family is currently selected for the body role.', 'tasty-fonts'); ?>"
-                                    data-idle-help="<?php echo esc_attr__('Assign this family to the body role and save the updated roles immediately. Apply sitewide when you want the live CSS updated.', 'tasty-fonts'); ?>"
-                                    <?php $this->renderPassiveHelpAttributes($isBody ? __('This family is currently selected for the body role.', 'tasty-fonts') : __('Assign this family to the body role and save the updated roles immediately. Apply sitewide when you want the live CSS updated.', 'tasty-fonts')); ?>
+                                    data-idle-help="<?php echo esc_attr__('Assign this family to Body and save the draft roles.', 'tasty-fonts'); ?>"
+                                    <?php $this->renderPassiveHelpAttributes($isBody ? __('This family is currently selected for the body role.', 'tasty-fonts') : __('Assign this family to Body and save the draft roles.', 'tasty-fonts')); ?>
                                     aria-label="<?php echo esc_attr($isBody ? __('Body selected', 'tasty-fonts') : __('Select body', 'tasty-fonts')); ?>"
                                     aria-pressed="<?php echo esc_attr($isBody ? 'true' : 'false'); ?>"
                                 >
@@ -140,8 +140,8 @@
                                         data-active-label="<?php echo esc_attr__('Monospace selected', 'tasty-fonts'); ?>"
                                         data-idle-label="<?php echo esc_attr__('Select monospace', 'tasty-fonts'); ?>"
                                         data-active-help="<?php echo esc_attr__('This family is currently selected for the monospace role.', 'tasty-fonts'); ?>"
-                                        data-idle-help="<?php echo esc_attr__('Assign this family to the monospace role and save the updated roles immediately. Apply sitewide when you want the live CSS updated.', 'tasty-fonts'); ?>"
-                                        <?php $this->renderPassiveHelpAttributes($isMonospace ? __('This family is currently selected for the monospace role.', 'tasty-fonts') : __('Assign this family to the monospace role and save the updated roles immediately. Apply sitewide when you want the live CSS updated.', 'tasty-fonts')); ?>
+                                        data-idle-help="<?php echo esc_attr__('Assign this family to Monospace and save the draft roles.', 'tasty-fonts'); ?>"
+                                        <?php $this->renderPassiveHelpAttributes($isMonospace ? __('This family is currently selected for the monospace role.', 'tasty-fonts') : __('Assign this family to Monospace and save the draft roles.', 'tasty-fonts')); ?>
                                         aria-label="<?php echo esc_attr($isMonospace ? __('Monospace selected', 'tasty-fonts') : __('Select monospace', 'tasty-fonts')); ?>"
                                         aria-pressed="<?php echo esc_attr($isMonospace ? 'true' : 'false'); ?>"
                                     >
@@ -170,11 +170,11 @@
                                         type="submit"
                                         class="button tasty-fonts-button-danger tasty-fonts-font-action-button--icon <?php echo $isRoleFamily ? 'is-disabled' : ''; ?>"
                                         data-delete-family="<?php echo esc_attr($familyName); ?>"
-                                        data-delete-ready-title="<?php echo esc_attr(__('Delete this family and remove its managed files from the site library.', 'tasty-fonts')); ?>"
+                                        data-delete-ready-title="<?php echo esc_attr(__('Delete this family and its managed files.', 'tasty-fonts')); ?>"
                                         <?php foreach ($deleteBlockedMessages as $key => $message): ?>
                                             data-delete-blocked-<?php echo esc_attr($key); ?>="<?php echo esc_attr($message); ?>"
                                         <?php endforeach; ?>
-                                        <?php $this->renderPassiveHelpAttributes($deleteBlockedMessage !== '' ? $deleteBlockedMessage : __('Delete this family and remove its managed files from the site library.', 'tasty-fonts')); ?>
+                                        <?php $this->renderPassiveHelpAttributes($deleteBlockedMessage !== '' ? $deleteBlockedMessage : __('Delete this family and its managed files.', 'tasty-fonts')); ?>
                                         aria-label="<?php echo esc_attr__('Delete family', 'tasty-fonts'); ?>"
                                         aria-disabled="<?php echo esc_attr($deleteBlockedMessage !== '' ? 'true' : 'false'); ?>"
                                         <?php disabled($deleteBlockedMessage !== ''); ?>

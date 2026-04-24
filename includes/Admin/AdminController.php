@@ -1948,6 +1948,12 @@ final class AdminController
                 : __('onboarding hints shown', 'tasty-fonts');
         }
 
+        if (!empty($before['show_activity_log']) !== !empty($after['show_activity_log'])) {
+            $changes[] = !empty($after['show_activity_log'])
+                ? __('activity log shown', 'tasty-fonts')
+                : __('activity log hidden', 'tasty-fonts');
+        }
+
         if (!empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled'])) {
             $changes[] = !empty($after['monospace_role_enabled'])
                 ? __('monospace role enabled', 'tasty-fonts')
@@ -2018,6 +2024,7 @@ final class AdminController
     private function settingsChangeRequiresReload(array $before, array $after): bool
     {
         return !empty($before['training_wheels_off']) !== !empty($after['training_wheels_off'])
+            || !empty($before['show_activity_log']) !== !empty($after['show_activity_log'])
             || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled'])
             || !empty($before['variable_fonts_enabled']) !== !empty($after['variable_fonts_enabled'])
             || $this->adminAccessSettingsDiffer($before, $after)

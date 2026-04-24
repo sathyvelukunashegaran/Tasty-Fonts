@@ -4,7 +4,7 @@ This is the versioned documentation hub for the current plugin codebase.
 
 ## Current Release Track
 
-`1.12.0-beta.2` is the current release. This is a pre-release beta — if you need a fully stable install for production, set `Settings → Behavior → Update Channel` to `Stable` and reinstall from that channel.
+`1.13.0-beta.5` is the current release. This is a pre-release beta — if you need a fully stable install for production, set `Settings → Behavior → Update Channel` to `Stable` and reinstall from that channel.
 
 These docs describe the current plugin behavior in full, covering the shipping features, release channels, variable font controls, Site Transfer, and the full integration surface.
 
@@ -103,6 +103,6 @@ These docs describe the current plugin behavior in full, covering the shipping f
 ## Notes
 
 - The docs in `main` always describe the current plugin behavior.
-- The docs cover the `1.12.0-beta.2` release, including Site Transfer, Google Fonts API key encryption, variable-font axis-default cleanup, and all existing Google, Bunny, Adobe, and integration workflows.
+- The docs cover the `1.13.0-beta.5` release, including Site Transfer, Google Fonts API key encryption, variable-font axis-default cleanup, and all existing Google, Bunny, Adobe, and integration workflows.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/blob/main/README.md) stays shorter and links here for full guidance.

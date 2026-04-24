@@ -77,6 +77,7 @@ final class SettingsSaveFields
             ['name' => 'oxygen_integration_enabled', 'kind' => 'toggle'],
             ['name' => 'acss_font_role_sync_enabled', 'kind' => 'toggle'],
             ['name' => 'delete_uploaded_files_on_uninstall', 'kind' => 'toggle'],
+            ['name' => 'show_activity_log', 'kind' => 'toggle'],
             ['name' => 'training_wheels_off', 'kind' => 'toggle'],
             ['name' => 'variable_fonts_enabled', 'kind' => 'toggle'],
             ['name' => 'monospace_role_enabled', 'kind' => 'toggle'],

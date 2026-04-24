@@ -1533,6 +1533,24 @@ $tests['settings_repository_persists_training_wheels_off_preference'] = static f
     assertSameValue(false, !empty($saved['training_wheels_off']), 'Settings should persist the training-wheels-off preference when disabled.');
 };
 
+$tests['settings_repository_hides_activity_log_by_default_and_persists_visibility'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+
+    assertSameValue(false, !empty($settings->getSettings()['show_activity_log']), 'The full activity log should be hidden by default.');
+
+    $settings->saveSettings(['show_activity_log' => '1']);
+    $saved = $settings->getSettings();
+
+    assertSameValue(true, !empty($saved['show_activity_log']), 'Settings should persist the activity log visibility preference when enabled.');
+
+    $settings->saveSettings(['show_activity_log' => '0']);
+    $saved = $settings->getSettings();
+
+    assertSameValue(false, !empty($saved['show_activity_log']), 'Settings should persist the activity log visibility preference when disabled.');
+};
+
 $tests['settings_repository_defaults_update_channel_to_stable_and_normalizes_invalid_values'] = static function (): void {
     resetTestState();
 
@@ -1627,6 +1645,7 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
         'preload_primary_fonts' => '0',
         'block_editor_font_library_sync_enabled' => '1',
         'delete_uploaded_files_on_uninstall' => '1',
+        'show_activity_log' => '1',
         'training_wheels_off' => '1',
     ]);
     $settings->saveSettings([
@@ -1650,6 +1669,7 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     assertSameValue(false, $saved['preload_primary_fonts'], 'Saving unrelated settings should not re-enable primary font preloads.');
     assertSameValue(true, $saved['block_editor_font_library_sync_enabled'], 'Saving unrelated settings should not disable the Block Editor Font Library sync preference.');
     assertSameValue(true, $saved['delete_uploaded_files_on_uninstall'], 'Saving unrelated settings should not disable uninstall cleanup.');
+    assertSameValue(true, $saved['show_activity_log'], 'Saving unrelated settings should not hide the activity log once it is enabled.');
     assertSameValue(true, $saved['training_wheels_off'], 'Saving unrelated settings should not re-enable training wheels once they are turned off.');
 };
 

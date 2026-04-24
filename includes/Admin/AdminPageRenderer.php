@@ -105,7 +105,9 @@ final class AdminPageRenderer extends AbstractSectionRenderer
 
         ob_start();
         $this->diagnosticsRenderer->render($view);
-        $this->activityRenderer->render($view);
+        if (!empty($view['showActivityLog'])) {
+            $this->activityRenderer->render($view);
+        }
         $diagnosticsSection = (string) ob_get_clean();
         ?>
         <div class="wrap tasty-fonts-admin<?php echo $trainingWheelsOff ? ' is-training-wheels-off' : ''; ?>">
@@ -132,35 +134,35 @@ final class AdminPageRenderer extends AbstractSectionRenderer
 
                         <div class="tasty-fonts-page-header-brand">
                             <div class="tasty-fonts-page-header-copy">
-                                <div class="tasty-fonts-page-header-title-row">
-                                    <p class="tasty-fonts-page-header-kicker"><?php esc_html_e('Typography Management for Pros', 'tasty-fonts'); ?></p>
-                                    <?php if ($pluginVersion !== ''): ?>
-                                        <div class="tasty-fonts-page-header-meta tasty-fonts-page-header-meta--inline">
-                                            <span class="screen-reader-text">
-                                                <?php echo esc_html(sprintf(__('Version %s', 'tasty-fonts'), $pluginVersion)); ?>
-                                            </span>
-                                            <a
-                                                class="tasty-fonts-version-link tasty-fonts-badge <?php echo esc_attr($pluginVersionBadgeClass); ?>"
-                                                href="<?php echo esc_url($pluginVersionUrl); ?>"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                aria-label="<?php echo esc_attr($pluginVersionAriaLabel !== '' ? $pluginVersionAriaLabel : sprintf(__('View GitHub changelog for version %s', 'tasty-fonts'), $pluginVersion)); ?>"
-                                                title="<?php echo esc_attr($pluginVersionTooltip !== '' ? $pluginVersionTooltip : sprintf(__('View changelog for version %s on GitHub', 'tasty-fonts'), $pluginVersion)); ?>"
-                                            >
-                                                <span class="tasty-fonts-version-link-primary"><?php echo esc_html(sprintf(__('v%s', 'tasty-fonts'), $pluginVersion)); ?></span>
-                                                <?php if ($pluginVersionMeta !== ''): ?>
-                                                    <span class="tasty-fonts-version-link-meta"><?php echo esc_html($pluginVersionMeta); ?></span>
-                                                <?php endif; ?>
-                                            </a>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
                                 <h1 class="tasty-fonts-header-title" data-page-header-title><?php echo esc_html($pageHeader['label']); ?></h1>
                                 <p class="tasty-fonts-page-header-summary" data-page-header-summary><?php echo esc_html($pageHeader['summary']); ?></p>
                             </div>
                         </div>
 
                         <div class="tasty-fonts-page-header-nav">
+                            <div class="tasty-fonts-page-header-title-row tasty-fonts-page-header-title-row--nav">
+                                <p class="tasty-fonts-page-header-kicker"><?php esc_html_e('Typography Management for Pros', 'tasty-fonts'); ?></p>
+                                <?php if ($pluginVersion !== ''): ?>
+                                    <div class="tasty-fonts-page-header-meta tasty-fonts-page-header-meta--inline">
+                                        <span class="screen-reader-text">
+                                            <?php echo esc_html(sprintf(__('Version %s', 'tasty-fonts'), $pluginVersion)); ?>
+                                        </span>
+                                        <a
+                                            class="tasty-fonts-version-link tasty-fonts-badge <?php echo esc_attr($pluginVersionBadgeClass); ?>"
+                                            href="<?php echo esc_url($pluginVersionUrl); ?>"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            aria-label="<?php echo esc_attr($pluginVersionAriaLabel !== '' ? $pluginVersionAriaLabel : sprintf(__('View GitHub changelog for version %s', 'tasty-fonts'), $pluginVersion)); ?>"
+                                            title="<?php echo esc_attr($pluginVersionTooltip !== '' ? $pluginVersionTooltip : sprintf(__('View changelog for version %s on GitHub', 'tasty-fonts'), $pluginVersion)); ?>"
+                                        >
+                                            <span class="tasty-fonts-version-link-primary"><?php echo esc_html(sprintf(__('v%s', 'tasty-fonts'), $pluginVersion)); ?></span>
+                                            <?php if ($pluginVersionMeta !== ''): ?>
+                                                <span class="tasty-fonts-version-link-meta"><?php echo esc_html($pluginVersionMeta); ?></span>
+                                            <?php endif; ?>
+                                        </a>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
                             <div class="tasty-fonts-studio-switcher tasty-fonts-tab-list" role="tablist" aria-label="<?php esc_attr_e('Tasty Fonts sections', 'tasty-fonts'); ?>" aria-orientation="horizontal">
                                 <?php foreach ($pageTabs as $pageKey => $pageConfig): ?>
                                     <?php $isActive = $currentPage === $pageKey; ?>
@@ -334,19 +336,19 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         return [
             AdminController::PAGE_ROLES => [
                 'label' => __('Deploy Fonts', 'tasty-fonts'),
-                'summary' => __('Assign font roles, preview the result, and publish them sitewide when ready.', 'tasty-fonts'),
+                'summary' => __('Set role fonts, review the pairing, and publish when it is ready.', 'tasty-fonts'),
             ],
             AdminController::PAGE_LIBRARY => [
                 'label' => __('Font Library', 'tasty-fonts'),
-                'summary' => __('Import, inspect, and manage every family and delivery profile in one place.', 'tasty-fonts'),
+                'summary' => __('Search, import, and manage every family and delivery profile.', 'tasty-fonts'),
             ],
             AdminController::PAGE_SETTINGS => [
                 'label' => __('Settings', 'tasty-fonts'),
-                'summary' => __('Tune output, integrations, updates, and access defaults for this site.', 'tasty-fonts'),
+                'summary' => __('Configure output, integrations, updates, and access.', 'tasty-fonts'),
             ],
             AdminController::PAGE_DIAGNOSTICS => [
                 'label' => __('Advanced Tools', 'tasty-fonts'),
-                'summary' => __('Inspect generated assets, clear caches, and run maintenance when something needs attention.', 'tasty-fonts'),
+                'summary' => __('Inspect assets, clear caches, and run maintenance.', 'tasty-fonts'),
             ],
         ];
     }

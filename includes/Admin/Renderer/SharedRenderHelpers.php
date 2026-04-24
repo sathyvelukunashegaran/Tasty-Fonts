@@ -259,9 +259,9 @@ trait SharedRenderHelpers
     {
         ?>
         <div class="tasty-fonts-source-status-copy">
-            <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source Setup', 'tasty-fonts'); ?></span>
+            <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source', 'tasty-fonts'); ?></span>
             <div class="tasty-fonts-source-status-title-row">
-                <h4><?php echo esc_html($title); ?></h4>
+                <h3><?php echo esc_html($title); ?></h3>
             </div>
             <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($summary); ?></p>
         </div>
@@ -428,7 +428,7 @@ trait SharedRenderHelpers
         <div class="<?php echo esc_attr($this->stringValue($config, 'workflow_class', 'tasty-fonts-google-workflow')); ?>">
             <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-search-shell tasty-fonts-workflow-step tasty-fonts-workflow-step--search">
                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
-                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 1', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Find', 'tasty-fonts'); ?></span>
                     <h4><?php esc_html_e('Find a Family', 'tasty-fonts'); ?></h4>
                 </div>
 
@@ -447,7 +447,7 @@ trait SharedRenderHelpers
                 </label>
                 <?php if (!empty($config['search_note_id']) && !empty($config['search_disabled'])): ?>
                     <p id="<?php echo esc_attr($this->scalarStringValue($config['search_note_id'])); ?>" class="tasty-fonts-inline-note tasty-fonts-inline-note--warning">
-                        <strong><?php esc_html_e('Search disabled.', 'tasty-fonts'); ?></strong>
+                        <strong><?php esc_html_e('Search unavailable.', 'tasty-fonts'); ?></strong>
                         <span><?php echo esc_html($this->stringValue($config, 'search_disabled_copy')); ?></span>
                     </p>
                 <?php endif; ?>
@@ -456,17 +456,17 @@ trait SharedRenderHelpers
 
             <section class="<?php echo esc_attr($this->stringValue($config, 'import_panel_class', 'tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-workflow-step tasty-fonts-workflow-step--import')); ?>">
                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
-                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Step 2', 'tasty-fonts'); ?></span>
-                    <h4 id="<?php echo esc_attr($this->stringValue($config, 'import_step_title_id')); ?>"><?php esc_html_e('Choose Variants and Delivery', 'tasty-fonts'); ?></h4>
+                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Import', 'tasty-fonts'); ?></span>
+                    <h4 id="<?php echo esc_attr($this->stringValue($config, 'import_step_title_id')); ?>"><?php esc_html_e('Configure Import', 'tasty-fonts'); ?></h4>
                 </div>
 
                 <div class="tasty-fonts-import-manual-grid">
                     <label class="tasty-fonts-stack-field">
-                        <?php $this->renderFieldLabel(__('Family Name', 'tasty-fonts')); ?>
+                        <?php $this->renderFieldLabel(__('Family', 'tasty-fonts')); ?>
                         <input type="text" id="<?php echo esc_attr($this->stringValue($config, 'manual_family_id')); ?>" class="regular-text tasty-fonts-text-control" placeholder="<?php echo esc_attr($this->stringValue($config, 'manual_family_placeholder')); ?>">
                     </label>
                     <label class="tasty-fonts-stack-field">
-                        <span id="<?php echo esc_attr($this->stringValue($config, 'manual_variants_label_id')); ?>" class="tasty-fonts-field-label"><?php esc_html_e('Manual Variants', 'tasty-fonts'); ?></span>
+                        <span id="<?php echo esc_attr($this->stringValue($config, 'manual_variants_label_id')); ?>" class="tasty-fonts-field-label"><?php esc_html_e('Variants', 'tasty-fonts'); ?></span>
                         <input type="text" id="<?php echo esc_attr($this->stringValue($config, 'manual_variants_id')); ?>" class="regular-text tasty-fonts-text-control" placeholder="<?php echo esc_attr($this->stringValue($config, 'manual_variants_placeholder')); ?>">
                     </label>
                 </div>
@@ -504,7 +504,7 @@ trait SharedRenderHelpers
                             </div>
                         </div>
                         <div class="tasty-fonts-import-preview-shell">
-                            <span class="tasty-fonts-import-preview-label"><?php esc_html_e('Live Preview', 'tasty-fonts'); ?></span>
+                            <span class="tasty-fonts-import-preview-label"><?php esc_html_e('Preview', 'tasty-fonts'); ?></span>
                             <div id="<?php echo esc_attr($this->stringValue($config, 'selected_preview_id')); ?>" class="tasty-fonts-import-selected-preview is-placeholder"><?php echo esc_html($this->stringValue($config, 'selected_preview_default')); ?></div>
                         </div>
                     </div>
@@ -512,11 +512,11 @@ trait SharedRenderHelpers
                     <div class="tasty-fonts-selected-card tasty-fonts-selected-card--import-variants">
                         <div class="tasty-fonts-import-card-head">
                             <div class="tasty-fonts-import-card-copy">
-                                <span id="<?php echo esc_attr($this->stringValue($config, 'selected_variants_label_id')); ?>" class="tasty-fonts-field-label"><?php esc_html_e('Variants to Import', 'tasty-fonts'); ?></span>
+                                <span id="<?php echo esc_attr($this->stringValue($config, 'selected_variants_label_id')); ?>" class="tasty-fonts-field-label"><?php esc_html_e('Selected Variants', 'tasty-fonts'); ?></span>
                                 <p id="<?php echo esc_attr($this->stringValue($config, 'selected_variants_note_id')); ?>" class="tasty-fonts-import-variant-note tasty-fonts-muted"><?php echo esc_html($this->stringValue($config, 'selected_variants_note')); ?></p>
                             </div>
                             <div class="tasty-fonts-import-card-meta">
-                                <div id="<?php echo esc_attr($this->stringValue($config, 'selection_summary_id')); ?>" class="tasty-fonts-import-selection-summary"><?php esc_html_e('0 Variants Selected', 'tasty-fonts'); ?></div>
+                                <div id="<?php echo esc_attr($this->stringValue($config, 'selection_summary_id')); ?>" class="tasty-fonts-import-selection-summary"><?php esc_html_e('0 selected', 'tasty-fonts'); ?></div>
                             </div>
                         </div>
                         <div class="tasty-fonts-import-variant-toolbar">
@@ -539,7 +539,7 @@ trait SharedRenderHelpers
                             type="button"
                             id="<?php echo esc_attr($this->stringValue($config, 'size_estimate_id')); ?>"
                             class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help is-role"
-                            <?php $this->renderPassiveHelpAttributes(__('The estimated transfer size only varies by family and subset.', 'tasty-fonts')); ?>
+                            <?php $this->renderPassiveHelpAttributes(__('Estimated WOFF2 transfer for the selected family and subset.', 'tasty-fonts')); ?>
                             aria-label="<?php esc_attr_e('Estimated transfer size information', 'tasty-fonts'); ?>"
                         ><?php esc_html_e('Approx. +0 KB WOFF2', 'tasty-fonts'); ?></button>
                         <button type="button" class="button button-primary" id="<?php echo esc_attr($this->stringValue($config, 'submit_id')); ?>"><?php esc_html_e('Add to Library', 'tasty-fonts'); ?></button>
@@ -676,7 +676,7 @@ trait SharedRenderHelpers
             </div>
 
             <div class="tasty-fonts-upload-row-foot">
-                <button type="button" class="button tasty-fonts-upload-detected" data-upload-detected-apply hidden></button>
+                <button type="button" class="button tasty-fonts-upload-detected" data-upload-detected-apply aria-label="<?php esc_attr_e('Use detected font metadata', 'tasty-fonts'); ?>" hidden></button>
                 <div class="tasty-fonts-upload-row-status" data-upload-row-status></div>
             </div>
 
@@ -705,10 +705,10 @@ trait SharedRenderHelpers
             <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
                     <span class="tasty-fonts-panel-kicker"><?php echo esc_html($this->stringValue($config, 'kicker')); ?></span>
-                    <h4><?php echo esc_html($this->stringValue($config, 'title')); ?></h4>
+                    <h3><?php echo esc_html($this->stringValue($config, 'title')); ?></h3>
                 </div>
                 <div class="tasty-fonts-role-box-meta">
-                    <span class="tasty-fonts-role-box-meta-label"><?php esc_html_e('Current Value', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-role-box-meta-label"><?php esc_html_e('Current Stack', 'tasty-fonts'); ?></span>
                     <button
                         type="button"
                         class="tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy tasty-fonts-role-box-copy"

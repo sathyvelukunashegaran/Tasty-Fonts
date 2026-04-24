@@ -193,6 +193,7 @@ final class AdminPageContextBuilder
             'admin_access_summary' => $adminAccessSummary,
             'developer_tool_statuses' => $developerToolStatuses,
             'block_editor_font_library_sync_enabled' => !empty($settings['block_editor_font_library_sync_enabled']),
+            'show_activity_log' => !empty($settings['show_activity_log']),
             'training_wheels_off' => !empty($settings['training_wheels_off']),
             'monospace_role_enabled' => !empty($settings['monospace_role_enabled']),
             'variable_fonts_enabled' => !empty($settings['variable_fonts_enabled']),
@@ -364,8 +365,8 @@ final class AdminPageContextBuilder
             default => '',
         };
         $stateCopy = match ($state) {
-            'upgrade' => __('A newer package is available for the selected channel through the normal WordPress updates flow.', 'tasty-fonts'),
-            'rollback' => __('The selected channel points to an older package than the one installed now. Use the reinstall action below to switch immediately.', 'tasty-fonts'),
+            'upgrade' => __('A newer package is available through WordPress updates.', 'tasty-fonts'),
+            'rollback' => __('This channel points to an older package. Use reinstall to switch now.', 'tasty-fonts'),
             'current' => __('This channel is already aligned with the installed version.', 'tasty-fonts'),
             default => __('No installable package is available for the selected channel right now.', 'tasty-fonts'),
         };
@@ -932,8 +933,8 @@ final class AdminPageContextBuilder
             'tone' => 'warning',
             'title' => __('Local environment detected', 'tasty-fonts'),
             'message' => $syncEnabled
-                ? __('Gutenberg Font Library sync is enabled on this local site. Keep it on only when this site can complete background requests back to this site without SSL or certificate errors. If Activity shows cURL 60 or certificate verification failures, open Integrations and turn the Gutenberg sync off for local development.', 'tasty-fonts')
-                : __('Gutenberg Font Library sync is off on this local site. Turn it back on in Integrations when you want imported fonts mirrored into WordPress typography controls and your local setup trusts this site\'s certificate.', 'tasty-fonts'),
+                ? __('Font Library sync is on for this local site. Turn it off if SSL or loopback checks fail.', 'tasty-fonts')
+                : __('Font Library sync is off locally. Turn it on when this site can complete loopback requests.', 'tasty-fonts'),
             'settings_label' => __('Open Integrations', 'tasty-fonts'),
             'settings_url' => $this->buildIntegrationsUrl(),
         ];
@@ -954,15 +955,15 @@ final class AdminPageContextBuilder
             'title' => __('Gutenberg Font Library', 'tasty-fonts'),
             'description' => $enabled
                 ? ($isLocal
-                    ? __('Sync imported families into the WordPress Font Library. Turn this off if local SSL or loopback errors block sync.', 'tasty-fonts')
-                    : __('Sync imported families into the WordPress Font Library.', 'tasty-fonts'))
-                : __('Enable this to sync imported families into the WordPress Font Library.', 'tasty-fonts'),
+                    ? __('Sync imported families to WordPress. Disable if local SSL or loopback checks fail.', 'tasty-fonts')
+                    : __('Sync imported families to the WordPress Font Library.', 'tasty-fonts'))
+                : __('Sync imported families to WordPress typography controls.', 'tasty-fonts'),
             'status_label' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
             'status_copy' => $enabled
                 ? ($isLocal
-                    ? __('On. Turn this off if local SSL or loopback errors block sync.', 'tasty-fonts')
-                    : __('On. Imported families sync to the WordPress Font Library.', 'tasty-fonts'))
-                : __('Off. Tasty will not sync families to the WordPress Font Library.', 'tasty-fonts'),
+                    ? __('On. Disable if local SSL or loopback checks fail.', 'tasty-fonts')
+                    : __('On. Imported families sync to WordPress.', 'tasty-fonts'))
+                : __('Off. Imported families stay inside Tasty.', 'tasty-fonts'),
         ];
     }
 
@@ -982,8 +983,8 @@ final class AdminPageContextBuilder
             'status' => $available ? 'active' : 'inactive',
             'title' => __('Etch Canvas Bridge', 'tasty-fonts'),
             'description' => $available
-                ? __('Mirrors Tasty fonts in Etch canvas previews.', 'tasty-fonts')
-                : __('Turns on automatically when Etch is active.', 'tasty-fonts'),
+                ? __('Loads Tasty fonts inside Etch canvas previews.', 'tasty-fonts')
+                : __('Available automatically when Etch is active.', 'tasty-fonts'),
         ];
     }
 
@@ -1005,12 +1006,12 @@ final class AdminPageContextBuilder
             [
                 'title' => __('Automatic.css', 'tasty-fonts'),
                 'description' => match ($status) {
-                    'synced' => __('Sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
-                    'ready' => __('Save settings to sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
-                    'out_of_sync' => __('Re-save to sync Automatic.css font settings with Tasty role variables again.', 'tasty-fonts'),
-                    'waiting_for_sitewide_roles' => __('Enable sitewide role delivery to sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
-                    'unavailable' => __('Sync Automatic.css font settings with Tasty role variables when Automatic.css is active.', 'tasty-fonts'),
-                    default => __('Enable this to sync Automatic.css font settings with Tasty role variables.', 'tasty-fonts'),
+                    'synced' => __('Automatic.css is mapped to Tasty role variables.', 'tasty-fonts'),
+                    'ready' => __('Save settings to apply the Automatic.css mapping.', 'tasty-fonts'),
+                    'out_of_sync' => __('Re-save to refresh the Automatic.css mapping.', 'tasty-fonts'),
+                    'waiting_for_sitewide_roles' => __('Turn on sitewide roles to sync Automatic.css.', 'tasty-fonts'),
+                    'unavailable' => __('Sync Automatic.css when it is active.', 'tasty-fonts'),
+                    default => __('Map Automatic.css font settings to Tasty roles.', 'tasty-fonts'),
                 },
                 'status_label' => $this->buildAcssIntegrationStatusLabel($status),
                 'status_copy' => $this->buildAcssIntegrationStatusCopy($status, $state),
@@ -1033,17 +1034,17 @@ final class AdminPageContextBuilder
             [
                 'title' => __('Bricks Builder', 'tasty-fonts'),
                 'description' => match ($status) {
-                    'active' => __('Manage Bricks typography with Tasty. Selectors and previews stay automatic.', 'tasty-fonts'),
-                    'unavailable' => __('Manage Bricks typography with Tasty when Bricks is active.', 'tasty-fonts'),
-                    default => __('Enable this to let Tasty manage Bricks typography.', 'tasty-fonts'),
+                    'active' => __('Manage Bricks typography with Tasty roles.', 'tasty-fonts'),
+                    'unavailable' => __('Manage Bricks typography when Bricks is active.', 'tasty-fonts'),
+                    default => __('Let Tasty manage Bricks typography.', 'tasty-fonts'),
                 },
                 'status_label' => $this->buildBuilderIntegrationStatusLabel($status),
                 'status_copy' => $this->buildBricksIntegrationStatusCopy($status),
                 'feature_descriptions' => [
-                    'selectors' => __('Show published Tasty families in Bricks font controls.', 'tasty-fonts'),
-                    'builder_preview' => __('Load active Tasty fonts in Bricks previews.', 'tasty-fonts'),
-                    'theme_styles' => __('Sync Tasty role fonts to one Theme Style or all Theme Styles.', 'tasty-fonts'),
-                    'google_fonts' => __('Hide Bricks’ built-in Google Fonts so only Tasty fonts appear.', 'tasty-fonts'),
+                    'selectors' => __('Show published families in Bricks controls.', 'tasty-fonts'),
+                    'builder_preview' => __('Load active fonts in Bricks previews.', 'tasty-fonts'),
+                    'theme_styles' => __('Sync role fonts to Bricks Theme Styles.', 'tasty-fonts'),
+                    'google_fonts' => __('Hide Bricks Google Fonts from pickers.', 'tasty-fonts'),
                 ],
             ]
         );
@@ -1067,9 +1068,9 @@ final class AdminPageContextBuilder
             [
                 'title' => __('Oxygen Builder', 'tasty-fonts'),
                 'description' => match ($status) {
-                    'active' => __('Show published Tasty fonts in Oxygen and sync families to Gutenberg.', 'tasty-fonts'),
-                    'unavailable' => __('Show published Tasty fonts in Oxygen when Oxygen is active.', 'tasty-fonts'),
-                    default => __('Enable this to show published Tasty fonts in Oxygen and sync families to Gutenberg.', 'tasty-fonts'),
+                    'active' => __('Show published fonts in Oxygen and WordPress.', 'tasty-fonts'),
+                    'unavailable' => __('Show published fonts when Oxygen is active.', 'tasty-fonts'),
+                    default => __('Show Tasty fonts in Oxygen and WordPress.', 'tasty-fonts'),
                 },
                 'status_label' => $this->buildBuilderIntegrationStatusLabel($status),
                 'status_copy' => $this->buildOxygenIntegrationStatusCopy($status),
@@ -1746,11 +1747,11 @@ final class AdminPageContextBuilder
         $current = is_array($state['current'] ?? null) ? $state['current'] : ['heading' => '', 'body' => ''];
 
         return match ($status) {
-            'synced' => __('Automatic.css is using Tasty’s managed font and weight variables.', 'tasty-fonts'),
-            'ready' => __('Automatic.css is active. Save settings to apply the mapping.', 'tasty-fonts'),
-            'out_of_sync' => __('Automatic.css is active, but its font settings do not match Tasty’s mapping.', 'tasty-fonts'),
-            'waiting_for_sitewide_roles' => __('Enable sitewide role delivery to apply Automatic.css sync.', 'tasty-fonts'),
-            'unavailable' => __('Automatic.css is not active on this site yet.', 'tasty-fonts'),
+            'synced' => __('Automatic.css is using Tasty role variables.', 'tasty-fonts'),
+            'ready' => __('Save settings to apply the Automatic.css mapping.', 'tasty-fonts'),
+            'out_of_sync' => __('Automatic.css no longer matches the saved mapping.', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Turn on sitewide roles to apply Automatic.css sync.', 'tasty-fonts'),
+            'unavailable' => __('Automatic.css is not active.', 'tasty-fonts'),
             default => sprintf(
                 __('Current values: heading `%1$s`, body `%2$s`.', 'tasty-fonts'),
                 $this->stringValue($current, 'heading') !== '' ? $this->stringValue($current, 'heading') : __('empty', 'tasty-fonts'),
@@ -1771,8 +1772,8 @@ final class AdminPageContextBuilder
     private function buildBricksIntegrationStatusCopy(string $status): string
     {
         return match ($status) {
-            'active' => __('Bricks is active. Published fonts already appear in selectors and previews.', 'tasty-fonts'),
-            'unavailable' => __('Bricks is not active on this site yet.', 'tasty-fonts'),
+            'active' => __('Bricks can use published Tasty fonts.', 'tasty-fonts'),
+            'unavailable' => __('Bricks is not active.', 'tasty-fonts'),
             default => __('Bricks integration is off.', 'tasty-fonts'),
         };
     }
@@ -1780,8 +1781,8 @@ final class AdminPageContextBuilder
     private function buildOxygenIntegrationStatusCopy(string $status): string
     {
         return match ($status) {
-            'active' => __('Oxygen is active. Published fonts are available in Oxygen and mirrored to Gutenberg.', 'tasty-fonts'),
-            'unavailable' => __('Oxygen is not active on this site yet.', 'tasty-fonts'),
+            'active' => __('Oxygen can use published Tasty fonts.', 'tasty-fonts'),
+            'unavailable' => __('Oxygen is not active.', 'tasty-fonts'),
             default => __('Oxygen integration is off.', 'tasty-fonts'),
         };
     }
@@ -1803,19 +1804,19 @@ final class AdminPageContextBuilder
         }
 
         return match ($googleApiState) {
-            'valid' => __('Google search is ready. Open key settings only when you want to replace or remove the saved key.', 'tasty-fonts'),
-            'invalid' => __('The saved Google Fonts API key was rejected. Update it to re-enable live search.', 'tasty-fonts'),
-            'unknown' => __('This saved key has not been verified yet. Save it again to validate before using live search.', 'tasty-fonts'),
-            default => __('Enable live family search with a Google Fonts Developer API key. The key is only needed for search, not for Google CDN delivery itself.', 'tasty-fonts'),
+            'valid' => __('Google search is ready.', 'tasty-fonts'),
+            'invalid' => __('The saved API key was rejected. Update it to restore search.', 'tasty-fonts'),
+            'unknown' => __('Save again to verify this API key.', 'tasty-fonts'),
+            default => __('Add a Google Fonts API key to enable live search. CDN delivery does not require a key.', 'tasty-fonts'),
         };
     }
 
     private function buildGoogleSearchDisabledCopy(string $googleApiState): string
     {
         return match ($googleApiState) {
-            'invalid' => __('Search is disabled because the saved API key is invalid. Update or remove it to continue.', 'tasty-fonts'),
-            'unknown' => __('Search is disabled until the saved API key has been validated.', 'tasty-fonts'),
-            default => __('Search is disabled until you save a Google Fonts API key.', 'tasty-fonts'),
+            'invalid' => __('Update or remove the invalid API key to search.', 'tasty-fonts'),
+            'unknown' => __('Verify the saved API key to search.', 'tasty-fonts'),
+            default => __('Save an API key to search Google Fonts.', 'tasty-fonts'),
         };
     }
 
@@ -1851,7 +1852,7 @@ final class AdminPageContextBuilder
     {
         if ($projectStatusMessage !== '') {
             if (!$projectEnabled && $projectState === 'valid') {
-                return __('The Adobe project is saved and validated but currently disabled. Enable it to load Adobe-hosted fonts on the site and in editors.', 'tasty-fonts');
+                return __('The Adobe project is valid but disabled.', 'tasty-fonts');
             }
 
             return $projectStatusMessage;
@@ -1859,11 +1860,11 @@ final class AdminPageContextBuilder
 
         return match ($projectState) {
             'valid' => $projectEnabled
-                ? __('This Adobe Fonts project will load remotely from use.typekit.net. Manage families and domains in Adobe Fonts, then resync here when needed.', 'tasty-fonts')
-                : __('The Adobe project is saved, but remote loading is disabled until you enable it below.', 'tasty-fonts'),
-            'invalid' => __('Adobe rejected the saved web project ID. Check the project ID and allowed domains in Adobe Fonts before saving again.', 'tasty-fonts'),
-            'unknown' => __('This Adobe project has not been validated yet. Save or resync it to fetch the project stylesheet and detected families.', 'tasty-fonts'),
-            default => __('Connect an existing Adobe Fonts web project to make its hosted families available for previews, roles, Gutenberg, and the Etch canvas.', 'tasty-fonts'),
+                ? __('Adobe fonts load from the connected web project.', 'tasty-fonts')
+                : __('The Adobe project is saved. Enable loading below.', 'tasty-fonts'),
+            'invalid' => __('Adobe rejected this project ID. Check the ID and allowed domains.', 'tasty-fonts'),
+            'unknown' => __('Save or resync to validate this Adobe project.', 'tasty-fonts'),
+            default => __('Connect an Adobe Fonts web project for previews, roles, WordPress, and Etch.', 'tasty-fonts'),
         };
     }
 

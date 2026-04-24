@@ -28,9 +28,17 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install npm dev tooling
+        shell: bash
+        run: npm ci
+
       - name: Lint PHP sources
         shell: bash
         run: find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Lint CSS sources
+        shell: bash
+        run: npm run lint:css
 
       - name: Run PHPStan
         shell: bash

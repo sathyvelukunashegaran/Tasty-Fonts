@@ -16,9 +16,9 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 ## Before You Start
 
-`1.12.0-beta.2` is the current active build, which is a **pre-release beta**. The plugin is feature-complete and suitable for testing. If you need a fully stable release for a production environment, go to `Settings → Behavior → Update Channel` and switch to `Stable` — the updater will offer the latest stable version for reinstall.
+`1.13.0-beta.5` is the current active build, which is a **pre-release beta**. The plugin is feature-complete and suitable for testing. If you need a fully stable release for a production environment, go to `Settings → Behavior → Update Channel` and switch to `Stable` — the updater will offer the latest stable version for reinstall.
 
-**Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No build step and no npm install. `composer install` is only for repository dev tooling and CI, not for normal plugin use.
+**Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No build step and no npm install are required for normal plugin use. `composer install` and `npm install`/`npm ci` are only for repository dev tooling and CI.
 
 **Tip for beginners:** if any term in this guide is unfamiliar, check the [Glossary](Glossary). The [Concepts](Concepts) page also explains the three big ideas — delivery profiles, draft/live roles, and the CSS pipeline — before you dive in.
 
@@ -35,7 +35,7 @@ Use one of these paths:
 
 After activation, a new `Tasty Fonts` item will appear in the WordPress admin sidebar.
 
-> **First-run note:** the plugin will create a `wp-content/uploads/fonts/` directory on activation. This is where font files and generated CSS are stored. No other install steps are needed for normal plugin use — there is no `npm install`, and `composer install` is only for repository dev tooling and CI.
+> **First-run note:** the plugin will create a `wp-content/uploads/fonts/` directory on activation. This is where font files and generated CSS are stored. No other install steps are needed for normal plugin use. Composer and npm are only for repository dev tooling and CI.
 
 ### 2. Learn The Four Top-Level Pages
 

@@ -5,13 +5,13 @@
                             <div class="tasty-fonts-library-tools">
                                 <div class="tasty-fonts-library-filterbar">
                                     <div class="tasty-fonts-search-field tasty-fonts-search-field--compact">
-                                        <label class="screen-reader-text" for="tasty-fonts-library-search"><?php esc_html_e('Filter fonts', 'tasty-fonts'); ?></label>
+                                        <label class="screen-reader-text" for="tasty-fonts-library-search"><?php esc_html_e('Search library', 'tasty-fonts'); ?></label>
                                         <input
                                             type="search"
                                             id="tasty-fonts-library-search"
                                             class="regular-text tasty-fonts-text-control"
-                                            placeholder="<?php esc_attr_e('Filter fonts', 'tasty-fonts'); ?>"
-                                            aria-label="<?php esc_attr_e('Filter fonts', 'tasty-fonts'); ?>"
+                                            placeholder="<?php esc_attr_e('Search library', 'tasty-fonts'); ?>"
+                                            aria-label="<?php esc_attr_e('Search library', 'tasty-fonts'); ?>"
                                         >
                                     </div>
                                     <label class="screen-reader-text" for="tasty-fonts-library-source-filter"><?php esc_html_e('Filter fonts by source', 'tasty-fonts'); ?></label>
@@ -51,19 +51,19 @@
                                 <div class="tasty-fonts-actions tasty-fonts-actions--library">
                                     <form method="post">
                                         <?php wp_nonce_field('tasty_fonts_rescan_fonts'); ?>
-                                        <button type="submit" class="button" name="tasty_fonts_rescan_fonts" value="1"><?php esc_html_e('Rescan Fonts', 'tasty-fonts'); ?></button>
+                                        <button type="submit" class="button" name="tasty_fonts_rescan_fonts" value="1"><?php esc_html_e('Rescan', 'tasty-fonts'); ?></button>
                                     </form>
                                     <button
                                         type="button"
                                         id="tasty-fonts-add-font-panel-toggle"
                                         class="button button-primary tasty-fonts-disclosure-button tasty-fonts-disclosure-button--library"
                                         data-disclosure-toggle="tasty-fonts-add-font-panel"
-                                        data-expanded-label="<?php echo esc_attr__('Add Fonts', 'tasty-fonts'); ?>"
-                                        data-collapsed-label="<?php echo esc_attr__('Add Fonts', 'tasty-fonts'); ?>"
+                                        data-expanded-label="<?php echo esc_attr__('Add Family', 'tasty-fonts'); ?>"
+                                        data-collapsed-label="<?php echo esc_attr__('Add Family', 'tasty-fonts'); ?>"
                                         aria-expanded="false"
                                         aria-controls="tasty-fonts-add-font-panel"
                                     >
-                                        <?php esc_html_e('Add Fonts', 'tasty-fonts'); ?>
+                                        <?php esc_html_e('Add Family', 'tasty-fonts'); ?>
                                     </button>
                                 </div>
                             </div>
@@ -83,9 +83,9 @@
                                         <section class="tasty-fonts-source-card tasty-fonts-source-card--status tasty-fonts-google-access">
                                             <div class="tasty-fonts-source-status-row">
                                                 <div class="tasty-fonts-source-status-copy">
-                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source Setup', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source', 'tasty-fonts'); ?></span>
                                                     <div class="tasty-fonts-source-status-title-row">
-                                                        <h4><?php esc_html_e('Google Fonts', 'tasty-fonts'); ?></h4>
+                                                        <h3><?php esc_html_e('Google Fonts', 'tasty-fonts'); ?></h3>
                                                     </div>
                                                     <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($googleAccessCopy); ?></p>
                                                 </div>
@@ -144,7 +144,7 @@
                                                             <div class="tasty-fonts-google-access-meta">
                                                                 <div class="tasty-fonts-access-note tasty-fonts-access-note--compact">
                                                                     <span class="tasty-fonts-access-note-label"><?php esc_html_e('Need an API key?', 'tasty-fonts'); ?></span>
-                                                                    <a class="tasty-fonts-access-link" href="https://developers.google.com/fonts/docs/developer_api" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Open the Google Fonts Developer API docs.', 'tasty-fonts'); ?></a>
+                                                                    <a class="tasty-fonts-access-link" href="https://developers.google.com/fonts/docs/developer_api" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Open Google API docs', 'tasty-fonts'); ?></a>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -160,7 +160,7 @@
                                                 'workflow_class' => 'tasty-fonts-google-workflow',
                                                 'search_label' => __('Search Google Fonts', 'tasty-fonts'),
                                                 'search_input_id' => 'tasty-fonts-google-search',
-                                                'search_placeholder' => $googleApiEnabled ? __('Search Google Fonts families', 'tasty-fonts') : __('Add or verify a Google Fonts API key to search', 'tasty-fonts'),
+                                                'search_placeholder' => $googleApiEnabled ? __('Search Google families', 'tasty-fonts') : __('Add an API key to search', 'tasty-fonts'),
                                                 'search_disabled' => !$googleApiEnabled,
                                                 'search_note_id' => 'tasty-fonts-google-search-note',
                                                 'search_disabled_copy' => $googleSearchDisabledCopy,
@@ -180,14 +180,14 @@
                                                     ['value' => 'cdn', 'label' => __('Use Google CDN', 'tasty-fonts')],
                                                 ],
                                                 'selected_family_id' => 'tasty-fonts-selected-family',
-                                                'selected_family_default' => __('Choose a Google family or type one manually.', 'tasty-fonts'),
+                                                'selected_family_default' => __('Choose or type a Google family.', 'tasty-fonts'),
                                                 'selected_family_meta_id' => 'tasty-fonts-selected-family-meta',
                                                 'selected_family_note_id' => 'tasty-fonts-selected-family-note',
                                                 'selected_preview_id' => 'tasty-fonts-selected-family-preview',
-                                                'selected_preview_default' => __('Preview appears here after you choose a family.', 'tasty-fonts'),
+                                                'selected_preview_default' => __('Choose a family to preview it.', 'tasty-fonts'),
                                                 'selected_variants_label_id' => 'tasty-fonts-google-selected-variants-label',
                                                 'selected_variants_note_id' => 'tasty-fonts-google-selected-variants-note',
-                                                'selected_variants_note' => __('Click chips or type a comma-separated list above. Both stay in sync.', 'tasty-fonts'),
+                                                'selected_variants_note' => __('Use chips or type a comma-separated list.', 'tasty-fonts'),
                                                 'selection_summary_id' => 'tasty-fonts-import-selection-summary',
                                                 'variant_list_id' => 'tasty-fonts-google-variants',
                                                 'import_status_id' => 'tasty-fonts-import-status',
@@ -206,7 +206,7 @@
                                                 <?php
                                                 $this->renderSourceSetupCopy(
                                                     __('Bunny Fonts', 'tasty-fonts'),
-                                                    __('Use Bunny Fonts as a privacy-friendly source, then store the downloaded font files locally so runtime CSS stays self-hosted.', 'tasty-fonts')
+                                                    __('Import from Bunny, then host the selected files locally or serve them from Bunny CDN.', 'tasty-fonts')
                                                 );
                                                 ?>
                                                 <div class="tasty-fonts-source-status-actions">
@@ -219,7 +219,7 @@
                                                     <div class="tasty-fonts-google-access-meta">
                                                         <div class="tasty-fonts-access-note tasty-fonts-access-note--compact">
                                                             <span class="tasty-fonts-access-note-label"><?php esc_html_e('Browse the catalog', 'tasty-fonts'); ?></span>
-                                                            <a class="tasty-fonts-access-link" href="<?php echo esc_url($bunnyCatalogLink); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Open Bunny Fonts Catalog', 'tasty-fonts'); ?></a>
+                                                            <a class="tasty-fonts-access-link" href="<?php echo esc_url($bunnyCatalogLink); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Open Bunny catalog', 'tasty-fonts'); ?></a>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -233,7 +233,7 @@
                                                 'workflow_class' => 'tasty-fonts-google-workflow',
                                                 'search_label' => __('Search Bunny Fonts', 'tasty-fonts'),
                                                 'search_input_id' => 'tasty-fonts-bunny-search',
-                                                'search_placeholder' => __('Search Bunny Fonts families', 'tasty-fonts'),
+                                                'search_placeholder' => __('Search Bunny families', 'tasty-fonts'),
                                                 'results_id' => 'tasty-fonts-bunny-results',
                                                 'import_panel_class' => 'tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--google tasty-fonts-import-panel--bunny tasty-fonts-workflow-step tasty-fonts-workflow-step--import',
                                                 'import_step_title_id' => 'tasty-fonts-bunny-import-step-title',
@@ -241,7 +241,7 @@
                                                 'manual_family_placeholder' => __('e.g. Inter', 'tasty-fonts'),
                                                 'manual_variants_label_id' => 'tasty-fonts-bunny-manual-variants-label',
                                                 'manual_variants_id' => 'tasty-fonts-bunny-variants',
-                                                'manual_variants_placeholder' => __('Leave blank, or enter 400,700italic', 'tasty-fonts'),
+                                                'manual_variants_placeholder' => __('Optional, e.g. 400,700italic', 'tasty-fonts'),
                                                 'format_fieldset_id' => 'tasty-fonts-bunny-delivery-choice',
                                                 'format_choice_id' => 'tasty-fonts-bunny-format-choice',
                                                 'delivery_input_name' => 'tasty_fonts_bunny_delivery_mode',
@@ -250,14 +250,14 @@
                                                     ['value' => 'cdn', 'label' => __('Use Bunny CDN', 'tasty-fonts')],
                                                 ],
                                                 'selected_family_id' => 'tasty-fonts-bunny-selected-family',
-                                                'selected_family_default' => __('Choose a Bunny family or type one manually.', 'tasty-fonts'),
+                                                'selected_family_default' => __('Choose or type a Bunny family.', 'tasty-fonts'),
                                                 'selected_family_meta_id' => 'tasty-fonts-bunny-selected-family-meta',
                                                 'selected_family_note_id' => 'tasty-fonts-bunny-selected-family-note',
                                                 'selected_preview_id' => 'tasty-fonts-bunny-selected-family-preview',
-                                                'selected_preview_default' => __('Preview appears here after you choose a Bunny family.', 'tasty-fonts'),
+                                                'selected_preview_default' => __('Choose a family to preview it.', 'tasty-fonts'),
                                                 'selected_variants_label_id' => 'tasty-fonts-bunny-selected-variants-label',
                                                 'selected_variants_note_id' => 'tasty-fonts-bunny-selected-variants-note',
-                                                'selected_variants_note' => __('Click chips or type a comma-separated list above. Both stay in sync.', 'tasty-fonts'),
+                                                'selected_variants_note' => __('Use chips or type a comma-separated list.', 'tasty-fonts'),
                                                 'selection_summary_id' => 'tasty-fonts-bunny-import-selection-summary',
                                                 'variant_list_id' => 'tasty-fonts-bunny-variants-list',
                                                 'import_status_id' => 'tasty-fonts-bunny-import-status',
@@ -274,9 +274,9 @@
                                         <section class="tasty-fonts-source-card tasty-fonts-source-card--status tasty-fonts-adobe-access">
                                             <div class="tasty-fonts-source-status-row">
                                                 <div class="tasty-fonts-source-status-copy">
-                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source Setup', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Source', 'tasty-fonts'); ?></span>
                                                     <div class="tasty-fonts-source-status-title-row">
-                                                        <h4><?php esc_html_e('Adobe Fonts', 'tasty-fonts'); ?></h4>
+                                                        <h3><?php esc_html_e('Adobe Fonts', 'tasty-fonts'); ?></h3>
                                                     </div>
                                                     <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($adobeAccessCopy); ?></p>
                                                 </div>
@@ -318,7 +318,7 @@
 
                                                         <label class="tasty-fonts-inline-checkbox">
                                                             <input type="checkbox" name="adobe_enabled" value="1" <?php checked($adobeProjectEnabled); ?>>
-                                                            <span><?php esc_html_e('Load this Adobe-hosted stylesheet on the frontend, editor, and Etch canvas.', 'tasty-fonts'); ?></span>
+                                                            <span><?php esc_html_e('Load this Adobe stylesheet across the site, editors, and Etch.', 'tasty-fonts'); ?></span>
                                                         </label>
 
                                                         <div class="tasty-fonts-google-access-footer">
@@ -330,11 +330,11 @@
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="tasty-fonts-google-access-meta">
-                                                                <aside class="tasty-fonts-access-note tasty-fonts-access-note--external">
+                                                                <div class="tasty-fonts-access-note tasty-fonts-access-note--external">
                                                                     <span class="tasty-fonts-access-note-label"><?php esc_html_e('Managed in Adobe Fonts', 'tasty-fonts'); ?></span>
-                                                                    <p class="tasty-fonts-muted"><?php esc_html_e('Domains and enabled families still live in Adobe Fonts. Resync here after changing the web project.', 'tasty-fonts'); ?></p>
-                                                                    <a class="tasty-fonts-access-link" href="<?php echo esc_url($adobeProjectLink); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Open Adobe Fonts Web Projects', 'tasty-fonts'); ?></a>
-                                                                </aside>
+                                                                    <p class="tasty-fonts-muted"><?php esc_html_e('Manage domains and enabled families in Adobe, then resync here.', 'tasty-fonts'); ?></p>
+                                                                    <a class="tasty-fonts-access-link" href="<?php echo esc_url($adobeProjectLink); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Open Adobe projects', 'tasty-fonts'); ?></a>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -368,14 +368,14 @@
                                                 <?php
                                                 $this->renderSourceSetupCopy(
                                                     __('Upload Files', 'tasty-fonts'),
-                                                    __('Build one family at a time, keep every face for that typeface together, and add another family only when you are uploading a separate typeface.', 'tasty-fonts')
+                                                    __('Upload one typeface per family and keep its faces together.', 'tasty-fonts')
                                                 );
                                                 ?>
-                                                <aside class="tasty-fonts-access-note tasty-fonts-access-note--external tasty-fonts-access-note--upload">
+                                                <div class="tasty-fonts-access-note tasty-fonts-access-note--external tasty-fonts-access-note--upload">
                                                     <span class="tasty-fonts-access-note-label"><?php esc_html_e('Auto-detect', 'tasty-fonts'); ?></span>
-                                                    <p class="tasty-fonts-muted"><?php esc_html_e('Filenames like Abel-400.woff2 or Inter-700-italic.woff2 can suggest the family name, weight, and style automatically.', 'tasty-fonts'); ?></p>
-                                                    <p class="tasty-fonts-muted"><?php echo $showUploadVariableControls ? esc_html__('Variable fonts are enabled. Upload rows can store axis ranges and defaults alongside the file.', 'tasty-fonts') : esc_html__('Turn on variable fonts in Settings → Behavior to upload and configure variable font files.', 'tasty-fonts'); ?></p>
-                                                </aside>
+                                                    <p class="tasty-fonts-muted"><?php esc_html_e('Clear filenames can prefill family, weight, and style.', 'tasty-fonts'); ?></p>
+                                                    <p class="tasty-fonts-muted"><?php echo $showUploadVariableControls ? esc_html__('Variable uploads can include axis ranges and defaults.', 'tasty-fonts') : esc_html__('Enable variable fonts in Settings to configure axes.', 'tasty-fonts'); ?></p>
+                                                </div>
                                             </div>
                                         </section>
 
@@ -416,11 +416,11 @@
                         <?php if ($catalog === []): ?>
                             <div class="tasty-fonts-empty-state tasty-fonts-empty-state--rich tasty-fonts-empty-state--library">
                                 <div class="tasty-fonts-empty-state-body">
-                                    <h3 class="tasty-fonts-empty-state-title"><?php esc_html_e('Your Library Is Empty', 'tasty-fonts'); ?></h3>
-                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Import a Google or Bunny family, connect an Adobe Fonts project, or upload local files to start building your library and assigning heading and body roles.', 'tasty-fonts'); ?></p>
+                                    <h3 class="tasty-fonts-empty-state-title"><?php esc_html_e('No Fonts Yet', 'tasty-fonts'); ?></h3>
+                                    <p class="tasty-fonts-empty-state-copy"><?php esc_html_e('Add a hosted family, connect Adobe Fonts, or upload local files to start assigning roles.', 'tasty-fonts'); ?></p>
                                 </div>
                                 <div class="tasty-fonts-empty-state-actions">
-                                    <button type="button" class="button button-primary" data-open-add-fonts aria-controls="tasty-fonts-add-font-panel"><?php esc_html_e('Add Fonts', 'tasty-fonts'); ?></button>
+                                    <button type="button" class="button button-primary" data-open-add-fonts aria-controls="tasty-fonts-add-font-panel"><?php esc_html_e('Add Family', 'tasty-fonts'); ?></button>
                                 </div>
                             </div>
                         <?php else: ?>

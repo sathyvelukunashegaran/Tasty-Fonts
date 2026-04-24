@@ -28,9 +28,18 @@ Each test prints `[PASS] <name>` on success. On failure it prints `[FAIL] <name>
 node --test tests/js/*.test.cjs
 ```
 
-These tests cover shared browser/Node-compatible admin and canvas helper contracts.
+These tests cover shared browser/Node-compatible admin and canvas helper contracts, plus the CSS token reference audit.
 
-### 3. Run The PHP Syntax Sweep
+### 3. Run The CSS Linter
+
+```bash
+npm ci
+npm run lint:css
+```
+
+Stylelint checks the committed admin CSS and design-token files. It is development tooling only; the plugin still has no runtime npm requirement.
+
+### 4. Run The PHP Syntax Sweep
 
 ```bash
 find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
@@ -38,7 +47,7 @@ find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './
 
 This catches syntax errors across every PHP file in the repository. Run this as a quick sanity check before opening a pull request.
 
-### 4. Run PHPStan
+### 5. Run PHPStan
 
 ```bash
 composer install
@@ -47,10 +56,10 @@ composer phpstan
 
 This runs the repo's WordPress-aware PHPStan level 10 analysis against `plugin.php` and `includes/`. The config excludes `includes/Admin/Renderer/templates/*`, which are treated as injected-scope view templates.
 
-### 5. Run All Checks Together
+### 6. Run All Checks Together
 
 ```bash
-composer install && composer phpstan && find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs
+composer install && npm ci && composer phpstan && npm run lint:css && find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l && php tests/run.php && node --test tests/js/*.test.cjs
 ```
 
 This is the same verification sequence the shared CI workflow runs before the broader release workflows continue.
@@ -161,7 +170,7 @@ The test runner discovers all `*.test.cjs` files automatically via the glob patt
 
 ## Notes
 
-- There is no build step and no npm install step for the current repo workflow.
+- There is no build step. npm is only used for optional repository CSS lint tooling and CI, not runtime plugin use.
 - Run `composer install` when you want the repo's dev tooling locally, including PHPStan.
 - The shared release quality workflow runs the PHP syntax sweep, PHPStan, the PHP suite, and the JS contract tests before any stable, beta, or nightly package is published.
 

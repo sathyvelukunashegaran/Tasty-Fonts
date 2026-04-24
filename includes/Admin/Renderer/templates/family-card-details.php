@@ -6,7 +6,7 @@
                                     <div class="tasty-fonts-inline-field-row">
                                         <label class="tasty-fonts-inline-field tasty-fonts-inline-field--select">
                                             <span class="tasty-fonts-field-label-row">
-                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Runtime State', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-field-label-text"><?php esc_html_e('Publish State', 'tasty-fonts'); ?></span>
                                                 <?php if (!$canChangePublishState): ?>
                                                     <span class="tasty-fonts-field-status tasty-fonts-field-status--auto" title="<?php esc_attr_e('Auto-managed', 'tasty-fonts'); ?>"><?php esc_html_e('Auto', 'tasty-fonts'); ?></span>
                                                 <?php endif; ?>
@@ -41,7 +41,7 @@
                                     <form method="post" class="tasty-fonts-family-delivery-form" data-family-delivery-form>
                                         <div class="tasty-fonts-inline-field-row">
                                             <label class="tasty-fonts-inline-field tasty-fonts-inline-field--select">
-                                                <span class="tasty-fonts-field-label"><?php esc_html_e('Live Delivery', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-field-label"><?php esc_html_e('Active Delivery', 'tasty-fonts'); ?></span>
                                                 <span class="tasty-fonts-select-field">
                                                     <select
                                                         class="tasty-fonts-family-delivery-selector"
@@ -62,7 +62,7 @@
                                                 class="button tasty-fonts-family-delivery-save"
                                                 data-family-delivery-save
                                             >
-                                                <?php esc_html_e('Switch Delivery', 'tasty-fonts'); ?>
+                                                <?php esc_html_e('Switch', 'tasty-fonts'); ?>
                                             </button>
                                         </div>
                                         <p class="tasty-fonts-family-delivery-feedback" data-family-delivery-feedback aria-live="polite" hidden></p>
@@ -141,7 +141,7 @@
                                 <?php else: ?>
                                     <div class="tasty-fonts-inline-note tasty-fonts-inline-note--warning">
                                         <strong><?php esc_html_e('Font Display unavailable', 'tasty-fonts'); ?></strong>
-                                        <span><?php esc_html_e('Adobe-hosted web fonts follow Adobe’s hosted stylesheet behavior and cannot be overridden from this plugin.', 'tasty-fonts'); ?></span>
+                                        <span><?php esc_html_e('Adobe-hosted fonts follow Adobe’s stylesheet behavior.', 'tasty-fonts'); ?></span>
                                     </div>
                                 <?php endif; ?>
                             </div>

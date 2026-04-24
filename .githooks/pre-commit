@@ -15,6 +15,13 @@ echo "Running PHPStan..."
 
 composer phpstan
 
+if [[ -x node_modules/.bin/stylelint ]]; then
+  echo "Running Stylelint..."
+  npm run lint:css
+else
+  echo "Skipping Stylelint because npm dependencies are not installed. Run 'npm ci' to enable CSS linting locally."
+fi
+
 if [[ "${TASTY_FONTS_SKIP_JSCPD_HOOK:-0}" == "1" ]]; then
   exit 0
 fi

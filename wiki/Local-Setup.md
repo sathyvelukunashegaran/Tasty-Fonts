@@ -42,7 +42,7 @@ If you use a different stack, follow the same manual install path and activate t
 3. Activate `Tasty Custom Fonts` in the WordPress admin.
 4. Open `Tasty Fonts` from the admin menu.
 
-There is no build step and no npm install required for normal development. Run `composer install` only when you want the repo's dev tooling, including PHPStan, or want to mirror CI locally.
+There is no build step and no npm install required for normal plugin use. Run `composer install` for PHP tooling and `npm ci` when you want the optional CSS lint tooling used by CI.
 
 ---
 
@@ -52,7 +52,9 @@ The automated checks do not require a full WordPress install.
 
 ```bash
 composer install
+npm ci
 composer phpstan
+npm run lint:css
 find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 php tests/run.php
 node --test tests/js/*.test.cjs
