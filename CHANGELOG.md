@@ -4,6 +4,60 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-04-24
+
+- Promoted the validated `1.13.0` beta line to stable.
+
+### Changed
+
+- Centralized settings save validation and REST schema generation from a shared field-definition source.
+- Split the library family card into a lightweight summary shell and an on-demand hydrated details fragment.
+- Refined the Settings experience with a dedicated admin-access panel, improved transfer and developer-tool states, reusable log filtering, and polished header and settings layouts.
+- Routed admin menu registration, REST permissions, and updater reinstalls through a shared admin-access policy.
+- Refactored duplicated hosted-provider import logic into a shared trait used by the Google Fonts and Bunny Fonts import services, while consolidating related utility helpers across library, runtime, transfer, and updater code paths.
+- Consolidated repeated admin renderer and messaging logic into shared helpers so the library and studio views reuse the same formatting and render support paths.
+- Updated the shared quality workflow and local pre-commit hook to run PHPStan alongside the repo-local `bin/run-jscpd` entrypoint, and documented the local git-hook setup.
+- Raised the repo's enforced PHPStan level from 9 to 10, backed by shared mixed-data normalization helpers and stricter internal contracts across admin, provider, runtime, updater, repository, integration, and filesystem code paths.
+- Tightened release packaging so GitHub archive builds exclude repository-only tooling, hooks, agent metadata, and other development-only files from distributable plugin zip files.
+- Reworked Output Settings into focused Minimal, Variables only, Classes only, and Custom flows with grouped disclosure controls for class and variable subfeatures.
+- Changed default Heading and Body fallback-only stacks from `sans-serif` to `system-ui, sans-serif`, with a one-time migration for legacy fallback-only role defaults.
+- Kept Classes only generated CSS previews annotated with a display-only note explaining why the retained `:root` role variables still exist for integrations and editor parity.
+- Updated Automatic.css sync opt-out handling so explicitly disabled sync stays disabled and stale Tasty-managed ACSS font values can be cleared back to ACSS defaults when no restore backup exists.
+- Updated caching/font-loading and settings docs to describe Minimal output behavior, Etch role bridging, and Automatic.css editor-parity mirroring.
+- Refreshed the admin UI token system, shell, masthead, role workflow, library cards, import panels, integration rows, developer tools, and preview surfaces with a denser Tasty Foundry workspace treatment.
+- Shortened Studio, Library, import, integration, transfer, updater, and developer-tool labels and helper copy so operational controls are easier to scan.
+- Updated CI, local hook guidance, and contributor docs to run optional npm CSS lint tooling alongside PHPStan, JS contract tests, PHP syntax checks, and jscpd.
+
+### Added
+
+- Added a lazy-loaded `families/card` REST fragment for expanding library cards without rendering the full detail panel up front.
+- Added optional Tasty Fonts admin-access controls so administrators can delegate plugin access to selected non-administrator roles and specific users.
+- Added a dry-run site transfer validation flow that stages import bundles before destructive import and surfaces transfer activity directly in the Transfer tab.
+- Added `jscpd` duplicate-code scanning to the quality workflow alongside a committed `.jscpd.json` baseline.
+- Added a `tasty-canvas` JavaScript contract test plus shared agent-instruction files (`AGENTS.md`, `CLAUDE.md`, and `.agents/`) for repository-local Codex and Claude guidance.
+- Added a shared `bin/run-jscpd` runner, a tracked `.githooks/pre-commit` hook, and a `bin/setup-git-hooks` installer so local clones can run the duplication scan automatically on commit.
+- Added root Composer PHPStan tooling plus a WordPress-aware config/bootstrap so the repo can enforce static analysis consistently in CI and local hooks.
+- Added editable Heading, Body, and Monospace role fallback controls in Studio so fallback-only roles can use intentional stacks without selecting a library family.
+- Added an opt-in Role Weights in Classes setting so `.font-heading`, `.font-body`, `.font-monospace`, and related role alias classes can include role weights and variation settings.
+- Added Minimal-output role bridges for Etch frontends, Etch canvas data, and Gutenberg editor styles so variable-only runtime output can still apply live sitewide roles in those surfaces.
+- Added editor-parity mirroring for the live Automatic.css runtime stylesheet when sitewide roles are active, even if direct Tasty-to-ACSS font-setting sync is off.
+- Added the Tasty Foundry admin design-system guide plus Stylelint and CSS-token audit coverage for the committed admin CSS.
+- Added a Show Activity Log behavior setting so Advanced Tools can hide the full diagnostics activity log by default while continuing to record events.
+
+### Fixed
+
+- Improved keyboard focus, loading announcements, and async status handling for hydrated family-card content.
+- Prevented transfer imports and destructive developer tools from running while settings changes are still unsaved, and kept bundle import disabled until a dry run succeeds.
+- Fixed oversized site-transfer uploads to surface a clear inline error and transfer-log entry instead of failing silently.
+- Cleared site-local individual-user grants from imported admin-access settings while preserving valid role-based access grants.
+- Hardened mixed-data normalization across admin actions, renderer payloads, provider clients, transfer bundles, updater responses, and runtime font planning so static analysis and runtime behavior stay aligned without loosening WordPress-facing boundaries.
+- Added focused regression coverage for the new normalization helpers and refreshed contributor docs so the PHPStan level 10 workflow is documented consistently in the repo and wiki.
+- Fixed fallback-only role output so generated role variables and sitewide usage rules still emit when Heading, Body, or Monospace use only a fallback stack.
+- Fixed role save/autosave requests to preserve fallback values for Heading, Body, and Monospace roles.
+- Fixed local admin asset version checks to clear PHP's stat cache before reading local file mtimes and hashes.
+- Fixed generated CSS panel display preparation so preformatted readable snippets are preserved instead of being reformatted unconditionally.
+- Improved admin accessibility by removing misleading tooltip expanded states and adding explicit labels for detected upload metadata actions.
+
 ## [1.13.0-beta.5] - 2026-04-24
 
 ### Added

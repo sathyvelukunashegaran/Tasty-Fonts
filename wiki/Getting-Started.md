@@ -16,7 +16,7 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 ## Before You Start
 
-`1.13.0-beta.5` is the current active build, which is a **pre-release beta**. The plugin is feature-complete and suitable for testing. If you need a fully stable release for a production environment, go to `Settings → Behavior → Update Channel` and switch to `Stable` — the updater will offer the latest stable version for reinstall.
+`1.13.0` is the current stable build. If you want to test upcoming prerelease builds, go to `Settings → Behavior → Update Channel` and switch to `Beta` or `Nightly`.
 
 **Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No build step and no npm install are required for normal plugin use. `composer install` and `npm install`/`npm ci` are only for repository dev tooling and CI.
 
