@@ -23,7 +23,8 @@ use TastyFonts\Support\FontUtils;
  *     title: string,
  *     message: string,
  *     evidence: list<HealthCheckEvidence>,
- *     action: HealthCheckAction|null
+ *     action: HealthCheckAction|null,
+ *     actions: list<HealthCheckAction>
  * }
  */
 final class HealthCheckService
@@ -34,6 +35,10 @@ final class HealthCheckService
      * @param NormalizedSettings $settings
      * @param CatalogCounts $counts
      * @param array{available?: bool, message?: string} $transferCapability
+     * @param array<string, mixed> $runtimeManifest
+     * @param array<string, mixed> $googleAccess
+     * @param array<string, mixed> $updateChannelStatus
+     * @param array<string, mixed> $environment
      * @return list<HealthCheck>
      */
     public function build(
@@ -41,12 +46,22 @@ final class HealthCheckService
         ?array $storage,
         array $settings,
         array $counts,
-        array $transferCapability = []
+        array $transferCapability = [],
+        array $runtimeManifest = [],
+        array $googleAccess = [],
+        array $updateChannelStatus = [],
+        array $environment = []
     ): array {
         return [
             $this->buildGeneratedCssCheck($assetStatus, $settings),
             $this->buildStorageCheck($storage),
+            $this->buildSelfHostedFilesCheck($runtimeManifest),
+            $this->buildExternalStylesheetCheck($runtimeManifest, $settings),
+            $this->buildPreloadCheck($runtimeManifest, $settings),
+            $this->buildBlockEditorSyncCheck($runtimeManifest, $environment),
             $this->buildTransferCheck($transferCapability),
+            $this->buildGoogleAccessCheck($googleAccess),
+            $this->buildUpdateChannelCheck($updateChannelStatus),
             $this->buildLibraryCheck($counts),
         ];
     }
@@ -128,8 +143,12 @@ final class HealthCheckService
         $path = FontUtils::scalarStringValue($assetStatus['path'] ?? '');
         $url = FontUtils::scalarStringValue($assetStatus['url'] ?? '');
         $exists = !empty($assetStatus['exists']);
+        $isCurrent = array_key_exists('is_current', $assetStatus) ? !empty($assetStatus['is_current']) : true;
         $sizeValue = $assetStatus['size'] ?? 0;
         $size = is_numeric($sizeValue) ? max(0, (int) $sizeValue) : 0;
+        $writePath = FontUtils::scalarStringValue($assetStatus['write_path'] ?? $path);
+        $writeDirectory = $writePath !== '' ? dirname($writePath) : '';
+        $writeable = $writeDirectory !== '' && (!is_dir($writeDirectory) || is_writable($writeDirectory));
 
         $severity = 'ok';
         $message = __('Generated CSS is available for runtime delivery.', 'tasty-fonts');
@@ -141,6 +160,20 @@ final class HealthCheckService
             $action = [
                 'slug' => 'regenerate_css',
                 'label' => __('Regenerate CSS File', 'tasty-fonts'),
+            ];
+        } elseif (!$isCurrent) {
+            $severity = 'warning';
+            $message = __('Generated CSS exists, but it does not match the current runtime plan.', 'tasty-fonts');
+            $action = [
+                'slug' => 'regenerate_css',
+                'label' => __('Regenerate CSS File', 'tasty-fonts'),
+            ];
+        } elseif (!$writeable) {
+            $severity = 'warning';
+            $message = __('The generated stylesheet folder is not writable.', 'tasty-fonts');
+            $action = [
+                'slug' => 'clear_plugin_caches',
+                'label' => __('Clear Caches & Rebuild', 'tasty-fonts'),
             ];
         } elseif ($path === '' || $url === '') {
             $severity = 'warning';
@@ -162,8 +195,215 @@ final class HealthCheckService
                 ['label' => __('Path', 'tasty-fonts'), 'value' => $path !== '' ? $path : __('Not available', 'tasty-fonts')],
                 ['label' => __('URL', 'tasty-fonts'), 'value' => $url !== '' ? $url : __('Not available', 'tasty-fonts')],
                 ['label' => __('Size', 'tasty-fonts'), 'value' => $exists ? size_format($size) : __('Not generated', 'tasty-fonts')],
+                ['label' => __('Current', 'tasty-fonts'), 'value' => $isCurrent ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
+                ['label' => __('Writable', 'tasty-fonts'), 'value' => $writeable ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
             ],
             $action
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeManifest
+     * @return HealthCheck
+     */
+    private function buildSelfHostedFilesCheck(array $runtimeManifest): array
+    {
+        $families = is_array($runtimeManifest['families'] ?? null) ? $runtimeManifest['families'] : [];
+        $missing = [];
+
+        foreach ($families as $family) {
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $familyName = FontUtils::scalarStringValue($family['family'] ?? __('Unknown family', 'tasty-fonts'));
+            $files = is_array($family['missing_files'] ?? null) ? $family['missing_files'] : [];
+
+            foreach ($files as $file) {
+                if (!is_scalar($file)) {
+                    continue;
+                }
+
+                $path = trim((string) $file);
+
+                if ($path !== '') {
+                    $missing[] = $familyName . ': ' . $path;
+                }
+            }
+        }
+
+        return $this->check(
+            'self_hosted_files',
+            'runtime',
+            $missing === [] ? 'ok' : 'critical',
+            __('Self-hosted Files', 'tasty-fonts'),
+            $missing === []
+                ? __('Active self-hosted delivery profiles have their font files available.', 'tasty-fonts')
+                : __('One or more active self-hosted delivery profiles reference missing font files.', 'tasty-fonts'),
+            [
+                ['label' => __('Missing files', 'tasty-fonts'), 'value' => $missing === [] ? '0' : implode(', ', array_slice($missing, 0, 3))],
+            ],
+            $missing === [] ? null : ['slug' => 'clear_plugin_caches', 'label' => __('Clear Caches & Rebuild', 'tasty-fonts')]
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeManifest
+     * @param NormalizedSettings $settings
+     * @return HealthCheck
+     */
+    private function buildExternalStylesheetCheck(array $runtimeManifest, array $settings): array
+    {
+        $stylesheets = is_array($runtimeManifest['external_stylesheets'] ?? null) ? $runtimeManifest['external_stylesheets'] : [];
+        $origins = [];
+
+        foreach ($stylesheets as $stylesheet) {
+            if (!is_array($stylesheet)) {
+                continue;
+            }
+
+            $url = FontUtils::scalarStringValue($stylesheet['url'] ?? '');
+            $host = $url !== '' ? (string) parse_url($url, PHP_URL_HOST) : '';
+
+            if ($host !== '') {
+                $origins['https://' . $host] = 'https://' . $host;
+            }
+        }
+
+        $hasThirdPartyOrigins = $origins !== [];
+
+        return $this->check(
+            'external_stylesheets',
+            'runtime',
+            $hasThirdPartyOrigins ? 'info' : 'ok',
+            __('External Stylesheets', 'tasty-fonts'),
+            $hasThirdPartyOrigins
+                ? __('Runtime delivery includes third-party stylesheet origins.', 'tasty-fonts')
+                : __('Runtime delivery is not using third-party stylesheet URLs.', 'tasty-fonts'),
+            [
+                ['label' => __('Stylesheets', 'tasty-fonts'), 'value' => (string) count($stylesheets)],
+                ['label' => __('Connection hints', 'tasty-fonts'), 'value' => !empty($settings['remote_connection_hints']) ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts')],
+                ['label' => __('Origins', 'tasty-fonts'), 'value' => $origins === [] ? __('None', 'tasty-fonts') : implode(', ', array_values($origins))],
+            ],
+            null
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeManifest
+     * @param NormalizedSettings $settings
+     * @return HealthCheck
+     */
+    private function buildPreloadCheck(array $runtimeManifest, array $settings): array
+    {
+        $preloadEnabled = !empty($settings['preload_primary_fonts']);
+        $preloadUrls = is_array($runtimeManifest['preload_urls'] ?? null) ? $runtimeManifest['preload_urls'] : [];
+
+        if (!$preloadEnabled) {
+            return $this->check(
+                'font_preload',
+                'runtime',
+                'ok',
+                __('Primary Font Preload', 'tasty-fonts'),
+                __('Primary font preloading is disabled.', 'tasty-fonts'),
+                [['label' => __('Preload URLs', 'tasty-fonts'), 'value' => '0']],
+                null
+            );
+        }
+
+        return $this->check(
+            'font_preload',
+            'runtime',
+            $preloadUrls === [] ? 'info' : 'ok',
+            __('Primary Font Preload', 'tasty-fonts'),
+            $preloadUrls === []
+                ? __('Primary font preloading is enabled, but no same-origin WOFF2 assets are currently preloadable.', 'tasty-fonts')
+                : __('Primary font preloading can emit same-origin WOFF2 assets.', 'tasty-fonts'),
+            [['label' => __('Preload URLs', 'tasty-fonts'), 'value' => (string) count($preloadUrls)]],
+            null
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeManifest
+     * @param array<string, mixed> $environment
+     * @return HealthCheck
+     */
+    private function buildBlockEditorSyncCheck(array $runtimeManifest, array $environment): array
+    {
+        $editor = is_array($runtimeManifest['editor'] ?? null) ? $runtimeManifest['editor'] : [];
+        $enabled = !empty($editor['block_editor_sync_enabled']);
+        $isLocal = !empty($environment) || $this->isLocalRestUrl();
+
+        return $this->check(
+            'block_editor_sync',
+            'integration',
+            $enabled && $isLocal ? 'warning' : 'ok',
+            __('Block Editor Sync', 'tasty-fonts'),
+            $enabled && $isLocal
+                ? __('Block Editor Font Library sync is enabled in a likely local or self-signed environment.', 'tasty-fonts')
+                : __('Block Editor sync state does not show a local loopback risk.', 'tasty-fonts'),
+            [
+                ['label' => __('Sync', 'tasty-fonts'), 'value' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts')],
+                ['label' => __('Environment', 'tasty-fonts'), 'value' => $isLocal ? __('Local', 'tasty-fonts') : __('Production-like', 'tasty-fonts')],
+            ],
+            null
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $googleAccess
+     * @return HealthCheck
+     */
+    private function buildGoogleAccessCheck(array $googleAccess): array
+    {
+        $saved = !empty($googleAccess['google_api_saved']);
+        $enabled = !empty($googleAccess['google_api_enabled']);
+        $state = FontUtils::scalarStringValue($googleAccess['google_api_state'] ?? '');
+
+        return $this->check(
+            'google_fonts_api',
+            'provider',
+            !$saved || $enabled ? 'ok' : 'warning',
+            __('Google Fonts API', 'tasty-fonts'),
+            !$saved
+                ? __('Google search can use the bundled catalog until an API key is added.', 'tasty-fonts')
+                : ($enabled ? __('The saved Google Fonts API key can be used for search.', 'tasty-fonts') : __('The saved Google Fonts API key is not currently valid for search.', 'tasty-fonts')),
+            [
+                ['label' => __('Key saved', 'tasty-fonts'), 'value' => $saved ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
+                ['label' => __('State', 'tasty-fonts'), 'value' => $state !== '' ? $state : __('Not checked', 'tasty-fonts')],
+            ],
+            $saved && !$enabled ? ['slug' => 'reset_integration_detection_state', 'label' => __('Run Integration Scan', 'tasty-fonts')] : null
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $updateChannelStatus
+     * @return HealthCheck
+     */
+    private function buildUpdateChannelCheck(array $updateChannelStatus): array
+    {
+        $state = FontUtils::scalarStringValue($updateChannelStatus['state'] ?? '');
+        $severity = match ($state) {
+            'rollback' => 'warning',
+            'upgrade' => 'info',
+            'unavailable' => 'info',
+            default => 'ok',
+        };
+        $copy = FontUtils::scalarStringValue($updateChannelStatus['state_copy'] ?? '');
+
+        return $this->check(
+            'update_channel',
+            'updates',
+            $severity,
+            __('Update Channel', 'tasty-fonts'),
+            $copy !== '' ? $copy : __('Update channel status is available.', 'tasty-fonts'),
+            [
+                ['label' => __('Selected', 'tasty-fonts'), 'value' => FontUtils::scalarStringValue($updateChannelStatus['selected_channel_label'] ?? __('Unknown', 'tasty-fonts'))],
+                ['label' => __('Installed', 'tasty-fonts'), 'value' => FontUtils::scalarStringValue($updateChannelStatus['installed_version'] ?? '')],
+                ['label' => __('Latest', 'tasty-fonts'), 'value' => FontUtils::scalarStringValue($updateChannelStatus['latest_version'] ?? __('Unavailable', 'tasty-fonts'))],
+            ],
+            null
         );
     }
 
@@ -283,6 +523,22 @@ final class HealthCheckService
             'message' => $message,
             'evidence' => $evidence,
             'action' => $action,
+            'actions' => $action === null ? [] : [$action],
         ];
+    }
+
+    private function isLocalRestUrl(): bool
+    {
+        if (!function_exists('rest_url')) {
+            return false;
+        }
+
+        $host = (string) parse_url(rest_url(''), PHP_URL_HOST);
+
+        return $host === 'localhost'
+            || str_ends_with($host, '.test')
+            || str_ends_with($host, '.local')
+            || str_starts_with($host, '127.')
+            || $host === '::1';
     }
 }

@@ -12,6 +12,7 @@ use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
+use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
@@ -69,6 +70,7 @@ final class AdminPageContextBuilder
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration,
         private readonly ?GitHubUpdater $updater = null,
+        private readonly ?RuntimeAssetPlanner $runtimePlanner = null,
         ?HealthCheckService $healthCheckService = null
     ) {
         $this->healthChecks = $healthCheckService ?? new HealthCheckService();
@@ -116,7 +118,32 @@ final class AdminPageContextBuilder
         $diagnosticItems = $this->buildDiagnosticItems($assetStatus, $storage, $settings, $counts);
         $overviewMetrics = $this->buildOverviewMetrics($counts);
         $generatedCssPanel = $this->buildGeneratedCssPanel($settings);
-        $healthChecks = $this->healthChecks->build($assetStatus, $storage, $settings, $counts);
+        $runtimeManifest = $this->buildRuntimeManifestContext(
+            $assetStatus,
+            $settings,
+            $counts,
+            $roles,
+            $appliedRoles,
+            $catalog,
+            [
+                'gutenberg' => $gutenbergIntegration,
+                'etch' => $etchIntegration,
+                'automatic_css' => $acssIntegration,
+                'bricks' => $bricksIntegration,
+                'oxygen' => $oxygenIntegration,
+            ]
+        );
+        $healthChecks = $this->healthChecks->build(
+            $assetStatus,
+            $storage,
+            $settings,
+            $counts,
+            [],
+            $runtimeManifest,
+            $googleAccessContext,
+            $updateChannelStatus,
+            $localEnvironmentNotice
+        );
         $advancedTools = $this->buildAdvancedToolsContext(
             $healthChecks,
             $assetStatus,
@@ -126,7 +153,8 @@ final class AdminPageContextBuilder
             $overviewMetrics,
             $developerToolStatuses,
             $generatedCssPanel,
-            $logs
+            $logs,
+            $runtimeManifest
         );
         $previewBaselineSource = $applyEverywhere ? 'live_sitewide' : 'draft';
         $previewBaselineLabel = $applyEverywhere
@@ -244,6 +272,7 @@ final class AdminPageContextBuilder
      * @param array<string, mixed> $developerToolStatuses
      * @param GeneratedCssPanel $generatedCssPanel
      * @param list<ActivityLogEntry> $logs
+     * @param array<string, mixed> $runtimeManifest
      * @return array<string, mixed>
      */
     private function buildAdvancedToolsContext(
@@ -255,12 +284,13 @@ final class AdminPageContextBuilder
         array $overviewMetrics,
         array $developerToolStatuses,
         array $generatedCssPanel,
-        array $logs
+        array $logs,
+        array $runtimeManifest
     ): array {
         return [
             'health_checks' => $healthChecks,
             'health_summary' => $this->healthChecks->summarize($healthChecks),
-            'runtime_manifest' => $this->buildRuntimeManifestContext($assetStatus, $settings, $counts),
+            'runtime_manifest' => $runtimeManifest,
             'diagnostic_items' => $diagnosticItems,
             'overview_metrics' => $overviewMetrics,
             'developer_tool_statuses' => $developerToolStatuses,
@@ -276,25 +306,56 @@ final class AdminPageContextBuilder
      * @param AssetStatus $assetStatus
      * @param NormalizedSettings $settings
      * @param CatalogCounts $counts
+     * @param RoleSet $roles
+     * @param RoleSet $appliedRoles
+     * @param CatalogMap $catalog
+     * @param array<string, IntegrationContext> $integrations
      * @return array<string, mixed>
      */
-    private function buildRuntimeManifestContext(array $assetStatus, array $settings, array $counts): array
-    {
+    private function buildRuntimeManifestContext(
+        array $assetStatus,
+        array $settings,
+        array $counts,
+        array $roles,
+        array $appliedRoles,
+        array $catalog,
+        array $integrations
+    ): array {
+        $runtimeFamilies = $this->runtimePlanner instanceof RuntimeAssetPlanner
+            ? $this->runtimePlanner->getRuntimeFamilies()
+            : array_values($catalog);
+        $externalStylesheets = $this->runtimePlanner instanceof RuntimeAssetPlanner
+            ? $this->runtimePlanner->getExternalStylesheets()
+            : [];
+        $preconnectOrigins = $this->runtimePlanner instanceof RuntimeAssetPlanner
+            ? $this->runtimePlanner->getPreconnectOrigins()
+            : [];
+        $preloadUrls = $this->runtimePlanner instanceof RuntimeAssetPlanner
+            ? $this->runtimePlanner->getPrimaryFontPreloadUrls()
+            : [];
+
         return [
-            'generated_css' => [
-                'path' => $this->stringValue($assetStatus, 'path'),
-                'url' => $this->stringValue($assetStatus, 'url'),
-                'exists' => !empty($assetStatus['exists']),
-                'size' => $this->intValue($assetStatus, 'size'),
-                'last_modified' => $this->intValue($assetStatus, 'last_modified'),
-                'expected_hash' => $this->stringValue($assetStatus, 'expected_hash'),
-                'expected_version' => $this->stringValue($assetStatus, 'expected_version'),
-            ],
+            'generated_css' => $this->buildGeneratedCssManifest($assetStatus),
+            'roles' => $this->buildRuntimeRoleMatrix($roles, $appliedRoles, $settings),
             'delivery' => [
                 'css_delivery_mode' => $this->stringValue($settings, 'css_delivery_mode', 'file'),
                 'auto_apply_roles' => !empty($settings['auto_apply_roles']),
                 'font_display' => $this->stringValue($settings, 'font_display', 'swap'),
+                'variable_fonts_enabled' => !empty($settings['variable_fonts_enabled']),
+                'preload_primary_fonts' => !empty($settings['preload_primary_fonts']),
+                'remote_connection_hints' => !empty($settings['remote_connection_hints']),
             ],
+            'families' => $this->buildRuntimeFamilyMatrix($runtimeFamilies),
+            'preload_urls' => $preloadUrls,
+            'preconnect_origins' => $preconnectOrigins,
+            'external_stylesheets' => $externalStylesheets,
+            'editor' => [
+                'block_editor_sync_enabled' => !empty($settings['block_editor_font_library_sync_enabled']),
+                'font_families' => $this->runtimePlanner instanceof RuntimeAssetPlanner
+                    ? $this->runtimePlanner->getEditorFontFamilies()
+                    : [],
+            ],
+            'integrations' => $this->buildRuntimeIntegrationSummaries($integrations),
             'library' => [
                 'families' => $this->catalogCount($counts, 'families'),
                 'files' => $this->catalogCount($counts, 'files'),
@@ -303,6 +364,169 @@ final class AdminPageContextBuilder
                 'local_families' => $this->catalogCount($counts, 'local_families'),
             ],
         ];
+    }
+
+    /**
+     * @param AssetStatus $assetStatus
+     * @return array<string, mixed>
+     */
+    private function buildGeneratedCssManifest(array $assetStatus): array
+    {
+        return [
+            'path' => $this->stringValue($assetStatus, 'path'),
+            'url' => $this->stringValue($assetStatus, 'url'),
+            'exists' => !empty($assetStatus['exists']),
+            'size' => $this->intValue($assetStatus, 'size'),
+            'last_modified' => $this->intValue($assetStatus, 'last_modified'),
+            'expected_hash' => $this->stringValue($assetStatus, 'expected_hash'),
+            'expected_version' => $this->stringValue($assetStatus, 'expected_version'),
+            'current_hash' => $this->stringValue($assetStatus, 'current_hash'),
+            'is_current' => !empty($assetStatus['is_current']),
+            'write_path' => $this->stringValue($assetStatus, 'write_path'),
+        ];
+    }
+
+    /**
+     * @param RoleSet $roles
+     * @param RoleSet $appliedRoles
+     * @param NormalizedSettings $settings
+     * @return array<string, array<string, mixed>>
+     */
+    private function buildRuntimeRoleMatrix(array $roles, array $appliedRoles, array $settings): array
+    {
+        $matrix = [];
+        $autoApplyRoles = !empty($settings['auto_apply_roles']);
+
+        foreach ($this->effectiveRoleKeys() as $roleKey) {
+            $draftFamily = $this->roleStringValue($roles, $roleKey);
+            $appliedFamily = $this->roleStringValue($appliedRoles, $roleKey);
+            $matrix[$roleKey] = [
+                'draft_family' => $draftFamily,
+                'applied_family' => $appliedFamily,
+                'runtime_family' => $autoApplyRoles ? $appliedFamily : '',
+                'source' => $autoApplyRoles ? 'live_sitewide' : 'draft_only',
+                'fallback' => $this->roleStringValue($autoApplyRoles ? $appliedRoles : $roles, $roleKey . '_fallback'),
+                'weight' => $this->roleStringValue($autoApplyRoles ? $appliedRoles : $roles, $roleKey . '_weight'),
+            ];
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * @param list<CatalogFamily> $families
+     * @return list<array<string, mixed>>
+     */
+    private function buildRuntimeFamilyMatrix(array $families): array
+    {
+        $matrix = [];
+
+        foreach ($families as $family) {
+            $activeDelivery = FontUtils::normalizeStringKeyedMap($family['active_delivery'] ?? []);
+            $familyName = $this->stringValue($family, 'family');
+            $deliveryId = $this->stringValue($activeDelivery, 'id', $this->stringValue($family, 'active_delivery_id'));
+            $faces = FontUtils::normalizeFaceList($activeDelivery['faces'] ?? []);
+            $missingFiles = $this->findMissingActiveDeliveryFiles($activeDelivery, $faces);
+
+            $matrix[] = [
+                'family' => $familyName,
+                'slug' => $this->stringValue($family, 'slug', FontUtils::slugify($familyName)),
+                'publish_state' => $this->stringValue($family, 'publish_state', 'published'),
+                'active_delivery_id' => $deliveryId,
+                'provider' => $this->stringValue($activeDelivery, 'provider'),
+                'type' => $this->stringValue($activeDelivery, 'type'),
+                'format' => FontUtils::resolveProfileFormat($activeDelivery),
+                'faces' => count($faces),
+                'missing_files' => $missingFiles,
+                'preloadable_woff2_files' => $this->countWoff2Faces($faces),
+                'variants' => array_values(array_filter(array_map(
+                    static fn (mixed $variant): string => is_scalar($variant) ? trim((string) $variant) : '',
+                    is_array($activeDelivery['variants'] ?? null) ? $activeDelivery['variants'] : []
+                ))),
+            ];
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * @param array<string, mixed> $activeDelivery
+     * @param list<array<string, mixed>> $faces
+     * @return list<string>
+     */
+    private function findMissingActiveDeliveryFiles(array $activeDelivery, array $faces): array
+    {
+        if (strtolower($this->stringValue($activeDelivery, 'type')) !== 'self_hosted') {
+            return [];
+        }
+
+        $root = $this->storage->getRoot();
+        $missing = [];
+
+        foreach ($faces as $face) {
+            $files = is_array($face['files'] ?? null) ? $face['files'] : [];
+
+            foreach ($files as $file) {
+                if (!is_scalar($file)) {
+                    continue;
+                }
+
+                $path = trim((string) $file);
+
+                if ($path === '') {
+                    continue;
+                }
+
+                $absolutePath = str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\/\\\\]/', $path) === 1
+                    ? $path
+                    : (is_string($root) && $root !== '' ? trailingslashit($root) . ltrim($path, '/\\') : '');
+
+                if ($absolutePath === '' || !file_exists($absolutePath)) {
+                    $missing[] = $path;
+                }
+            }
+        }
+
+        return array_values(array_unique($missing));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $faces
+     */
+    private function countWoff2Faces(array $faces): int
+    {
+        $count = 0;
+
+        foreach ($faces as $face) {
+            $files = is_array($face['files'] ?? null) ? $face['files'] : [];
+
+            if (isset($files['woff2']) && is_scalar($files['woff2']) && trim((string) $files['woff2']) !== '') {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param array<string, IntegrationContext> $integrations
+     * @return array<string, array<string, mixed>>
+     */
+    private function buildRuntimeIntegrationSummaries(array $integrations): array
+    {
+        $summaries = [];
+
+        foreach ($integrations as $key => $integration) {
+            $summaries[$key] = [
+                'enabled' => !empty($integration['enabled']),
+                'available' => !array_key_exists('available', $integration) || !empty($integration['available']),
+                'title' => $this->stringValue($integration, 'title'),
+                'status_label' => $this->stringValue($integration, 'status_label'),
+                'status_copy' => $this->stringValue($integration, 'status_copy'),
+            ];
+        }
+
+        return $summaries;
     }
 
     /**

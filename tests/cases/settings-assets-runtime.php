@@ -2247,7 +2247,19 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
     assertSameValue('warning', (string) ($checks[0]['severity'] ?? ''), 'Missing generated CSS file delivery should be reported as a warning.');
     assertSameValue('storage_root', (string) ($checks[1]['slug'] ?? ''), 'Health checks should expose managed storage as a first-class check.');
     assertSameValue('critical', (string) ($checks[1]['severity'] ?? ''), 'Unavailable managed storage should be reported as critical.');
-    assertSameValue('site_transfer', (string) ($checks[2]['slug'] ?? ''), 'Health checks should expose site transfer capability.');
+    $checksBySlug = [];
+
+    foreach ($checks as $check) {
+        $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+    }
+
+    assertSameValue(true, isset($checksBySlug['site_transfer']), 'Health checks should expose site transfer capability.');
+    assertSameValue(true, isset($checksBySlug['self_hosted_files']), 'Health checks should expose self-hosted file integrity.');
+    assertSameValue(true, isset($checksBySlug['external_stylesheets']), 'Health checks should expose external stylesheet delivery.');
+    assertSameValue(true, isset($checksBySlug['font_preload']), 'Health checks should expose preload readiness.');
+    assertSameValue(true, isset($checksBySlug['block_editor_sync']), 'Health checks should expose editor sync risk.');
+    assertSameValue(true, isset($checksBySlug['google_fonts_api']), 'Health checks should expose Google API readiness.');
+    assertSameValue(true, isset($checksBySlug['update_channel']), 'Health checks should expose update channel readiness.');
     assertSameValue('critical', (string) ($summary['status'] ?? ''), 'Health summaries should elevate critical checks above warnings and notices.');
 };
 
@@ -2276,6 +2288,12 @@ $tests['admin_page_context_builder_exposes_advanced_tools_context'] = static fun
     $healthSummary = is_array($advancedTools['health_summary'] ?? null) ? $advancedTools['health_summary'] : [];
 
     assertSameValue(false, $advancedTools === [], 'The page context should expose a structured Advanced Tools payload.');
+    assertSameValue(true, isset($manifest['roles']), 'The runtime manifest should expose the role resolution matrix.');
+    assertSameValue(true, isset($manifest['families']), 'The runtime manifest should expose the active delivery matrix.');
+    assertSameValue(true, isset($manifest['preload_urls']), 'The runtime manifest should expose runtime preload URLs.');
+    assertSameValue(true, isset($manifest['preconnect_origins']), 'The runtime manifest should expose runtime preconnect origins.');
+    assertSameValue(true, isset($manifest['external_stylesheets']), 'The runtime manifest should expose runtime external stylesheet descriptors.');
+    assertSameValue(true, isset($manifest['integrations']), 'The runtime manifest should expose integration summaries.');
     assertSameValue(false, $healthChecks === [], 'Advanced Tools should include structured health checks for power-user diagnostics.');
     assertSameValue(false, $healthSummary === [], 'Advanced Tools should include a summarized health status.');
     assertSameValue('file', (string) ($manifest['delivery']['css_delivery_mode'] ?? ''), 'The runtime manifest should expose the current generated CSS delivery mode.');

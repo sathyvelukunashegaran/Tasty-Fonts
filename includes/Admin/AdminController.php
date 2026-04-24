@@ -16,6 +16,7 @@ use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
+use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Google\GoogleImportService;
 use TastyFonts\Integrations\AcssIntegrationService;
@@ -105,7 +106,8 @@ final class AdminController
         private readonly DeveloperToolsService $developerTools,
         private readonly SiteTransferService $siteTransfer,
         private readonly ?GitHubUpdater $updater = null,
-        ?AdminAccessService $adminAccess = null
+        ?AdminAccessService $adminAccess = null,
+        private readonly ?RuntimeAssetPlanner $runtimePlanner = null
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
         $this->adminAccess = $adminAccess ?? new AdminAccessService($this->settings);
@@ -121,7 +123,8 @@ final class AdminController
             $this->acssIntegration,
             $this->bricksIntegration,
             $this->oxygenIntegration,
-            $this->updater
+            $this->updater,
+            $this->runtimePlanner
         );
     }
 
@@ -908,6 +911,49 @@ final class AdminController
         $this->log->add($message);
 
         return ['message' => $message];
+    }
+
+    /**
+     * @return Payload
+     */
+    public function buildAdvancedToolsPayload(): array
+    {
+        $context = $this->buildPageContext();
+
+        return [
+            'advanced_tools' => is_array($context['advanced_tools'] ?? null) ? $context['advanced_tools'] : [],
+            'generated_css_panel' => is_array($context['generated_css_panel'] ?? null) ? $context['generated_css_panel'] : [],
+            'diagnostic_items' => is_array($context['diagnostic_items'] ?? null) ? $context['diagnostic_items'] : [],
+            'overview_metrics' => is_array($context['overview_metrics'] ?? null) ? $context['overview_metrics'] : [],
+            'logs' => is_array($context['logs'] ?? null) ? $context['logs'] : [],
+            'activity_actor_options' => is_array($context['activity_actor_options'] ?? null) ? $context['activity_actor_options'] : [],
+        ];
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function runAdvancedToolsAction(string $action): array|WP_Error
+    {
+        $result = match ($action) {
+            'clear_plugin_caches' => $this->clearPluginCachesAndRegenerateAssets(),
+            'regenerate_css' => $this->regenerateCss(),
+            'reset_integration_detection_state' => $this->resetIntegrationDetectionState(),
+            'reset_suppressed_notices' => $this->resetSuppressedNotices(),
+            default => new WP_Error(
+                'tasty_fonts_invalid_tools_action',
+                __('Unknown advanced tools action.', 'tasty-fonts')
+            ),
+        };
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        return array_merge(
+            $result,
+            $this->buildAdvancedToolsPayload()
+        );
     }
 
     /**

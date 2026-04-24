@@ -4,7 +4,13 @@
                     $developerToolStatuses = isset($developerToolStatuses) && is_array($developerToolStatuses) ? $developerToolStatuses : [];
                     $generatedCssPanel = isset($generatedCssPanel) && is_array($generatedCssPanel) ? $generatedCssPanel : [];
                     $advancedTools = isset($advancedTools) && is_array($advancedTools) ? $advancedTools : [];
+                    $healthChecks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
                     $healthSummary = is_array($advancedTools['health_summary'] ?? null) ? $advancedTools['health_summary'] : [];
+                    $runtimeManifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
+                    $runtimeFamilies = is_array($runtimeManifest['families'] ?? null) ? $runtimeManifest['families'] : [];
+                    $runtimePreloadUrls = is_array($runtimeManifest['preload_urls'] ?? null) ? $runtimeManifest['preload_urls'] : [];
+                    $runtimePreconnectOrigins = is_array($runtimeManifest['preconnect_origins'] ?? null) ? $runtimeManifest['preconnect_origins'] : [];
+                    $runtimeExternalStylesheets = is_array($runtimeManifest['external_stylesheets'] ?? null) ? $runtimeManifest['external_stylesheets'] : [];
                     $siteTransfer = isset($siteTransfer) && is_array($siteTransfer) ? $siteTransfer : [];
                     $logs = isset($logs) && is_array($logs) ? $logs : [];
                     $activityActorOptions = isset($activityActorOptions) && is_array($activityActorOptions) ? $activityActorOptions : [];
@@ -244,6 +250,127 @@
                                             <div class="tasty-fonts-diagnostic-value"><?php echo esc_html($metricValue); ?></div>
                                         </div>
                                     <?php endforeach; ?>
+                                </div>
+                                <?php if ($healthChecks !== []): ?>
+                                    <div class="tasty-fonts-system-details-panel tasty-fonts-advanced-health-panel">
+                                        <div class="tasty-fonts-output-settings-copy">
+                                            <h3><?php esc_html_e('Health Checks', 'tasty-fonts'); ?></h3>
+                                            <?php if ($showSettingsDescriptions): ?>
+                                                <p><?php esc_html_e('Runtime readiness, storage, provider, integration, transfer, and update checks.', 'tasty-fonts'); ?></p>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="tasty-fonts-advanced-health-grid">
+                                            <?php foreach ($healthChecks as $healthCheck): ?>
+                                                <?php
+                                                if (!is_array($healthCheck)) {
+                                                    continue;
+                                                }
+
+                                                $healthSeverity = sanitize_html_class((string) ($healthCheck['severity'] ?? 'ok'));
+                                                $healthTitle = trim((string) ($healthCheck['title'] ?? ''));
+                                                $healthMessage = trim((string) ($healthCheck['message'] ?? ''));
+                                                $healthEvidence = is_array($healthCheck['evidence'] ?? null) ? $healthCheck['evidence'] : [];
+
+                                                if ($healthTitle === '') {
+                                                    continue;
+                                                }
+                                                ?>
+                                                <article class="tasty-fonts-health-check-card tasty-fonts-health-check-card--<?php echo esc_attr($healthSeverity); ?>">
+                                                    <div class="tasty-fonts-health-check-card-head">
+                                                        <h4><?php echo esc_html($healthTitle); ?></h4>
+                                                        <span class="tasty-fonts-health-badge tasty-fonts-health-badge--<?php echo esc_attr($healthSeverity); ?>"><?php echo esc_html(ucfirst($healthSeverity)); ?></span>
+                                                    </div>
+                                                    <?php if ($showSettingsDescriptions && $healthMessage !== ''): ?>
+                                                        <p><?php echo esc_html($healthMessage); ?></p>
+                                                    <?php endif; ?>
+                                                    <?php if ($healthEvidence !== []): ?>
+                                                        <dl class="tasty-fonts-health-evidence-list">
+                                                            <?php foreach (array_slice($healthEvidence, 0, 3) as $evidence): ?>
+                                                                <?php
+                                                                if (!is_array($evidence)) {
+                                                                    continue;
+                                                                }
+
+                                                                $evidenceLabel = trim((string) ($evidence['label'] ?? ''));
+                                                                $evidenceValue = trim((string) ($evidence['value'] ?? ''));
+
+                                                                if ($evidenceLabel === '' || $evidenceValue === '') {
+                                                                    continue;
+                                                                }
+                                                                ?>
+                                                                <div>
+                                                                    <dt><?php echo esc_html($evidenceLabel); ?></dt>
+                                                                    <dd><?php echo esc_html($evidenceValue); ?></dd>
+                                                                </div>
+                                                            <?php endforeach; ?>
+                                                        </dl>
+                                                    <?php endif; ?>
+                                                </article>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="tasty-fonts-system-details-panel tasty-fonts-runtime-inspector-panel">
+                                    <div class="tasty-fonts-output-settings-copy">
+                                        <h3><?php esc_html_e('Runtime Inspector', 'tasty-fonts'); ?></h3>
+                                        <?php if ($showSettingsDescriptions): ?>
+                                            <p><?php esc_html_e('Active deliveries, connection hints, preloads, and external runtime stylesheets.', 'tasty-fonts'); ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="tasty-fonts-advanced-overview-grid">
+                                        <div class="tasty-fonts-diagnostic-item">
+                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('Active Families', 'tasty-fonts'); ?></div>
+                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimeFamilies)); ?></div>
+                                        </div>
+                                        <div class="tasty-fonts-diagnostic-item">
+                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('Preloads', 'tasty-fonts'); ?></div>
+                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimePreloadUrls)); ?></div>
+                                        </div>
+                                        <div class="tasty-fonts-diagnostic-item">
+                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('Preconnects', 'tasty-fonts'); ?></div>
+                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimePreconnectOrigins)); ?></div>
+                                        </div>
+                                        <div class="tasty-fonts-diagnostic-item">
+                                            <div class="tasty-fonts-diagnostic-label"><?php esc_html_e('External CSS', 'tasty-fonts'); ?></div>
+                                            <div class="tasty-fonts-diagnostic-value"><?php echo esc_html((string) count($runtimeExternalStylesheets)); ?></div>
+                                        </div>
+                                    </div>
+                                    <?php if ($runtimeFamilies !== []): ?>
+                                        <div class="tasty-fonts-runtime-family-table" role="table" aria-label="<?php esc_attr_e('Active runtime delivery profiles', 'tasty-fonts'); ?>">
+                                            <?php foreach ($runtimeFamilies as $runtimeFamily): ?>
+                                                <?php
+                                                if (!is_array($runtimeFamily)) {
+                                                    continue;
+                                                }
+
+                                                $runtimeFamilyName = trim((string) ($runtimeFamily['family'] ?? ''));
+                                                $runtimeProvider = trim((string) ($runtimeFamily['provider'] ?? ''));
+                                                $runtimeType = trim((string) ($runtimeFamily['type'] ?? ''));
+                                                $runtimeFaces = (int) ($runtimeFamily['faces'] ?? 0);
+
+                                                if ($runtimeFamilyName === '') {
+                                                    continue;
+                                                }
+                                                ?>
+                                                <div class="tasty-fonts-runtime-family-row" role="row">
+                                                    <span role="cell"><?php echo esc_html($runtimeFamilyName); ?></span>
+                                                    <span role="cell"><?php echo esc_html($runtimeProvider !== '' ? $runtimeProvider : __('Local', 'tasty-fonts')); ?></span>
+                                                    <span role="cell"><?php echo esc_html($runtimeType !== '' ? $runtimeType : __('Default', 'tasty-fonts')); ?></span>
+                                                    <span role="cell">
+                                                        <?php
+                                                        echo esc_html(
+                                                            sprintf(
+                                                                /* translators: %d: number of font faces */
+                                                                _n('%d face', '%d faces', $runtimeFaces, 'tasty-fonts'),
+                                                                $runtimeFaces
+                                                            )
+                                                        );
+                                                        ?>
+                                                    </span>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="tasty-fonts-system-details-panel">
                                     <div class="tasty-fonts-output-settings-copy">

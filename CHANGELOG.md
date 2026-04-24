@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Reworked Advanced Tools into a power-user command center with Overview, Generated CSS, Developer, Transfer, and Activity tabs while preserving existing guarded maintenance and transfer workflows.
+- Expanded Advanced Tools with runtime manifest inspection, richer health checks, and REST endpoints for refreshing diagnostics and running safe maintenance actions.
 
 ## [1.13.0] - 2026-04-24
 

@@ -4514,7 +4514,7 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('data-tab-heading="transfer"', $output, 'Advanced Tools should include the transfer contextual heading.');
     assertNotContainsValue('Command center for runtime inspection, maintenance, transfer, and activity review.', $output, 'Advanced Tools should avoid repeating the masthead copy inside the diagnostics card.');
     assertContainsValue('System Details', $output, 'Overview should include the system details diagnostics.');
-    assertNotContainsValue('Runtime Inspector', $output, 'Overview should not render non-actionable shortcut cards for tabs that are already visible.');
+    assertContainsValue('Runtime Inspector', $output, 'Overview should render the Phase 2 runtime manifest inspector without reintroducing redundant shortcut cards.');
     assertNotContainsValue('class="tasty-fonts-generated-css-toolbar"', $output, 'Generated CSS should use the shared contextual header instead of a detached panel title.');
     assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-panel-generated"[\s\S]*?Download Generated CSS/', $output), 'The generated CSS download action should live inside the generated CSS tab panel.');
     assertContainsValue('class="button tasty-fonts-output-download-button"', $output, 'Generated CSS should render the download action as an icon-only code panel control.');

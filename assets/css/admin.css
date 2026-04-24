@@ -10769,6 +10769,129 @@ h3.tasty-fonts-section-title {
 #tasty-fonts-diagnostics-page .tasty-fonts-diagnostics-grid {
     gap: var(--tasty-space-2);
 }
+
+#tasty-fonts-diagnostics-page .tasty-fonts-advanced-health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--tasty-layout-100pct), var(--tasty-layout-260px)), var(--tasty-layout-1fr)));
+    gap: var(--tasty-space-2);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card {
+    display: grid;
+    gap: var(--tasty-space-2);
+    padding: var(--tasty-layout-12px) var(--tasty-layout-14px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle-strong);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface);
+    box-shadow: var(--tasty-shadow-card);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card--critical,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card--warning {
+    border-color: rgba(var(--tasty-danger-rgb), var(--tasty-alpha-18));
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--tasty-space-2);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card h4,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card p,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dt,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dd {
+    margin: var(--tasty-layout-0);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card h4 {
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-body-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-check-card p {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-body);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tasty-layout-22px);
+    padding: var(--tasty-layout-0) var(--tasty-layout-8px);
+    border-radius: var(--tasty-radius-pill);
+    background: rgba(var(--tasty-accent-rgb), var(--tasty-alpha-10));
+    color: var(--tasty-accent);
+    font-size: var(--tasty-type-label-micro-size);
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-control);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-badge--ok {
+    background: rgba(var(--tasty-success-rgb), var(--tasty-alpha-10));
+    color: var(--tasty-success);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-badge--warning,
+#tasty-fonts-diagnostics-page .tasty-fonts-health-badge--critical {
+    background: rgba(var(--tasty-danger-rgb), var(--tasty-alpha-10));
+    color: var(--tasty-danger);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list {
+    display: grid;
+    gap: var(--tasty-space-1);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list > div {
+    display: grid;
+    grid-template-columns: minmax(var(--tasty-layout-88px), max-content) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
+    gap: var(--tasty-space-2);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dt {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-label-micro-size);
+    font-weight: var(--tasty-font-weight-bold);
+    text-transform: uppercase;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-health-evidence-list dd {
+    min-width: var(--tasty-layout-0);
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-caption-size);
+    overflow-wrap: anywhere;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-family-table {
+    display: grid;
+    gap: var(--tasty-space-1);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-family-row {
+    display: grid;
+    grid-template-columns: minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) repeat(var(--tasty-layout-3), minmax(var(--tasty-layout-88px), var(--tasty-layout-120px)));
+    gap: var(--tasty-space-3);
+    align-items: center;
+    padding: var(--tasty-layout-10px) var(--tasty-layout-14px);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    border-radius: var(--tasty-radius-card);
+    background: var(--tasty-surface);
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-control);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-runtime-family-row span:not(:first-child) {
+    color: var(--tasty-text-muted);
+    font-weight: var(--tasty-font-weight-semibold);
+}
+
 #tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-item {
     position: relative;
     padding: var(--tasty-layout-10px) var(--tasty-layout-14px);

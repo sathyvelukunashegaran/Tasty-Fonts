@@ -276,7 +276,10 @@ final class AssetService
      *     size: int,
      *     last_modified: int,
      *     expected_hash: string,
-     *     expected_version: string
+     *     expected_version: string,
+     *     current_hash: string,
+     *     is_current: bool,
+     *     write_path: string
      * } Generated stylesheet status payload.
      */
     public function getStatus(): array
@@ -291,6 +294,9 @@ final class AssetService
             'last_modified' => $state['last_modified'],
             'expected_hash' => $state['expected_hash'],
             'expected_version' => $state['expected_version'],
+            'current_hash' => $state['current_hash'],
+            'is_current' => $state['is_current'],
+            'write_path' => $state['write_path'],
         ];
     }
 

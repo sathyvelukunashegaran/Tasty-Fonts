@@ -1941,6 +1941,9 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/families/publish-state' => 'PATCH',
         'tasty-fonts/v1/families/delivery-profile' => 'DELETE',
         'tasty-fonts/v1/families/card' => 'GET',
+        'tasty-fonts/v1/tools/health' => 'GET',
+        'tasty-fonts/v1/tools/runtime-manifest' => 'GET',
+        'tasty-fonts/v1/tools/action' => 'POST',
     ];
 
     assertSameValue(
@@ -2019,6 +2022,43 @@ $tests['rest_controller_returns_native_payloads_for_write_routes'] = static func
     assertSameValue(true, $response instanceof WP_REST_Response, 'REST write routes should return a native REST response object.');
     assertSameValue('Inter', (string) ($response->get_data()['family'] ?? ''), 'REST write routes should return the saved family in the response body.');
     assertSameValue('serif', (string) ($response->get_data()['fallback'] ?? ''), 'REST write routes should return the saved fallback in the response body.');
+};
+
+$tests['rest_controller_returns_advanced_tools_health_and_manifest_payloads'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+
+    $healthResponse = $services['rest']->toolsHealth(
+        new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/tools/health')
+    );
+    $manifestResponse = $services['rest']->toolsRuntimeManifest(
+        new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/tools/runtime-manifest')
+    );
+
+    assertSameValue(true, $healthResponse instanceof WP_REST_Response, 'The tools health route should return a native REST response object.');
+    assertSameValue(true, is_array($healthResponse->get_data()['health_checks'] ?? null), 'The tools health route should return refreshed health checks.');
+    assertSameValue(true, is_array($healthResponse->get_data()['generated_css_panel'] ?? null), 'The tools health route should return the refreshed generated CSS panel.');
+    assertSameValue(true, $manifestResponse instanceof WP_REST_Response, 'The runtime manifest route should return a native REST response object.');
+    assertSameValue(true, is_array($manifestResponse->get_data()['runtime_manifest']['generated_css'] ?? null), 'The runtime manifest route should expose generated stylesheet metadata.');
+    assertSameValue(true, is_array($manifestResponse->get_data()['runtime_manifest']['roles'] ?? null), 'The runtime manifest route should expose role resolution data.');
+};
+
+$tests['rest_controller_runs_safe_advanced_tools_action_and_returns_refreshed_payload'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/tools/action');
+    $request->set_param('action', 'reset_suppressed_notices');
+
+    $response = $services['rest']->runToolsAction($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The tools action route should return a native REST response object.');
+    assertSameValue('Suppressed notices reset. Hidden reminders can appear again.', (string) ($data['message'] ?? ''), 'The tools action route should run the requested safe action.');
+    assertSameValue(true, is_array($data['advanced_tools']['health_checks'] ?? null), 'The tools action route should return refreshed Advanced Tools health state.');
+    assertSameValue(true, is_array($data['generated_css_panel'] ?? null), 'The tools action route should return refreshed generated CSS data.');
+    assertSameValue(true, is_array($data['logs'] ?? null), 'The tools action route should return refreshed activity entries.');
 };
 
 $tests['rest_controller_family_fallback_returns_refreshed_generated_css_panel'] = static function (): void {

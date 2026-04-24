@@ -41,6 +41,9 @@ final class RestController
         'saveFamilyPublishState' => 'families/publish-state',
         'deleteDeliveryProfile' => 'families/delivery-profile',
         'familyCard' => 'families/card',
+        'toolsHealth' => 'tools/health',
+        'toolsRuntimeManifest' => 'tools/runtime-manifest',
+        'toolsAction' => 'tools/action',
     ];
 
     private readonly AdminAccessService $adminAccess;
@@ -109,6 +112,16 @@ final class RestController
         ]);
         $this->registerRoute(self::ROUTES['familyCard'], 'GET', [$this, 'renderFamilyCard'], [
             'family_slug' => $this->buildTextArg(true),
+        ]);
+        $this->registerRoute(self::ROUTES['toolsHealth'], 'GET', [$this, 'toolsHealth']);
+        $this->registerRoute(self::ROUTES['toolsRuntimeManifest'], 'GET', [$this, 'toolsRuntimeManifest']);
+        $this->registerRoute(self::ROUTES['toolsAction'], 'POST', [$this, 'runToolsAction'], [
+            'action' => $this->buildTextArg(true, [
+                'clear_plugin_caches',
+                'regenerate_css',
+                'reset_integration_detection_state',
+                'reset_suppressed_notices',
+            ]),
         ]);
     }
 
@@ -257,6 +270,41 @@ final class RestController
                 $this->getTextParam($request, 'family_slug')
             ),
             404
+        );
+    }
+
+    public function toolsHealth(WP_REST_Request $request): mixed
+    {
+        unset($request);
+
+        $payload = $this->admin->buildAdvancedToolsPayload();
+        $advancedTools = is_array($payload['advanced_tools'] ?? null) ? $payload['advanced_tools'] : [];
+
+        return $this->restResult([
+            'health_checks' => is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [],
+            'health_summary' => is_array($advancedTools['health_summary'] ?? null) ? $advancedTools['health_summary'] : [],
+            'generated_css_panel' => is_array($payload['generated_css_panel'] ?? null) ? $payload['generated_css_panel'] : [],
+            'activity' => is_array($advancedTools['activity'] ?? null) ? $advancedTools['activity'] : [],
+        ]);
+    }
+
+    public function toolsRuntimeManifest(WP_REST_Request $request): mixed
+    {
+        unset($request);
+
+        $payload = $this->admin->buildAdvancedToolsPayload();
+        $advancedTools = is_array($payload['advanced_tools'] ?? null) ? $payload['advanced_tools'] : [];
+
+        return $this->restResult([
+            'runtime_manifest' => is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [],
+            'diagnostic_items' => is_array($payload['diagnostic_items'] ?? null) ? $payload['diagnostic_items'] : [],
+        ]);
+    }
+
+    public function runToolsAction(WP_REST_Request $request): mixed
+    {
+        return $this->restResult(
+            $this->admin->runAdvancedToolsAction($this->getTextParam($request, 'action'))
         );
     }
 

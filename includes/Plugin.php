@@ -207,7 +207,8 @@ final class Plugin
             $this->developerTools,
             $this->siteTransfer,
             $this->updater,
-            $this->adminAccess
+            $this->adminAccess,
+            $this->planner
         );
         $this->rest = new RestController($this->admin, $this->adminAccess);
     }

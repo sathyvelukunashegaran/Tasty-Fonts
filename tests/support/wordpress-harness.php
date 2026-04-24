@@ -2005,7 +2005,8 @@ function makeServiceGraph(): array
         $developerTools,
         $siteTransfer,
         $updater,
-        $adminAccess
+        $adminAccess,
+        $planner
     );
     $rest = new RestController($controller, $adminAccess);
     $runtime = new RuntimeService($planner, $assets, $cssBuilder, $adobe, $settings, $acssIntegration, $bricksIntegration, $oxygenIntegration);
