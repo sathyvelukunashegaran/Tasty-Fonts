@@ -99,7 +99,6 @@
                                                     <?php if (!$trainingWheelsOff): ?>
                                                         data-help-tooltip="<?php echo esc_attr($hasPendingLiveRoleChanges ? '' : $applyLiveDisabledCopy); ?>"
                                                         data-help-passive="1"
-                                                        title="<?php echo esc_attr($hasPendingLiveRoleChanges ? '' : $applyLiveDisabledCopy); ?>"
                                                         aria-label="<?php echo esc_attr($hasPendingLiveRoleChanges ? '' : $applyLiveDisabledCopy); ?>"
                                                     <?php endif; ?>
                                                 >
@@ -114,7 +113,6 @@
                                                     <?php if (!$trainingWheelsOff): ?>
                                                         data-help-tooltip="<?php echo esc_attr($saveDraftDisabledCopy); ?>"
                                                         data-help-passive="1"
-                                                        title="<?php echo esc_attr($saveDraftDisabledCopy); ?>"
                                                         aria-label="<?php echo esc_attr($saveDraftDisabledCopy); ?>"
                                                     <?php endif; ?>
                                                 >

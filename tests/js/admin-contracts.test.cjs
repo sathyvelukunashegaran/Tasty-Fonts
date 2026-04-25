@@ -11,6 +11,7 @@ const {
     hasVariableFontMetadata,
     isTrustedHostedStylesheetUrl,
     logEntryMatchesFilters,
+    normalizeSettingsFieldName,
     normalizeOutputQuickModePreference,
     parsePhpIniSizeToBytes,
     rowMatchesLibraryFilters,
@@ -184,6 +185,12 @@ test('admin contracts keep empty arrays when only hidden sentinels are submitted
     );
 });
 
+test('admin contracts normalize settings field names for baseline restoration', () => {
+    assert.equal(normalizeSettingsFieldName('admin_access_role_slugs[]'), 'admin_access_role_slugs');
+    assert.equal(normalizeSettingsFieldName(' output_quick_mode_preference '), 'output_quick_mode_preference');
+    assert.equal(normalizeSettingsFieldName(''), '');
+});
+
 test('admin contracts match library rows against query and filter combinations', () => {
     assert.equal(
         rowMatchesLibraryFilters(
@@ -295,7 +302,7 @@ test('admin contracts detect pending live changes when saved role axes differ', 
     );
 });
 
-test('admin contracts prefer family catalog fallbacks over legacy role fallback values', () => {
+test('admin contracts prefer explicit role fallbacks over family catalog fallbacks', () => {
     assert.equal(
         roleStatesMatch(
             {
@@ -316,7 +323,7 @@ test('admin contracts prefer family catalog fallbacks over legacy role fallback 
                 },
             }
         ),
-        true
+        false
     );
 });
 
@@ -478,8 +485,8 @@ test('admin contracts normalizeAxisTag normalizes lowercase, uppercase, and non-
     assert.equal(hasVariableFontMetadata({ variation_axes: { '': {} } }), false);
 });
 
-test('admin contracts resolveRoleFallback uses catalog-driven fallback when available', () => {
-    // When the role family has a matching catalog entry with a fallback, that fallback is used.
+test('admin contracts resolveRoleFallback only uses catalog-driven fallback when role fallback is absent', () => {
+    // Explicit role fallbacks are role-specific and should not be hidden by the family catalog.
     const stateWithCatalog = roleStatesMatch(
         { heading: 'Inter', headingFallback: 'serif' },
         { heading: 'Inter', headingFallback: 'sans-serif' },
@@ -489,21 +496,19 @@ test('admin contracts resolveRoleFallback uses catalog-driven fallback when avai
             },
         }
     );
-    // Both sides resolve the catalog-driven fallback, so the states match.
-    assert.equal(stateWithCatalog, true);
+    assert.equal(stateWithCatalog, false);
 
-    // When the catalog fallback differs from the explicit fallback, the catalog wins.
-    const mismatch = roleStatesMatch(
-        { heading: 'Inter', headingFallback: 'serif' },
-        { heading: 'Inter', headingFallback: 'serif' },
+    // Legacy states without a role fallback can still fall back to family catalog metadata.
+    const legacyCatalogFallback = roleStatesMatch(
+        { heading: 'Inter' },
+        { heading: 'Inter' },
         {
             roleFamilyCatalog: {
                 Inter: { fallback: 'sans-serif' },
             },
         }
     );
-    // Both sides use the catalog fallback 'sans-serif', overriding 'serif', so they still match.
-    assert.equal(mismatch, true);
+    assert.equal(legacyCatalogFallback, true);
 });
 
 test('admin contracts canDisableOutputLayer returns true when another output layer remains enabled', () => {

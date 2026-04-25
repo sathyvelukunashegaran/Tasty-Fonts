@@ -624,7 +624,7 @@ trait FamilyCardRendererSupport
             return __('The quick brown fox…', 'tasty-fonts');
         }
 
-        return wp_trim_words($normalized, 6, '…');
+        return wp_trim_words($normalized, 9, '…');
     }
 
     protected function buildMonospacePreviewText(string $familyName, bool $multiline = false): string

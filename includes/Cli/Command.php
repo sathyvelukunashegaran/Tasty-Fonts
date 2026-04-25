@@ -18,7 +18,7 @@ use WP_Error;
  */
 final class Command
 {
-    public function __construct(private readonly AdminController $admin)
+    public function __construct(private readonly AdminController $admin, private readonly ?\Closure $secretReader = null)
     {
     }
 
@@ -128,6 +128,114 @@ final class Command
     }
 
     /**
+     * Check or save the Google Fonts API key.
+     *
+     * ## OPTIONS
+     *
+     * <status|save>
+     * : Report whether a key is saved, or securely prompt for and save a new key.
+     *
+     * [--google-api-key-stdin]
+     * : Read the new key from the first STDIN line instead of prompting.
+     *
+     * [--format=<format>]
+     * : Use "summary" or "json". Default: summary.
+     *
+     * @param list<string> $args
+     * @param array<string, mixed> $assocArgs
+     */
+    public function googleApiKey(array $args, array $assocArgs): void
+    {
+        $subcommand = $this->string($args[0] ?? '');
+
+        if ($subcommand === 'status') {
+            $this->finish($this->admin->googleApiKeyStatus(), $assocArgs);
+            return;
+        }
+
+        if ($subcommand === 'save') {
+            $googleApiKey = $this->resolveGoogleApiKeyInput(
+                $assocArgs,
+                true,
+                true,
+                'Enter Google Fonts API key: ',
+                false
+            );
+
+            if (is_wp_error($googleApiKey)) {
+                $this->fail($googleApiKey);
+                return;
+            }
+
+            $this->finish($this->admin->saveGoogleApiKey($googleApiKey), $assocArgs);
+            return;
+        }
+
+        $this->failMessage('Usage: wp tasty-fonts google-api-key status|save');
+    }
+
+    /**
+     * Underscored method alias for WP-CLI dispatch compatibility.
+     *
+     * @param list<string> $args
+     * @param array<string, mixed> $assocArgs
+     */
+    public function google_api_key(array $args, array $assocArgs): void
+    {
+        $this->googleApiKey($args, $assocArgs);
+    }
+
+    /**
+     * Reset plugin settings.
+     *
+     * ## OPTIONS
+     *
+     * <reset>
+     * : Reset all stored Tasty Fonts settings to defaults.
+     *
+     * [--yes]
+     * : Required for destructive resets.
+     *
+     * [--format=<format>]
+     * : Use "summary" or "json". Default: summary.
+     *
+     * @param list<string> $args
+     * @param array<string, mixed> $assocArgs
+     */
+    public function settings(array $args, array $assocArgs): void
+    {
+        $this->requireSubcommand($args, ['reset'], 'Usage: wp tasty-fonts settings reset --yes');
+        $this->requireYes($assocArgs, 'Settings reset removes saved Tasty Fonts settings, roles, access rules, and stored Google API key data.');
+
+        $this->finish($this->admin->resetPluginSettingsToDefaults(), $assocArgs);
+    }
+
+    /**
+     * Delete plugin-managed generated/downloaded files.
+     *
+     * ## OPTIONS
+     *
+     * <delete>
+     * : Delete managed font files, generated CSS, transfer exports, and rollback snapshots.
+     *
+     * [--yes]
+     * : Required for destructive deletion.
+     *
+     * [--format=<format>]
+     * : Use "summary" or "json". Default: summary.
+     *
+     * @param list<string> $args
+     * @param array<string, mixed> $assocArgs
+     */
+    public function files(array $args, array $assocArgs): void
+    {
+        $this->requireSubcommand($args, ['delete'], 'Usage: wp tasty-fonts files delete --yes');
+        $this->requireYes($assocArgs, 'Files delete removes plugin-managed font files, generated CSS, retained transfer exports, and rollback snapshots.');
+
+        $this->finish($this->admin->deletePluginManagedFiles(), $assocArgs);
+    }
+
+    /**
      * Export or import site transfer bundles.
      *
      * ## OPTIONS
@@ -141,8 +249,11 @@ final class Command
      * [--dry-run]
      * : Validate and diff an import bundle without changing state.
      *
-     * [--google-api-key=<key>]
-     * : Optional fresh Google Fonts API key for import.
+     * [--prompt-google-api-key]
+     * : Prompt securely for an optional fresh Google Fonts API key for import.
+     *
+     * [--google-api-key-stdin]
+     * : Read the optional fresh Google Fonts API key from STDIN for automation.
      *
      * [--yes]
      * : Required for destructive imports.
@@ -172,7 +283,18 @@ final class Command
             $this->failMessage('A bundle path is required for transfer import.');
         }
 
-        $googleApiKey = $this->string($assocArgs['google-api-key'] ?? '');
+        $googleApiKey = $this->resolveGoogleApiKeyInput(
+            $assocArgs,
+            false,
+            false,
+            'Enter optional fresh Google Fonts API key (leave empty to skip): ',
+            true
+        );
+
+        if (is_wp_error($googleApiKey)) {
+            $this->fail($googleApiKey);
+            return;
+        }
 
         if (!empty($assocArgs['dry-run'])) {
             $this->finish($this->admin->dryRunSiteTransferBundlePath($bundlePath, $googleApiKey), $assocArgs);
@@ -353,6 +475,139 @@ final class Command
     }
 
     /**
+     * @param array<string, mixed> $assocArgs
+     */
+    private function resolveGoogleApiKeyInput(
+        array $assocArgs,
+        bool $required,
+        bool $promptWhenMissing,
+        string $prompt,
+        bool $allowEmptyPrompt
+    ): string|WP_Error {
+        if (array_key_exists('google-api-key', $assocArgs)) {
+            return new WP_Error(
+                'tasty_fonts_cli_google_key_removed',
+                'The --google-api-key option has been removed. Use --prompt-google-api-key or --google-api-key-stdin.'
+            );
+        }
+
+        $hasStdinFlag = !empty($assocArgs['google-api-key-stdin']);
+        $hasPromptFlag = !empty($assocArgs['prompt-google-api-key']);
+        $sources = array_filter([$hasStdinFlag, $hasPromptFlag]);
+
+        if (count($sources) > 1) {
+            return new WP_Error(
+                'tasty_fonts_cli_google_key_conflict',
+                'Use only one Google API key input source: --prompt-google-api-key or --google-api-key-stdin.'
+            );
+        }
+
+        if ($hasStdinFlag) {
+            $value = $this->readSecretFromStdin();
+
+            if (is_wp_error($value)) {
+                return $value;
+            }
+
+            if ($required && $value === '') {
+                return new WP_Error('tasty_fonts_cli_google_key_empty', 'A Google Fonts API key is required.');
+            }
+
+            return $value;
+        }
+
+        if ($hasPromptFlag || $promptWhenMissing) {
+            $value = $this->readSecretFromPrompt($prompt, $allowEmptyPrompt);
+
+            if (is_wp_error($value)) {
+                return $value;
+            }
+
+            if ($required && $value === '') {
+                return new WP_Error('tasty_fonts_cli_google_key_empty', 'A Google Fonts API key is required.');
+            }
+
+            return $value;
+        }
+
+        if ($required) {
+            return new WP_Error('tasty_fonts_cli_google_key_missing', 'A Google Fonts API key is required.');
+        }
+
+        return '';
+    }
+
+    private function readSecretFromStdin(): string|WP_Error
+    {
+        if (!defined('STDIN')) {
+            return new WP_Error('tasty_fonts_cli_stdin_unavailable', 'STDIN is not available. Use an interactive prompt instead.');
+        }
+
+        $line = fgets(STDIN);
+
+        if ($line === false) {
+            return new WP_Error('tasty_fonts_cli_stdin_empty', 'No Google Fonts API key was received from STDIN.');
+        }
+
+        return trim($line);
+    }
+
+    private function readSecretFromPrompt(string $prompt, bool $allowEmpty): string|WP_Error
+    {
+        if ($this->secretReader instanceof \Closure) {
+            $value = ($this->secretReader)($prompt, $allowEmpty);
+
+            if (is_wp_error($value)) {
+                return $value;
+            }
+
+            return is_scalar($value) ? trim((string) $value) : '';
+        }
+
+        if (!defined('STDIN')) {
+            return new WP_Error('tasty_fonts_cli_prompt_unavailable', 'Interactive secret input is unavailable. Pipe the key with --google-api-key-stdin.');
+        }
+
+        if (function_exists('posix_isatty') && !posix_isatty(STDIN)) {
+            return new WP_Error('tasty_fonts_cli_prompt_not_interactive', 'Interactive secret input requires a TTY. Pipe the key with --google-api-key-stdin.');
+        }
+
+        if (!function_exists('shell_exec')) {
+            return new WP_Error('tasty_fonts_cli_prompt_no_echo_control', 'Hidden secret input is unavailable. Pipe the key with --google-api-key-stdin.');
+        }
+
+        $sttyMode = shell_exec('stty -g 2>/dev/null');
+
+        if (!is_string($sttyMode) || trim($sttyMode) === '') {
+            return new WP_Error('tasty_fonts_cli_prompt_no_echo_control', 'Hidden secret input is unavailable. Pipe the key with --google-api-key-stdin.');
+        }
+
+        $this->writePrompt($prompt);
+        shell_exec('stty -echo 2>/dev/null');
+        $line = fgets(STDIN);
+        shell_exec('stty ' . escapeshellarg(trim($sttyMode)) . ' 2>/dev/null');
+        $this->writePrompt(PHP_EOL);
+
+        $value = $line === false ? '' : trim($line);
+
+        if (!$allowEmpty && $value === '') {
+            return new WP_Error('tasty_fonts_cli_google_key_empty', 'A Google Fonts API key is required.');
+        }
+
+        return $value;
+    }
+
+    private function writePrompt(string $message): void
+    {
+        if (defined('STDERR')) {
+            fwrite(STDERR, $message);
+            return;
+        }
+
+        echo $message;
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     private function nestedValue(array $payload, string $path): mixed
@@ -416,8 +671,36 @@ final class Command
      */
     private function json(array $payload): void
     {
-        $json = wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $json = wp_json_encode($this->sanitizeCliPayload($payload), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $this->line(is_string($json) ? $json : '{}');
+    }
+
+    /**
+     * @param array<mixed> $payload
+     * @return array<mixed>
+     */
+    private function sanitizeCliPayload(array $payload): array
+    {
+        $sanitized = [];
+
+        foreach ($payload as $key => $value) {
+            if (is_string($key) && $this->isSensitivePayloadKey($key)) {
+                $sanitized[$key] = '[redacted]';
+                continue;
+            }
+
+            $sanitized[$key] = is_array($value) ? $this->sanitizeCliPayload($value) : $value;
+        }
+
+        return $sanitized;
+    }
+
+    private function isSensitivePayloadKey(string $key): bool
+    {
+        $normalized = strtolower($key);
+
+        return in_array($normalized, ['google_api_key', 'google_api_key_encrypted'], true)
+            || str_contains($normalized, 'secret');
     }
 
     /**

@@ -810,6 +810,64 @@ $tests['site_transfer_service_retains_recent_export_bundles_and_respects_protect
     assertSameValue(false, in_array($protectedId, array_column($services['site_transfer']->listExportBundles(), 'id'), true), 'Deleted export bundles should be removed from history.');
 };
 
+$tests['admin_controller_delete_plugin_managed_files_clears_storage_exports_and_snapshots'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $fontPath = (string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($fontPath, 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings(['google_api_key' => 'preserve-key']);
+
+    $export = $services['site_transfer']->buildExportBundle(true);
+    $snapshot = $services['snapshots']->createSnapshot('manual');
+
+    assertFalseValue(is_wp_error($export), 'A retained export bundle should be created before managed-file cleanup.');
+    assertFalseValue(is_wp_error($snapshot), 'A rollback snapshot should be created before managed-file cleanup.');
+    assertSameValue(1, count($services['site_transfer']->listExportBundles()), 'The export bundle should be listed before cleanup.');
+    assertSameValue(1, count($services['snapshots']->listSnapshots()), 'The rollback snapshot should be listed before cleanup.');
+
+    $result = $services['controller']->deletePluginManagedFiles();
+
+    assertFalseValue(is_wp_error($result), 'Deleting all plugin-managed files through the controller should succeed.');
+    assertSameValue(false, file_exists($fontPath), 'Managed font files should be deleted.');
+    assertSameValue(null, $services['imports']->getFamily('inter'), 'Managed-file cleanup should clear font library metadata to avoid broken file references.');
+    assertSameValue(true, is_readable((string) $services['storage']->pathForRelativePath('index.php')), 'Managed-file cleanup should recreate the root storage scaffold.');
+    assertSameValue(true, is_readable((string) $services['storage']->pathForRelativePath('.generated/index.php')), 'Managed-file cleanup should recreate the generated CSS scaffold.');
+    assertSameValue(false, file_exists((string) $services['storage']->getGeneratedCssPath()), 'Managed-file cleanup should delete generated CSS output.');
+    assertSameValue([], $services['site_transfer']->listExportBundles(), 'Managed-file cleanup should clear retained transfer export metadata.');
+    assertSameValue([], $services['snapshots']->listSnapshots(), 'Managed-file cleanup should clear retained rollback snapshot metadata.');
+    assertSameValue([], glob((string) $GLOBALS['uploadBaseDir'] . '/tasty-fonts-export-bundles/*.zip') ?: [], 'Managed-file cleanup should remove retained transfer ZIP files.');
+    assertSameValue([], glob((string) $GLOBALS['uploadBaseDir'] . '/tasty-fonts-snapshots/*.zip') ?: [], 'Managed-file cleanup should remove rollback snapshot ZIP files.');
+    assertSameValue('preserve-key', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Managed-file cleanup should preserve unrelated settings such as the Google API key.');
+    assertSameValue(1, (int) ($result['deleted_export_bundles'] ?? 0), 'Managed-file cleanup should report deleted export bundle metadata count.');
+    assertSameValue(1, (int) ($result['deleted_snapshots'] ?? 0), 'Managed-file cleanup should report deleted snapshot metadata count.');
+};
+
 $tests['site_transfer_service_rejects_checksum_mismatches_during_bundle_validation'] = static function (): void {
     resetTestState();
 
@@ -2453,6 +2511,191 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
     assertSameValue('info', (string) ($checksBySlug['google_fonts_api']['severity'] ?? ''), 'Missing Google API keys should be advisory, not a passing verified check.');
     assertSameValue(true, isset($checksBySlug['update_channel']), 'Health checks should expose update channel readiness.');
     assertSameValue('critical', (string) ($summary['status'] ?? ''), 'Health summaries should elevate critical checks above warnings and notices.');
+};
+
+$tests['admin_page_context_builder_does_not_report_hydrated_self_hosted_urls_as_missing_files'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'static',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+    $context = $builder->build();
+    $advancedTools = is_array($context['advanced_tools'] ?? null) ? $context['advanced_tools'] : [];
+    $manifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
+    $families = is_array($manifest['families'] ?? null) ? $manifest['families'] : [];
+    $checks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
+    $checksBySlug = [];
+
+    foreach ($checks as $check) {
+        if (is_array($check)) {
+            $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+        }
+    }
+
+    assertSameValue([], (array) ($families[0]['missing_files'] ?? ['unexpected']), 'Hydrated public URLs should be checked through their stored relative paths instead of being reported missing.');
+    assertSameValue('ok', (string) ($checksBySlug['self_hosted_files']['severity'] ?? ''), 'The self-hosted files health check should pass when the hydrated public URL points at an existing managed file.');
+};
+
+$tests['admin_page_context_builder_resolves_self_hosted_upload_urls_without_paths_before_reporting_missing_files'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-700.woff2'), 'font-data');
+
+    add_filter('tasty_fonts_catalog', static function (array $catalog): array {
+        $catalog['Inter'] = [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'publish_state' => 'published',
+            'active_delivery_id' => 'local-self_hosted',
+            'delivery_profiles' => [
+                'local-self_hosted' => [
+                    'id' => 'local-self_hosted',
+                    'label' => 'Self-hosted',
+                    'provider' => 'local',
+                    'type' => 'self_hosted',
+                    'format' => 'static',
+                    'variants' => ['700'],
+                    'faces' => [[
+                        'family' => 'Inter',
+                        'slug' => 'inter',
+                        'source' => 'local',
+                        'weight' => '700',
+                        'style' => 'normal',
+                        'files' => ['woff2' => '/wp-content/uploads/fonts/inter/Inter-700.woff2'],
+                    ]],
+                ],
+            ],
+        ];
+
+        return $catalog;
+    });
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+    $context = $builder->build();
+    $advancedTools = is_array($context['advanced_tools'] ?? null) ? $context['advanced_tools'] : [];
+    $manifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
+    $families = is_array($manifest['families'] ?? null) ? $manifest['families'] : [];
+    $checks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
+    $checksBySlug = [];
+
+    foreach ($checks as $check) {
+        if (is_array($check)) {
+            $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+        }
+    }
+
+    assertSameValue([], (array) ($families[0]['missing_files'] ?? ['unexpected']), 'Root-relative uploads URLs should resolve back to the managed fonts directory before diagnostics report missing files.');
+    assertSameValue('ok', (string) ($checksBySlug['self_hosted_files']['severity'] ?? ''), 'The self-hosted files check should not flag upload URLs that resolve to existing managed files.');
+};
+
+$tests['admin_page_context_builder_keeps_reporting_truly_missing_self_hosted_files'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'format' => 'static',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Missing-400.woff2'],
+                'paths' => ['woff2' => 'inter/Missing-400.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+    $context = $builder->build();
+    $advancedTools = is_array($context['advanced_tools'] ?? null) ? $context['advanced_tools'] : [];
+    $manifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
+    $families = is_array($manifest['families'] ?? null) ? $manifest['families'] : [];
+    $checks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
+    $checksBySlug = [];
+
+    foreach ($checks as $check) {
+        if (is_array($check)) {
+            $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+        }
+    }
+
+    assertSameValue(['inter/Missing-400.woff2'], (array) ($families[0]['missing_files'] ?? []), 'The runtime manifest should still expose genuinely missing self-hosted files.');
+    assertSameValue('critical', (string) ($checksBySlug['self_hosted_files']['severity'] ?? ''), 'The self-hosted files health check should remain critical when a managed self-hosted file is actually missing.');
 };
 
 $tests['admin_page_context_builder_exposes_advanced_tools_context'] = static function (): void {

@@ -582,6 +582,15 @@
     const settingsStatesMatch = typeof adminContracts.settingsStatesMatch === 'function'
         ? adminContracts.settingsStatesMatch
         : (left, right) => JSON.stringify(left || {}) === JSON.stringify(right || {});
+    const normalizeSettingsFieldName = typeof adminContracts.normalizeSettingsFieldName === 'function'
+        ? adminContracts.normalizeSettingsFieldName
+        : (name) => String(name || '').replace(/\[\]$/, '').trim();
+    const settingsFormIgnoredKeys = [
+        '_wpnonce',
+        '_wp_http_referer',
+        'tasty_fonts_save_settings',
+        'tasty_fonts_output_quick_mode',
+    ];
     const serializeSettingsFormEntries = typeof adminContracts.serializeSettingsFormEntries === 'function'
         ? adminContracts.serializeSettingsFormEntries
         : (entries, options = {}) => {
@@ -828,6 +837,11 @@
     function resolveRoleFallbackValue(roleKey, input = {}) {
         const defaultFallback = defaultRoleFallback(roleKey);
         const familyName = String(input[roleKey] || '').trim();
+        const explicitFallback = String(input[`${roleKey}Fallback`] || input[`${roleKey}_fallback`] || '').trim();
+
+        if (explicitFallback !== '') {
+            return sanitizeFallback(explicitFallback, defaultFallback);
+        }
 
         if (familyName) {
             const entry = roleFamilyEntryForFamily(familyName);
@@ -838,10 +852,7 @@
             }
         }
 
-        return sanitizeFallback(
-            input[`${roleKey}Fallback`] || input[`${roleKey}_fallback`],
-            defaultFallback
-        );
+        return defaultFallback;
     }
 
     function buildRoleSelectionKey(roleKeys) {
@@ -1245,12 +1256,7 @@
         const formData = new FormData(form);
 
         return serializeSettingsFormEntries(Array.from(formData.entries()), {
-            ignoredKeys: [
-                '_wpnonce',
-                '_wp_http_referer',
-                'tasty_fonts_save_settings',
-                'tasty_fonts_output_quick_mode',
-            ],
+            ignoredKeys: settingsFormIgnoredKeys,
         });
     }
 
@@ -3888,6 +3894,31 @@
         };
     }
 
+    function createIconPill(label, options = {}) {
+        const fullLabel = String(label || '').trim();
+
+        if (!fullLabel) {
+            return null;
+        }
+
+        const toneClass = String(options.toneClass || '').trim();
+        const pill = document.createElement('span');
+
+        pill.className = [
+            'tasty-fonts-badge',
+            toneClass,
+        ].filter(Boolean).join(' ');
+        pill.setAttribute('data-help-tooltip', fullLabel);
+        pill.setAttribute('data-help-passive', '1');
+        pill.setAttribute('data-help-persistent', '1');
+        pill.setAttribute('aria-label', fullLabel);
+        pill.tabIndex = 0;
+        pill.textContent = fullLabel;
+        prepareHelpTooltipTrigger(pill);
+
+        return pill;
+    }
+
     function axisSummaryLabel(tag, definition) {
         const min = String(definition && definition.min ? definition.min : '').trim();
         const max = String(definition && definition.max ? definition.max : '').trim();
@@ -3959,14 +3990,17 @@
                 return;
             }
 
-            const badge = document.createElement('span');
             const badgeClass = mode === 'variable'
                 ? (format.source_only ? 'is-warning' : 'is-role')
                 : '';
+            const badge = createIconPill(format.label, {
+                kind: 'type',
+                toneClass: badgeClass,
+            });
 
-            badge.className = `tasty-fonts-badge${badgeClass ? ` ${badgeClass}` : ''}`;
-            badge.textContent = format.label;
-            container.appendChild(badge);
+            if (badge) {
+                container.appendChild(badge);
+            }
         });
 
         if (variableFontsEnabled && familySupportsFormat(family, 'variable', provider)) {
@@ -4003,11 +4037,14 @@
         badges.className = 'tasty-fonts-badges tasty-fonts-badges--import tasty-fonts-search-card-badges';
 
         if (inLibrary) {
-            const badge = document.createElement('span');
+            const badge = createIconPill(getString('searchResultInLibrary', 'In Library'), {
+                kind: 'status',
+                toneClass: 'is-success',
+            });
 
-            badge.className = 'tasty-fonts-badge is-success';
-            badge.textContent = getString('searchResultInLibrary', 'In Library');
-            badges.appendChild(badge);
+            if (badge) {
+                badges.appendChild(badge);
+            }
         }
 
         familyVisibleFormats(item, provider).forEach((mode) => {
@@ -4017,14 +4054,17 @@
                 return;
             }
 
-            const badge = document.createElement('span');
             const badgeClass = mode === 'variable'
                 ? (format.source_only ? 'is-warning' : 'is-role')
                 : '';
+            const badge = createIconPill(format.label, {
+                kind: 'type',
+                toneClass: badgeClass,
+            });
 
-            badge.className = `tasty-fonts-badge${badgeClass ? ` ${badgeClass}` : ''}`;
-            badge.textContent = format.label;
-            badges.appendChild(badge);
+            if (badge) {
+                badges.appendChild(badge);
+            }
         });
 
         if (badges.childElementCount > 0) {
@@ -5463,12 +5503,33 @@
         activeHelpButton = null;
     }
 
+    function suppressNativeHelpTooltip(button) {
+        if (!button || !button.hasAttribute('title')) {
+            return;
+        }
+
+        const title = String(button.getAttribute('title') || '').trim();
+        const previousTitle = button.dataset.helpTooltipTitle || '';
+        const currentCopy = String(button.getAttribute('data-help-tooltip') || '').trim();
+
+        if (title && (!currentCopy || currentCopy === previousTitle)) {
+            button.setAttribute('data-help-tooltip', title);
+        }
+
+        if (title) {
+            button.dataset.helpTooltipTitle = title;
+        }
+
+        button.removeAttribute('title');
+    }
+
     function prepareHelpTooltipTrigger(button) {
         if (!button) {
             return;
         }
 
         button.removeAttribute('aria-expanded');
+        suppressNativeHelpTooltip(button);
         rememberHelpTooltipDescription(button);
     }
 
@@ -5484,6 +5545,7 @@
         button.removeAttribute('data-help-tooltip');
         button.removeAttribute('data-help-passive');
         button.removeAttribute('title');
+        delete button.dataset.helpTooltipTitle;
     }
 
     function setPassiveHelpTooltip(button, copy) {
@@ -5500,7 +5562,6 @@
 
         button.setAttribute('data-help-tooltip', nextCopy);
         button.setAttribute('data-help-passive', '1');
-        button.setAttribute('title', nextCopy);
         prepareHelpTooltipTrigger(button);
     }
 
@@ -5739,6 +5800,8 @@
             return;
         }
 
+        suppressNativeHelpTooltip(button);
+
         const copy = button.getAttribute('data-help-tooltip');
 
         if (!copy) {
@@ -5774,9 +5837,22 @@
         }
 
         if (trainingWheelsOff) {
-            helpButtons.forEach((button) => clearPassiveHelpTooltip(button));
-            hideHelpTooltip();
-            return;
+            helpButtons.forEach((button) => {
+                if (button.getAttribute('data-help-persistent') === '1') {
+                    prepareHelpTooltipTrigger(button);
+                    return;
+                }
+
+                if (button.hasAttribute('data-help-passive')) {
+                    clearPassiveHelpTooltip(button);
+                }
+            });
+            helpButtons = Array.from(document.querySelectorAll('[data-help-tooltip]'));
+
+            if (!helpButtons.length) {
+                hideHelpTooltip();
+                return;
+            }
         }
 
         helpButtons.forEach((button) => prepareHelpTooltipTrigger(button));
@@ -9381,7 +9457,8 @@
             const summaryText = labelText ? `${labelText}: ${value}` : value;
 
             item.setAttribute('aria-label', summaryText);
-            item.setAttribute('title', summaryText);
+            item.removeAttribute('title');
+            setPassiveHelpTooltip(item, summaryText);
         }
     }
 
@@ -9967,7 +10044,7 @@
         const activityLists = Array.from(document.querySelectorAll('[data-activity-list]'));
 
         activityLists.forEach((list) => {
-            const root = list.closest('.tasty-fonts-studio-panel, .tasty-fonts-activity-card, [data-log-filter-root]') || document;
+            const root = list.closest('[data-activity-filter-root], [data-log-filter-root], .tasty-fonts-activity-card, .tasty-fonts-studio-panel') || document;
             const actorFilter = root.querySelector('[data-activity-actor-filter], [data-log-actor-filter]');
             const search = root.querySelector('[data-activity-search], [data-log-search]');
             const count = root.querySelector('[data-activity-count], [data-log-count]');
@@ -10090,6 +10167,51 @@
             }
 
             applyActivityFilter();
+        });
+    }
+
+    function initActivityDetailToggles() {
+        document.querySelectorAll('[data-activity-detail-toggle]').forEach((toggle) => {
+            toggle.addEventListener('click', () => {
+                const detailId = String(toggle.getAttribute('aria-controls') || '').trim();
+                const detail = detailId ? document.getElementById(detailId) : null;
+
+                if (!detail) {
+                    return;
+                }
+
+                const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+                const showLabel = String(toggle.getAttribute('data-activity-detail-show-label') || '');
+                const hideLabel = String(toggle.getAttribute('data-activity-detail-hide-label') || '');
+
+                if (isExpanded) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                    detail.classList.remove('is-expanded');
+
+                    if (showLabel) {
+                        toggle.setAttribute('aria-label', showLabel);
+                    }
+
+                    window.setTimeout(() => {
+                        if (toggle.getAttribute('aria-expanded') !== 'true') {
+                            detail.hidden = true;
+                        }
+                    }, 260);
+
+                    return;
+                }
+
+                detail.hidden = false;
+                toggle.setAttribute('aria-expanded', 'true');
+
+                if (hideLabel) {
+                    toggle.setAttribute('aria-label', hideLabel);
+                }
+
+                window.requestAnimationFrame(() => {
+                    detail.classList.add('is-expanded');
+                });
+            });
         });
     }
 
@@ -11883,12 +12005,94 @@
         syncBricksThemeStyleTargetState(form);
     }
 
+    function restoreSettingsFormState(form, baselineState) {
+        if (!(form instanceof HTMLFormElement) || !baselineState || typeof baselineState !== 'object') {
+            return;
+        }
+
+        const fields = getSettingsFormFields(form);
+
+        fields.forEach((field) => {
+            const rawName = String(field.getAttribute('name') || '').trim();
+            const normalizedName = normalizeSettingsFieldName(rawName);
+
+            if (rawName === '' || normalizedName === '' || settingsFormIgnoredKeys.includes(rawName)) {
+                return;
+            }
+
+            const hasBaselineValue = Object.prototype.hasOwnProperty.call(baselineState, normalizedName);
+            const baselineValue = hasBaselineValue ? baselineState[normalizedName] : '';
+
+            if (field instanceof HTMLInputElement) {
+                const fieldType = String(field.type || '').toLowerCase();
+
+                if (fieldType === 'radio') {
+                    field.checked = hasBaselineValue && String(baselineValue) === String(field.value || '');
+                    return;
+                }
+
+                if (fieldType === 'checkbox') {
+                    field.checked = Array.isArray(baselineValue)
+                        ? baselineValue.map((value) => String(value)).includes(String(field.value || ''))
+                        : (hasBaselineValue && String(baselineValue) === String(field.value || 'on'));
+                    return;
+                }
+
+                if (fieldType === 'file') {
+                    return;
+                }
+
+                const hasCheckableCompanion = fields.some((candidate) => (
+                    candidate !== field
+                    && candidate instanceof HTMLInputElement
+                    && String(candidate.getAttribute('name') || '').trim() === rawName
+                    && (candidate.type === 'checkbox' || candidate.type === 'radio')
+                ));
+
+                if (fieldType === 'hidden' && hasCheckableCompanion) {
+                    return;
+                }
+
+                field.value = Array.isArray(baselineValue)
+                    ? String(baselineValue[0] || '')
+                    : (hasBaselineValue ? String(baselineValue) : '');
+                return;
+            }
+
+            if (field instanceof HTMLSelectElement) {
+                if (field.multiple) {
+                    const selectedValues = Array.isArray(baselineValue)
+                        ? baselineValue.map((value) => String(value))
+                        : (hasBaselineValue ? [String(baselineValue)] : []);
+
+                    Array.from(field.options).forEach((option) => {
+                        option.selected = selectedValues.includes(String(option.value || ''));
+                    });
+                    return;
+                }
+
+                field.value = Array.isArray(baselineValue)
+                    ? String(baselineValue[0] || '')
+                    : (hasBaselineValue ? String(baselineValue) : '');
+                return;
+            }
+
+            if (field instanceof HTMLTextAreaElement) {
+                field.value = Array.isArray(baselineValue)
+                    ? String(baselineValue[0] || '')
+                    : (hasBaselineValue ? String(baselineValue) : '');
+            }
+        });
+    }
+
     function resetSettingsFormChanges(form) {
         if (!(form instanceof HTMLFormElement)) {
             return;
         }
 
-        form.reset();
+        const state = getSettingsFormState(form);
+
+        restoreSettingsFormState(form, state ? state.initialState : {});
         syncSettingsFormDerivedUi(form);
         syncSettingsFormDirtyState(form);
     }
@@ -12199,6 +12403,7 @@
         initUploadRows();
         initLibraryFiltering();
         initLogFiltering();
+        initActivityDetailToggles();
         initActivityFiltering();
         renderAllRoleWeightEditors();
         renderAllRoleAxisEditors();

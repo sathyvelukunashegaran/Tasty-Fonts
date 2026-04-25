@@ -127,11 +127,17 @@ Power users can export, dry-run, and import bundles without opening the admin UI
 
 ```bash
 wp tasty-fonts transfer export
-wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run
-wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run --prompt-google-api-key
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes --prompt-google-api-key
 ```
 
-Use `--google-api-key=<key>` during dry-run or import when the destination site should save a fresh Google Fonts API key. Destructive imports require `--yes` and create a rollback snapshot before replacing the current Tasty Fonts state.
+Use `--prompt-google-api-key` during dry-run or import when the destination site should save a fresh Google Fonts API key. The prompt hides the key so it does not appear in shell history. For automation, pipe the key through STDIN instead:
+
+```bash
+printf '%s\n' "$GOOGLE_FONTS_API_KEY" | wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes --google-api-key-stdin
+```
+
+The older `--google-api-key=<key>` flag has been removed because shells may record it in history. Destructive imports require `--yes` and create a rollback snapshot before replacing the current Tasty Fonts state.
 
 ---
 
@@ -177,6 +183,7 @@ API keys are excluded from bundles by design. To restore Google search access:
 
 - Option A: paste a key into the Google Fonts API Key field in the Import card before importing.
 - Option B: go to `Settings → Output` after import and save a Google Fonts API key there.
+- Option C: run `wp tasty-fonts google-api-key save` and enter the key at the hidden CLI prompt.
 
 See [Google Fonts](Provider-Google-Fonts) for how to create an API key.
 

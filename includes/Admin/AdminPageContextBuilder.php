@@ -570,30 +570,129 @@ final class AdminPageContextBuilder
         $missing = [];
 
         foreach ($faces as $face) {
-            $files = is_array($face['files'] ?? null) ? $face['files'] : [];
+            $files = FontUtils::normalizeStringMap($face['files'] ?? []);
+            $paths = FontUtils::normalizeStringMap($face['paths'] ?? []);
+            $formats = array_values(array_unique(array_merge(array_keys($paths), array_keys($files))));
 
-            foreach ($files as $file) {
-                if (!is_scalar($file)) {
-                    continue;
+            foreach ($formats as $format) {
+                $candidates = [];
+
+                if (isset($paths[$format])) {
+                    $candidates[] = $paths[$format];
                 }
 
-                $path = trim((string) $file);
-
-                if ($path === '') {
-                    continue;
+                if (isset($files[$format])) {
+                    $candidates[] = $files[$format];
                 }
 
-                $absolutePath = str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\/\\\\]/', $path) === 1
-                    ? $path
-                    : (is_string($root) && $root !== '' ? trailingslashit($root) . ltrim($path, '/\\') : '');
+                if (!$this->activeDeliveryFileExists($candidates, is_string($root) ? $root : '')) {
+                    $reportedPath = $candidates[0] ?? '';
 
-                if ($absolutePath === '' || !file_exists($absolutePath)) {
-                    $missing[] = $path;
+                    if ($reportedPath !== '') {
+                        $missing[] = $reportedPath;
+                    }
                 }
             }
         }
 
         return array_values(array_unique($missing));
+    }
+
+    /**
+     * @param list<string> $candidates
+     */
+    private function activeDeliveryFileExists(array $candidates, string $root): bool
+    {
+        foreach ($candidates as $candidate) {
+            $absolutePath = $this->resolveManagedFontFilePath($candidate, $root);
+
+            if ($absolutePath !== '' && file_exists($absolutePath)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function resolveManagedFontFilePath(string $pathOrUrl, string $root): string
+    {
+        $pathOrUrl = trim($pathOrUrl);
+
+        if ($pathOrUrl === '') {
+            return '';
+        }
+
+        if (FontUtils::isRemoteUrl($pathOrUrl)) {
+            return $this->managedFontPathFromUrl($pathOrUrl);
+        }
+
+        if (str_starts_with($pathOrUrl, '/') || preg_match('/^[A-Za-z]:[\/\\\\]/', $pathOrUrl) === 1) {
+            $absolutePath = wp_normalize_path($pathOrUrl);
+
+            if (file_exists($absolutePath)) {
+                return $absolutePath;
+            }
+
+            $managedPath = $this->managedFontPathFromUrl($pathOrUrl);
+
+            return $managedPath !== '' ? $managedPath : $absolutePath;
+        }
+
+        $absolutePath = $this->storage->pathForRelativePath($pathOrUrl);
+
+        if (is_string($absolutePath) && $absolutePath !== '') {
+            return $absolutePath;
+        }
+
+        return $root !== '' ? wp_normalize_path(trailingslashit($root) . ltrim($pathOrUrl, '/\\')) : '';
+    }
+
+    private function managedFontPathFromUrl(string $url): string
+    {
+        $storage = $this->storage->get();
+
+        if (!is_array($storage)) {
+            return '';
+        }
+
+        $urlPath = $this->urlPath($url);
+
+        if ($urlPath === '') {
+            return '';
+        }
+
+        foreach (['url_full', 'url'] as $storageUrlKey) {
+            $storageUrl = $this->stringValue($storage, $storageUrlKey);
+            $storageUrlPath = $this->urlPath($storageUrl);
+
+            if ($storageUrlPath === '') {
+                continue;
+            }
+
+            if ($urlPath !== $storageUrlPath && !str_starts_with($urlPath, trailingslashit($storageUrlPath))) {
+                continue;
+            }
+
+            $relativePath = ltrim(substr($urlPath, strlen($storageUrlPath)), '/');
+            $absolutePath = $this->storage->pathForRelativePath(rawurldecode($relativePath));
+
+            return is_string($absolutePath) ? $absolutePath : '';
+        }
+
+        return '';
+    }
+
+    private function urlPath(string $url): string
+    {
+        $url = trim($url);
+
+        if ($url === '') {
+            return '';
+        }
+
+        $path = (string) (wp_parse_url($url, PHP_URL_PATH) ?: $url);
+
+        return untrailingslashit(wp_normalize_path($path));
     }
 
     /**
@@ -1310,10 +1409,207 @@ final class AdminPageContextBuilder
 
         foreach ($logs as $entry) {
             $entry['time'] = $this->formatLogTimestamp($this->stringValue($entry, 'time'));
+            $message = $this->stringValue($entry, 'message');
+            $summary = $this->stringValue($entry, 'summary', $message);
+            $outcome = $this->activityOutcome($this->stringValue($entry, 'outcome'));
+            $statusLabel = $this->stringValue($entry, 'status_label', $this->activityStatusLabel($outcome));
+            $source = $this->stringValue($entry, 'source', $this->activitySourceLabel($this->stringValue($entry, 'category')));
+            $details = $this->decodeActivityDetails($this->stringValue($entry, 'details_json'));
+            $details = array_merge($details, $this->buildDefaultActivityDetails($entry, $summary, $message));
+
+            $entry['summary'] = $summary !== '' ? $summary : $message;
+            $entry['outcome'] = $outcome;
+            $entry['status_label'] = $statusLabel;
+            $entry['source'] = $source;
+            $entry['detail_items'] = $details;
+            $entry['search_text'] = $this->buildActivitySearchText($entry, $details);
+
             $entries[] = $entry;
         }
 
         return $entries;
+    }
+
+    private function activityOutcome(string $outcome): string
+    {
+        $outcome = sanitize_key($outcome);
+
+        return in_array($outcome, ['success', 'info', 'warning', 'error', 'danger'], true)
+            ? $outcome
+            : 'info';
+    }
+
+    private function activityStatusLabel(string $outcome): string
+    {
+        return match ($outcome) {
+            'success' => __('Success', 'tasty-fonts'),
+            'warning' => __('Warning', 'tasty-fonts'),
+            'error' => __('Error', 'tasty-fonts'),
+            'danger' => __('Deleted', 'tasty-fonts'),
+            default => __('Info', 'tasty-fonts'),
+        };
+    }
+
+    private function activitySourceLabel(string $category): string
+    {
+        $category = sanitize_key($category);
+
+        if ($category === '') {
+            return __('Activity', 'tasty-fonts');
+        }
+
+        return match ($category) {
+            LogRepository::CATEGORY_TRANSFER => __('Transfer & Recovery', 'tasty-fonts'),
+            LogRepository::CATEGORY_SETTINGS => __('Settings', 'tasty-fonts'),
+            LogRepository::CATEGORY_ROLES => __('Roles', 'tasty-fonts'),
+            LogRepository::CATEGORY_LIBRARY => __('Library', 'tasty-fonts'),
+            LogRepository::CATEGORY_IMPORT => __('Import', 'tasty-fonts'),
+            LogRepository::CATEGORY_INTEGRATION => __('Integration', 'tasty-fonts'),
+            LogRepository::CATEGORY_MAINTENANCE => __('Developer', 'tasty-fonts'),
+            LogRepository::CATEGORY_UPDATE => __('Updates', 'tasty-fonts'),
+            default => ucwords(str_replace('_', ' ', $category)),
+        };
+    }
+
+    /**
+     * @return list<array{label: string, value: string, kind?: string}>
+     */
+    private function decodeActivityDetails(string $detailsJson): array
+    {
+        if ($detailsJson === '') {
+            return [];
+        }
+
+        $decoded = json_decode($detailsJson, true);
+
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $details = [];
+
+        foreach ($decoded as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+
+            $label = $this->stringValue($detail, 'label');
+            $value = $this->stringValue($detail, 'value');
+
+            if ($label === '' || $value === '') {
+                continue;
+            }
+
+            $details[] = [
+                'label' => $label,
+                'value' => $value,
+                'kind' => sanitize_key($this->stringValue($detail, 'kind', 'text')),
+            ];
+        }
+
+        return $details;
+    }
+
+    /**
+     * @param ActivityLogEntry $entry
+     * @return list<array{label: string, value: string, kind?: string}>
+     */
+    private function buildDefaultActivityDetails(array $entry, string $summary, string $message): array
+    {
+        $details = [];
+
+        if ($message !== '' && $message !== $summary) {
+            $details[] = [
+                'label' => __('Full message', 'tasty-fonts'),
+                'value' => $message,
+                'kind' => 'message',
+            ];
+        }
+
+        $entityName = $this->stringValue($entry, 'entity_name');
+        $entityId = $this->stringValue($entry, 'entity_id');
+
+        if ($entityName !== '' || $entityId !== '') {
+            $details[] = [
+                'label' => __('Affected item', 'tasty-fonts'),
+                'value' => trim($entityName . ($entityId !== '' ? ' (' . $entityId . ')' : '')),
+                'kind' => 'entity',
+            ];
+        }
+
+        foreach (
+            [
+                'category' => __('Category', 'tasty-fonts'),
+                'event' => __('Event', 'tasty-fonts'),
+                'error_code' => __('Error code', 'tasty-fonts'),
+            ] as $key => $label
+        ) {
+            $value = $this->stringValue($entry, $key);
+
+            if ($value === '') {
+                continue;
+            }
+
+            $details[] = [
+                'label' => $label,
+                'value' => $value,
+                'kind' => 'taxonomy',
+            ];
+        }
+
+        if ($details === [] && $message !== '') {
+            $details[] = [
+                'label' => __('Message', 'tasty-fonts'),
+                'value' => $message,
+                'kind' => 'message',
+            ];
+        }
+
+        return $details;
+    }
+
+    /**
+     * @param ActivityLogEntry $entry
+     * @param list<array<string, string>> $details
+     */
+    private function buildActivitySearchText(array $entry, array $details): string
+    {
+        $parts = [];
+
+        foreach (
+            [
+                'time',
+                'actor',
+                'message',
+                'summary',
+                'source',
+                'status_label',
+                'category',
+                'event',
+                'entity_type',
+                'entity_id',
+                'entity_name',
+                'error_code',
+            ] as $key
+        ) {
+            $value = $this->stringValue($entry, $key);
+
+            if ($value !== '') {
+                $parts[] = $value;
+            }
+        }
+
+        foreach ($details as $detail) {
+            foreach (['label', 'value'] as $key) {
+                $value = $this->stringValue($detail, $key);
+
+                if ($value !== '') {
+                    $parts[] = $value;
+                }
+            }
+        }
+
+        return trim(implode(' ', $parts));
     }
 
     /**
@@ -2366,6 +2662,11 @@ final class AdminPageContextBuilder
     {
         $default = $this->defaultRoleFallback($roleKey);
         $familyName = trim($this->roleStringValue($roles, $roleKey));
+        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
+
+        if ($fallback !== '') {
+            return FontUtils::sanitizeFallback($fallback);
+        }
 
         if ($familyName !== '') {
                 $familyFallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
@@ -2385,9 +2686,7 @@ final class AdminPageContextBuilder
             }
         }
 
-        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
-
-        return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
+        return $default;
     }
 
     /**

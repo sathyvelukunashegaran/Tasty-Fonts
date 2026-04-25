@@ -30,8 +30,8 @@ use WP_Error;
  */
 final class BunnyFontsClient
 {
-    public const TRANSIENT_CATALOG = 'tasty_fonts_bunny_catalog_v1';
-    public const TRANSIENT_FAMILY_PREFIX = 'tasty_fonts_bunny_family_';
+    public const TRANSIENT_CATALOG = 'tasty_fonts_bunny_catalog_v2';
+    public const TRANSIENT_FAMILY_PREFIX = 'tasty_fonts_bunny_family_v2_';
     private const CATALOG_TTL = 7 * DAY_IN_SECONDS;
     private const FAMILY_TTL = 7 * DAY_IN_SECONDS;
     private const CATALOG_URL = 'https://fonts.bunny.net/sitemap.xml';

@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+'use strict';
+
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const executable = process.platform === 'win32' ? 'stylelint.cmd' : 'stylelint';
+const stylelintBin = path.join(root, 'node_modules', '.bin', executable);
+const cssFiles = [
+  'assets/css/admin-rtl.css',
+  'assets/css/admin.css',
+  'assets/css/tokens.css'
+];
+
+const result = spawnSync(stylelintBin, [...cssFiles, ...process.argv.slice(2)], {
+  cwd: root,
+  stdio: 'inherit'
+});
+
+if (result.error) {
+  console.error(result.error.message);
+  process.exit(1);
+}
+
+if (result.signal) {
+  console.error(`stylelint terminated by signal ${result.signal}`);
+  process.exit(1);
+}
+
+process.exit(result.status ?? 1);

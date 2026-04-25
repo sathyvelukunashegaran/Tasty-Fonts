@@ -248,9 +248,14 @@
     function resolveRoleFallback(roleKey, input = {}, options = {}) {
         const defaultFallback = defaultRoleFallback(roleKey);
         const familyName = String(input[roleKey] || '').trim();
+        const explicitFallback = String(input[`${roleKey}Fallback`] || input[`${roleKey}_fallback`] || '').trim();
         const familyCatalog = options.roleFamilyCatalog && typeof options.roleFamilyCatalog === 'object'
             ? options.roleFamilyCatalog
             : {};
+
+        if (explicitFallback !== '') {
+            return sanitizeFallback(explicitFallback, defaultFallback);
+        }
 
         if (familyName && familyCatalog[familyName] && typeof familyCatalog[familyName] === 'object') {
             const familyFallback = String(familyCatalog[familyName].fallback || '').trim();
@@ -260,7 +265,7 @@
             }
         }
 
-        return sanitizeFallback(input[`${roleKey}Fallback`] || input[`${roleKey}_fallback`], defaultFallback);
+        return defaultFallback;
     }
 
     function normalizeRoleState(input = {}, options = {}) {
@@ -557,6 +562,7 @@
         normalizeOutputQuickModePreference,
         parsePhpIniSizeToBytes,
         rowMatchesLibraryFilters,
+        normalizeSettingsFieldName,
         resolveLogPagination,
         resolveStatusAnnouncement,
         resolveAssignedRoleState,

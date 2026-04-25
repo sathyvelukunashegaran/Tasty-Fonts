@@ -221,7 +221,7 @@
                         <div class="tasty-fonts-detail-card-list tasty-fonts-detail-card-list--faces">
                             <?php foreach ($activeFaces as $face): ?>
                                 <?php if (!is_array($face)) { continue; } ?>
-                                <?php $this->renderFaceDetailCard($familyName, $familySlug, $defaultStack, $facePreviewText, $faceCount, $assignedRoleKeys, (string) ($family['font_category'] ?? ''), $categoryAliasOwners, $extendedVariableOptions, $activeDelivery, $face, $isMonospace); ?>
+                                <?php $this->renderFaceDetailCard($familyName, $familySlug, $defaultStack, $facePreviewText, $faceCount, $assignedRoleKeys, (string) ($family['font_category'] ?? ''), $categoryAliasOwners, $extendedVariableOptions, $activeDelivery, $face, $usesMonospacePreview); ?>
                             <?php endforeach; ?>
                         </div>
                     </section>

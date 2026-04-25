@@ -18,10 +18,11 @@ trait SharedRenderHelpers
     /**
      * @param list<ActivityLogEntry> $entries
      */
-    public function renderLogList(array $entries, string $className = 'tasty-fonts-log-list', int $pageSize = 5): void
+    public function renderLogList(array $entries, string $className = 'tasty-fonts-log-list', int $pageSize = 5, string $idPrefix = 'activity'): void
     {
         $pageSize = max(1, $pageSize);
         $pageSizeOptions = [5, 10, 25, 100];
+        $idPrefix = sanitize_html_class($idPrefix !== '' ? $idPrefix : 'activity');
 
         if (!in_array($pageSize, $pageSizeOptions, true)) {
             $pageSizeOptions[] = $pageSize;
@@ -29,36 +30,109 @@ trait SharedRenderHelpers
         }
         ?>
         <ol class="<?php echo esc_attr($className); ?>" data-activity-list data-activity-page-size="<?php echo esc_attr((string) $pageSize); ?>">
-            <?php foreach ($entries as $entry): ?>
+            <?php foreach ($entries as $index => $entry): ?>
                 <?php
                 $time = $this->stringValue($entry, 'time');
                 $actor = $this->stringValue($entry, 'actor');
                 $message = $this->stringValue($entry, 'message');
+                $summary = $this->stringValue($entry, 'summary', $message);
+                $outcome = $this->normalizeLogOutcome($this->stringValue($entry, 'outcome', 'info'));
+                $statusLabel = $this->stringValue($entry, 'status_label', $this->defaultLogStatusLabel($outcome));
+                $source = $this->stringValue($entry, 'source', __('Activity', 'tasty-fonts'));
                 $actionLabel = $this->stringValue($entry, 'action_label');
                 $actionUrl = $this->stringValue($entry, 'action_url');
-                $searchValue = trim(implode(' ', array_filter([$time, $actor, $message], static fn ($value): bool => $value !== '')));
+                $details = $this->listOfMaps($entry['detail_items'] ?? []);
+                $searchValue = $this->stringValue($entry, 'search_text');
+
+                if ($searchValue === '') {
+                    $searchParts = [$time, $actor, $message, $summary, $statusLabel, $source];
+
+                    foreach ($details as $detail) {
+                        $searchParts[] = $this->stringValue($detail, 'label');
+                        $searchParts[] = $this->stringValue($detail, 'value');
+                    }
+
+                    $searchValue = trim(implode(' ', array_filter($searchParts, static fn ($value): bool => $value !== '')));
+                }
+
+                if ($details === [] && $message !== '') {
+                    $details[] = [
+                        'label' => __('Message', 'tasty-fonts'),
+                        'value' => $message,
+                        'kind' => 'message',
+                    ];
+                }
+
+                $detailId = sprintf('tasty-fonts-%s-log-detail-%d', $idPrefix, $index + 1);
                 ?>
                 <li
-                    class="tasty-fonts-log-item"
+                    class="tasty-fonts-log-item tasty-fonts-log-item--compact"
                     data-activity-entry
                     data-activity-actor="<?php echo esc_attr($actor); ?>"
                     data-activity-search="<?php echo esc_attr($searchValue); ?>"
+                    data-activity-outcome="<?php echo esc_attr($outcome); ?>"
                 >
                     <span class="tasty-fonts-log-marker" aria-hidden="true"></span>
                     <div class="tasty-fonts-log-content">
-                        <div class="tasty-fonts-log-message-row">
-                            <div class="tasty-fonts-log-message"><?php echo esc_html($message); ?></div>
-                            <?php if ($actionLabel !== '' && $actionUrl !== ''): ?>
-                                <a class="button button-small tasty-fonts-log-action" href="<?php echo esc_url($actionUrl); ?>">
-                                    <?php echo esc_html($actionLabel); ?>
-                                </a>
-                            <?php endif; ?>
+                        <div class="tasty-fonts-log-message-row tasty-fonts-log-summary-row">
+                            <div class="tasty-fonts-log-message tasty-fonts-log-summary"><?php echo esc_html($summary); ?></div>
+                            <span class="tasty-fonts-log-chips" aria-label="<?php esc_attr_e('Activity metadata', 'tasty-fonts'); ?>">
+                                <span class="tasty-fonts-log-chip tasty-fonts-log-chip--status"><?php echo esc_html($statusLabel); ?></span>
+                                <?php if ($source !== ''): ?>
+                                    <span class="tasty-fonts-log-chip tasty-fonts-log-chip--source"><?php echo esc_html($source); ?></span>
+                                <?php endif; ?>
+                            </span>
+                            <button
+                                type="button"
+                                class="button button-small tasty-fonts-log-toggle"
+                                data-activity-detail-toggle
+                                data-activity-detail-show-label="<?php echo esc_attr(sprintf(__('Show details for %s', 'tasty-fonts'), $summary)); ?>"
+                                data-activity-detail-hide-label="<?php echo esc_attr(sprintf(__('Hide details for %s', 'tasty-fonts'), $summary)); ?>"
+                                aria-expanded="false"
+                                aria-controls="<?php echo esc_attr($detailId); ?>"
+                                aria-label="<?php echo esc_attr(sprintf(__('Show details for %s', 'tasty-fonts'), $summary)); ?>"
+                            >
+                                <span class="tasty-fonts-log-toggle-icon" aria-hidden="true"></span>
+                                <span class="screen-reader-text"><?php esc_html_e('Details', 'tasty-fonts'); ?></span>
+                            </button>
                         </div>
                         <div class="tasty-fonts-log-meta">
                             <span class="tasty-fonts-log-time"><?php echo esc_html($time); ?></span>
                             <?php if ($actor !== ''): ?>
                                 <span class="tasty-fonts-log-actor"><?php echo esc_html($actor); ?></span>
                             <?php endif; ?>
+                        </div>
+                        <div
+                            id="<?php echo esc_attr($detailId); ?>"
+                            class="tasty-fonts-log-details"
+                            data-activity-detail
+                            hidden
+                        >
+                            <div class="tasty-fonts-log-details-inner">
+                                <?php if ($details !== []): ?>
+                                    <dl class="tasty-fonts-log-details-list">
+                                        <?php foreach ($details as $detail): ?>
+                                            <?php
+                                            $detailLabel = $this->stringValue($detail, 'label');
+                                            $detailValue = $this->stringValue($detail, 'value');
+
+                                            if ($detailLabel === '' || $detailValue === '') {
+                                                continue;
+                                            }
+                                            ?>
+                                            <div class="tasty-fonts-log-detail-row">
+                                                <dt><?php echo esc_html($detailLabel); ?></dt>
+                                                <dd><?php echo esc_html($detailValue); ?></dd>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </dl>
+                                <?php endif; ?>
+                                <?php if ($actionLabel !== '' && $actionUrl !== ''): ?>
+                                    <a class="button button-small tasty-fonts-log-action" href="<?php echo esc_url($actionUrl); ?>">
+                                        <?php echo esc_html($actionLabel); ?>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 </li>
@@ -94,6 +168,26 @@ trait SharedRenderHelpers
             </span>
         </nav>
         <?php
+    }
+
+    private function normalizeLogOutcome(string $outcome): string
+    {
+        $outcome = sanitize_key($outcome);
+
+        return in_array($outcome, ['success', 'info', 'warning', 'error', 'danger'], true)
+            ? $outcome
+            : 'info';
+    }
+
+    private function defaultLogStatusLabel(string $outcome): string
+    {
+        return match ($outcome) {
+            'success' => __('Success', 'tasty-fonts'),
+            'warning' => __('Warning', 'tasty-fonts'),
+            'error' => __('Error', 'tasty-fonts'),
+            'danger' => __('Deleted', 'tasty-fonts'),
+            default => __('Info', 'tasty-fonts'),
+        };
     }
 
     public function renderFaceVariableCopyPill(string $label, string $value, string $successMessage): void
@@ -159,18 +253,19 @@ trait SharedRenderHelpers
         $message = $this->stringValue($notice, 'message');
         $settingsLabel = $this->stringValue($notice, 'settings_label');
         $settingsUrl = $this->stringValue($notice, 'settings_url');
-        $toneClass = $this->stringValue($notice, 'tone') === 'warning'
-            ? ' tasty-fonts-inline-note--warning'
-            : '';
+        $tone = $this->stringValue($notice, 'tone');
+        $isWarning = $tone === 'warning';
+        $toneClass = $isWarning ? ' tasty-fonts-inline-note--warning' : '';
+        $bannerToneClass = $isWarning ? ' is-advisory' : ' is-info';
 
         if ($title === '' && $message === '') {
             return;
         }
         ?>
         <div
-            class="tasty-fonts-page-notice tasty-fonts-inline-note<?php echo esc_attr($toneClass); ?>"
-            role="<?php echo esc_attr($this->stringValue($notice, 'tone') === 'warning' ? 'alert' : 'status'); ?>"
-            aria-live="<?php echo esc_attr($this->stringValue($notice, 'tone') === 'warning' ? 'assertive' : 'polite'); ?>"
+            class="tasty-fonts-banner<?php echo esc_attr($bannerToneClass); ?> tasty-fonts-page-notice tasty-fonts-inline-note<?php echo esc_attr($toneClass); ?>"
+            role="<?php echo esc_attr($isWarning ? 'alert' : 'status'); ?>"
+            aria-live="<?php echo esc_attr($isWarning ? 'assertive' : 'polite'); ?>"
             aria-atomic="true"
         >
             <?php if ($title !== ''): ?>
@@ -181,29 +276,33 @@ trait SharedRenderHelpers
             <?php endif; ?>
             <div class="tasty-fonts-page-notice-actions">
                 <?php if ($settingsLabel !== '' && $settingsUrl !== ''): ?>
-                    <a class="button button-secondary" href="<?php echo esc_url($settingsUrl); ?>">
-                        <?php echo esc_html($settingsLabel); ?>
+                    <a class="button button-secondary tasty-fonts-page-notice-icon-action" href="<?php echo esc_url($settingsUrl); ?>" aria-label="<?php echo esc_attr($settingsLabel); ?>"<?php $this->renderPassiveHelpAttributes($settingsLabel); ?>>
+                        <span class="dashicons dashicons-admin-plugins" aria-hidden="true"></span>
+                        <span class="screen-reader-text"><?php echo esc_html($settingsLabel); ?></span>
                     </a>
                 <?php endif; ?>
                 <form method="post" class="tasty-fonts-page-notice-form">
                     <?php wp_nonce_field('tasty_fonts_local_environment_notice'); ?>
                     <input type="hidden" name="tasty_fonts_local_environment_notice" value="1">
-                    <button type="submit" class="button" name="tasty_fonts_local_environment_notice_action" value="remind_tomorrow">
-                        <?php esc_html_e('Remind Tomorrow', 'tasty-fonts'); ?>
+                    <button type="submit" class="button tasty-fonts-page-notice-icon-action" name="tasty_fonts_local_environment_notice_action" value="remind_tomorrow" aria-label="<?php esc_attr_e('Remind Tomorrow', 'tasty-fonts'); ?>"<?php $this->renderPassiveHelpAttributes(__('Remind Tomorrow', 'tasty-fonts')); ?>>
+                        <span class="dashicons dashicons-clock" aria-hidden="true"></span>
+                        <span class="screen-reader-text"><?php esc_html_e('Remind Tomorrow', 'tasty-fonts'); ?></span>
                     </button>
                 </form>
                 <form method="post" class="tasty-fonts-page-notice-form">
                     <?php wp_nonce_field('tasty_fonts_local_environment_notice'); ?>
                     <input type="hidden" name="tasty_fonts_local_environment_notice" value="1">
-                    <button type="submit" class="button" name="tasty_fonts_local_environment_notice_action" value="remind_week">
-                        <?php esc_html_e('Remind in 1 Week', 'tasty-fonts'); ?>
+                    <button type="submit" class="button tasty-fonts-page-notice-icon-action" name="tasty_fonts_local_environment_notice_action" value="remind_week" aria-label="<?php esc_attr_e('Remind in 1 Week', 'tasty-fonts'); ?>"<?php $this->renderPassiveHelpAttributes(__('Remind in 1 Week', 'tasty-fonts')); ?>>
+                        <span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span>
+                        <span class="screen-reader-text"><?php esc_html_e('Remind in 1 Week', 'tasty-fonts'); ?></span>
                     </button>
                 </form>
                 <form method="post" class="tasty-fonts-page-notice-form">
                     <?php wp_nonce_field('tasty_fonts_local_environment_notice'); ?>
                     <input type="hidden" name="tasty_fonts_local_environment_notice" value="1">
-                    <button type="submit" class="button" name="tasty_fonts_local_environment_notice_action" value="dismiss_forever">
-                        <?php esc_html_e('Never Show Again', 'tasty-fonts'); ?>
+                    <button type="submit" class="button tasty-fonts-page-notice-icon-action" name="tasty_fonts_local_environment_notice_action" value="dismiss_forever" aria-label="<?php esc_attr_e('Never Show Again', 'tasty-fonts'); ?>"<?php $this->renderPassiveHelpAttributes(__('Never Show Again', 'tasty-fonts')); ?>>
+                        <span class="dashicons dashicons-hidden" aria-hidden="true"></span>
+                        <span class="screen-reader-text"><?php esc_html_e('Never Show Again', 'tasty-fonts'); ?></span>
                     </button>
                 </form>
             </div>
@@ -271,7 +370,6 @@ trait SharedRenderHelpers
 
         echo ' data-help-tooltip="' . esc_attr($copy) . '"';
         echo ' data-help-passive="1"';
-        echo ' title="' . esc_attr($copy) . '"';
         if ($describedBy !== '') {
             echo ' aria-describedby="' . esc_attr($describedBy) . '"';
         }

@@ -48,6 +48,18 @@ function cssBlockForSelector(source, selector) {
   return source.slice(blockStart + 1, blockEnd);
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function cssBlocksForExactSelector(source, selector) {
+  const pattern = new RegExp(`${escapeRegExp(selector)}\\s*\\{([\\s\\S]*?)\\}`, 'g');
+  const blocks = Array.from(source.matchAll(pattern), (match) => match[1]);
+  assert.notEqual(blocks.length, 0, `Missing exact CSS selector: ${selector}`);
+
+  return blocks;
+}
+
 test('admin CSS only references known Tasty design tokens', () => {
   const files = readCssFiles();
   const defined = new Set();
@@ -88,6 +100,23 @@ test('admin CSS keeps raw color values out of component styles', () => {
   }
 
   assert.deepEqual(violations, []);
+});
+
+test('admin typography tokens enforce a readable 12px minimum', () => {
+  const tokensCss = fs.readFileSync(path.join(cssDir, 'tokens.css'), 'utf8');
+  const requiredAliases = [
+    '--tasty-font-size-3xs',
+    '--tasty-font-size-2xs',
+    '--tasty-font-size-xs',
+    '--tasty-font-size-s'
+  ];
+
+  assert.match(tokensCss, /--tasty-font-size-minimum:\s*12px;/);
+
+  for (const token of requiredAliases) {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(tokensCss, new RegExp(`${escaped}:\\s*var\\(--tasty-font-size-minimum\\);`));
+  }
 });
 
 test('admin CSS keeps typography declarations on design tokens', () => {
@@ -166,4 +195,38 @@ test('admin CSS keeps settings group headers in title case', () => {
 
   assert.match(block, /letter-spacing:\s*var\(--tasty-type-letter-spacing-none\);/);
   assert.match(block, /text-transform:\s*none;/);
+});
+
+test('admin CSS uses one tokenized gradient for library preview boxes', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+  const previewSelectors = [
+    '.tasty-fonts-font-inline-preview',
+    '.tasty-fonts-font-specimen',
+    '.tasty-fonts-face-preview',
+    '.tasty-fonts-detail-card--face .tasty-fonts-face-preview'
+  ];
+
+  for (const selector of previewSelectors) {
+    const blocks = cssBlocksForExactSelector(adminCss, selector);
+
+    assert.equal(
+      blocks.some((block) => /background:\s*var\(--tasty-library-preview-background\);/.test(block)),
+      true,
+      `${selector} should use the shared preview box gradient token.`
+    );
+  }
+
+  const monospaceBlock = cssBlockForSelector(
+    adminCss,
+    '.tasty-fonts-font-inline-preview.is-monospace,\n.tasty-fonts-font-specimen.is-monospace,\n.tasty-fonts-face-preview.is-monospace'
+  );
+
+  assert.doesNotMatch(monospaceBlock, /\bbackground\s*:/, 'Monospace previews should inherit the shared preview box gradient.');
+
+  const inlineMonospaceTextBlocks = cssBlocksForExactSelector(adminCss, '.tasty-fonts-font-inline-preview-text.is-monospace');
+  assert.equal(
+    inlineMonospaceTextBlocks.some((block) => /font-size:\s*var\(--tasty-library-monospace-preview-size\);/.test(block)),
+    true,
+    'Collapsed monospace previews should use the balanced code preview size token.'
+  );
 });

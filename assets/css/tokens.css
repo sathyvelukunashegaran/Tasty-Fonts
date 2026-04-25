@@ -37,11 +37,37 @@
     --tasty-brand-blue-hover: #0b5f9e;
     --tasty-brand-blue-active: #084a7d;
     --tasty-brand-blue-rgb: 15, 111, 183;
+    --tasty-brand-cyan: #32c5f4;
     --tasty-brand-cyan-rgb: 50, 197, 244;
     --tasty-ink: #0a2540;
     --tasty-ink-rgb: 10, 37, 64;
+    --tasty-ink-soft: #1c2e44;
+    --tasty-ink-soft-rgb: 28, 46, 68;
     --tasty-slate: #425466;
     --tasty-slate-rgb: 66, 84, 102;
+
+    /*
+     * Warm Amber — secondary color in the Three-Color Restraint palette.
+     * Paired with Tasty Blue (primary) and Soft Cream (tertiary).
+     * NEVER replaces blue for primary actions, focus rings, or selected
+     * states. The single "color" survivor in semantic state work:
+     * --tasty-warning-raw is now an alias for warm amber (the previous
+     * legible warning color #9a6700 is removed, since warning is what
+     * Warm Amber is for).
+     */
+    --tasty-warm-amber: #e89a3c;
+    --tasty-warm-amber-rgb: 232, 154, 60;
+    --tasty-warm-amber-deep: #c97c1f;
+    --tasty-warm-amber-deep-rgb: 201, 124, 31;
+
+    /*
+     * Soft Cream paper — warm hero/specimen canvas surface.
+     * Used by the preview workspace and the page header hero band.
+     */
+    --tasty-paper: #faf7f2;
+    --tasty-paper-rgb: 250, 247, 242;
+    --tasty-paper-deep: #f5f0e6;
+    --tasty-paper-deep-rgb: 245, 240, 230;
     /* Shadow/overlay base — blue-navy depth used across all shadow rgba() calls */
     --tasty-shadow-color-rgb: 10, 37, 64;
 
@@ -54,12 +80,34 @@
     --tasty-ctrl-text-muted: var(--tasty-slate);
     --tasty-ctrl-text-muted-rgb: var(--tasty-slate-rgb);
 
-    --tasty-success-raw: #138a4b;
-    --tasty-success-rgb: 19, 138, 75;
-    --tasty-warning-raw: #9a6700;
-    --tasty-warning-rgb: 154, 103, 0;
-    --tasty-danger-raw: #c8323a;
-    --tasty-danger-rgb: 200, 50, 58;
+    /*
+     * Three-Color Restraint:
+     *
+     * The plugin uses ONLY Tasty Blue, Warm Amber, and Soft Cream
+     * (plus neutrals: white, grays, ink, slate). The legacy
+     * --tasty-success / --tasty-warning / --tasty-danger token
+     * NAMES survive as semantic roles so 124 existing consumers
+     * keep working, but they no longer carry green / red / warning-amber
+     * color identity. They now compose from the approved palette:
+     *
+     *   --tasty-success  → ink + neutral surface (state shown via icon + filled chrome)
+     *   --tasty-warning  → Warm Amber (the only colored survivor — warning is what amber is for)
+     *   --tasty-danger   → ink + neutral surface with inset shadow (state shown via icon + sunken chrome)
+     *
+     * The previous *-raw and *-rgb primitives are retained so existing
+     * rgba composition calls (rgba of any --tasty-X-rgb triplet) in
+     * admin.css still resolve, but they now point into the approved
+     * palette:
+     *   --tasty-success-rgb → ink RGB triplet (deep neutral)
+     *   --tasty-warning-rgb → warm amber RGB triplet
+     *   --tasty-danger-rgb  → ink RGB triplet (deep neutral; chrome differentiates)
+     */
+    --tasty-success-raw: var(--tasty-ink);
+    --tasty-success-rgb: var(--tasty-ink-rgb);
+    --tasty-warning-raw: var(--tasty-warm-amber);
+    --tasty-warning-rgb: var(--tasty-warm-amber-rgb);
+    --tasty-danger-raw: var(--tasty-ink);
+    --tasty-danger-rgb: var(--tasty-ink-rgb);
 
     /* Accent and semantic surfaces */
     --tasty-accent: var(--tasty-brand-blue);
@@ -80,6 +128,17 @@
     --tasty-surface-danger-strong: rgba(var(--tasty-danger-rgb), 0.1);
     --tasty-surface-progress-track: rgba(var(--tasty-gray-900-rgb), 0.08);
     --tasty-surface-overlay-soft: rgba(var(--tasty-white-rgb), 0.6);
+
+    /* Hero / paper / spotlight / rail surfaces (Phase 1 additions) */
+    --tasty-surface-hero: var(--tasty-paper);
+    --tasty-surface-paper: var(--tasty-paper);
+    --tasty-surface-paper-deep: var(--tasty-paper-deep);
+    --tasty-surface-spotlight: rgba(var(--tasty-warm-amber-rgb), 0.06);
+    --tasty-surface-spotlight-soft: rgba(var(--tasty-warm-amber-rgb), 0.035);
+    --tasty-surface-rail: rgba(var(--tasty-paper-rgb), 0.7);
+    --tasty-surface-rail-soft: rgba(var(--tasty-paper-rgb), 0.45);
+    --tasty-warm-amber-soft: rgba(var(--tasty-warm-amber-rgb), 0.08);
+    --tasty-warm-amber-glow: rgba(var(--tasty-warm-amber-rgb), 0.18);
 
     /* Alpha values used by tokenized color compositions */
     --tasty-alpha-025: 0.025;
@@ -129,6 +188,11 @@
     --tasty-border-success-soft: rgba(var(--tasty-success-rgb), 0.18);
     --tasty-border-warning-soft: rgba(var(--tasty-warning-rgb), 0.18);
     --tasty-border-danger-soft: rgba(var(--tasty-danger-rgb), 0.15);
+    --tasty-border-hero-soft: rgba(var(--tasty-paper-deep-rgb), 0.86);
+    --tasty-border-rail: rgba(var(--tasty-gray-600-rgb), 0.18);
+    --tasty-border-active-strong: rgba(var(--tasty-accent-rgb), 0.42);
+    --tasty-border-amber-soft: rgba(var(--tasty-warm-amber-rgb), 0.32);
+    --tasty-border-amber-strong: rgba(var(--tasty-warm-amber-deep-rgb), 0.46);
 
     /* Semantic text and status */
     --tasty-text: var(--tasty-ink);
@@ -155,8 +219,10 @@
     --tasty-space-4-5: 18px;
     --tasty-space-5: 20px;
     --tasty-space-6: 24px;
+    --tasty-space-7: 28px;
     --tasty-space-8: 32px;
     --tasty-space-9: 36px;
+    --tasty-space-10: 40px;
 
     /* Primitive layout values used by tokenized admin CSS declarations */
     --tasty-layout-0: 0;
@@ -179,8 +245,10 @@
     --tasty-layout-0-92fr: 0.92fr;
     --tasty-layout-0-95fr: 0.95fr;
     --tasty-layout-0-97: 0.97;
+    --tasty-layout-0fr: 0fr;
     --tasty-layout-0pct: 0%;
     --tasty-layout-1: 1;
+    --tasty-layout-1-04: 1.04;
     --tasty-layout-1-2fr: 1.2fr;
     --tasty-layout-1-3fr: 1.3fr;
     --tasty-layout-1-4fr: 1.4fr;
@@ -300,6 +368,7 @@
     --tasty-layout-780px: 780px;
     --tasty-layout-860px: 860px;
     --tasty-layout-999px: 999px;
+    --tasty-layout-1100px: 1100px;
     --tasty-layout-neg-1: -1;
     --tasty-layout-neg-1px: -1px;
     --tasty-layout-neg-2px: -2px;
@@ -315,6 +384,7 @@
     --tasty-radius-card: 8px;
     --tasty-radius-inner: 8px;
     --tasty-radius-panel: 8px;
+    --tasty-radius-hero: 12px;
     --tasty-radius-xl: 14px;
     --tasty-radius-large: 10px;
     --tasty-radius-lg: var(--tasty-radius-large);
@@ -353,13 +423,20 @@
     --tasty-control-padding-inline-roomy: 14px;
 
     /* Typography scale */
-    --tasty-font-family-sans: Inter, "Sohne", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    --tasty-font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    /*
+     * Display family — page titles and hero specimen scenes only.
+     * Uses the same WordPress/admin system stack as the product UI while
+     * keeping a separate token for display-specific optical refinements.
+     */
+    --tasty-font-family-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     --tasty-font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     --tasty-font-family-inherit: inherit;
-    --tasty-font-size-3xs: 9px;
-    --tasty-font-size-2xs: 10px;
-    --tasty-font-size-xs: 11px;
-    --tasty-font-size-s: 12px;
+    --tasty-font-size-minimum: 12px;
+    --tasty-font-size-3xs: var(--tasty-font-size-minimum);
+    --tasty-font-size-2xs: var(--tasty-font-size-minimum);
+    --tasty-font-size-xs: var(--tasty-font-size-minimum);
+    --tasty-font-size-s: var(--tasty-font-size-minimum);
     --tasty-font-size-sm: var(--tasty-font-size-s);
     --tasty-font-size-m: 13px;
     --tasty-font-size-l: 14px;
@@ -429,6 +506,22 @@
     --tasty-type-letter-spacing-status: 0.08em;
     --tasty-type-letter-spacing-kicker: 0.11em;
     --tasty-type-letter-spacing-overline: var(--tasty-type-overline-spacing);
+    /*
+     * Optical tracking refinements (Phase 1).
+     * Negative values tighten display type for premium feel; only used
+     * on the page H1 and the hero specimen scenes.
+     */
+    --tasty-type-page-title-tracking: -0.02em;
+    --tasty-type-display-tracking: -0.018em;
+    --tasty-type-overline-strong-spacing: 0.16em;
+    --tasty-type-numeric-tabular-tight: 0.005em;
+    --tasty-type-prose-line-height: 1.55;
+    /*
+     * Inter / Sohne stylistic-set hint. Has zero effect on system
+     * fonts that don't ship these features.
+     */
+    --tasty-type-display-features: "ss01" 1, "cv11" 1;
+    --tasty-type-text-features: "ss01" 1;
     --tasty-font-variant-numeric: tabular-nums;
     --tasty-type-preview-scale-1-size: clamp(42px, calc(var(--tasty-preview-base, 32px) * 1.58), 58px);
     --tasty-type-preview-scale-2-size: clamp(33px, calc(var(--tasty-preview-base, 32px) * 1.26), 42px);
@@ -469,11 +562,88 @@
     --tasty-shadow-tab-hover: 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.05);
     --tasty-shadow-hairline: inset 0 1px 0 rgba(var(--tasty-white-rgb), 0.86);
 
+    /*
+     * Elevation scale (Phase 1)
+     * Use these tokens instead of ad-hoc shadow values. The scale is
+     * intentional: flat → rise-1 (hairline) → rise-2 (card hover) →
+     * rise-3 (pressed/selected) → popover (overlay) → spotlight
+     * (cyan + amber dual-layer, max once per page) → inset-rail
+     * (paper / code panels) → pressed (button :active feedback).
+     */
+    --tasty-shadow-flat: none;
+    --tasty-shadow-rise-1: 0 1px 1px rgba(var(--tasty-shadow-color-rgb), 0.05), 0 4px 12px -10px rgba(var(--tasty-shadow-color-rgb), 0.18);
+    --tasty-shadow-rise-2: 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.07), 0 14px 32px -22px rgba(var(--tasty-shadow-color-rgb), 0.32);
+    --tasty-shadow-rise-3: 0 0 0 1px rgba(var(--tasty-accent-rgb), 0.16), 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.06), 0 18px 38px -24px rgba(var(--tasty-shadow-color-rgb), 0.34);
+    --tasty-shadow-popover: 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.06), 0 18px 38px -16px rgba(var(--tasty-shadow-color-rgb), 0.32), 0 4px 14px rgba(var(--tasty-shadow-color-rgb), 0.08);
+    --tasty-shadow-spotlight: 0 0 0 1px rgba(var(--tasty-warm-amber-rgb), 0.18), 0 12px 30px -18px rgba(var(--tasty-warm-amber-rgb), 0.34), 0 22px 48px -28px rgba(var(--tasty-brand-cyan-rgb), 0.32);
+    --tasty-shadow-inset-rail: inset 0 1px 0 rgba(var(--tasty-white-rgb), 0.7), inset 0 0 0 1px rgba(var(--tasty-paper-deep-rgb), 0.7);
+    --tasty-shadow-pressed: inset 0 1px 1px rgba(var(--tasty-shadow-color-rgb), 0.12);
+    --tasty-shadow-amber-halo: 0 0 0 3px rgba(var(--tasty-warm-amber-rgb), 0.16), 0 0 0 5px rgba(var(--tasty-warm-amber-rgb), 0.06);
+    --tasty-shadow-amber-halo-pulse: 0 0 0 4px rgba(var(--tasty-warm-amber-rgb), 0.22), 0 0 0 6px rgba(var(--tasty-warm-amber-rgb), 0.05);
+
+    /*
+     * Copy-action hover contract. Every copy control in the plugin —
+     * the Preview/Snippets/Diagnostics copy buttons AND the role-stack
+     * / family-stack / generic copy pills — consumes these tokens for
+     * its hover and focus-visible state. The background is INTENTIONALLY
+     * a quiet Warm Amber wash (never accent blue) so the affordance
+     * reads as warm and tactile. New copy controls MUST consume these
+     * tokens directly; do NOT redefine background/border/color per
+     * component.
+     */
+    --tasty-copy-hover-background: var(--tasty-warm-amber-soft);
+    --tasty-copy-hover-border: var(--tasty-border-amber-soft);
+    --tasty-copy-hover-color: var(--tasty-warm-amber-deep);
+    --tasty-copy-hover-shadow: var(--tasty-shadow-amber-halo);
+
     /* Layout constants */
     --tasty-admin-max-width: 1360px;
     --tasty-admin-footer-clearance: 96px;
     --tasty-card-padding: var(--tasty-space-6);
     --tasty-card-padding-tight: var(--tasty-space-4);
+
+    /*
+     * Surface system — the unified card chrome contract.
+     *
+     * Every card-like element in the plugin must consume these
+     * semantic aliases instead of reaching into the underlying
+     * primitives. Three modes:
+     *   - Resting (default): static container, you read it.
+     *   - Interactive (.is-interactive): the card itself is the
+     *     click target. Adds the rise-* lift contract.
+     *   - Priority (.is-priority): cream wash + hairline + larger
+     *     radius. At most one per rail. New uses require a
+     *     DESIGN.md appendix entry first.
+     *
+     * .tasty-fonts-banner is a separate component for inline
+     * notifications and is NOT a card — see banner tokens below.
+     */
+    --tasty-surface-card: var(--tasty-gray-0);
+    --tasty-surface-card-border: var(--tasty-border);
+    --tasty-surface-card-border-strong: var(--tasty-border-subtle-strong);
+    --tasty-surface-card-radius: var(--tasty-radius-card);
+    --tasty-surface-card-padding: var(--tasty-card-padding);
+    --tasty-surface-card-padding-tight: var(--tasty-card-padding-tight);
+    --tasty-surface-card-gap: var(--tasty-space-4);
+
+    /*
+     * Banner (inline notification) — now part of the card chrome.
+     * The previous cream paper + 4px left rail has been dropped;
+     * banners use the resting card surface (white, faint border)
+     * and the universal top hairline so they read as a unified
+     * surface with the rest of the plugin. The banner-* token
+     * names survive as semantic aliases pointing into the card
+     * surface tokens so the audit contract stays intact.
+     */
+    --tasty-surface-banner-background: var(--tasty-surface-card);
+    --tasty-surface-banner-border: var(--tasty-surface-card-border);
+    --tasty-surface-banner-rail-advisory: transparent;
+    --tasty-surface-banner-rail-info: transparent;
+    --tasty-surface-banner-rail-width: var(--tasty-layout-0);
+    --tasty-surface-banner-radius: var(--tasty-surface-card-radius);
+    --tasty-surface-banner-padding-block: var(--tasty-space-3);
+    --tasty-surface-banner-padding-inline: var(--tasty-space-4);
+    --tasty-surface-banner-gap: var(--tasty-space-3);
     --tasty-panel-gap: var(--tasty-space-5);
     --tasty-section-gap: var(--tasty-space-5);
     --tasty-section-gap-tight: var(--tasty-space-4);
@@ -489,6 +659,10 @@
     --tasty-library-card-inline-gap: var(--tasty-space-2);
     --tasty-library-search-preview-size: clamp(15px, 0.98vw, 16px);
     --tasty-library-preview-padding: var(--tasty-space-4);
+    --tasty-library-preview-background: var(--tasty-gradient-surface-inset);
+    --tasty-library-preview-border: var(--tasty-border-subtle);
+    --tasty-library-preview-border-strong: var(--tasty-border-subtle-strong);
+    --tasty-library-inline-preview-min-height: 90px;
     --tasty-library-preview-size: clamp(22px, 2.2vw, 30px);
     --tasty-library-import-preview-size: clamp(24px, 2.2vw, 34px);
     --tasty-library-import-preview-size-mobile: clamp(20px, 8vw, 28px);
@@ -504,7 +678,7 @@
     --tasty-library-stack-copy-width: 20rem;
     --tasty-library-monospace-preview-padding-block: 18px;
     --tasty-library-monospace-preview-padding-inline: var(--tasty-space-5);
-    --tasty-library-monospace-preview-size: clamp(15px, 1.15vw, 18px);
+    --tasty-library-monospace-preview-size: clamp(20px, 1.9vw, 26px);
     --tasty-role-card-padding: var(--tasty-space-5);
     --tasty-role-card-gap: var(--tasty-space-3);
     --tasty-role-card-head-gap: var(--tasty-space-3);
@@ -539,6 +713,20 @@
     --tasty-status-dot-shadow-warning: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-warning-rgb), var(--tasty-alpha-12)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-warning-rgb), var(--tasty-alpha-04));
     --tasty-status-dot-shadow-danger: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-danger-rgb), var(--tasty-alpha-12)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-danger-rgb), var(--tasty-alpha-04));
     --tasty-status-dot-shadow-muted: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-gray-600-rgb), var(--tasty-alpha-10)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-gray-600-rgb), var(--tasty-alpha-04));
+    /*
+     * Phase 2.1: Warm Amber dot variant for the masthead kicker.
+     * Uses the same two-ring halo as the other semantic dots so
+     * scale, shape, and rhythm match the existing dot family.
+     * Reserved for the kicker; if reused elsewhere it must follow
+     * the "Where Amber Appears" appendix.
+     */
+    --tasty-status-dot-shadow-warm-amber: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-12)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-04));
+    /*
+     * Smaller dot size for inline brand-mark contexts (kicker line).
+     * The standard 8px dot is too loud against an ~11px uppercase
+     * kicker — 6px reads as "punctuation" rather than "status."
+     */
+    --tasty-status-dot-size-small: var(--tasty-layout-6px);
     --tasty-status-dot-shadow: var(--tasty-status-dot-shadow-accent);
     --tasty-activity-log-marker-column: var(--tasty-status-dot-column);
     --tasty-activity-log-marker-size: var(--tasty-status-dot-size);
@@ -571,7 +759,7 @@
     --tasty-shell-fuse-width: min(52vw, 560px);
     --tasty-shell-fuse-height: 190px;
     --tasty-shell-fuse-blur: 18px;
-    --tasty-shell-fuse-opacity: 0.22;
+    --tasty-shell-fuse-opacity: 0.16;
     --tasty-shell-fuse-rotation: -7deg;
     --tasty-shell-orb-display: none;
     --tasty-shell-orb-top: var(--tasty-space-9);
@@ -612,17 +800,89 @@
     --tasty-masthead-glow-cyan-top: -96px;
     --tasty-masthead-glow-cyan-left: -64px;
     --tasty-masthead-glow-cyan-size: 240px;
-    --tasty-masthead-glow-accent-right: 8%;
-    --tasty-masthead-glow-accent-bottom: -110px;
+    --tasty-masthead-glow-accent-right: 6%;
+    --tasty-masthead-glow-accent-bottom: -70px;
     --tasty-masthead-glow-accent-width: 320px;
     --tasty-masthead-glow-accent-height: 190px;
     --tasty-header-logo-height: var(--tasty-layout-54px);
     --tasty-header-logo-height-mobile: clamp(42px, 9vw, 50px);
-    --tasty-header-glow-cyan: radial-gradient(circle, rgba(var(--tasty-brand-cyan-rgb), 0.14) 0%, rgba(var(--tasty-brand-cyan-rgb), 0.045) 42%, rgba(var(--tasty-brand-cyan-rgb), 0) 72%);
-    --tasty-header-glow-accent: radial-gradient(circle, rgba(var(--tasty-accent-rgb), 0.18) 0%, rgba(var(--tasty-accent-rgb), 0.055) 46%, rgba(var(--tasty-accent-rgb), 0) 76%);
-    --tasty-gradient-fuse: linear-gradient(115deg, rgba(var(--tasty-brand-cyan-rgb), 0.46) 0%, rgba(var(--tasty-accent-rgb), 0.72) 52%, rgba(var(--tasty-brand-blue-rgb), 0.28) 100%);
-    --tasty-gradient-page: radial-gradient(circle at 9% -16%, rgba(var(--tasty-brand-cyan-rgb), 0.09) 0%, rgba(var(--tasty-brand-cyan-rgb), 0) 32%), radial-gradient(circle at 82% -12%, rgba(var(--tasty-accent-rgb), 0.08) 0%, rgba(var(--tasty-accent-rgb), 0) 30%), linear-gradient(180deg, var(--tasty-gray-50) 0%, var(--tasty-white) 48%, var(--tasty-gray-50) 100%);
+    /*
+     * Phase 2.1 masthead glows. The upper-left glow stays cyan (the
+     * existing brand atmosphere), demoted slightly to ~12% so it
+     * doesn't out-shout the new amber counterweight. The lower-right
+     * glow is now Warm Amber instead of a second blue shape — the
+     * masthead reads "blue + a touch of amber" rather than
+     * "blue + more blue." The amber sits at ~14% peak so it has
+     * enough presence to register as ambient lighting against the
+     * cream paper, but not enough to become decoration.
+     */
+    --tasty-header-glow-cyan: radial-gradient(circle, rgba(var(--tasty-brand-cyan-rgb), 0.12) 0%, rgba(var(--tasty-brand-cyan-rgb), 0.04) 42%, rgba(var(--tasty-brand-cyan-rgb), 0) 72%);
+    --tasty-header-glow-accent: radial-gradient(circle, rgba(var(--tasty-warm-amber-rgb), 0.14) 0%, rgba(var(--tasty-warm-amber-rgb), 0.045) 46%, rgba(var(--tasty-warm-amber-rgb), 0) 76%);
+    /*
+     * Phase 2.2 — neutralized shell field.
+     *
+     * Earlier passes layered three blue/cyan sources on the workspace
+     * field (page radials + diagonal beam + ::before fuse). The cumulative
+     * effect was a blue field that flattened every accent we tried to
+     * place on top of it: the cream masthead lost its warmth, amber
+     * highlights were swallowed, and the "lifted white card" language
+     * stopped reading because the field was already cool-tinted.
+     *
+     * --tasty-gradient-page is now just a quiet gray-50 → white → gray-50
+     *   paper stripe. No blue radials, no cyan glow. True neutral.
+     * --tasty-gradient-fuse becomes a soft warm cream/amber wash so the
+     *   ::before corner highlight harmonizes with the masthead amber
+     *   instead of duplicating the blue brand color. Reduced opacity
+     *   inside the shell rule lets it read as "a hint of light" not
+     *   "a colored shape."
+     * --tasty-gradient-page-beam is retired; the token is preserved as
+     *   a no-op (transparent) only to avoid breaking any external
+     *   reference that may have picked it up.
+     */
+    --tasty-gradient-fuse: linear-gradient(115deg, rgba(var(--tasty-warm-amber-rgb), 0.18) 0%, rgba(var(--tasty-paper-rgb), 0.5) 52%, rgba(var(--tasty-warm-amber-rgb), 0.08) 100%);
+    --tasty-gradient-page: linear-gradient(180deg, var(--tasty-gray-50) 0%, var(--tasty-white) 48%, var(--tasty-gray-50) 100%);
+    --tasty-gradient-page-beam: linear-gradient(135deg, transparent 0%, transparent 100%);
     --tasty-gradient-header: radial-gradient(circle at 5% -32%, rgba(var(--tasty-brand-cyan-rgb), 0.1) 0%, rgba(var(--tasty-brand-cyan-rgb), 0) 36%), linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-white-rgb), 0.96) 100%);
+    /*
+     * Phase 2 hero header: cream paper base. The cyan + amber
+     * accents now live in the layered glow tokens
+     * (--tasty-header-glow-cyan, --tasty-header-glow-accent)
+     * so this base is just paper warmth. Letting the glows own
+     * the color stops them from double-stacking with whispers
+     * embedded in the base.
+     */
+    --tasty-gradient-header-hero: linear-gradient(180deg, rgba(var(--tasty-paper-rgb), 0.96) 0%, rgba(var(--tasty-white-rgb), 0.98) 78%, rgba(var(--tasty-paper-rgb), 0.96) 100%);
+    /*
+     * Phase 2 hairline: 1px gradient line that lives along the bottom
+     * of the page header. Reads as a "live boundary" — the first
+     * intentional blue+amber pairing in the UI.
+     */
+    --tasty-gradient-hero-hairline: linear-gradient(90deg, rgba(var(--tasty-brand-cyan-rgb), 0) 0%, rgba(var(--tasty-brand-cyan-rgb), 0.5) 22%, rgba(var(--tasty-accent-rgb), 0.5) 50%, rgba(var(--tasty-warm-amber-rgb), 0.42) 78%, rgba(var(--tasty-warm-amber-rgb), 0) 100%);
+
+    /*
+     * Quiet spotlight wash for single-cell priority surfaces (the
+     * preview specimen board, used through .tasty-fonts-surface.is-priority).
+     * Amber-tinted at the top, fades to white quickly so the cell
+     * stays scannable.
+     */
+    --tasty-gradient-role-priority: linear-gradient(180deg, var(--tasty-surface-spotlight-soft) 0%, var(--tasty-surface) 36%);
+
+    /*
+     * Roles rail wash — one continuous horizontal gradient that runs
+     * across the whole roles rail (Heading, Body, Monospace), so the
+     * trio reads as a single unified rail rather than three separate
+     * tinted cells. The wash starts warmer on the right (Monospace
+     * end) and softens through the middle so the rail has visible
+     * direction without picking a winner.
+     */
+    --tasty-gradient-role-rail: linear-gradient(to left, var(--tasty-surface-spotlight) 0%, var(--tasty-surface-spotlight-soft) 50%, var(--tasty-surface) 100%);
+
+    /*
+     * Phase 3.2: friendly amber blob behind discovery empty states.
+     * Pure decoration; the radial gradient fades from a warm halo
+     * through the amber soft wash to fully transparent.
+     */
+    --tasty-gradient-amber-blob: radial-gradient(circle, var(--tasty-warm-amber-glow) 0%, var(--tasty-warm-amber-soft) 38%, rgba(var(--tasty-warm-amber-rgb), 0) 70%);
     --tasty-gradient-tab-active: linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-gray-50-rgb), 0.92) 100%);
     --tasty-gradient-border-soft: linear-gradient(135deg, rgba(var(--tasty-brand-cyan-rgb), 0.22) 0%, rgba(var(--tasty-accent-rgb), 0.28) 58%, rgba(var(--tasty-brand-blue-rgb), 0.12) 100%);
     --tasty-gradient-surface-card: linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-white-rgb), 0.96) 100%);
@@ -662,60 +922,90 @@
     --tasty-version-pill-danger-meta-background: rgba(var(--tasty-danger-rgb), 0.08);
     --tasty-version-pill-danger-meta-border: rgba(var(--tasty-danger-rgb), 0.13);
 
-    /* Code/editor component colors */
-    --tasty-preview-code-chrome-rgb: 148, 163, 184;
-    --tasty-preview-code-window-bg: #0f172a;
-    --tasty-preview-code-topbar-bg: #111c2e;
-    --tasty-preview-code-dot-red: #f87171;
-    --tasty-preview-code-dot-yellow: #fbbf24;
-    --tasty-preview-code-dot-green: #34d399;
-    --tasty-preview-code-tab-text: #cbd5e1;
-    --tasty-preview-code-tab-icon: #93c5fd;
-    --tasty-preview-code-statusbar-text: #94a3b8;
-    --tasty-preview-code-dark-bg: #0f172a;
-    --tasty-preview-code-dark-text: #e2e8f0;
-    --tasty-preview-code-dark-muted: #64748b;
-    --tasty-preview-code-dark-comment: #7c8da7;
-    --tasty-preview-code-dark-keyword: #93c5fd;
-    --tasty-preview-code-dark-property: #86efac;
-    --tasty-preview-code-dark-string: #fcd34d;
-    --tasty-preview-code-dark-number: #f9a8d4;
-    --tasty-preview-code-dark-function: #c4b5fd;
-    --tasty-preview-code-dark-selector: #67e8f9;
-    --tasty-preview-code-dark-variable: #f8fafc;
-    --tasty-preview-code-dark-operator: #f8fafc;
-    --tasty-preview-code-dark-punctuation: #94a3b8;
-    --tasty-preview-code-dark-tag: #fda4af;
-    --tasty-preview-code-dark-attr: #fcd34d;
-    --tasty-preview-code-light-rule: #e2e8f0;
-    --tasty-preview-code-light-text: #0f172a;
-    --tasty-preview-code-light-muted: #64748b;
-    --tasty-preview-code-light-comment: #64748b;
-    --tasty-preview-code-light-keyword: #1d4ed8;
-    --tasty-preview-code-light-property: #047857;
-    --tasty-preview-code-light-string: #b45309;
-    --tasty-preview-code-light-number: #0b5f9e;
-    --tasty-preview-code-light-function: #0f6fb7;
-    --tasty-preview-code-light-selector: #0f766e;
-    --tasty-preview-code-light-variable: #0f766e;
-    --tasty-preview-code-light-operator: #0f172a;
-    --tasty-preview-code-light-punctuation: #475569;
-    --tasty-preview-code-light-tag: #0f766e;
-    --tasty-preview-code-light-attr: #92400e;
-    --tasty-preview-code-light-at-rule: #0b5f9e;
+    /*
+     * Code / editor palette — Three-Color Restraint.
+     *
+     * Previously this block held ~35 raw hex values (rainbow syntax
+     * theme). The plugin's 3-color rule applies even to the code
+     * preview window: the whole product should feel like one system.
+     *
+     * Two roles only inside the code window:
+     *   - Tasty Blue : keywords, properties, selectors, at-rules
+     *                  (anything "structural" that introduces a token)
+     *   - Warm Amber : strings, numbers, function names, attribute values
+     *                  (anything that's a "value")
+     * Everything else (text, punctuation, comments, operators, tags)
+     * uses neutrals (paper / cream / gray scale / ink).
+     *
+     * The window chrome (background, topbar, traffic-light dots, tab
+     * text, status bar) collapses to ink + paper + neutrals.
+     */
+    --tasty-preview-code-chrome-rgb: var(--tasty-gray-600-rgb);
+    --tasty-preview-code-window-bg: var(--tasty-ink);
+    --tasty-preview-code-topbar-bg: var(--tasty-ink-soft);
+    /* Traffic-light dots: neutral chrome only (filled / outlined / outlined). */
+    --tasty-preview-code-dot-red: rgba(var(--tasty-paper-rgb), 0.42);
+    --tasty-preview-code-dot-yellow: rgba(var(--tasty-paper-rgb), 0.28);
+    --tasty-preview-code-dot-green: rgba(var(--tasty-paper-rgb), 0.18);
+    --tasty-preview-code-tab-text: rgba(var(--tasty-paper-rgb), 0.78);
+    --tasty-preview-code-tab-icon: var(--tasty-brand-cyan);
+    --tasty-preview-code-statusbar-text: rgba(var(--tasty-paper-rgb), 0.5);
+    /* Dark theme — ink window with paper text + blue/amber roles only. */
+    --tasty-preview-code-dark-bg: var(--tasty-ink);
+    --tasty-preview-code-dark-text: var(--tasty-paper);
+    --tasty-preview-code-dark-muted: rgba(var(--tasty-paper-rgb), 0.5);
+    --tasty-preview-code-dark-comment: rgba(var(--tasty-paper-rgb), 0.42);
+    --tasty-preview-code-dark-keyword: var(--tasty-brand-cyan);
+    --tasty-preview-code-dark-property: var(--tasty-brand-cyan);
+    --tasty-preview-code-dark-string: var(--tasty-warm-amber);
+    --tasty-preview-code-dark-number: var(--tasty-warm-amber);
+    --tasty-preview-code-dark-function: var(--tasty-warm-amber);
+    --tasty-preview-code-dark-selector: var(--tasty-brand-cyan);
+    --tasty-preview-code-dark-variable: var(--tasty-paper);
+    --tasty-preview-code-dark-operator: var(--tasty-paper);
+    --tasty-preview-code-dark-punctuation: rgba(var(--tasty-paper-rgb), 0.62);
+    --tasty-preview-code-dark-tag: var(--tasty-brand-cyan);
+    --tasty-preview-code-dark-attr: var(--tasty-warm-amber);
+    /* Light theme — paper-toned window with ink text + blue/amber roles only. */
+    --tasty-preview-code-light-rule: var(--tasty-gray-150);
+    --tasty-preview-code-light-text: var(--tasty-ink);
+    --tasty-preview-code-light-muted: var(--tasty-slate);
+    --tasty-preview-code-light-comment: var(--tasty-slate);
+    --tasty-preview-code-light-keyword: var(--tasty-brand-blue);
+    --tasty-preview-code-light-property: var(--tasty-brand-blue);
+    --tasty-preview-code-light-string: var(--tasty-warm-amber-deep);
+    --tasty-preview-code-light-number: var(--tasty-warm-amber-deep);
+    --tasty-preview-code-light-function: var(--tasty-warm-amber-deep);
+    --tasty-preview-code-light-selector: var(--tasty-brand-blue);
+    --tasty-preview-code-light-variable: var(--tasty-brand-blue-hover);
+    --tasty-preview-code-light-operator: var(--tasty-ink);
+    --tasty-preview-code-light-punctuation: var(--tasty-slate);
+    --tasty-preview-code-light-tag: var(--tasty-brand-blue);
+    --tasty-preview-code-light-attr: var(--tasty-warm-amber-deep);
+    --tasty-preview-code-light-at-rule: var(--tasty-brand-blue);
 
-    /* Integration brand marks */
-    --tasty-integration-bricks-bg: linear-gradient(135deg, #fff1ec, #ffe2d4);
-    --tasty-integration-bricks-border: rgba(201, 89, 37, 0.22);
-    --tasty-integration-bricks-color: #b94d1d;
-    --tasty-integration-oxygen-bg: linear-gradient(135deg, #eef6ff, #dcecff);
-    --tasty-integration-oxygen-color: #2364c9;
-    --tasty-integration-gutenberg-bg: linear-gradient(135deg, #edf7ff, #dcefff);
-    --tasty-integration-gutenberg-border: rgba(0, 112, 186, 0.2);
-    --tasty-integration-gutenberg-color: #0070ba;
-    --tasty-integration-acss-bg: linear-gradient(135deg, #eef7ff, #dceefa);
-    --tasty-integration-acss-border: rgba(var(--tasty-brand-blue-rgb), 0.2);
-    --tasty-integration-acss-color: var(--tasty-brand-blue-hover);
+    /*
+     * Integration brand marks — Three-Color Restraint.
+     *
+     * The plugin previously framed each integration tile in its own
+     * brand color (Bricks orange, Oxygen blue, Gutenberg blue, ACSS blue).
+     * Per the restraint pass, the framing chrome is now neutral for
+     * every integration. The brand logo image already lives inside the
+     * tile (`integrations/bricks-favicon.png` etc.) and provides full
+     * brand recognition; the colored frame around it was just noise.
+     * All four marks now share the same paper / cream / ink chrome.
+     */
+    --tasty-integration-bricks-bg: linear-gradient(135deg, var(--tasty-paper) 0%, var(--tasty-paper-deep) 100%);
+    --tasty-integration-bricks-border: rgba(var(--tasty-paper-deep-rgb), 0.86);
+    --tasty-integration-bricks-color: var(--tasty-ink-soft);
+    --tasty-integration-oxygen-bg: linear-gradient(135deg, var(--tasty-paper) 0%, var(--tasty-paper-deep) 100%);
+    --tasty-integration-oxygen-color: var(--tasty-ink-soft);
+    --tasty-integration-gutenberg-bg: linear-gradient(135deg, var(--tasty-paper) 0%, var(--tasty-paper-deep) 100%);
+    --tasty-integration-gutenberg-border: rgba(var(--tasty-paper-deep-rgb), 0.86);
+    --tasty-integration-gutenberg-color: var(--tasty-ink-soft);
+    --tasty-integration-acss-bg: linear-gradient(135deg, var(--tasty-paper) 0%, var(--tasty-paper-deep) 100%);
+    --tasty-integration-acss-border: rgba(var(--tasty-paper-deep-rgb), 0.86);
+    --tasty-integration-acss-color: var(--tasty-ink-soft);
     --tasty-integration-row-padding-block-compact: var(--tasty-space-2-5);
     --tasty-integration-row-gap: var(--tasty-space-2);
     --tasty-integration-row-control-gap: var(--tasty-space-6);
@@ -734,6 +1024,44 @@
     --tasty-duration-1-15s: 1.15s;
     --tasty-easing-base: ease;
     --tasty-easing-spring: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    /*
+     * Semantic motion vocabulary (Phase 1)
+     *
+     * Use these tokens for every transition and animation in admin.css.
+     * Each duration maps to an interaction intent — pick by meaning,
+     * not by feel. Reduced-motion users automatically receive the
+     * --tasty-motion-instant collapse via the @media block in admin.css.
+     *
+     * - instant   : structural toggles, reduced-motion fallback
+     * - hairline  : color-only shifts (link hover, badge tint)
+     * - tap       : button press feedback (translate / scale)
+     * - hover     : standard control hover (alias of duration-base)
+     * - reveal    : panels / disclosures opening
+     * - stage     : page-level transitions, tab swaps
+     * - celebrate : success flourishes (publish, copied)
+     */
+    --tasty-motion-instant: 0s;
+    --tasty-motion-hairline: 0.08s;
+    --tasty-motion-tap: 0.11s;
+    --tasty-motion-hover: var(--tasty-duration-base);
+    --tasty-motion-reveal: 0.24s;
+    --tasty-motion-stage: 0.32s;
+    --tasty-motion-celebrate: 0.52s;
+    --tasty-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --tasty-easing-decel: cubic-bezier(0, 0, 0.2, 1);
+    --tasty-easing-overshoot: cubic-bezier(0.2, 1.4, 0.4, 1);
+
+    /*
+     * Composite transition tokens — apply directly to `transition:`.
+     * Component CSS should read like
+     *   transition: var(--tasty-transition-card);
+     * and never re-declare property/duration/easing inline.
+     */
+    --tasty-transition-control: background-color var(--tasty-motion-hover) var(--tasty-easing-decel), border-color var(--tasty-motion-hover) var(--tasty-easing-decel), color var(--tasty-motion-hover) var(--tasty-easing-decel), box-shadow var(--tasty-motion-hover) var(--tasty-easing-decel), transform var(--tasty-motion-tap) var(--tasty-easing-emphasized);
+    --tasty-transition-card: background-color var(--tasty-motion-reveal) var(--tasty-easing-decel), border-color var(--tasty-motion-reveal) var(--tasty-easing-decel), box-shadow var(--tasty-motion-reveal) var(--tasty-easing-decel), transform var(--tasty-motion-reveal) var(--tasty-easing-decel);
+    --tasty-transition-rail: background-color var(--tasty-motion-stage) var(--tasty-easing-decel), border-color var(--tasty-motion-stage) var(--tasty-easing-decel), opacity var(--tasty-motion-stage) var(--tasty-easing-decel);
+    --tasty-transition-fade: opacity var(--tasty-motion-reveal) var(--tasty-easing-decel);
 
     /* Layer (z-index) */
     --tasty-z-overlay: 100000;
@@ -790,14 +1118,23 @@
     --tasty-syntax-text: var(--tasty-text);
     --tasty-syntax-comment: var(--tasty-text-muted);
     --tasty-syntax-punctuation: var(--tasty-gray-700);      /* : ; { } ( ) */
+    /*
+     * Structure / Declarations — Three-Color Restraint.
+     *
+     * The light syntax theme uses the same two-role split as the
+     * code preview window:
+     *   - Tasty Blue : structural tokens (at-rules, selectors, properties, keywords)
+     *   - Warm Amber Deep : value tokens (strings, numbers, functions)
+     *   - Slate / Ink : variables, operators, punctuation
+     */
     /* Structure */
-    --tasty-syntax-at-rule: #0b5f9e;                        /* @font-face  @media  @keyframes */
-    --tasty-syntax-selector: #1d4ed8;                       /* :root  .class  element */
+    --tasty-syntax-at-rule: var(--tasty-brand-blue);        /* @font-face  @media  @keyframes */
+    --tasty-syntax-selector: var(--tasty-brand-blue);       /* :root  .class  element */
     /* Declarations */
-    --tasty-syntax-property: #047857;                       /* font-family  src  --custom-prop-name */
-    --tasty-syntax-string: #b45309;                         /* "Font Name"  url(…) content */
-    --tasty-syntax-number: #1e3a8a;                         /* 300  900  16px  #hexcolor */
-    --tasty-syntax-variable: #0f766e;                       /* --font-heading  --font-body (as value) */
-    --tasty-syntax-keyword: #065f46;                        /* swap  normal  italic  bold */
-    --tasty-syntax-function: #c2410c;                       /* url()  var()  format()  calc() */
+    --tasty-syntax-property: var(--tasty-brand-blue-hover); /* font-family  src  --custom-prop-name */
+    --tasty-syntax-string: var(--tasty-warm-amber-deep);    /* "Font Name"  url(…) content */
+    --tasty-syntax-number: var(--tasty-warm-amber-deep);    /* 300  900  16px  #hexcolor */
+    --tasty-syntax-variable: var(--tasty-brand-blue-active);/* --font-heading  --font-body (as value) */
+    --tasty-syntax-keyword: var(--tasty-brand-blue);        /* swap  normal  italic  bold */
+    --tasty-syntax-function: var(--tasty-warm-amber-deep);  /* url()  var()  format()  calc() */
 }

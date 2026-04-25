@@ -104,7 +104,21 @@ final class LibraryService
                 ),
                 $familyName,
                 $fileCount
-            )
+            ),
+            [
+                'category' => LogRepository::CATEGORY_LIBRARY,
+                'event' => 'family_deleted',
+                'outcome' => 'danger',
+                'status_label' => __('Deleted', 'tasty-fonts'),
+                'source' => __('Library', 'tasty-fonts'),
+                'entity_type' => 'font_family',
+                'entity_id' => $familySlug,
+                'entity_name' => $familyName,
+                'details' => [
+                    ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                    ['label' => __('Files removed', 'tasty-fonts'), 'value' => (string) $fileCount, 'kind' => 'count'],
+                ],
+            ]
         );
 
         return true;
@@ -196,7 +210,21 @@ final class LibraryService
 
         $label = $this->stringValue($profile, 'label', ucfirst($provider));
         $message = sprintf(__('Removed %1$s from %2$s.', 'tasty-fonts'), $label, $familyName);
-        $this->log->add($message);
+        $this->log->add($message, [
+            'category' => LogRepository::CATEGORY_LIBRARY,
+            'event' => 'delivery_profile_deleted',
+            'outcome' => 'danger',
+            'status_label' => __('Deleted', 'tasty-fonts'),
+            'source' => __('Library', 'tasty-fonts'),
+            'entity_type' => 'font_family',
+            'entity_id' => $familySlug,
+            'entity_name' => $familyName,
+            'details' => [
+                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                ['label' => __('Delivery', 'tasty-fonts'), 'value' => $label],
+                ['label' => __('Files removed', 'tasty-fonts'), 'value' => (string) count($relativePaths), 'kind' => 'count'],
+            ],
+        ]);
 
         return [
             'family' => $familyName,
@@ -255,7 +283,21 @@ final class LibraryService
             $familyName,
             $this->stringValue($profile, 'label', __('the selected profile', 'tasty-fonts'))
         );
-        $this->log->add($message);
+        $this->log->add($message, [
+            'category' => LogRepository::CATEGORY_LIBRARY,
+            'event' => 'active_delivery_changed',
+            'outcome' => 'success',
+            'status_label' => __('Switched', 'tasty-fonts'),
+            'source' => __('Library', 'tasty-fonts'),
+            'entity_type' => 'font_family',
+            'entity_id' => $familySlug,
+            'entity_name' => $familyName,
+            'details' => [
+                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                ['label' => __('Live delivery', 'tasty-fonts'), 'value' => $this->stringValue($profile, 'label', $deliveryId)],
+                ['label' => __('Delivery ID', 'tasty-fonts'), 'value' => $deliveryId],
+            ],
+        ]);
 
         return [
             'family' => $familyName,
@@ -396,7 +438,20 @@ final class LibraryService
         $message = $publishState === 'library_only'
             ? sprintf(__('%s is now In Library Only.', 'tasty-fonts'), $familyName)
             : sprintf(__('%s is now Published.', 'tasty-fonts'), $familyName);
-        $this->log->add($message);
+        $this->log->add($message, [
+            'category' => LogRepository::CATEGORY_LIBRARY,
+            'event' => 'publish_state_changed',
+            'outcome' => 'success',
+            'status_label' => __('Updated', 'tasty-fonts'),
+            'source' => __('Library', 'tasty-fonts'),
+            'entity_type' => 'font_family',
+            'entity_id' => $familySlug,
+            'entity_name' => $familyName,
+            'details' => [
+                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                ['label' => __('Publish state', 'tasty-fonts'), 'value' => $publishState === 'library_only' ? __('In Library Only', 'tasty-fonts') : __('Published', 'tasty-fonts')],
+            ],
+        ]);
 
         return [
             'family' => $familyName,
@@ -592,7 +647,24 @@ final class LibraryService
                 $normalizedWeight,
                 $normalizedStyle,
                 $fileCount
-            )
+            ),
+            [
+                'category' => LogRepository::CATEGORY_LIBRARY,
+                'event' => 'variant_deleted',
+                'outcome' => 'danger',
+                'status_label' => __('Deleted', 'tasty-fonts'),
+                'source' => __('Library', 'tasty-fonts'),
+                'entity_type' => 'font_family',
+                'entity_id' => $familySlug,
+                'entity_name' => $familyName,
+                'details' => [
+                    ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                    ['label' => __('Weight', 'tasty-fonts'), 'value' => $normalizedWeight],
+                    ['label' => __('Style', 'tasty-fonts'), 'value' => $normalizedStyle],
+                    ['label' => __('Source', 'tasty-fonts'), 'value' => $normalizedSource],
+                    ['label' => __('Files removed', 'tasty-fonts'), 'value' => (string) $fileCount, 'kind' => 'count'],
+                ],
+            ]
         );
 
         return [

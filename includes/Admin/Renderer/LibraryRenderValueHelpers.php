@@ -82,6 +82,11 @@ trait LibraryRenderValueHelpers
     {
         $default = $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
         $familyName = trim($this->roleStringValue($roles, $roleKey));
+        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
+
+        if ($fallback !== '') {
+            return FontUtils::sanitizeFallback($fallback);
+        }
 
         if ($familyName !== '') {
             if (array_key_exists($familyName, $familyFallbacks)) {
@@ -99,9 +104,7 @@ trait LibraryRenderValueHelpers
             }
         }
 
-        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
-
-        return $fallback !== '' ? FontUtils::sanitizeFallback($fallback) : $default;
+        return $default;
     }
 
     /**

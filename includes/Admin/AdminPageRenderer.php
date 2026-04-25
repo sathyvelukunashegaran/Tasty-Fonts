@@ -177,6 +177,7 @@ final class AdminPageRenderer extends AbstractSectionRenderer
                                 <?php endforeach; ?>
                             </div>
                         </div>
+                        <span class="tasty-fonts-page-header-hairline" aria-hidden="true"></span>
                     </section>
 
                     <section id="tasty-fonts-page-panel-roles" class="tasty-fonts-page-panel <?php echo $currentPage === AdminController::PAGE_ROLES ? 'is-active' : ''; ?>" data-tab-group="page" data-tab-panel="<?php echo esc_attr(AdminController::PAGE_ROLES); ?>" role="tabpanel" aria-labelledby="tasty-fonts-page-tab-roles" <?php echo $currentPage === AdminController::PAGE_ROLES ? '' : 'hidden'; ?>>
@@ -329,19 +330,19 @@ final class AdminPageRenderer extends AbstractSectionRenderer
         return [
             AdminController::PAGE_ROLES => [
                 'label' => __('Deploy Fonts', 'tasty-fonts'),
-                'summary' => __('Set role fonts, review the pairing, and publish when it is ready.', 'tasty-fonts'),
+                'summary' => __('Pair role fonts, review, and publish.', 'tasty-fonts'),
             ],
             AdminController::PAGE_LIBRARY => [
                 'label' => __('Font Library', 'tasty-fonts'),
-                'summary' => __('Search, import, and manage every family and delivery profile.', 'tasty-fonts'),
+                'summary' => __('Search, import, and manage families and delivery profiles.', 'tasty-fonts'),
             ],
             AdminController::PAGE_SETTINGS => [
                 'label' => __('Settings', 'tasty-fonts'),
-                'summary' => __('Configure output, integrations, updates, and access.', 'tasty-fonts'),
+                'summary' => __('Configure output, integrations, behavior, and access.', 'tasty-fonts'),
             ],
             AdminController::PAGE_DIAGNOSTICS => [
                 'label' => __('Advanced Tools', 'tasty-fonts'),
-                'summary' => __('Inspect assets, clear caches, and run maintenance.', 'tasty-fonts'),
+                'summary' => __('Inspect assets, caches, and maintenance.', 'tasty-fonts'),
             ],
         ];
     }

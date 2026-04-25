@@ -3,7 +3,7 @@
   "private": true,
   "description": "Optional development tooling for the Tasty Custom Fonts WordPress plugin.",
   "scripts": {
-    "lint:css": "stylelint \"assets/css/*.css\""
+    "lint:css": "node bin/lint-css"
   },
   "devDependencies": {
     "stylelint": "17.9.0",

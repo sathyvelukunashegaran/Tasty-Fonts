@@ -329,6 +329,7 @@ final class Plugin
         $cliCommand = new CliCommand($this->admin);
 
         \WP_CLI::add_command('tasty-fonts', $cliCommand);
+        \WP_CLI::add_command('tasty-fonts google-api-key', [$cliCommand, 'googleApiKey']);
         \WP_CLI::add_command('tasty-fonts support-bundle', [$cliCommand, 'supportBundle']);
     }
 

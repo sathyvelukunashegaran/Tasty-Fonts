@@ -632,6 +632,43 @@ $tests['log_repository_add_omits_action_link_when_label_or_url_is_missing'] = st
     assertFalseValue(isset($entries[1]['action_label']), 'Log entry should not include action_label when it is absent and action_url is present alone.');
 };
 
+$tests['log_repository_add_persists_enriched_activity_metadata_as_scalar_fields'] = static function (): void {
+    resetTestState();
+
+    $log = new LogRepository();
+    $log->add('Plugin settings saved: preview text updated.', [
+        'category' => LogRepository::CATEGORY_SETTINGS,
+        'event' => 'settings_saved',
+        'summary' => 'Settings saved.',
+        'outcome' => 'success',
+        'status_label' => 'Saved',
+        'source' => 'Settings',
+        'entity_type' => 'settings',
+        'entity_id' => 'output',
+        'entity_name' => 'Output Settings',
+        'error_code' => '',
+        'details' => [
+            ['label' => 'Changed settings', 'value' => 'preview text updated', 'kind' => 'text'],
+            ['label' => '', 'value' => 'ignored'],
+        ],
+    ]);
+
+    $entry = $log->all()[0] ?? [];
+
+    assertSameValue('2', (string) ($entry['schema_version'] ?? ''), 'Enriched log entries should include a schema marker.');
+    assertSameValue(LogRepository::CATEGORY_SETTINGS, (string) ($entry['category'] ?? ''), 'Enriched log entries should persist the category.');
+    assertSameValue('settings_saved', (string) ($entry['event'] ?? ''), 'Enriched log entries should persist the event.');
+    assertSameValue('Settings saved.', (string) ($entry['summary'] ?? ''), 'Enriched log entries should persist a compact summary.');
+    assertSameValue('success', (string) ($entry['outcome'] ?? ''), 'Enriched log entries should persist the normalized outcome.');
+    assertSameValue('Saved', (string) ($entry['status_label'] ?? ''), 'Enriched log entries should persist the visible status label.');
+    assertSameValue('Settings', (string) ($entry['source'] ?? ''), 'Enriched log entries should persist the source label.');
+    assertSameValue('settings', (string) ($entry['entity_type'] ?? ''), 'Enriched log entries should persist the entity type.');
+    assertSameValue('output', (string) ($entry['entity_id'] ?? ''), 'Enriched log entries should persist the entity ID.');
+    assertSameValue('Output Settings', (string) ($entry['entity_name'] ?? ''), 'Enriched log entries should persist the entity label.');
+    assertContainsValue('Changed settings', (string) ($entry['details_json'] ?? ''), 'Detail rows should be encoded into the scalar details_json field.');
+    assertNotContainsValue('ignored', (string) ($entry['details_json'] ?? ''), 'Invalid detail rows should be omitted.');
+};
+
 $tests['log_repository_add_respects_maximum_entries_limit'] = static function (): void {
     resetTestState();
 

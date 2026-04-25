@@ -28,9 +28,11 @@
                     $activityActorOptions = isset($activityActorOptions) && is_array($activityActorOptions) ? $activityActorOptions : [];
                     $showSettingsDescriptions = empty($trainingWheelsOff);
                     $showActivityLog = !empty($showActivityLog);
+					$updateChannel = isset($updateChannel) ? (string) $updateChannel : 'stable';
+					$updateChannelOptions = isset($updateChannelOptions) && is_array($updateChannelOptions) ? $updateChannelOptions : [];
+					$updateChannelStatus = isset($updateChannelStatus) && is_array($updateChannelStatus) ? $updateChannelStatus : [];
                     $generatedCssDownloadUrl = trim((string) ($generatedCssPanel['download_url'] ?? ''));
                     $attentionHealthChecks = [];
-                    $advisoryHealthChecks = [];
                     $passingHealthChecks = [];
                     $copyableDiagnosticItems = [];
 
@@ -41,14 +43,9 @@
 
                         $severity = (string) ($healthCheck['severity'] ?? 'ok');
 
-                        if ($severity === 'critical' || $severity === 'warning') {
+                        if ($severity === 'critical' || $severity === 'warning' || $severity === 'info') {
                             $attentionHealthChecks[] = $healthCheck;
 
-                            continue;
-                        }
-
-                        if ($severity === 'info') {
-                            $advisoryHealthChecks[] = $healthCheck;
                             continue;
                         }
 
@@ -198,8 +195,8 @@
                                 'external' => false,
                             ],
                             'update_channel' => [
-                                'label' => __('Review Update Channel', 'tasty-fonts'),
-                                'url' => add_query_arg('tf_studio', 'plugin-behavior', $settingsPageUrl),
+								'label' => __('Open Release Rail', 'tasty-fonts'),
+								'url' => $overviewMaintenanceUrl,
                                 'external' => false,
                             ],
                             'site_transfer' => [
@@ -334,6 +331,22 @@
 	                            ],
 	                        ],
 	                        [
+	                            'slug' => 'google-api-key',
+	                            'title' => __('Google API Key', 'tasty-fonts'),
+	                            'commands' => [
+	                                [
+	                                    'label' => __('Check key status', 'tasty-fonts'),
+	                                    'command' => 'wp tasty-fonts google-api-key status',
+	                                    'description' => __('Reports whether a Google Fonts API key is stored without printing the key.', 'tasty-fonts'),
+	                                ],
+	                                [
+	                                    'label' => __('Save key securely', 'tasty-fonts'),
+	                                    'command' => 'wp tasty-fonts google-api-key save',
+	                                    'description' => __('Prompts for a Google Fonts API key, validates it, and saves it without exposing the key in shell history.', 'tasty-fonts'),
+	                                ],
+	                            ],
+	                        ],
+	                        [
 	                            'slug' => 'generated-assets',
 	                            'title' => __('Generated Assets', 'tasty-fonts'),
 	                            'commands' => [
@@ -355,6 +368,22 @@
 	                            ],
 	                        ],
 	                        [
+	                            'slug' => 'maintenance',
+	                            'title' => __('Maintenance', 'tasty-fonts'),
+	                            'commands' => [
+	                                [
+	                                    'label' => __('Reset settings', 'tasty-fonts'),
+	                                    'command' => 'wp tasty-fonts settings reset --yes',
+	                                    'description' => __('Resets all Tasty Fonts settings and stored Google key data to defaults while keeping managed font files.', 'tasty-fonts'),
+	                                ],
+	                                [
+	                                    'label' => __('Delete managed files', 'tasty-fonts'),
+	                                    'command' => 'wp tasty-fonts files delete --yes',
+	                                    'description' => __('Deletes plugin-managed font files, generated CSS, retained transfer exports, and rollback snapshots, then rebuilds empty storage.', 'tasty-fonts'),
+	                                ],
+	                            ],
+	                        ],
+	                        [
 	                            'slug' => 'transfer',
 	                            'title' => __('Transfer', 'tasty-fonts'),
 	                            'commands' => [
@@ -365,13 +394,13 @@
 	                                ],
 	                                [
 	                                    'label' => __('Dry-run import', 'tasty-fonts'),
-	                                    'command' => 'wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run',
-	                                    'description' => __('Validates a transfer ZIP and previews the import diff without replacing current site data.', 'tasty-fonts'),
+	                                    'command' => 'wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run --prompt-google-api-key',
+	                                    'description' => __('Validates a transfer ZIP, optionally prompts for a destination Google key, and previews the import diff without replacing current site data.', 'tasty-fonts'),
 	                                ],
 	                                [
 	                                    'label' => __('Import bundle', 'tasty-fonts'),
-	                                    'command' => 'wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes',
-	                                    'description' => __('Imports a validated transfer ZIP, creates a rollback snapshot first, and replaces current Tasty Fonts data.', 'tasty-fonts'),
+	                                    'command' => 'wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes --prompt-google-api-key',
+	                                    'description' => __('Imports a validated transfer ZIP, prompts for an optional destination Google key, creates a rollback snapshot first, and replaces current Tasty Fonts data.', 'tasty-fonts'),
 	                                ],
 	                            ],
 	                        ],
@@ -454,7 +483,6 @@
 
                         echo ' data-help-tooltip="' . esc_attr($copy) . '"';
                         echo ' data-help-passive="1"';
-                        echo ' title="' . esc_attr($copy) . '"';
                         echo ' aria-describedby="tasty-fonts-help-tooltip-layer"';
                     };
                     $snapshotReasonLabel = static function (string $reason): string {
@@ -574,16 +602,6 @@
                                                         /* translators: %d: number of health checks needing attention */
                                                         _n('%d Item', '%d Items', count($attentionHealthChecks), 'tasty-fonts'),
                                                         count($attentionHealthChecks)
-                                                    ),
-                                                ],
-                                                [
-                                                    'slug' => 'advisory',
-                                                    'title' => __('Advisory', 'tasty-fonts'),
-                                                    'checks' => $advisoryHealthChecks,
-                                                    'summary' => sprintf(
-                                                        /* translators: %d: number of advisory health checks */
-                                                        _n('%d Note', '%d Notes', count($advisoryHealthChecks), 'tasty-fonts'),
-                                                        count($advisoryHealthChecks)
                                                     ),
                                                 ],
                                                 [
@@ -754,8 +772,8 @@
                                                         <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
                                                         <div class="tasty-fonts-health-row-copy">
                                                             <div class="tasty-fonts-health-row-title">
-                                                                <strong><?php esc_html_e('No active runtime families.', 'tasty-fonts'); ?></strong>
-                                                                <span><?php esc_html_e('Publish sitewide roles to emit managed families on the front end.', 'tasty-fonts'); ?></span>
+                                                                <strong><?php esc_html_e('No families on the front end yet.', 'tasty-fonts'); ?></strong>
+                                                                <span><?php esc_html_e('Publish your roles to deploy them.', 'tasty-fonts'); ?></span>
                                                             </div>
                                                         </div>
                                                         <div class="tasty-fonts-health-row-actions">
@@ -838,6 +856,8 @@
                                     $toolsRenderer->renderCodeEditor($generatedCssPanel, [
                                         'preserve_display_format' => true,
                                         'allow_readable_toggle' => !empty($minifyCssOutput),
+                                        'default_to_readable' => !empty($minifyCssOutput),
+                                        'toggle_label_active' => __('Minified CSS', 'tasty-fonts'),
                                         'download_url' => $generatedCssDownloadUrl,
                                         'download_label' => __('Download Generated CSS', 'tasty-fonts'),
                                     ]);
@@ -860,6 +880,67 @@
                                         <span><?php esc_html_e('Pending settings changes temporarily disable developer actions.', 'tasty-fonts'); ?></span>
                                     </div>
                                     <div class="tasty-fonts-health-board tasty-fonts-developer-board">
+										<section class="tasty-fonts-health-group tasty-fonts-health-group--developer tasty-fonts-developer-tool-group tasty-fonts-developer-tool-group--release-rail" aria-labelledby="tasty-fonts-advanced-developer-group-release-rail">
+											<div class="tasty-fonts-health-group-head">
+												<h4 id="tasty-fonts-advanced-developer-group-release-rail"><?php esc_html_e('Release Rail', 'tasty-fonts'); ?></h4>
+												<span class="tasty-fonts-health-group-count"><?php esc_html_e('Testing Channel', 'tasty-fonts'); ?></span>
+											</div>
+											<div class="tasty-fonts-health-list">
+												<article class="tasty-fonts-health-row tasty-fonts-developer-row tasty-fonts-developer-row--release-rail">
+													<span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+													<div class="tasty-fonts-health-row-copy">
+														<div class="tasty-fonts-health-row-title">
+															<strong><?php esc_html_e('Update Channel', 'tasty-fonts'); ?></strong>
+															<?php if ($showSettingsDescriptions): ?>
+																<span><?php esc_html_e('Choose which GitHub release rail this site follows. Stable is best for production; Beta and Nightly are for testing.', 'tasty-fonts'); ?></span>
+															<?php endif; ?>
+														</div>
+													</div>
+													<div class="tasty-fonts-health-row-actions">
+														<button
+															type="button"
+															class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-health-help-trigger"
+															aria-label="<?php esc_attr_e('Explain Update Channel', 'tasty-fonts'); ?>"
+															<?php $renderSiteTransferHelpAttributes(__('Stable is recommended for production sites. Use Beta or Nightly only when you are testing release candidates or development builds.', 'tasty-fonts')); ?>
+														>?</button>
+														<form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form tasty-fonts-release-rail-form">
+															<?php wp_nonce_field('tasty_fonts_save_settings'); ?>
+															<input type="hidden" name="tasty_fonts_save_settings" value="1">
+															<div class="tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--channel-control">
+																<span class="tasty-fonts-select-field tasty-fonts-settings-row-select">
+																	<select class="tasty-fonts-select" name="update_channel" aria-label="<?php esc_attr_e('Update channel', 'tasty-fonts'); ?>">
+																		<?php foreach ($updateChannelOptions as $option): ?>
+																			<?php $optionValue = (string) ($option['value'] ?? 'stable'); ?>
+																			<option value="<?php echo esc_attr($optionValue); ?>" <?php selected($updateChannel, $optionValue); ?>>
+																				<?php echo esc_html((string) ($option['label'] ?? '')); ?>
+																			</option>
+																		<?php endforeach; ?>
+																	</select>
+																</span>
+															</div>
+															<div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
+																<button type="submit" class="button tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--save tasty-fonts-developer-action-button"><?php esc_html_e('Save Channel', 'tasty-fonts'); ?></button>
+															</div>
+														</form>
+														<?php if (!empty($updateChannelStatus['can_reinstall'])): ?>
+															<form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form tasty-fonts-release-rail-reinstall-form">
+																<?php wp_nonce_field('tasty_fonts_reinstall_update_channel', '_tasty_fonts_reinstall_nonce'); ?>
+																<div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
+																	<button
+																		type="submit"
+																		class="button button-small tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--restore tasty-fonts-developer-action-button"
+																		name="tasty_fonts_reinstall_update_channel"
+																		value="1"
+																		aria-label="<?php esc_attr_e('Reinstall selected channel', 'tasty-fonts'); ?>"
+																		<?php $renderSiteTransferHelpAttributes((string) ($updateChannelStatus['state_copy'] ?? '')); ?>
+																	><?php esc_html_e('Reinstall', 'tasty-fonts'); ?></button>
+																</div>
+															</form>
+														<?php endif; ?>
+													</div>
+												</article>
+											</div>
+										</section>
                                         <?php foreach ($developerToolGroups as $developerToolGroup): ?>
                                             <?php
                                             $developerToolGroupSlug = isset($developerToolGroup['slug']) ? sanitize_html_class((string) $developerToolGroup['slug']) : 'group';
@@ -1421,7 +1502,7 @@
                                                         <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
                                                         <div class="tasty-fonts-health-row-copy">
                                                             <div class="tasty-fonts-health-row-title">
-                                                                <strong><?php esc_html_e('Dry Run Incoming Bundle', 'tasty-fonts'); ?></strong>
+																<strong><?php esc_html_e('Import Bundle', 'tasty-fonts'); ?></strong>
                                                                 <?php if ($showSettingsDescriptions): ?>
                                                                     <span><?php esc_html_e('Choose a transfer ZIP, validate the diff, then import only after the dry-run is clear.', 'tasty-fonts'); ?></span>
                                                                 <?php endif; ?>
@@ -1478,11 +1559,11 @@
                                                                     </div>
                                                                     <div class="tasty-fonts-site-transfer-summary-wrap">
                                                                         <div class="tasty-fonts-site-transfer-summary" aria-label="<?php esc_attr_e('Import readiness', 'tasty-fonts'); ?>">
-                                                                            <div class="tasty-fonts-site-transfer-summary-item" data-state="neutral" aria-label="<?php esc_attr_e('Bundle: No bundle selected', 'tasty-fonts'); ?>" title="<?php esc_attr_e('Bundle: No bundle selected', 'tasty-fonts'); ?>">
+                                                                            <div class="tasty-fonts-site-transfer-summary-item" data-state="neutral" aria-label="<?php esc_attr_e('Bundle: No bundle selected', 'tasty-fonts'); ?>"<?php echo $showSettingsDescriptions ? ' data-help-tooltip="' . esc_attr__('Bundle: No bundle selected', 'tasty-fonts') . '" data-help-passive="1"' : ''; ?>>
                                                                                 <span class="tasty-fonts-site-transfer-summary-label"><?php esc_html_e('Bundle', 'tasty-fonts'); ?></span>
                                                                                 <span class="tasty-fonts-site-transfer-summary-value" data-site-transfer-summary="bundle"><?php esc_html_e('No bundle selected', 'tasty-fonts'); ?></span>
                                                                             </div>
-                                                                            <div class="tasty-fonts-site-transfer-summary-item" data-state="neutral" aria-label="<?php echo esc_attr($siteTransferUploadLimitLabel !== '' ? sprintf(__('Upload limit: %s Upload Limit', 'tasty-fonts'), $siteTransferUploadLimitLabel) : __('Upload limit: Upload Limit Available', 'tasty-fonts')); ?>" title="<?php echo esc_attr($siteTransferUploadLimitLabel !== '' ? sprintf(__('Upload limit: %s Upload Limit', 'tasty-fonts'), $siteTransferUploadLimitLabel) : __('Upload limit: Upload Limit Available', 'tasty-fonts')); ?>">
+                                                                            <div class="tasty-fonts-site-transfer-summary-item" data-state="neutral" aria-label="<?php echo esc_attr($siteTransferUploadLimitLabel !== '' ? sprintf(__('Upload limit: %s Upload Limit', 'tasty-fonts'), $siteTransferUploadLimitLabel) : __('Upload limit: Upload Limit Available', 'tasty-fonts')); ?>"<?php echo $showSettingsDescriptions ? ' data-help-tooltip="' . esc_attr($siteTransferUploadLimitLabel !== '' ? sprintf(__('Upload limit: %s Upload Limit', 'tasty-fonts'), $siteTransferUploadLimitLabel) : __('Upload limit: Upload Limit Available', 'tasty-fonts')) . '" data-help-passive="1"' : ''; ?>>
 	                                                                                <span class="tasty-fonts-site-transfer-summary-label"><?php esc_html_e('Upload limit', 'tasty-fonts'); ?></span>
                                                                                 <span class="tasty-fonts-site-transfer-summary-value" data-site-transfer-summary="limit">
                                                                                     <?php
@@ -1494,7 +1575,7 @@
                                                                                     ?>
                                                                                 </span>
                                                                             </div>
-                                                                            <div class="tasty-fonts-site-transfer-summary-item" data-state="neutral" aria-label="<?php esc_attr_e('Google API key: Optional', 'tasty-fonts'); ?>" title="<?php esc_attr_e('Google API key: Optional', 'tasty-fonts'); ?>">
+                                                                            <div class="tasty-fonts-site-transfer-summary-item" data-state="neutral" aria-label="<?php esc_attr_e('Google API key: Optional', 'tasty-fonts'); ?>"<?php echo $showSettingsDescriptions ? ' data-help-tooltip="' . esc_attr__('Google API key: Optional', 'tasty-fonts') . '" data-help-passive="1"' : ''; ?>>
 	                                                                                <span class="tasty-fonts-site-transfer-summary-label"><?php esc_html_e('Google API key', 'tasty-fonts'); ?></span>
                                                                                 <span class="tasty-fonts-site-transfer-summary-value" data-site-transfer-summary="google"><?php esc_html_e('Optional', 'tasty-fonts'); ?></span>
                                                                             </div>
@@ -1813,6 +1894,10 @@
                                                         <div class="tasty-fonts-activity-head-actions tasty-fonts-site-transfer-activity-head-actions">
                                                             <span class="tasty-fonts-health-group-count"><?php esc_html_e('No Events Yet', 'tasty-fonts'); ?></span>
                                                         </div>
+                                                    <?php else: ?>
+                                                        <div class="tasty-fonts-activity-head-actions tasty-fonts-site-transfer-activity-head-actions">
+                                                            <span class="tasty-fonts-health-group-count" data-log-count><?php echo esc_html(sprintf(_n('%d entry', '%d entries', count($siteTransferLogs), 'tasty-fonts'), count($siteTransferLogs))); ?></span>
+                                                        </div>
                                                     <?php endif; ?>
                                                 </div>
                                                 <?php if ($siteTransferLogs === []): ?>
@@ -1866,7 +1951,7 @@
                                                     </div>
                                                     <div class="tasty-fonts-activity-shell">
                                                         <div id="tasty-fonts-advanced-transfer-log-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty--panel tasty-fonts-activity-empty" data-log-empty-filtered hidden><?php esc_html_e('No transfer activity matches the current filters.', 'tasty-fonts'); ?></div>
-                                                        <?php $this->renderLogList($siteTransferLogs); ?>
+                                                        <?php $this->renderLogList($siteTransferLogs, 'tasty-fonts-log-list', 5, 'transfer'); ?>
                                                     </div>
                                                 <?php endif; ?>
                                             </section>
@@ -1894,6 +1979,8 @@
                                                     <span class="tasty-fonts-health-group-count"><?php esc_html_e('Hidden', 'tasty-fonts'); ?></span>
                                                 <?php elseif ($logs === []): ?>
                                                     <span class="tasty-fonts-health-group-count"><?php esc_html_e('No Events Yet', 'tasty-fonts'); ?></span>
+                                                <?php else: ?>
+                                                    <span class="tasty-fonts-health-group-count" data-activity-count><?php echo esc_html(sprintf(_n('%d entry', '%d entries', $logCount, 'tasty-fonts'), $logCount)); ?></span>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -1961,7 +2048,7 @@
                                             </div>
                                             <div class="tasty-fonts-activity-shell">
                                                 <div id="tasty-fonts-advanced-activity-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty--panel tasty-fonts-activity-empty" data-activity-empty-filtered hidden><?php esc_html_e('No activity matches the current filters.', 'tasty-fonts'); ?></div>
-                                                <?php $this->renderLogList($logs); ?>
+                                                <?php $this->renderLogList($logs, 'tasty-fonts-log-list', 5, 'activity'); ?>
                                             </div>
                                         <?php endif; ?>
                                     </section>

@@ -6,6 +6,7 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\LogRepository;
 use TastyFonts\Support\FontUtils;
 use WP_Error;
 
@@ -136,7 +137,21 @@ trait HostedProviderImportTrait
             ? sprintf($this->stringValue($messages, 'cdn'), $familyName)
             : sprintf($this->stringValue($messages, 'existing'), $familyName);
 
-        $this->log->add($message);
+        $this->log->add($message, [
+            'category' => LogRepository::CATEGORY_IMPORT,
+            'event' => 'hosted_import_skipped',
+            'outcome' => 'info',
+            'status_label' => __('Skipped', 'tasty-fonts'),
+            'source' => __('Import', 'tasty-fonts'),
+            'entity_type' => 'font_family',
+            'entity_name' => $familyName,
+            'details' => [
+                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                ['label' => __('Delivery type', 'tasty-fonts'), 'value' => $deliveryMode],
+                ['label' => __('Requested variants', 'tasty-fonts'), 'value' => implode(', ', $requestedVariants)],
+                ['label' => __('Skipped variants', 'tasty-fonts'), 'value' => implode(', ', $variantPlan['skipped'])],
+            ],
+        ]);
 
         return [
             'status' => 'skipped',
@@ -600,7 +615,24 @@ trait HostedProviderImportTrait
         array $variants,
         array $variantPlan
     ): array {
-        $this->log->add($message);
+        $this->log->add($message, [
+            'category' => LogRepository::CATEGORY_IMPORT,
+            'event' => $status === 'imported' ? 'hosted_import_imported' : 'hosted_import_saved',
+            'outcome' => 'success',
+            'status_label' => $status === 'imported' ? __('Imported', 'tasty-fonts') : __('Saved', 'tasty-fonts'),
+            'source' => __('Import', 'tasty-fonts'),
+            'entity_type' => 'font_family',
+            'entity_id' => $deliveryId,
+            'entity_name' => $familyName,
+            'details' => [
+                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                ['label' => __('Delivery type', 'tasty-fonts'), 'value' => $deliveryType],
+                ['label' => __('Faces', 'tasty-fonts'), 'value' => (string) $faceCount, 'kind' => 'count'],
+                ['label' => __('Files', 'tasty-fonts'), 'value' => (string) $fileCount, 'kind' => 'count'],
+                ['label' => __('Imported variants', 'tasty-fonts'), 'value' => $variantPlan['import'] === [] ? __('None', 'tasty-fonts') : implode(', ', $variantPlan['import'])],
+                ['label' => __('Skipped variants', 'tasty-fonts'), 'value' => $variantPlan['skipped'] === [] ? __('None', 'tasty-fonts') : implode(', ', $variantPlan['skipped'])],
+            ],
+        ]);
 
         return [
             'status' => $status,
@@ -815,7 +847,18 @@ trait HostedProviderImportTrait
 
     private function error(string $code, string $message): WP_Error
     {
-        $this->log->add($message);
+        $this->log->add($message, [
+            'category' => LogRepository::CATEGORY_IMPORT,
+            'event' => 'hosted_import_failed',
+            'outcome' => 'error',
+            'status_label' => __('Failed', 'tasty-fonts'),
+            'source' => __('Import', 'tasty-fonts'),
+            'error_code' => $code,
+            'details' => [
+                ['label' => __('Failure code', 'tasty-fonts'), 'value' => $code],
+                ['label' => __('Reason', 'tasty-fonts'), 'value' => $message],
+            ],
+        ]);
 
         return new WP_Error($code, $message);
     }

@@ -70,7 +70,14 @@ Google API keys, generated CSS, logs, and transient runtime state are excluded f
 
 ### Activity
 
-The `Activity` tab shows recent scans, imports, deletes, settings changes, generated asset refreshes, transfer dry-run results, import outcomes, and sync issues. The log can be searched and filtered when visible.
+The `Activity` tab shows recent scans, imports, deletes, settings changes, generated asset refreshes, transfer dry-run results, import outcomes, and sync issues. Rows stay compact by default, then expand to show audit and troubleshooting details such as:
+
+- the outcome and source area
+- affected fonts, deliveries, settings, or assets
+- counts for imported, skipped, removed, or refreshed items
+- error codes and recovery links when an event is actionable
+
+Use the account filter to review changes by actor, or search for names, event types, settings, error codes, and detail values. The log keeps the newest 100 entries.
 
 If the Activity tab says the log is hidden, enable `Settings -> Behavior -> Show Activity Log`. The plugin records events regardless of whether the panel is visible, so you can re-enable the setting at any time to view past history.
 
@@ -81,19 +88,28 @@ Advanced Tools also exposes command-line equivalents for maintenance and support
 ```bash
 wp tasty-fonts doctor
 wp tasty-fonts doctor --format=json
+wp tasty-fonts google-api-key status
+wp tasty-fonts google-api-key save
 wp tasty-fonts css regenerate
 wp tasty-fonts cache clear
 wp tasty-fonts library rescan
+wp tasty-fonts settings reset --yes
+wp tasty-fonts files delete --yes
 wp tasty-fonts transfer export
-wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run
-wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run --prompt-google-api-key
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes --prompt-google-api-key
 wp tasty-fonts support-bundle
+wp tasty-fonts support-bundle --format=json
 wp tasty-fonts snapshot create
-wp tasty-fonts snapshot list
+wp tasty-fonts snapshot list --format=json
 wp tasty-fonts snapshot restore <snapshot-id> --yes
 ```
 
 Destructive CLI actions require `--yes`. Transfer imports and snapshot restores still create rollback snapshots first, matching the admin UI safety behavior.
+
+Google API key commands never print the stored key. Use `google-api-key save` or transfer import with `--prompt-google-api-key` for hidden interactive input. Automation can pipe a key with `--google-api-key-stdin`; the older direct `--google-api-key=<key>` flag has been removed because shells may store it in history.
+
+`wp tasty-fonts files delete --yes` removes plugin-managed font files, generated CSS, retained transfer export bundles, and rollback snapshots, then recreates the empty storage scaffold. It does not scan arbitrary temporary directories or delete media outside Tasty Fonts storage.
 
 ## Notes
 

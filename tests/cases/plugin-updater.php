@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
@@ -114,7 +115,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_regenerate_css_queued',
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_CATALOG,
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_METADATA,
-        'tasty_fonts_bunny_catalog_v1',
+        BunnyFontsClient::TRANSIENT_CATALOG,
         'tasty_fonts_github_release_manifest_v1',
         'tasty_fonts_github_release_version_v1',
     ] as $transientKey) {
@@ -130,7 +131,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_regenerate_css_queued',
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_CATALOG,
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_METADATA,
-        'tasty_fonts_bunny_catalog_v1',
+        BunnyFontsClient::TRANSIENT_CATALOG,
         'tasty_fonts_github_release_manifest_v1',
         'tasty_fonts_github_release_version_v1',
     ] as $transientKey) {
@@ -1421,6 +1422,7 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
         'tasty_fonts_local_environment_notice_preferences' => [1 => ['hidden_until' => 123456, 'dismissed_forever' => true]],
     ];
     $transientStore = [
+        TransientKey::forSite(BunnyFontsClient::TRANSIENT_CATALOG) => ['Inter'],
         TransientKey::forSite('tasty_fonts_bunny_catalog_v1') => ['Inter'],
     ];
 
@@ -1429,14 +1431,18 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
     assertSameValue(true, in_array('tasty_fonts_library', $optionDeleted, true), 'Uninstall should delete the live library option key.');
     assertSameValue(true, in_array('tasty_fonts_google_api_key_data', $optionDeleted, true), 'Uninstall should delete the dedicated Google API key option.');
     assertSameValue(true, in_array('tasty_fonts_local_environment_notice_preferences', $optionDeleted, true), 'Uninstall should delete persisted local-environment reminder preferences.');
-    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_bunny_catalog_v1'), $transientDeleted, true), 'Uninstall should delete the Bunny catalog transient.');
-    assertSameValue(2, count($wpdbQueries), 'Uninstall should issue wildcard cleanup queries for Bunny family and admin notice transients.');
+    assertSameValue(true, in_array(TransientKey::forSite(BunnyFontsClient::TRANSIENT_CATALOG), $transientDeleted, true), 'Uninstall should delete the Bunny catalog transient.');
+    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_bunny_catalog_v1'), $transientDeleted, true), 'Uninstall should delete the legacy Bunny catalog transient.');
+    assertSameValue(3, count($wpdbQueries), 'Uninstall should issue wildcard cleanup queries for current Bunny family, legacy Bunny family, and admin notice transients.');
     assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[0] ?? '', 'Uninstall should target the options table when cleaning Bunny family transients.');
-    assertContainsValue('blog\\_1\\_tasty\\_fonts\\_bunny\\_family\\_', $wpdbQueries[0] ?? '', 'Uninstall should wildcard-match blog-scoped Bunny family transients.');
+    assertContainsValue('blog\\_1\\_tasty\\_fonts\\_bunny\\_family\\_v2\\_', $wpdbQueries[0] ?? '', 'Uninstall should wildcard-match blog-scoped Bunny family transients.');
     assertContainsValue('timeout', $wpdbQueries[0] ?? '', 'Uninstall should also remove Bunny family transient timeout rows.');
-    assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[1] ?? '', 'Uninstall should target the options table when cleaning admin notice transients.');
-    assertContainsValue('blog\\_1\\_tasty\\_fonts\\_admin\\_notices\\_', $wpdbQueries[1] ?? '', 'Uninstall should wildcard-match blog-scoped per-user admin notice transients.');
-    assertContainsValue('timeout', $wpdbQueries[1] ?? '', 'Uninstall should also remove admin notice transient timeout rows.');
+    assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[1] ?? '', 'Uninstall should target the options table when cleaning legacy Bunny family transients.');
+    assertContainsValue('blog\\_1\\_tasty\\_fonts\\_bunny\\_family\\_', $wpdbQueries[1] ?? '', 'Uninstall should wildcard-match blog-scoped legacy Bunny family transients.');
+    assertContainsValue('timeout', $wpdbQueries[1] ?? '', 'Uninstall should also remove legacy Bunny family transient timeout rows.');
+    assertContainsValue('DELETE FROM wp_options WHERE option_name LIKE', $wpdbQueries[2] ?? '', 'Uninstall should target the options table when cleaning admin notice transients.');
+    assertContainsValue('blog\\_1\\_tasty\\_fonts\\_admin\\_notices\\_', $wpdbQueries[2] ?? '', 'Uninstall should wildcard-match blog-scoped per-user admin notice transients.');
+    assertContainsValue('timeout', $wpdbQueries[2] ?? '', 'Uninstall should also remove admin notice transient timeout rows.');
 };
 
 $tests['uninstall_always_deletes_generated_css_and_removes_synced_block_editor_families'] = static function (): void {

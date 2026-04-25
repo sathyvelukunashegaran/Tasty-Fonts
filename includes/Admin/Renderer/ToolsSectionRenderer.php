@@ -53,7 +53,16 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
         $canToggleReadableView = !empty($options['allow_readable_toggle'])
             && $this->looksLikeCssSnippet(trim($value))
             && $readableDisplayValue !== $displayValue;
+        $defaultToReadable = $canToggleReadableView && !empty($options['default_to_readable']);
         $readableTarget = $target !== '' ? $target . '-readable' : '';
+        $toggleDefaultLabel = trim($this->stringValue($options, 'toggle_label_default'));
+        $toggleActiveLabel = trim($this->stringValue($options, 'toggle_label_active'));
+        $toggleDefaultLabel = $toggleDefaultLabel !== ''
+            ? $toggleDefaultLabel
+            : __('Readable Preview', 'tasty-fonts');
+        $toggleActiveLabel = $toggleActiveLabel !== ''
+            ? $toggleActiveLabel
+            : __('Show Actual Output', 'tasty-fonts');
         $downloadUrl = trim($this->stringValue($options, 'download_url'));
         $downloadLabelOption = trim($this->stringValue($options, 'download_label'));
         $downloadLabel = $downloadLabelOption !== ''
@@ -68,12 +77,12 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
                         type="button"
                         class="button tasty-fonts-output-display-toggle"
                         data-snippet-display-toggle
-                        data-label-default="<?php esc_attr_e('Readable Preview', 'tasty-fonts'); ?>"
-                        data-label-active="<?php esc_attr_e('Show Actual Output', 'tasty-fonts'); ?>"
-                        aria-pressed="false"
+                        data-label-default="<?php echo esc_attr($toggleDefaultLabel); ?>"
+                        data-label-active="<?php echo esc_attr($toggleActiveLabel); ?>"
+                        aria-pressed="<?php echo $defaultToReadable ? 'true' : 'false'; ?>"
                         aria-controls="<?php echo esc_attr(trim($target . ' ' . $readableTarget)); ?>"
                     >
-                        <?php esc_html_e('Readable Preview', 'tasty-fonts'); ?>
+                        <?php echo esc_html($defaultToReadable ? $toggleActiveLabel : $toggleDefaultLabel); ?>
                     </button>
                 <?php endif; ?>
                 <?php if ($downloadUrl !== ''): ?>
@@ -97,9 +106,9 @@ final class ToolsSectionRenderer extends AbstractSectionRenderer
             </div>
         </div>
         <div class="tasty-fonts-code-panel-body" data-snippet-display aria-labelledby="<?php echo esc_attr($headingId); ?>">
-            <pre class="tasty-fonts-output" data-snippet-view="raw" aria-labelledby="<?php echo esc_attr($headingId); ?>"><code id="<?php echo esc_attr($target); ?>" class="tasty-fonts-output-code"><?php $this->renderHighlightedSnippet($displayValue); ?></code></pre>
+            <pre class="tasty-fonts-output" data-snippet-view="raw" aria-labelledby="<?php echo esc_attr($headingId); ?>"<?php echo $defaultToReadable ? ' hidden' : ''; ?>><code id="<?php echo esc_attr($target); ?>" class="tasty-fonts-output-code"><?php $this->renderHighlightedSnippet($displayValue); ?></code></pre>
             <?php if ($canToggleReadableView): ?>
-                <pre class="tasty-fonts-output" data-snippet-view="readable" aria-labelledby="<?php echo esc_attr($headingId); ?>" hidden><code id="<?php echo esc_attr($readableTarget); ?>" class="tasty-fonts-output-code"><?php $this->renderHighlightedSnippet($readableDisplayValue); ?></code></pre>
+                <pre class="tasty-fonts-output" data-snippet-view="readable" aria-labelledby="<?php echo esc_attr($headingId); ?>"<?php echo $defaultToReadable ? '' : ' hidden'; ?>><code id="<?php echo esc_attr($readableTarget); ?>" class="tasty-fonts-output-code"><?php $this->renderHighlightedSnippet($readableDisplayValue); ?></code></pre>
             <?php endif; ?>
         </div>
         <?php

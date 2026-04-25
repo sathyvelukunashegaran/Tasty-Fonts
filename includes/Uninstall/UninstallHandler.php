@@ -19,6 +19,9 @@ use TastyFonts\Support\TransientKey;
 
 final class UninstallHandler
 {
+    private const LEGACY_BUNNY_CATALOG_TRANSIENT = 'tasty_fonts_bunny_catalog_v1';
+    private const LEGACY_BUNNY_FAMILY_TRANSIENT_PREFIX = 'tasty_fonts_bunny_family_';
+
     /**
      * @param array<string, mixed> $settings Saved plugin settings captured before option deletion.
      */
@@ -97,6 +100,7 @@ final class UninstallHandler
     private function deleteTransients(): void
     {
         $this->developerTools->clearDeactivationCaches();
+        delete_transient(TransientKey::forSite(self::LEGACY_BUNNY_CATALOG_TRANSIENT));
     }
 
     private function deleteWildcardTransients(): void
@@ -117,6 +121,7 @@ final class UninstallHandler
         foreach (
             [
                 BunnyFontsClient::TRANSIENT_FAMILY_PREFIX,
+                self::LEGACY_BUNNY_FAMILY_TRANSIENT_PREFIX,
                 AdminController::NOTICE_TRANSIENT_PREFIX,
             ] as $prefix
         ) {

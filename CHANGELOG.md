@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added a repo-local `bin/lint-css` Stylelint wrapper and wired the beta release helper to run CSS linting when npm dependencies are installed.
+- Added CSS surface-system and Three-Color palette audits, alongside broader CSS token audit coverage, so admin CSS stays on approved design tokens.
+- Added WP-CLI commands for Google API key status/save, settings reset, and plugin-managed file deletion, with redacted JSON output and prompt/stdin secret input.
+- Added richer structured activity metadata for settings, roles, library actions, imports, uploads, integrations, updates, maintenance, and transfers so Advanced Tools Activity rows can be filtered, searched, and expanded with useful details.
+
+### Changed
+
+- Refined the admin UI around the shared surface system, warmed page-header/preview/snippet treatments, simplified collapsed library family cards to a single source pill, and moved update-channel controls into the Advanced Tools Developer release rail.
+- Reworked the admin CSS token set around the Tasty Blue, Warm Amber, and Soft Cream palette, removed dead or hand-rolled card CSS, and documented the surface/three-color rules in the design guide.
+- Centralized managed-storage file metadata scanning for rollback snapshots and support bundles, removing the actionable duplicate-code reported by jscpd.
+- Moved Bunny Fonts cache reads to a fresh v2 transient namespace so stale pre-v2 cached family metadata is ignored.
+- Removed the deprecated plaintext WP-CLI `--google-api-key=<key>` input path; use `--prompt-google-api-key` or `--google-api-key-stdin` instead.
+- Removed AI-agent instruction files from Git tracking while keeping them local-only via ignore rules, and expanded ignores for local Playwright, prompt-export, report, zip, and research screenshot artifacts.
+
+### Fixed
+
+- Fixed Advanced Tools self-hosted font diagnostics so hydrated upload URLs resolve back to managed relative paths before reporting missing files.
+- Fixed generated CSS fallback handling so explicit role fallback stacks are preserved when a family fallback changes.
+- Fixed managed-file cleanup so it also clears retained transfer export bundles and rollback snapshots while preserving unrelated settings.
+- Fixed CLI and activity-log output so Google API keys and other secret-like payload fields are redacted from JSON responses.
+
 ## [1.14.0-beta.3] - 2026-04-25
 
 ### Added

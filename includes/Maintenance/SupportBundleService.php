@@ -114,41 +114,7 @@ final class SupportBundleService
      */
     private function storageFileMetadata(): array
     {
-        $root = $this->storage->getRoot();
-
-        if (!is_string($root) || $root === '' || !is_dir($root)) {
-            return [];
-        }
-
-        $files = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
-        );
-
-        foreach ($iterator as $item) {
-            if (!$item instanceof \SplFileInfo || !$item->isFile()) {
-                continue;
-            }
-
-            $absolutePath = wp_normalize_path($item->getPathname());
-            $relativePath = $this->storage->relativePath($absolutePath);
-
-            if ($relativePath === '') {
-                continue;
-            }
-
-            $checksum = hash_file('sha256', $absolutePath);
-
-            $files[] = [
-                'relative_path' => $relativePath,
-                'size' => (int) $item->getSize(),
-                'sha256' => is_string($checksum) ? $checksum : '',
-            ];
-        }
-
-        usort($files, static fn (array $left, array $right): int => strcmp($left['relative_path'], $right['relative_path']));
-
-        return $files;
+        return $this->storage->listFileMetadata();
     }
 
     /**

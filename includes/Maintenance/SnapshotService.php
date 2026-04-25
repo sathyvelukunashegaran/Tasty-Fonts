@@ -201,6 +201,32 @@ final class SnapshotService
     }
 
     /**
+     * @return array{message: string, deleted_snapshots: int, deleted_snapshot_files: int}
+     */
+    public function deleteAllSnapshots(): array
+    {
+        $snapshots = $this->storedSnapshots();
+        $deletedFiles = 0;
+
+        foreach ($snapshots as $snapshot) {
+            $path = $this->snapshotPath($snapshot['id']);
+
+            if ($path !== '' && file_exists($path)) {
+                $deletedFiles++;
+            }
+        }
+
+        $this->deleteDirectory($this->snapshotDirectory());
+        delete_option(self::OPTION_SNAPSHOTS);
+
+        return [
+            'message' => __('Rollback snapshots deleted.', 'tasty-fonts'),
+            'deleted_snapshots' => count($snapshots),
+            'deleted_snapshot_files' => $deletedFiles,
+        ];
+    }
+
+    /**
      * @param SnapshotSummary $snapshot
      * @return SnapshotSummary
      */
@@ -471,45 +497,11 @@ final class SnapshotService
      */
     private function managedFileManifest(): array
     {
-        $root = $this->storage->getRoot();
-
-        if (!is_string($root) || $root === '' || !is_dir($root)) {
-            return [];
-        }
-
-        $files = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        return $this->storage->listFileMetadata(
+            static fn (string $relativePath): bool => $relativePath !== self::GENERATED_CSS_RELATIVE_PATH
+                && !str_starts_with($relativePath, '.snapshots/'),
+            true
         );
-
-        foreach ($iterator as $item) {
-            if (!$item instanceof \SplFileInfo || !$item->isFile()) {
-                continue;
-            }
-
-            $absolutePath = wp_normalize_path($item->getPathname());
-            $relativePath = $this->storage->relativePath($absolutePath);
-
-            if ($relativePath === '' || $relativePath === self::GENERATED_CSS_RELATIVE_PATH || str_starts_with($relativePath, '.snapshots/')) {
-                continue;
-            }
-
-            $checksum = hash_file('sha256', $absolutePath);
-
-            if (!is_string($checksum)) {
-                continue;
-            }
-
-            $files[] = [
-                'relative_path' => $relativePath,
-                'size' => (int) $item->getSize(),
-                'sha256' => $checksum,
-            ];
-        }
-
-        usort($files, static fn (array $left, array $right): int => strcmp($left['relative_path'], $right['relative_path']));
-
-        return $files;
     }
 
     /**

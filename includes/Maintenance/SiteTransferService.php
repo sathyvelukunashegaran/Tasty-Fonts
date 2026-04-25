@@ -481,6 +481,32 @@ final class SiteTransferService
     }
 
     /**
+     * @return array{message: string, deleted_export_bundles: int, deleted_export_files: int}
+     */
+    public function deleteAllExportBundles(): array
+    {
+        $bundles = $this->storedExportBundles();
+        $deletedFiles = 0;
+
+        foreach ($bundles as $bundle) {
+            $path = $this->exportBundlePath($bundle['id']);
+
+            if ($path !== '' && file_exists($path)) {
+                $deletedFiles++;
+            }
+        }
+
+        $this->deleteDirectory($this->exportBundleDirectory());
+        delete_option(self::OPTION_EXPORT_BUNDLES);
+
+        return [
+            'message' => __('Site transfer export bundles deleted.', 'tasty-fonts'),
+            'deleted_export_bundles' => count($bundles),
+            'deleted_export_files' => $deletedFiles,
+        ];
+    }
+
+    /**
      * @return ValidatedImportBundle|WP_Error
      */
     public function validateImportBundle(string $zipPath): array|WP_Error

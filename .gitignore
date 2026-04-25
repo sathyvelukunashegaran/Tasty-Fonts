@@ -51,7 +51,19 @@ cache/
 # AI agent context files
 jscpd-report.json
 report/
+.agents/
+AGENTS.md
+CLAUDE.md
 .agents/tasks/todo-*.md
+
+# Local Playwright MCP artifacts
+.playwright-mcp/
+
+# Local research screenshots (repo root)
+kicker-*.png
+masthead-warmer.png
+neutral-bg.png
+three-color-*.png
 
 # Optional local build/release artifacts
 dist/

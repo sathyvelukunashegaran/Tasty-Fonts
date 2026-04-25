@@ -221,6 +221,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $isHeading = $roles['heading'] === $familyName;
         $isBody = $roles['body'] === $familyName;
         $isMonospace = $monospaceRoleEnabled && ($roles['monospace'] === $familyName);
+        $fontCategory = strtolower(trim($this->stringValue($family, 'font_category')));
         $assignedRoleKeys = array_values(
             array_filter(
                 [
@@ -238,6 +239,11 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $categoryTokens[] = 'variable';
         }
         $categoryTokens = array_values(array_unique($categoryTokens));
+        $normalizedCategoryTokens = array_map(static fn (string $token): string => strtolower(trim($token)), $categoryTokens);
+        $usesMonospacePreview = $isMonospace
+            || $fontCategory === 'monospace'
+            || in_array('monospace', $normalizedCategoryTokens, true)
+            || in_array('mono', $normalizedCategoryTokens, true);
         $fontCategoryLabel = $this->formatLibraryCategoryLabel($this->stringValue($family, 'font_category'));
         $deleteBlockedMessage = $this->buildDeleteBlockedMessage($familyName, $assignedRoleKeys);
         $deleteBlockedMessages = [];
@@ -272,9 +278,9 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $activeDeliveryLabel = $activeDeliveryLabel !== '' ? $activeDeliveryLabel : __('Unavailable', 'tasty-fonts');
         $supportsFontDisplayOverride = strtolower(trim($this->stringValue($activeDelivery, 'provider'))) !== 'adobe';
         $defaultStack = FontUtils::buildFontStack($familyName, $savedFallback);
-        $previewLabel = $isMonospace ? __('Code Preview', 'tasty-fonts') : __('Preview', 'tasty-fonts');
-        $inlinePreviewText = $this->buildFacePreviewText($previewText, $familyName, $isMonospace, false);
-        $facePreviewText = $this->buildFacePreviewText($previewText, $familyName, $isMonospace, true);
+        $previewLabel = $usesMonospacePreview ? __('Code Preview', 'tasty-fonts') : __('Preview', 'tasty-fonts');
+        $inlinePreviewText = $this->buildFacePreviewText($previewText, $familyName, $usesMonospacePreview, false);
+        $facePreviewText = $this->buildFacePreviewText($previewText, $familyName, $usesMonospacePreview, true);
         $familyFaces = $this->normalizeFaceList($family['faces'] ?? []);
         $faceSummaryLabels = $this->buildFamilyFaceSummaryLabels($familyFaces);
         $visibleFaceSummaryLabels = array_slice($faceSummaryLabels, 0, 4);

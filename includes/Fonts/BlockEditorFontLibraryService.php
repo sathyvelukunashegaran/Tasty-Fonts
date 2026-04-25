@@ -732,7 +732,10 @@ final class BlockEditorFontLibraryService
                     __('Block Editor Font Library sync failed for %1$s because PHP could not verify this site\'s HTTPS certificate during the editor sync request. Open Integrations to turn this feature off for local development, or turn it back on after PHP/cURL trusts the site certificate.', 'tasty-fonts'),
                     $familyName
                 ),
-                $this->buildIntegrationsLogAction()
+                array_merge(
+                    $this->buildIntegrationsLogAction(),
+                    $this->buildSyncFailureLogContext($familyName, $error, $message)
+                )
             );
 
             return;
@@ -748,8 +751,30 @@ final class BlockEditorFontLibraryService
                 $familyName,
                 $message
             ),
-            $context
+            array_merge($context, $this->buildSyncFailureLogContext($familyName, $error, $message))
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSyncFailureLogContext(string $familyName, WP_Error $error, string $message): array
+    {
+        return [
+            'category' => LogRepository::CATEGORY_INTEGRATION,
+            'event' => 'block_editor_font_library_sync_failed',
+            'outcome' => 'error',
+            'status_label' => __('Failed', 'tasty-fonts'),
+            'source' => __('Block Editor Font Library', 'tasty-fonts'),
+            'entity_type' => 'font_family',
+            'entity_name' => $familyName,
+            'error_code' => $error->get_error_code() !== '' ? $error->get_error_code() : 'tasty_fonts_block_editor_font_library_sync_failed',
+            'details' => [
+                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
+                ['label' => __('Failure code', 'tasty-fonts'), 'value' => $error->get_error_code() !== '' ? $error->get_error_code() : 'tasty_fonts_block_editor_font_library_sync_failed'],
+                ['label' => __('Reason', 'tasty-fonts'), 'value' => $message],
+            ],
+        ];
     }
 
     /**

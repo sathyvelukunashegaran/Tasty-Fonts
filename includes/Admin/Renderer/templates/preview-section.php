@@ -40,7 +40,7 @@
                                                 class="button button-secondary"
                                                 data-preview-sync-draft
                                             >
-                                                <?php echo esc_html($previewBaselineSource === 'live_sitewide' ? __('Use current draft selections', 'tasty-fonts') : __('Sync preview to role draft', 'tasty-fonts')); ?>
+                                                <?php echo esc_html($previewBaselineSource === 'live_sitewide' ? __('Use draft selections', 'tasty-fonts') : __('Sync preview to role draft', 'tasty-fonts')); ?>
                                             </button>
                                             <button
                                                 type="button"

@@ -675,7 +675,19 @@ final class AdminController
         $this->assets->refreshGeneratedAssets(false, false);
 
         $message = $this->buildRolesSavedMessage('save', $roles, $appliedRoles, $applyEverywhere);
-        $this->log->add($message, $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_IMPORT_SUCCESS));
+        $this->log->add(
+            $message,
+            $this->buildActivityLogContext(
+                LogRepository::CATEGORY_ROLES,
+                'roles_saved',
+                [
+                    'outcome' => 'success',
+                    'status_label' => __('Saved', 'tasty-fonts'),
+                    'source' => __('Roles', 'tasty-fonts'),
+                    'details' => $this->buildRoleActivityDetails($roles, $appliedRoles, $applyEverywhere),
+                ]
+            )
+        );
 
         return [
             'message' => $message,
@@ -783,7 +795,22 @@ final class AdminController
         if ($clearGoogleKey) {
             $this->settings->saveGoogleApiKeyStatus('empty');
             $message = $this->buildNoticeMessage('google_key_cleared');
-            $this->log->add(__('Google Fonts API key removed.', 'tasty-fonts'));
+            $this->log->add(
+                __('Google Fonts API key removed.', 'tasty-fonts'),
+                $this->buildActivityLogContext(
+                    LogRepository::CATEGORY_SETTINGS,
+                    'google_api_key_removed',
+                    [
+                        'outcome' => 'warning',
+                        'status_label' => __('Removed', 'tasty-fonts'),
+                        'source' => __('Settings', 'tasty-fonts'),
+                        'details' => [
+                            ['label' => __('Provider', 'tasty-fonts'), 'value' => __('Google Fonts', 'tasty-fonts')],
+                            ['label' => __('Impact', 'tasty-fonts'), 'value' => __('Catalog search may be limited until a new key is saved.', 'tasty-fonts')],
+                        ],
+                    ]
+                )
+            );
 
             return [
                 'message' => $message,
@@ -805,7 +832,22 @@ final class AdminController
 
             if ($validationState === 'valid') {
                 $message = $this->buildNoticeMessage('google_key_saved');
-                $this->log->add(__('Google Fonts API key validated.', 'tasty-fonts'));
+                $this->log->add(
+                    __('Google Fonts API key validated.', 'tasty-fonts'),
+                    $this->buildActivityLogContext(
+                        LogRepository::CATEGORY_SETTINGS,
+                        'google_api_key_validated',
+                        [
+                            'outcome' => 'success',
+                            'status_label' => __('Validated', 'tasty-fonts'),
+                            'source' => __('Settings', 'tasty-fonts'),
+                            'details' => [
+                                ['label' => __('Provider', 'tasty-fonts'), 'value' => __('Google Fonts', 'tasty-fonts')],
+                                ['label' => __('State', 'tasty-fonts'), 'value' => $validationState],
+                            ],
+                        ]
+                    )
+                );
 
                 return [
                     'message' => $message,
@@ -815,7 +857,23 @@ final class AdminController
                 ];
             }
 
-            $this->log->add(__('Google Fonts API key validation failed.', 'tasty-fonts'));
+            $this->log->add(
+                __('Google Fonts API key validation failed.', 'tasty-fonts'),
+                $this->buildActivityLogContext(
+                    LogRepository::CATEGORY_SETTINGS,
+                    'google_api_key_validation_failed',
+                    [
+                        'outcome' => 'error',
+                        'status_label' => __('Failed', 'tasty-fonts'),
+                        'source' => __('Settings', 'tasty-fonts'),
+                        'error_code' => 'tasty_fonts_google_api_key_invalid',
+                        'details' => [
+                            ['label' => __('Provider', 'tasty-fonts'), 'value' => __('Google Fonts', 'tasty-fonts')],
+                            ['label' => __('Reason', 'tasty-fonts'), 'value' => $validationMessage !== '' ? $validationMessage : __('Validation did not return a reason.', 'tasty-fonts')],
+                        ],
+                    ]
+                )
+            );
 
             return new WP_Error(
                 'tasty_fonts_google_api_key_invalid',
@@ -833,7 +891,22 @@ final class AdminController
             }
         }
 
-        $this->log->add($settingsMessage);
+        $this->log->add(
+            $settingsMessage,
+            $this->buildActivityLogContext(
+                LogRepository::CATEGORY_SETTINGS,
+                'settings_saved',
+                [
+                    'outcome' => 'success',
+                    'status_label' => __('Saved', 'tasty-fonts'),
+                    'source' => __('Settings', 'tasty-fonts'),
+                    'details' => [
+                        ['label' => __('Assets refreshed', 'tasty-fonts'), 'value' => $this->settingsChangeRequiresAssetRefresh($previousSettings, $savedSettings) ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
+                        ['label' => __('Reload required', 'tasty-fonts'), 'value' => $reloadRequired ? __('Yes', 'tasty-fonts') : __('No', 'tasty-fonts')],
+                    ],
+                ]
+            )
+        );
 
         return [
             'message' => $settingsMessage,
@@ -861,7 +934,19 @@ final class AdminController
         }
 
         $message = __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'plugin_settings_reset',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Reset', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Preserved', 'tasty-fonts'), 'value' => __('Managed font library and files', 'tasty-fonts')],
+                    ['label' => __('Reset', 'tasty-fonts'), 'value' => __('Settings, roles, access rules, and stored Google key data', 'tasty-fonts')],
+                ],
+            ]
+        ));
 
         return [
             'message' => $message,
@@ -887,11 +972,155 @@ final class AdminController
         }
 
         $message = __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'managed_font_library_wiped',
+            [
+                'outcome' => 'danger',
+                'status_label' => __('Deleted', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Deleted', 'tasty-fonts'), 'value' => __('Managed font library and font storage files', 'tasty-fonts')],
+                    ['label' => __('Recreated', 'tasty-fonts'), 'value' => __('Empty storage scaffold', 'tasty-fonts')],
+                ],
+            ]
+        ));
 
         return [
             'message' => $message,
             'settings' => $settings,
+        ];
+    }
+
+    /**
+     * @return Payload
+     */
+    public function googleApiKeyStatus(): array
+    {
+        $status = $this->settings->getGoogleApiKeyStatus();
+        $hasGoogleApiKey = $this->settings->hasGoogleApiKey();
+        $message = $hasGoogleApiKey
+            ? __('Google Fonts API key is stored.', 'tasty-fonts')
+            : __('Google Fonts API key is not stored.', 'tasty-fonts');
+
+        return [
+            'message' => $message,
+            'has_google_api_key' => $hasGoogleApiKey,
+            'google_api_key_status' => $this->stringValue($status, 'state', $hasGoogleApiKey ? 'unknown' : 'empty'),
+            'google_api_key_status_message' => $this->stringValue($status, 'message'),
+            'google_api_key_checked_at' => $this->intValue($status, 'checked_at'),
+        ];
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function saveGoogleApiKey(string $googleApiKey): array|WP_Error
+    {
+        $googleApiKey = trim(sanitize_text_field($googleApiKey));
+
+        if ($googleApiKey === '') {
+            return new WP_Error(
+                'tasty_fonts_google_api_key_empty',
+                __('A Google Fonts API key is required.', 'tasty-fonts')
+            );
+        }
+
+        $validation = $this->validateGoogleApiKeyValue(
+            $googleApiKey,
+            'tasty_fonts_google_api_key_invalid',
+            __('Google Fonts API key could not be validated.', 'tasty-fonts')
+        );
+
+        if (is_wp_error($validation)) {
+            $this->log->add(
+                __('Google Fonts API key validation failed.', 'tasty-fonts'),
+                $this->buildActivityLogContext(
+                    LogRepository::CATEGORY_SETTINGS,
+                    'google_api_key_validation_failed',
+                    [
+                        'outcome' => 'error',
+                        'status_label' => __('Validation failed', 'tasty-fonts'),
+                        'source' => __('Settings', 'tasty-fonts'),
+                        'details' => [
+                            ['label' => __('Google API key', 'tasty-fonts'), 'value' => __('Not saved', 'tasty-fonts')],
+                        ],
+                    ]
+                )
+            );
+            return $validation;
+        }
+
+        $this->settings->saveSettings(['google_api_key' => $googleApiKey]);
+        $this->settings->saveGoogleApiKeyStatus($validation['state'], $validation['message']);
+        $this->googleClient->clearCatalogCache();
+
+        $message = __('Google Fonts API key validated.', 'tasty-fonts');
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_SETTINGS,
+            'google_api_key_validated',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Validated', 'tasty-fonts'),
+                'source' => __('Settings', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Google API key', 'tasty-fonts'), 'value' => __('Saved', 'tasty-fonts')],
+                ],
+            ]
+        ));
+
+        return array_merge(
+            $this->googleApiKeyStatus(),
+            ['message' => $message]
+        );
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function deletePluginManagedFiles(): array|WP_Error
+    {
+        $settings = $this->developerTools->wipeManagedFontLibrary();
+
+        if (is_wp_error($settings)) {
+            return $settings;
+        }
+
+        $generatedCssPath = $this->storage->getGeneratedCssPath();
+
+        if (is_string($generatedCssPath) && $generatedCssPath !== '' && file_exists($generatedCssPath) && !$this->storage->deleteAbsolutePath($generatedCssPath)) {
+            return new WP_Error(
+                'tasty_fonts_managed_files_delete_failed',
+                __('Generated CSS could not be deleted after managed file cleanup.', 'tasty-fonts')
+            );
+        }
+
+        $exportCleanup = $this->siteTransfer->deleteAllExportBundles();
+        $snapshotCleanup = $this->snapshots->deleteAllSnapshots();
+
+        $message = __('Plugin-managed files deleted. Storage reset to an empty scaffold.', 'tasty-fonts');
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'plugin_managed_files_deleted',
+            [
+                'outcome' => 'danger',
+                'status_label' => __('Deleted', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Transfer exports deleted', 'tasty-fonts'), 'value' => (string) $this->intValue($exportCleanup, 'deleted_export_bundles'), 'kind' => 'count'],
+                    ['label' => __('Rollback snapshots deleted', 'tasty-fonts'), 'value' => (string) $this->intValue($snapshotCleanup, 'deleted_snapshots'), 'kind' => 'count'],
+                    ['label' => __('Storage', 'tasty-fonts'), 'value' => __('Managed font files and generated CSS removed; scaffold recreated', 'tasty-fonts')],
+                ],
+            ]
+        ));
+
+        return [
+            'message' => $message,
+            'settings' => $settings,
+            'deleted_export_bundles' => $this->intValue($exportCleanup, 'deleted_export_bundles'),
+            'deleted_export_files' => $this->intValue($exportCleanup, 'deleted_export_files'),
+            'deleted_snapshots' => $this->intValue($snapshotCleanup, 'deleted_snapshots'),
+            'deleted_snapshot_files' => $this->intValue($snapshotCleanup, 'deleted_snapshot_files'),
         ];
     }
 
@@ -908,7 +1137,18 @@ final class AdminController
         }
 
         $message = __('Plugin caches cleared and generated assets refreshed.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'plugin_caches_refreshed',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Refreshed', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Affected assets', 'tasty-fonts'), 'value' => __('Caches, generated CSS, and runtime assets', 'tasty-fonts')],
+                ],
+            ]
+        ));
 
         return ['message' => $message];
     }
@@ -926,7 +1166,18 @@ final class AdminController
         }
 
         $message = __('Generated CSS regenerated.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'generated_css_regenerated',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Regenerated', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Affected asset', 'tasty-fonts'), 'value' => __('Generated CSS', 'tasty-fonts')],
+                ],
+            ]
+        ));
 
         return ['message' => $message];
     }
@@ -938,7 +1189,18 @@ final class AdminController
     {
         $this->assets->refreshGeneratedAssets(true, false);
         $message = __('Fonts rescanned.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'font_library_rescanned',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Rescanned', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Affected area', 'tasty-fonts'), 'value' => __('Font library and generated assets', 'tasty-fonts')],
+                ],
+            ]
+        ));
 
         return ['message' => $message];
     }
@@ -956,7 +1218,18 @@ final class AdminController
         }
 
         $message = __('Storage scaffold repaired.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'storage_scaffold_repaired',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Repaired', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Affected area', 'tasty-fonts'), 'value' => __('Storage directories and index files', 'tasty-fonts')],
+                ],
+            ]
+        ));
 
         return ['message' => $message];
     }
@@ -968,7 +1241,15 @@ final class AdminController
     {
         $settings = $this->developerTools->resetIntegrationDetectionState();
         $message = __('Integration detection state reset.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'integration_detection_reset',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Reset', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+            ]
+        ));
 
         return [
             'message' => $message,
@@ -983,7 +1264,15 @@ final class AdminController
     {
         $this->developerTools->resetSuppressedNotices();
         $message = __('Suppressed notices reset. Hidden reminders can appear again.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'suppressed_notices_reset',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Reset', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+            ]
+        ));
 
         return ['message' => $message];
     }
@@ -1255,7 +1544,15 @@ final class AdminController
         }
 
         $message = __('Support bundle created.', 'tasty-fonts');
-        $this->log->add($message);
+        $this->log->add($message, $this->buildActivityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'support_bundle_created',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Created', 'tasty-fonts'),
+                'source' => __('Support', 'tasty-fonts'),
+            ]
+        ));
 
         return [
             'message' => $message,
@@ -1376,16 +1673,31 @@ final class AdminController
 
         $familyCount = $result['families'];
         $fileCount = $result['files'];
+        $message = sprintf(
+            __('Dry run succeeded. Ready to import %1$d famil%2$s and %3$d file%4$s.', 'tasty-fonts'),
+            $familyCount,
+            $familyCount === 1 ? 'y' : 'ies',
+            $fileCount,
+            $fileCount === 1 ? '' : 's'
+        );
+
+        $this->log->add($message, $this->buildTransferLogContext(
+            'site_transfer_import_dry_run',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Validated', 'tasty-fonts'),
+                'source' => __('Transfer & Recovery', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Families ready', 'tasty-fonts'), 'value' => (string) $familyCount, 'kind' => 'count'],
+                    ['label' => __('Files ready', 'tasty-fonts'), 'value' => (string) $fileCount, 'kind' => 'count'],
+                    ['label' => __('Fresh Google API key', 'tasty-fonts'), 'value' => $googleApiKeyValidation['state'] === 'valid' ? __('Validated', 'tasty-fonts') : __('Not supplied', 'tasty-fonts')],
+                ],
+            ]
+        ));
 
         return [
             'status' => 'validated',
-            'message' => sprintf(
-                __('Dry run succeeded. Ready to import %1$d famil%2$s and %3$d file%4$s.', 'tasty-fonts'),
-                $familyCount,
-                $familyCount === 1 ? 'y' : 'ies',
-                $fileCount,
-                $fileCount === 1 ? '' : 's'
-            ),
+            'message' => $message,
             'bundle_name' => $result['bundle_name'],
             'plugin_version' => $result['plugin_version'],
             'exported_at' => $result['exported_at'],
@@ -1436,7 +1748,19 @@ final class AdminController
             ];
         }
 
-        $validation = $this->googleClient->validateApiKey($freshGoogleApiKey);
+        return $this->validateGoogleApiKeyValue(
+            $freshGoogleApiKey,
+            'tasty_fonts_transfer_google_api_key_invalid',
+            __('The fresh Google Fonts API key could not be validated.', 'tasty-fonts')
+        );
+    }
+
+    /**
+     * @return array{state: string, message: string}|WP_Error
+     */
+    private function validateGoogleApiKeyValue(string $googleApiKey, string $errorCode, string $fallbackMessage): array|WP_Error
+    {
+        $validation = $this->googleClient->validateApiKey($googleApiKey);
         $validationState = $this->stringValue($validation, 'state', 'unknown');
         $validationMessage = $this->stringValue($validation, 'message');
 
@@ -1448,10 +1772,8 @@ final class AdminController
         }
 
         return new WP_Error(
-            'tasty_fonts_transfer_google_api_key_invalid',
-            $validationMessage !== ''
-                ? $validationMessage
-                : __('The fresh Google Fonts API key could not be validated.', 'tasty-fonts')
+            $errorCode,
+            $validationMessage !== '' ? $validationMessage : $fallbackMessage
         );
     }
 
@@ -1529,7 +1851,22 @@ final class AdminController
             $message .= ' ' . implode(' ', $messages);
         }
 
-        $this->log->add($message);
+        $this->log->add(
+            $message,
+            $this->buildTransferLogContext(
+                LogRepository::EVENT_SITE_TRANSFER_IMPORT_SUCCESS,
+                [
+                    'outcome' => 'success',
+                    'status_label' => __('Imported', 'tasty-fonts'),
+                    'source' => __('Transfer & Recovery', 'tasty-fonts'),
+                    'details' => [
+                        ['label' => __('Families imported', 'tasty-fonts'), 'value' => (string) $familyCount, 'kind' => 'count'],
+                        ['label' => __('Files imported', 'tasty-fonts'), 'value' => (string) $fileCount, 'kind' => 'count'],
+                        ['label' => __('Fresh Google API key', 'tasty-fonts'), 'value' => !empty($result['used_fresh_google_api_key']) ? __('Saved', 'tasty-fonts') : __('Not imported', 'tasty-fonts')],
+                    ],
+                ]
+            )
+        );
 
         return [
             'message' => $message,
@@ -1967,7 +2304,19 @@ final class AdminController
             $this->queueSiteTransferStatus($status);
             $this->log->add(
                 $this->formatSiteTransferStatusForActivityLog($status),
-                $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE)
+                $this->buildTransferLogContext(
+                    LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE,
+                    [
+                        'outcome' => 'error',
+                        'status_label' => __('Failed', 'tasty-fonts'),
+                        'source' => __('Transfer & Recovery', 'tasty-fonts'),
+                        'error_code' => $result->get_error_code(),
+                        'details' => [
+                            ['label' => __('Failure code', 'tasty-fonts'), 'value' => $result->get_error_code()],
+                            ['label' => __('Reason', 'tasty-fonts'), 'value' => $this->stringValue($status, 'message', $result->get_error_message())],
+                        ],
+                    ]
+                )
             );
             $this->redirectWithError($this->stringValue($status, 'message', $result->get_error_message()));
         }
@@ -2032,6 +2381,21 @@ final class AdminController
                 __('Saved fallback for %1$s: %2$s.', 'tasty-fonts'),
                 $this->stringValue($result, 'family', $family),
                 $this->stringValue($result, 'fallback', $fallback)
+            ),
+            $this->buildActivityLogContext(
+                LogRepository::CATEGORY_SETTINGS,
+                'family_fallback_saved',
+                [
+                    'outcome' => 'success',
+                    'status_label' => __('Saved', 'tasty-fonts'),
+                    'source' => __('Settings', 'tasty-fonts'),
+                    'entity_type' => 'font_family',
+                    'entity_name' => $this->stringValue($result, 'family', $family),
+                    'details' => [
+                        ['label' => __('Family', 'tasty-fonts'), 'value' => $this->stringValue($result, 'family', $family)],
+                        ['label' => __('Fallback stack', 'tasty-fonts'), 'value' => $this->stringValue($result, 'fallback', $fallback)],
+                    ],
+                ]
             )
         );
 
@@ -2208,7 +2572,21 @@ final class AdminController
             $message .= ' ' . $integrationMessage;
         }
 
-        $this->log->add($message);
+        $this->log->add(
+            $message,
+            $this->buildActivityLogContext(
+                LogRepository::CATEGORY_ROLES,
+                $actionType === 'apply' ? 'roles_published' : ($actionType === 'disable' ? 'roles_sitewide_disabled' : 'roles_saved'),
+                [
+                    'outcome' => $actionType === 'disable' ? 'warning' : 'success',
+                    'status_label' => $actionType === 'apply'
+                        ? __('Published', 'tasty-fonts')
+                        : ($actionType === 'disable' ? __('Disabled', 'tasty-fonts') : __('Saved', 'tasty-fonts')),
+                    'source' => __('Roles', 'tasty-fonts'),
+                    'details' => $this->buildRoleActivityDetails($roles, $liveRoles, $sitewideEnabled),
+                ]
+            )
+        );
 
         $this->redirectWithSuccess($message);
     }
@@ -3129,8 +3507,33 @@ final class AdminController
                 : sprintf(
                     __('Roles saved. Sitewide roles stay off until you apply %s.', 'tasty-fonts'),
                     $savedSummary
-                ),
+            ),
         };
+    }
+
+    /**
+     * @param RoleSet $roles
+     * @param RoleSet|array{} $liveRoles
+     * @return list<array{label: string, value: string, kind?: string}>
+     */
+    private function buildRoleActivityDetails(array $roles, array $liveRoles, bool $sitewideEnabled): array
+    {
+        $settings = $this->settings->getSettings();
+
+        return [
+            [
+                'label' => __('Saved roles', 'tasty-fonts'),
+                'value' => $this->buildRoleTextSummary($roles, $settings),
+            ],
+            [
+                'label' => __('Live roles', 'tasty-fonts'),
+                'value' => $liveRoles === [] ? __('Not applied sitewide', 'tasty-fonts') : $this->buildRoleTextSummary($liveRoles, $settings),
+            ],
+            [
+                'label' => __('Apply Sitewide', 'tasty-fonts'),
+                'value' => $sitewideEnabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
+            ],
+        ];
     }
 
     private function pageContextBuilderOrNull(): ?AdminPageContextBuilder
@@ -5133,7 +5536,19 @@ final class AdminController
         $this->queueSiteTransferStatus($status);
         $this->log->add(
             $this->formatSiteTransferStatusForActivityLog($status),
-            $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE)
+            $this->buildTransferLogContext(
+                LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE,
+                [
+                    'outcome' => 'error',
+                    'status_label' => __('Failed', 'tasty-fonts'),
+                    'source' => __('Transfer & Recovery', 'tasty-fonts'),
+                    'error_code' => 'tasty_fonts_transfer_request_too_large',
+                    'details' => [
+                        ['label' => __('Failure code', 'tasty-fonts'), 'value' => 'tasty_fonts_transfer_request_too_large'],
+                        ['label' => __('Reason', 'tasty-fonts'), 'value' => $message],
+                    ],
+                ]
+            )
         );
         $this->queueNoticeToast('error', $message, 'alert');
 
@@ -5302,14 +5717,27 @@ final class AdminController
     }
 
     /**
-     * @return array<string, string>
+     * @param array<string, mixed> $meta
+     * @return array<string, mixed>
      */
-    private function buildTransferLogContext(string $event): array
+    private function buildActivityLogContext(string $category, string $event, array $meta = []): array
     {
-        return [
-            'category' => LogRepository::CATEGORY_TRANSFER,
-            'event' => $event,
-        ];
+        return array_merge(
+            [
+                'category' => $category,
+                'event' => $event,
+            ],
+            $meta
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     * @return array<string, mixed>
+     */
+    private function buildTransferLogContext(string $event, array $meta = []): array
+    {
+        return $this->buildActivityLogContext(LogRepository::CATEGORY_TRANSFER, $event, $meta);
     }
 
     /**

@@ -15,6 +15,15 @@
                                 <div class="tasty-fonts-font-identity-top">
                                     <div class="tasty-fonts-font-title-row">
                                         <h3><?php echo esc_html($familyName); ?></h3>
+                                        <span
+                                            class="tasty-fonts-badge tasty-fonts-font-source-badge"
+                                            data-help-tooltip="<?php echo esc_attr($activeDeliveryLabel); ?>"
+                                            data-help-passive="1"
+                                            data-help-persistent="1"
+                                            title="<?php echo esc_attr($activeDeliveryLabel); ?>"
+                                            tabindex="0"
+                                            aria-label="<?php echo esc_attr($activeDeliveryLabel); ?>"
+                                        ><?php echo esc_html($activeDeliveryLabel); ?></span>
                                         <button
                                             type="button"
                                             class="tasty-fonts-stack-copy tasty-fonts-pill--interactive tasty-fonts-pill--copy"
@@ -27,70 +36,20 @@
                                             <?php echo esc_html($defaultStack); ?>
                                         </button>
                                     </div>
-                                    <div class="tasty-fonts-badges">
-                                        <?php foreach ((array) ($family['delivery_badges'] ?? []) as $badge): ?>
-                                            <?php if (!is_array($badge)) { continue; } ?>
-                                            <span
-                                                class="tasty-fonts-badge <?php echo esc_attr((string) ($badge['class'] ?? '')); ?>"
-                                                title="<?php echo esc_attr((string) ($badge['copy'] ?? '')); ?>"
-                                            ><?php echo esc_html((string) ($badge['label'] ?? '')); ?></span>
-                                        <?php endforeach; ?>
-                                        <span class="tasty-fonts-badge <?php echo esc_attr((string) ($fontTypeDescriptor['badge_class'] ?? '')); ?>">
-                                            <?php echo esc_html((string) ($fontTypeDescriptor['label'] ?? '')); ?>
-                                        </span>
-                                        <?php if ($fontCategoryLabel !== ''): ?>
-                                            <span class="tasty-fonts-badge"><?php echo esc_html($fontCategoryLabel); ?></span>
-                                        <?php endif; ?>
-                                        <?php if ($isHeading): ?>
-                                            <span class="tasty-fonts-badge is-role"><?php esc_html_e('Heading', 'tasty-fonts'); ?></span>
-                                        <?php endif; ?>
-                                        <?php if ($isBody): ?>
-                                            <span class="tasty-fonts-badge is-role"><?php esc_html_e('Body', 'tasty-fonts'); ?></span>
-                                        <?php endif; ?>
-                                        <?php if ($isMonospace): ?>
-                                            <span class="tasty-fonts-badge is-role"><?php esc_html_e('Monospace', 'tasty-fonts'); ?></span>
-                                        <?php endif; ?>
-                                    </div>
                                 </div>
                             </div>
-                            <?php if ($visibleFaceSummaryLabels !== [] || $deliveryCount === 1): ?>
-                                <div class="tasty-fonts-font-loaded <?php echo $deliveryCount === 1 ? 'tasty-fonts-font-loaded--inline' : ''; ?>">
-                                    <?php if ($visibleFaceSummaryLabels !== []): ?>
-                                        <div class="tasty-fonts-face-pills">
-                                            <?php foreach ($visibleFaceSummaryLabels as $label): ?>
-                                                <span class="tasty-fonts-face-pill"><?php echo esc_html($label); ?></span>
-                                            <?php endforeach; ?>
-                                            <?php if ($hiddenFaceSummaryCount > 0): ?>
-                                                <span class="tasty-fonts-face-pill is-muted">
-                                                    <?php echo esc_html(sprintf(__('+%d more', 'tasty-fonts'), $hiddenFaceSummaryCount)); ?>
-                                                </span>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                    <?php if ($deliveryCount === 1): ?>
-                                        <div class="tasty-fonts-badges tasty-fonts-badges--library-inline">
-                                            <span
-                                                class="tasty-fonts-badge"
-                                                title="<?php echo esc_attr($this->buildProfileRequestSummary($activeDelivery)); ?>"
-                                            >
-                                                <?php echo esc_html($activeDeliveryLabel); ?>
-                                            </span>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endif; ?>
-                            <div class="tasty-fonts-font-inline-preview <?php echo $isMonospace ? 'is-monospace' : ''; ?>" role="group" aria-label="<?php echo esc_attr(sprintf(__('Preview for %s', 'tasty-fonts'), $familyName)); ?>">
+                            <div class="tasty-fonts-font-inline-preview <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>" role="group" aria-label="<?php echo esc_attr(sprintf(__('Preview for %s', 'tasty-fonts'), $familyName)); ?>">
                                 <span class="tasty-fonts-font-inline-preview-label"><?php echo esc_html($previewLabel); ?></span>
                                 <div
-                                    class="tasty-fonts-font-inline-preview-text <?php echo $isMonospace ? 'is-monospace' : ''; ?>"
+                                    class="tasty-fonts-font-inline-preview-text <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>"
                                     data-font-preview-family="<?php echo esc_attr($familyName); ?>"
                                     style="font-family:<?php echo esc_attr($defaultStack); ?>;"
                                 ><?php echo esc_html($inlinePreviewText); ?></div>
                             </div>
-                            <div class="tasty-fonts-font-specimen <?php echo $isMonospace ? 'is-monospace' : ''; ?>" role="group" aria-label="<?php echo esc_attr(sprintf(__('Preview for %s', 'tasty-fonts'), $familyName)); ?>">
+                            <div class="tasty-fonts-font-specimen <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>" role="group" aria-label="<?php echo esc_attr(sprintf(__('Preview for %s', 'tasty-fonts'), $familyName)); ?>">
                                 <span class="tasty-fonts-font-specimen-label"><?php echo esc_html($previewLabel); ?></span>
                                 <div
-                                    class="tasty-fonts-font-specimen-display <?php echo $isMonospace ? 'is-monospace' : ''; ?>"
+                                    class="tasty-fonts-font-specimen-display <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>"
                                     data-font-preview-family="<?php echo esc_attr($familyName); ?>"
                                     style="font-family:<?php echo esc_attr($defaultStack); ?>;"
                                 ><?php echo esc_html($facePreviewText); ?></div>

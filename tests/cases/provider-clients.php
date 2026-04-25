@@ -138,14 +138,17 @@ HTML,
     );
 };
 
-$tests['bunny_fonts_client_refetches_legacy_cached_family_records_without_variable_metadata'] = static function (): void {
+$tests['bunny_fonts_client_ignores_v1_cached_family_records_after_namespace_bump'] = static function (): void {
     resetTestState();
 
+    global $remoteGetCalls;
     global $remoteGetResponses;
     global $transientStore;
 
     $client = new BunnyFontsClient();
-    $transientStore[TransientKey::forSite(TastyFonts\Bunny\BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . substr(md5('inter'), 0, 12))] = [
+    $v1Key = TransientKey::forSite('tasty_fonts_bunny_family_' . substr(md5('inter'), 0, 12));
+    $v2Key = TransientKey::forSite(TastyFonts\Bunny\BunnyFontsClient::TRANSIENT_FAMILY_PREFIX . substr(md5('inter'), 0, 12));
+    $transientStore[$v1Key] = [
         'family' => 'Inter',
         'slug' => 'inter',
         'category' => 'sans-serif',
@@ -175,7 +178,10 @@ HTML,
 
     $family = $client->getFamily('Inter');
 
-    assertSameValue(false, !empty($family['is_variable']), 'Legacy Bunny family cache entries should be refetched into the new static-only Bunny shape.');
+    assertSameValue(1, count($remoteGetCalls), 'Bunny family lookup should ignore old v1 family cache records and fetch fresh metadata.');
+    assertSameValue(true, array_key_exists($v1Key, $transientStore), 'Ignoring the old Bunny family namespace should leave v1 cache rows to expire naturally.');
+    assertSameValue(true, array_key_exists($v2Key, $transientStore), 'Fresh Bunny family metadata should be stored in the v2 family cache namespace.');
+    assertSameValue(false, !empty($family['is_variable']), 'Refetched Bunny family records should stay in the static-only Bunny shape.');
     assertSameValue([], $family['axis_tags'] ?? null, 'Refetched Bunny family records should clear any legacy Bunny axis tags.');
     assertSameValue([], $family['axes'] ?? null, 'Refetched Bunny family records should clear any legacy Bunny axis ranges.');
     assertSameValue(

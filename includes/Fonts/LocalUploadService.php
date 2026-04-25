@@ -202,7 +202,19 @@ final class LocalUploadService
         $summaryMessage = $this->buildSummaryMessage($importedCount, $skippedCount, $errorCount, array_keys($importedFamilies));
 
         if ($results !== []) {
-            $this->log->add($summaryMessage);
+            $this->log->add($summaryMessage, [
+                'category' => LogRepository::CATEGORY_IMPORT,
+                'event' => 'local_upload_finished',
+                'outcome' => $errorCount > 0 ? 'warning' : ($importedCount > 0 ? 'success' : 'info'),
+                'status_label' => $errorCount > 0 ? __('Review', 'tasty-fonts') : ($importedCount > 0 ? __('Uploaded', 'tasty-fonts') : __('Skipped', 'tasty-fonts')),
+                'source' => __('Upload', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Imported rows', 'tasty-fonts'), 'value' => (string) $importedCount, 'kind' => 'count'],
+                    ['label' => __('Skipped rows', 'tasty-fonts'), 'value' => (string) $skippedCount, 'kind' => 'count'],
+                    ['label' => __('Rows with errors', 'tasty-fonts'), 'value' => (string) $errorCount, 'kind' => 'count'],
+                    ['label' => __('Families affected', 'tasty-fonts'), 'value' => $importedFamilies === [] ? __('None', 'tasty-fonts') : implode(', ', array_keys($importedFamilies))],
+                ],
+            ]);
         }
 
         return [

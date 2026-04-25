@@ -5,6 +5,7 @@ declare(strict_types=1);
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Api\RestController;
+use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Cli\Command as CliCommand;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
@@ -2077,14 +2078,47 @@ $tests['rest_controller_lists_rollback_snapshots_from_snapshot_service'] = stati
 $tests['cli_command_routes_phase_four_actions_through_admin_controller'] = static function (): void {
     resetTestState();
 
+    global $remoteGetResponses;
+
     $services = makeServiceGraph();
-    $command = new CliCommand($services['controller']);
+    $command = new CliCommand($services['controller'], static fn (): string => 'cli-secret-key');
 
     ob_start();
     $command->doctor([], []);
     $doctorOutput = (string) ob_get_clean();
 
     assertContainsValue('Tasty Fonts doctor:', $doctorOutput, 'The WP-CLI doctor command should summarize Advanced Tools health checks.');
+
+    ob_start();
+    $command->googleApiKey(['status'], ['format' => 'json']);
+    $initialGoogleOutput = (string) ob_get_clean();
+
+    assertContainsValue('"has_google_api_key": false', $initialGoogleOutput, 'The WP-CLI Google API key status command should report when no key is stored.');
+    assertNotContainsValue('cli-secret-key', $initialGoogleOutput, 'The WP-CLI Google API key status command should never print secrets.');
+
+    $remoteGetResponses['https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=cli-secret-key'] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode(['items' => []]),
+    ];
+
+    ob_start();
+    $command->googleApiKey(['save'], ['format' => 'json']);
+    $saveGoogleOutput = (string) ob_get_clean();
+
+    assertContainsValue('"has_google_api_key": true', $saveGoogleOutput, 'The WP-CLI Google API key save command should persist a validated prompted key.');
+    assertContainsValue('"google_api_key_status": "valid"', $saveGoogleOutput, 'The WP-CLI Google API key save command should return validation state.');
+    assertNotContainsValue('cli-secret-key', $saveGoogleOutput, 'The WP-CLI Google API key save command should redact the prompted key from JSON output.');
+    assertSameValue('cli-secret-key', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'The prompted Google API key should be saved through the shared settings repository.');
+
+    $legacyGoogleKeyRejected = false;
+
+    try {
+        $command->googleApiKey(['save'], ['google-api-key' => 'plaintext-secret']);
+    } catch (RuntimeException $exception) {
+        $legacyGoogleKeyRejected = str_contains($exception->getMessage(), '--google-api-key option has been removed');
+    }
+
+    assertSameValue(true, $legacyGoogleKeyRejected, 'The WP-CLI Google API key save command should reject the removed plaintext --google-api-key option.');
 
     ob_start();
     $command->css(['regenerate'], []);
@@ -2097,6 +2131,44 @@ $tests['cli_command_routes_phase_four_actions_through_admin_controller'] = stati
     $libraryOutput = (string) ob_get_clean();
 
     assertContainsValue('Fonts rescanned.', $libraryOutput, 'The WP-CLI library command should route through the shared rescan action.');
+
+    $settingsResetRequiresYes = false;
+
+    try {
+        $command->settings(['reset'], []);
+    } catch (RuntimeException) {
+        $settingsResetRequiresYes = true;
+    }
+
+    assertSameValue(true, $settingsResetRequiresYes, 'The WP-CLI settings reset command should require --yes.');
+
+    ob_start();
+    $command->settings(['reset'], ['yes' => true]);
+    $settingsResetOutput = (string) ob_get_clean();
+
+    assertContainsValue('Plugin settings reset to defaults.', $settingsResetOutput, 'The WP-CLI settings reset command should route through the shared reset action when confirmed.');
+
+    $filesDeleteRequiresYes = false;
+
+    try {
+        $command->files(['delete'], []);
+    } catch (RuntimeException) {
+        $filesDeleteRequiresYes = true;
+    }
+
+    assertSameValue(true, $filesDeleteRequiresYes, 'The WP-CLI files delete command should require --yes.');
+
+    $services['storage']->ensureRootDirectory();
+    $managedFile = (string) $services['storage']->pathForRelativePath('upload/cli/cli-400.woff2');
+    $services['storage']->writeAbsoluteFile($managedFile, 'font-data');
+
+    ob_start();
+    $command->files(['delete'], ['yes' => true]);
+    $filesDeleteOutput = (string) ob_get_clean();
+
+    assertContainsValue('Plugin-managed files deleted.', $filesDeleteOutput, 'The WP-CLI files delete command should route through the shared managed-file cleanup action.');
+    assertSameValue(false, file_exists($managedFile), 'The WP-CLI files delete command should remove managed font files.');
+    assertSameValue(true, is_readable((string) $services['storage']->pathForRelativePath('index.php')), 'The WP-CLI files delete command should recreate storage scaffolding.');
 
     ob_start();
     $command->supportBundle([], ['format' => 'json']);
@@ -2113,6 +2185,63 @@ $tests['cli_command_routes_phase_four_actions_through_admin_controller'] = stati
     $snapshotOutput = (string) ob_get_clean();
 
     assertContainsValue('"snapshots": []', $snapshotOutput, 'The WP-CLI snapshot list command should expose JSON output for automation.');
+};
+
+$tests['cli_transfer_import_accepts_prompted_google_api_key_without_printing_it'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $bundle = $services['site_transfer']->buildExportBundle();
+    assertFalseValue(is_wp_error($bundle), 'Building a transfer bundle for the CLI prompt test should succeed.');
+
+    $remoteGetResponses['https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=fresh-cli-key'] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode(['items' => []]),
+    ];
+
+    $command = new CliCommand($services['controller'], static fn (): string => 'fresh-cli-key');
+
+    ob_start();
+    $command->transfer(
+        ['import', (string) ($bundle['path'] ?? '')],
+        ['dry-run' => true, 'prompt-google-api-key' => true, 'format' => 'json']
+    );
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('"status": "validated"', $output, 'Transfer dry-run should accept a prompted fresh Google API key.');
+    assertContainsValue('"google_api_key_state": "valid"', $output, 'Transfer dry-run should report the prompted Google API key validation state.');
+    assertNotContainsValue('fresh-cli-key', $output, 'Transfer dry-run JSON output should not print the prompted Google API key.');
+
+    @unlink((string) ($bundle['path'] ?? ''));
 };
 
 $tests['rest_controller_family_fallback_returns_refreshed_generated_css_panel'] = static function (): void {
@@ -2161,8 +2290,9 @@ $tests['rest_controller_family_fallback_returns_refreshed_generated_css_panel'] 
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'Family fallback saves should return a native REST response.');
     assertSameValue('generated', (string) ($panel['key'] ?? ''), 'Family fallback saves should include the refreshed Generated CSS diagnostics panel.');
-    assertContainsValue('"Inter",serif', (string) ($panel['value'] ?? ''), 'The refreshed Generated CSS panel should include the saved fallback stack.');
-    assertContainsValue('"Inter",serif', (string) ($panel['readable_display_value'] ?? ''), 'The readable Generated CSS panel payload should also reflect the saved fallback stack.');
+    assertContainsValue('"Inter",sans-serif', (string) ($panel['value'] ?? ''), 'Generated CSS should keep the explicit role fallback when a family fallback changes.');
+    assertContainsValue('"Inter",sans-serif', (string) ($panel['readable_display_value'] ?? ''), 'The readable Generated CSS panel should also keep the explicit role fallback.');
+    assertNotContainsValue('"Inter",serif', (string) ($panel['value'] ?? ''), 'Family fallback changes should not override an explicit role fallback stack.');
 };
 
 $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): void {
@@ -3374,6 +3504,63 @@ $tests['admin_controller_build_page_context_formats_activity_log_times_in_site_t
     );
 };
 
+$tests['admin_controller_build_page_context_normalizes_enriched_activity_entries'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $details = wp_json_encode([[
+        'label' => 'Changed settings',
+        'value' => 'preview text updated',
+        'kind' => 'text',
+    ]]);
+    $optionStore[TastyFonts\Repository\LogRepository::OPTION_LOG] = [[
+        'time' => '2026-04-23 13:55:04',
+        'message' => 'Plugin settings saved: preview text updated.',
+        'summary' => 'Settings saved.',
+        'actor' => 'System',
+        'category' => 'settings',
+        'event' => 'settings_saved',
+        'outcome' => 'success',
+        'status_label' => 'Saved',
+        'source' => 'Settings',
+        'entity_type' => 'settings',
+        'entity_name' => 'Output Settings',
+        'details_json' => is_string($details) ? $details : '',
+    ]];
+
+    $services = makeServiceGraph();
+    $context = invokePrivateMethod($services['controller'], 'buildPageContext');
+    $logs = $context['logs'] ?? [];
+    $firstLog = is_array($logs[0] ?? null) ? $logs[0] : [];
+    $details = is_array($firstLog['detail_items'] ?? null) ? $firstLog['detail_items'] : [];
+
+    assertSameValue('Settings saved.', (string) ($firstLog['summary'] ?? ''), 'Activity context should expose the compact summary.');
+    assertSameValue('success', (string) ($firstLog['outcome'] ?? ''), 'Activity context should expose the normalized outcome.');
+    assertSameValue('Settings', (string) ($firstLog['source'] ?? ''), 'Activity context should expose the source label.');
+    assertContainsValue('preview text updated', (string) ($firstLog['search_text'] ?? ''), 'Activity search text should include detail values.');
+    assertSameValue('Changed settings', (string) ($details[0]['label'] ?? ''), 'Activity context should decode detail rows from details_json.');
+};
+
+$tests['admin_controller_save_role_drafts_logs_role_activity_instead_of_transfer_activity'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['controller']->saveRoleDraftValues([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ]);
+
+    $entry = $services['log']->all()[0] ?? [];
+
+    assertSameValue('roles', (string) ($entry['category'] ?? ''), 'Role draft saves should be categorized as role activity.');
+    assertSameValue('roles_saved', (string) ($entry['event'] ?? ''), 'Role draft saves should record a role-save event.');
+    assertSameValue('Saved', (string) ($entry['status_label'] ?? ''), 'Role draft saves should expose a concise outcome label.');
+    assertContainsValue('Saved roles', (string) ($entry['details_json'] ?? ''), 'Role draft saves should include role detail rows.');
+};
+
 $tests['admin_controller_maps_snippets_disclosure_state_to_the_roles_page'] = static function (): void {
     resetTestState();
 
@@ -3517,7 +3704,7 @@ $tests['admin_controller_clears_plugin_caches_and_logs_the_reset'] = static func
         TransientKey::forSite('tasty_fonts_css_hash_v2') => 'hash',
         TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG) => ['google'],
         TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA) => ['google' => ['family' => 'Google', 'axes' => []]],
-        TransientKey::forSite('tasty_fonts_bunny_catalog_v1') => ['bunny'],
+        TransientKey::forSite(BunnyFontsClient::TRANSIENT_CATALOG) => ['bunny'],
     ];
 
     set_transient(TransientKey::forSite(AdminController::SEARCH_CACHE_TRANSIENT_PREFIX . 'google_inter'), ['Inter'], 300);

@@ -10,6 +10,7 @@ defined('ABSPATH') || exit;
  * @phpstan-type StorageState array<string, string>
  * @phpstan-type RelativePathList list<string>
  * @phpstan-type DirectoryList list<string>
+ * @phpstan-type StorageFileMetadata array{relative_path: string, size: int, sha256: string}
  */
 final class Storage
 {
@@ -200,6 +201,53 @@ final class Storage
         $encodedSegments = array_map('rawurlencode', array_filter($segments, static fn (string $segment): bool => $segment !== ''));
 
         return untrailingslashit($rootUrl) . '/' . implode('/', $encodedSegments);
+    }
+
+    /**
+     * @param null|callable(string, string, \SplFileInfo): bool $include
+     * @return list<StorageFileMetadata>
+     */
+    public function listFileMetadata(?callable $include = null, bool $requireChecksum = false): array
+    {
+        $root = $this->getRoot();
+
+        if (!is_string($root) || $root === '' || !is_dir($root)) {
+            return [];
+        }
+
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $item) {
+            if (!$item instanceof \SplFileInfo || !$item->isFile()) {
+                continue;
+            }
+
+            $absolutePath = wp_normalize_path($item->getPathname());
+            $relativePath = $this->relativePath($absolutePath);
+
+            if ($relativePath === '' || ($include !== null && !$include($relativePath, $absolutePath, $item))) {
+                continue;
+            }
+
+            $checksum = hash_file('sha256', $absolutePath);
+
+            if (!is_string($checksum) && $requireChecksum) {
+                continue;
+            }
+
+            $files[] = [
+                'relative_path' => $relativePath,
+                'size' => (int) $item->getSize(),
+                'sha256' => is_string($checksum) ? $checksum : '',
+            ];
+        }
+
+        usort($files, static fn (array $left, array $right): int => strcmp($left['relative_path'], $right['relative_path']));
+
+        return $files;
     }
 
     public function ensureDirectory(string $path): bool
