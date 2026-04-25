@@ -153,13 +153,24 @@ final class SupportBundleService
 
     /**
      * @param array<mixed> $payload
-     * @return array<string, mixed>
+     * @return array<non-negative-int|string, mixed>
      */
     private function sanitizePayload(array $payload): array
     {
         $sanitized = [];
+        $isList = array_is_list($payload);
 
         foreach ($payload as $key => $value) {
+            if ($isList) {
+                if (is_array($value)) {
+                    $sanitized[] = $this->sanitizePayload($value);
+                } elseif (is_scalar($value) || $value === null) {
+                    $sanitized[] = $value;
+                }
+
+                continue;
+            }
+
             if (!is_string($key)) {
                 continue;
             }
@@ -169,7 +180,7 @@ final class SupportBundleService
             }
 
             if (is_array($value)) {
-                $sanitized[$key] = $this->sanitizePayload(FontUtils::normalizeStringKeyedMap($value));
+                $sanitized[$key] = $this->sanitizePayload($value);
                 continue;
             }
 

@@ -27,7 +27,6 @@ final class GoogleFontsClient
 {
     public const ACTION_REVALIDATE_API_KEY = 'tasty_fonts_revalidate_google_api_key';
     public const TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v2';
-    public const LEGACY_TRANSIENT_CATALOG = 'tasty_fonts_google_catalog_v1';
     public const TRANSIENT_METADATA = 'tasty_fonts_google_metadata_v1';
     public const TRANSIENT_API_KEY_REVALIDATION_QUEUED = 'tasty_fonts_google_api_key_revalidation_queued_v1';
     private const CATALOG_TTL = 12 * HOUR_IN_SECONDS;
@@ -77,7 +76,6 @@ final class GoogleFontsClient
         $this->catalogItems = null;
         $this->metadataIndex = null;
         delete_transient(TransientKey::forSite(self::TRANSIENT_CATALOG));
-        delete_transient(TransientKey::forSite(self::LEGACY_TRANSIENT_CATALOG));
         delete_transient(TransientKey::forSite(self::TRANSIENT_METADATA));
     }
 

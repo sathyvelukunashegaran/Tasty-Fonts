@@ -526,13 +526,8 @@ $tests['uninstall_handler_deletes_all_known_option_keys'] = static function (): 
         SettingsRepository::OPTION_ROLES,
         SettingsRepository::OPTION_GOOGLE_API_KEY_DATA,
         ImportRepository::OPTION_LIBRARY,
-        ImportRepository::OPTION_IMPORTS,
         LogRepository::OPTION_LOG,
         AdminController::LOCAL_ENV_NOTICE_OPTION,
-        SettingsRepository::LEGACY_OPTION_SETTINGS,
-        SettingsRepository::LEGACY_OPTION_ROLES,
-        ImportRepository::LEGACY_OPTION_IMPORTS,
-        LogRepository::LEGACY_OPTION_LOG,
     ];
 
     foreach ($expectedOptions as $key) {

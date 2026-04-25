@@ -23,8 +23,7 @@ use TastyFonts\Support\TransientKey;
  *     expected_version: string,
  *     current_hash: string,
  *     is_current: bool,
- *     write_path: string,
- *     needs_migration: bool
+ *     write_path: string
  * }
  */
 final class AssetService
@@ -178,7 +177,7 @@ final class AssetService
             return false;
         }
 
-        if (!empty($state['is_current']) && empty($state['needs_migration'])) {
+        if (!empty($state['is_current'])) {
             return true;
         }
 
@@ -216,11 +215,6 @@ final class AssetService
     {
         $css = $this->getCss();
         $state = $this->getGeneratedStylesheetState();
-
-        if (!empty($state['is_current']) && !empty($state['needs_migration'])) {
-            $this->writeGeneratedCssFile($state, false);
-            $state = $this->getGeneratedStylesheetState();
-        }
 
         $url = (string) $state['url'];
         $expectedVersion = (string) $state['expected_version'];
@@ -495,22 +489,8 @@ final class AssetService
         $path = $this->storage->getGeneratedCssPath() ?? '';
         $url = $this->storage->getGeneratedCssUrl() ?? '';
         $writePath = $path;
-        $canonicalState = $this->buildStylesheetStateForPath($path, $url);
+        $state = $this->buildStylesheetStateForPath($path, $url);
         $expectedHash = $this->expectedFileHash();
-        $state = $canonicalState;
-
-        if (!$canonicalState['exists']) {
-            $legacyPath = $this->getLegacyGeneratedCssPath();
-            $legacyUrl = $this->getLegacyGeneratedCssUrl();
-
-            if ($legacyPath !== '' && $legacyUrl !== '') {
-                $legacyState = $this->buildStylesheetStateForPath($legacyPath, $legacyUrl);
-
-                if ($legacyState['exists']) {
-                    $state = $legacyState;
-                }
-            }
-        }
 
         return [
             'path' => $state['path'],
@@ -523,7 +503,6 @@ final class AssetService
             'current_hash' => $state['current_hash'],
             'is_current' => $state['exists'] && $state['current_hash'] === $expectedHash,
             'write_path' => $writePath,
-            'needs_migration' => $state['exists'] && $writePath !== '' && $state['path'] !== $writePath,
         ];
     }
 
@@ -534,7 +513,7 @@ final class AssetService
     {
         $path = $state['write_path'];
 
-        if ($path === '' || (!empty($state['is_current']) && empty($state['needs_migration']))) {
+        if ($path === '' || !empty($state['is_current'])) {
             return $path !== '' && !empty($state['is_current']);
         }
 
@@ -572,25 +551,4 @@ final class AssetService
         ];
     }
 
-    private function getLegacyGeneratedCssPath(): string
-    {
-        $root = $this->storage->getRoot();
-
-        if (!is_string($root) || $root === '') {
-            return '';
-        }
-
-        return trailingslashit($root) . 'tasty-fonts.css';
-    }
-
-    private function getLegacyGeneratedCssUrl(): string
-    {
-        $rootUrl = $this->storage->getRootUrlFull();
-
-        if (!is_string($rootUrl) || $rootUrl === '') {
-            return '';
-        }
-
-        return untrailingslashit($rootUrl) . '/tasty-fonts.css';
-    }
 }

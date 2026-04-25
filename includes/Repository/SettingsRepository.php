@@ -17,9 +17,6 @@ use TastyFonts\Support\FontUtils;
  *     heading: string,
  *     body: string,
  *     monospace: string,
- *     heading_delivery_id: string,
- *     body_delivery_id: string,
- *     monospace_delivery_id: string,
  *     heading_fallback: string,
  *     body_fallback: string,
  *     monospace_fallback: string,
@@ -59,8 +56,6 @@ final class SettingsRepository
     public const OPTION_SETTINGS = 'tasty_fonts_settings';
     public const OPTION_ROLES = 'tasty_fonts_roles';
     public const OPTION_GOOGLE_API_KEY_DATA = 'tasty_fonts_google_api_key_data';
-    public const LEGACY_OPTION_SETTINGS = 'etch_fonts_settings';
-    public const LEGACY_OPTION_ROLES = 'etch_fonts_roles';
     private const GOOGLE_API_KEY_ENCRYPTED_FIELD = 'google_api_key_encrypted';
     private const GOOGLE_API_KEY_CIPHER_PREFIX = 'secretbox:';
     private const PREVIEW_SENTENCE_MAX_LENGTH = 280;
@@ -130,8 +125,6 @@ final class SettingsRepository
         'update_channel' => self::UPDATE_CHANNEL_STABLE,
         'block_editor_font_library_sync_enabled' => null,
         'bricks_integration_enabled' => null,
-        'bricks_selector_fonts_enabled' => true,
-        'bricks_builder_preview_enabled' => true,
         'bricks_theme_styles_sync_enabled' => false,
         'bricks_theme_style_target_mode' => 'managed',
         'bricks_theme_style_target_id' => 'managed',
@@ -153,7 +146,6 @@ final class SettingsRepository
         'acss_font_role_sync_previous_text_font_family' => '',
         'acss_font_role_sync_previous_heading_font_weight' => '',
         'acss_font_role_sync_previous_text_font_weight' => '',
-        'role_fallback_defaults_migrated' => false,
         'preview_sentence' => 'The quick brown fox jumps over the lazy dog. 1234567890',
         'adobe_enabled' => false,
         'adobe_project_id' => '',
@@ -194,12 +186,12 @@ final class SettingsRepository
             return $this->settingsCache;
         }
 
-        $storedSettings = $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS);
+        $storedSettings = $this->getOptionArray(self::OPTION_SETTINGS);
         $settings = $this->normalizeInputMap(wp_parse_args(
             $storedSettings,
             self::DEFAULT_SETTINGS
         ));
-        $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions($settings));
+        $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions());
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($this->normalizeInputMap($storedSettings), $settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
         $settings['font_display'] = $this->normalizeFontDisplay($this->stringValue($settings, 'font_display', 'swap'));
@@ -229,8 +221,6 @@ final class SettingsRepository
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
         $settings['bricks_integration_enabled'] = $this->normalizeOptionalBoolean($settings['bricks_integration_enabled'] ?? null);
-        $settings['bricks_selector_fonts_enabled'] = !empty($settings['bricks_selector_fonts_enabled']);
-        $settings['bricks_builder_preview_enabled'] = !empty($settings['bricks_builder_preview_enabled']);
         $settings['bricks_theme_styles_sync_enabled'] = !empty($settings['bricks_theme_styles_sync_enabled']);
         $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($settings['bricks_theme_style_target_mode'] ?? 'managed');
         $settings['bricks_theme_style_target_id'] = $this->normalizeBricksThemeStyleTargetId($settings['bricks_theme_style_target_id'] ?? 'managed');
@@ -251,7 +241,6 @@ final class SettingsRepository
         $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($settings['acss_font_role_sync_enabled'] ?? null);
         $settings['acss_font_role_sync_opted_out'] = !empty($settings['acss_font_role_sync_opted_out']);
         $settings['acss_font_role_sync_applied'] = !empty($settings['acss_font_role_sync_applied']);
-        $settings['role_fallback_defaults_migrated'] = !empty($settings['role_fallback_defaults_migrated']);
         $settings['acss_font_role_sync_previous_heading_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_family'] ?? '');
         $settings['acss_font_role_sync_previous_text_font_family'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_text_font_family'] ?? '');
         $settings['acss_font_role_sync_previous_heading_font_weight'] = $this->sanitizeTextValue($settings['acss_font_role_sync_previous_heading_font_weight'] ?? '');
@@ -274,9 +263,7 @@ final class SettingsRepository
         $settings['family_fallbacks'] = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
         $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
         $settings['delete_uploaded_files_on_uninstall'] = !empty($settings['delete_uploaded_files_on_uninstall']);
-        $settings = $this->normalizeBricksBaselineSettings($settings);
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
-        unset($settings['bricks_variables_sync_enabled']);
         $settings['output_quick_mode_preference'] = $this->resolveOutputQuickModePreference($storedSettings, $settings);
 
         return $this->cacheSettings($settings);
@@ -290,7 +277,7 @@ final class SettingsRepository
     {
         $settings = $this->getSettings();
         $monospaceRoleWasEnabled = !empty($settings['monospace_role_enabled']);
-        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions($settings);
+        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
         $clearGoogleKey = !empty($input['tasty_fonts_clear_google_api_key']);
         $submittedGoogleKey = array_key_exists('google_api_key', $input)
             ? sanitize_text_field($this->stringValue($input, 'google_api_key'))
@@ -439,8 +426,6 @@ final class SettingsRepository
 
         foreach (
             [
-                'bricks_selector_fonts_enabled',
-                'bricks_builder_preview_enabled',
                 'bricks_theme_styles_sync_enabled',
                 'bricks_disable_google_fonts_enabled',
             ] as $field
@@ -462,8 +447,6 @@ final class SettingsRepository
             $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($input['bricks_theme_style_target_mode']);
             $settingsChanged = true;
         }
-
-        $settings = $this->normalizeBricksBaselineSettings($settings);
 
         if (array_key_exists('oxygen_integration_enabled', $input)) {
             $settings['oxygen_integration_enabled'] = $this->normalizeOptionalBoolean($input['oxygen_integration_enabled']);
@@ -557,10 +540,8 @@ final class SettingsRepository
      */
     public function getRoles(array $catalog): array
     {
-        $this->ensureLegacyRoleFallbackDefaultsMigrated($catalog);
-
         return $this->normalizeRoleSet(
-            $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES),
+            $this->getOptionArray(self::OPTION_ROLES),
             $catalog
         );
     }
@@ -578,7 +559,7 @@ final class SettingsRepository
     public function saveRoles(array $input, array $catalog): array
     {
         $storedRoles = $this->normalizeRoleSet(
-            $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES),
+            $this->getOptionArray(self::OPTION_ROLES),
             $catalog
         );
         $roles = $storedRoles;
@@ -631,14 +612,13 @@ final class SettingsRepository
      */
     public function getAppliedRoles(array $catalog): array
     {
-        $this->ensureLegacyRoleFallbackDefaultsMigrated($catalog);
         $settings = $this->getSettings();
         $storedAppliedRoles = is_array($settings['applied_roles'] ?? null)
             ? $settings['applied_roles']
             : [];
 
         if ($storedAppliedRoles === [] && !empty($settings['auto_apply_roles'])) {
-            $storedAppliedRoles = $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES);
+            $storedAppliedRoles = $this->getOptionArray(self::OPTION_ROLES);
         }
 
         return $this->normalizeRoleSet($this->normalizeInputMap($storedAppliedRoles), $catalog);
@@ -743,8 +723,6 @@ final class SettingsRepository
         delete_option(self::OPTION_SETTINGS);
         delete_option(self::OPTION_ROLES);
         delete_option(self::OPTION_GOOGLE_API_KEY_DATA);
-        delete_option(self::LEGACY_OPTION_SETTINGS);
-        delete_option(self::LEGACY_OPTION_ROLES);
         $this->settingsCache = null;
 
         return $this->getSettings();
@@ -817,7 +795,6 @@ final class SettingsRepository
         $settings['adobe_project_checked_at'] = 0;
 
         delete_option(self::OPTION_ROLES);
-        delete_option(self::LEGACY_OPTION_ROLES);
 
         return $this->persistSettings($settings);
     }
@@ -830,8 +807,6 @@ final class SettingsRepository
         $settings = $this->getSettings();
         $settings['block_editor_font_library_sync_enabled'] = null;
         $settings['bricks_integration_enabled'] = null;
-        $settings['bricks_selector_fonts_enabled'] = true;
-        $settings['bricks_builder_preview_enabled'] = true;
         $settings['bricks_theme_styles_sync_enabled'] = false;
         $settings['bricks_theme_style_target_mode'] = 'managed';
         $settings['bricks_theme_style_target_id'] = 'managed';
@@ -1041,9 +1016,6 @@ final class SettingsRepository
             'heading' => '',
             'body' => '',
             'monospace' => '',
-            'heading_delivery_id' => '',
-            'body_delivery_id' => '',
-            'monospace_delivery_id' => '',
             'heading_weight' => '',
             'body_weight' => '',
             'monospace_weight' => '',
@@ -1056,7 +1028,7 @@ final class SettingsRepository
     /**
      * @return SettingsInput
      */
-    private function getOptionArray(string $option, ?string $legacyOption = null): array
+    private function getOptionArray(string $option): array
     {
         $value = get_option($option, null);
 
@@ -1064,15 +1036,7 @@ final class SettingsRepository
             return $this->normalizeInputMap($value);
         }
 
-        $legacyValue = $legacyOption !== null ? get_option($legacyOption, null) : null;
-
-        if (!is_array($legacyValue)) {
-            return [];
-        }
-
-        update_option($option, $legacyValue, false);
-
-        return $this->normalizeInputMap($legacyValue);
+        return [];
     }
 
     /**
@@ -1141,8 +1105,6 @@ final class SettingsRepository
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
         $settings['bricks_integration_enabled'] = $this->normalizeOptionalBoolean($settings['bricks_integration_enabled'] ?? null);
-        $settings['bricks_selector_fonts_enabled'] = !empty($settings['bricks_selector_fonts_enabled']);
-        $settings['bricks_builder_preview_enabled'] = !empty($settings['bricks_builder_preview_enabled']);
         $settings['bricks_theme_styles_sync_enabled'] = !empty($settings['bricks_theme_styles_sync_enabled']);
         $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($settings['bricks_theme_style_target_mode'] ?? 'managed');
         $settings['bricks_theme_style_target_id'] = $this->normalizeBricksThemeStyleTargetId($settings['bricks_theme_style_target_id'] ?? 'managed');
@@ -1183,10 +1145,7 @@ final class SettingsRepository
         $settings['family_fallbacks'] = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
         $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
         $settings['delete_uploaded_files_on_uninstall'] = !empty($settings['delete_uploaded_files_on_uninstall']);
-        $settings = $this->normalizeBricksBaselineSettings($settings);
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
-        unset($settings['bricks_variables_sync_enabled']);
-
         return $this->withoutGoogleApiKeyData($settings);
     }
 
@@ -1211,9 +1170,6 @@ final class SettingsRepository
         $normalizedRoles['heading'] = $this->sanitizeTextValue($normalizedRoles['heading'] ?? '');
         $normalizedRoles['body'] = $this->sanitizeTextValue($normalizedRoles['body'] ?? '');
         $normalizedRoles['monospace'] = $this->sanitizeTextValue($normalizedRoles['monospace'] ?? '');
-        $normalizedRoles['heading_delivery_id'] = '';
-        $normalizedRoles['body_delivery_id'] = '';
-        $normalizedRoles['monospace_delivery_id'] = '';
         $normalizedRoles['heading_fallback'] = $this->normalizeRoleFallback($normalizedRoles['heading_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
         $normalizedRoles['body_fallback'] = $this->normalizeRoleFallback($normalizedRoles['body_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
         $normalizedRoles['monospace_fallback'] = $this->normalizeRoleFallback($normalizedRoles['monospace_fallback'] ?? '', 'monospace');
@@ -1224,7 +1180,20 @@ final class SettingsRepository
         $normalizedRoles['body_axes'] = $this->normalizeRoleAxes($normalizedRoles['body_axes'] ?? []);
         $normalizedRoles['monospace_axes'] = $this->normalizeRoleAxes($normalizedRoles['monospace_axes'] ?? []);
 
-        return $normalizedRoles;
+        return [
+            'heading' => $normalizedRoles['heading'],
+            'body' => $normalizedRoles['body'],
+            'monospace' => $normalizedRoles['monospace'],
+            'heading_fallback' => $normalizedRoles['heading_fallback'],
+            'body_fallback' => $normalizedRoles['body_fallback'],
+            'monospace_fallback' => $normalizedRoles['monospace_fallback'],
+            'heading_weight' => $normalizedRoles['heading_weight'],
+            'body_weight' => $normalizedRoles['body_weight'],
+            'monospace_weight' => $normalizedRoles['monospace_weight'],
+            'heading_axes' => $normalizedRoles['heading_axes'],
+            'body_axes' => $normalizedRoles['body_axes'],
+            'monospace_axes' => $normalizedRoles['monospace_axes'],
+        ];
     }
 
     /**
@@ -1305,68 +1274,6 @@ final class SettingsRepository
         }
 
         return FontUtils::sanitizeFallback($rawValue);
-    }
-
-    /**
-     * @param array<int|string, mixed> $catalog
-     */
-    private function ensureLegacyRoleFallbackDefaultsMigrated(array $catalog): void
-    {
-        $settings = $this->getSettings();
-
-        if (!empty($settings['role_fallback_defaults_migrated'])) {
-            return;
-        }
-
-        $draftRoles = $this->normalizeRoleSet(
-            $this->getOptionArray(self::OPTION_ROLES, self::LEGACY_OPTION_ROLES),
-            $catalog
-        );
-        $draftChanged = false;
-        $draftRoles = $this->migrateLegacyFallbackOnlyRoleDefaults($draftRoles, $draftChanged);
-
-        $storedAppliedRoles = is_array($settings['applied_roles'] ?? null)
-            ? $settings['applied_roles']
-            : [];
-        $hasStoredAppliedRoles = $storedAppliedRoles !== [];
-        $appliedRoles = $hasStoredAppliedRoles
-            ? $this->normalizeRoleSet($this->normalizeInputMap($storedAppliedRoles), $catalog)
-            : $draftRoles;
-        $appliedChanged = false;
-        $appliedRoles = $this->migrateLegacyFallbackOnlyRoleDefaults($appliedRoles, $appliedChanged);
-
-        if ($draftChanged) {
-            update_option(self::OPTION_ROLES, $draftRoles, false);
-        }
-
-        if ($hasStoredAppliedRoles) {
-            $settings['applied_roles'] = $appliedRoles;
-        }
-
-        $settings['role_fallback_defaults_migrated'] = true;
-        $this->persistSettings($settings);
-    }
-
-    /**
-     * @param RoleSet $roles
-     * @return RoleSet
-     */
-    private function migrateLegacyFallbackOnlyRoleDefaults(array $roles, bool &$changed): array
-    {
-        foreach (['heading', 'body'] as $roleKey) {
-            $fallbackKey = $roleKey . '_fallback';
-            $familyName = trim($roles[$roleKey]);
-            $fallback = trim($roles[$fallbackKey]);
-
-            if ($familyName !== '' || strtolower($fallback) !== 'sans-serif') {
-                continue;
-            }
-
-            $roles[$fallbackKey] = FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
-            $changed = true;
-        }
-
-        return $roles;
     }
 
     private function sanitizeTextValue(mixed $value): string
@@ -1779,7 +1686,6 @@ final class SettingsRepository
 
         foreach (
             [
-                'class_output_mode',
                 'class_output_enabled',
                 'class_output_role_heading_enabled',
                 'class_output_role_body_enabled',
@@ -1810,19 +1716,14 @@ final class SettingsRepository
     }
 
     /**
-     * @param SettingsInput|NormalizedSettings $settings
      * @return GoogleApiKeyData
      */
-    private function getGoogleApiKeyDataFromOptions(array $settings = []): array
+    private function getGoogleApiKeyDataFromOptions(): array
     {
         $googleApiKeyData = get_option(self::OPTION_GOOGLE_API_KEY_DATA, null);
 
         if (!is_array($googleApiKeyData)) {
-            if ($settings === []) {
-                $settings = $this->getOptionArray(self::OPTION_SETTINGS, self::LEGACY_OPTION_SETTINGS);
-            }
-
-            $googleApiKeyData = $this->extractGoogleApiKeyData($settings);
+            $googleApiKeyData = self::DEFAULT_GOOGLE_API_KEY_DATA;
         }
 
         $normalizedGoogleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
@@ -1896,9 +1797,6 @@ final class SettingsRepository
         foreach (self::GOOGLE_API_KEY_FIELDS as $field) {
             unset($settings[$field]);
         }
-
-        unset($settings['class_output_mode']);
-
         return $settings;
     }
 
@@ -2081,10 +1979,6 @@ final class SettingsRepository
      */
     private function hasClassOutputInput(array $input): bool
     {
-        if (array_key_exists('class_output_mode', $input)) {
-            return true;
-        }
-
         foreach (self::CLASS_OUTPUT_BOOLEAN_FIELDS as $field) {
             if (array_key_exists($field, $input)) {
                 return true;
@@ -2123,12 +2017,6 @@ final class SettingsRepository
             }
         }
 
-        if (!$hasBooleanInput && array_key_exists('class_output_mode', $input)) {
-            $normalized = $this->classOutputSettingsFromLegacyMode($this->stringValue($input, 'class_output_mode'));
-        } elseif (!$hasBooleanInput && array_key_exists('class_output_mode', $fallback)) {
-            $normalized = $this->classOutputSettingsFromLegacyMode($this->stringValue($fallback, 'class_output_mode'));
-        }
-
         return $normalized;
     }
 
@@ -2152,59 +2040,6 @@ final class SettingsRepository
         }
 
         return $settings;
-    }
-
-    /**
-     * @return array<string, bool>
-     */
-    private function classOutputSettingsFromLegacyMode(string $mode): array
-    {
-        $mode = in_array($mode, ['off', 'roles', 'families', 'all'], true)
-            ? $mode
-            : 'off';
-        $settings = [];
-
-        foreach (self::CLASS_OUTPUT_BOOLEAN_FIELDS as $field) {
-            $settings[$field] = self::DEFAULT_SETTINGS[$field];
-        }
-
-        return match ($mode) {
-            'roles' => array_replace(
-                $settings,
-                [
-                    'class_output_enabled' => true,
-                    'class_output_families_enabled' => false,
-                ]
-            ),
-            'families' => array_replace(
-                $settings,
-                [
-                    'class_output_enabled' => true,
-                    'class_output_role_heading_enabled' => false,
-                    'class_output_role_body_enabled' => false,
-                    'class_output_role_monospace_enabled' => false,
-                    'class_output_role_alias_interface_enabled' => false,
-                    'class_output_role_alias_ui_enabled' => false,
-                    'class_output_role_alias_code_enabled' => false,
-                    'class_output_category_sans_enabled' => false,
-                    'class_output_category_serif_enabled' => false,
-                    'class_output_category_mono_enabled' => false,
-                    'class_output_families_enabled' => true,
-                ]
-            ),
-            'all' => array_replace(
-                $settings,
-                [
-                    'class_output_enabled' => true,
-                ]
-            ),
-            default => array_replace(
-                $settings,
-                [
-                    'class_output_enabled' => false,
-                ]
-            ),
-        };
     }
 
     private function sanitizeAdobeProjectId(string $projectId): string
@@ -2298,20 +2133,6 @@ final class SettingsRepository
         }
 
         return in_array($state, ['unknown', 'valid', 'invalid'], true) ? $state : 'unknown';
-    }
-
-    /**
-     * @param NormalizedSettings $settings
-     * @return NormalizedSettings
-     */
-    private function normalizeBricksBaselineSettings(array $settings): array
-    {
-        $bricksEnabled = ($settings['bricks_integration_enabled'] ?? null) !== false;
-
-        $settings['bricks_selector_fonts_enabled'] = $bricksEnabled;
-        $settings['bricks_builder_preview_enabled'] = $bricksEnabled;
-
-        return $settings;
     }
 
     /**

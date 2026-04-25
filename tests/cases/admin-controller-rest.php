@@ -5,6 +5,7 @@ declare(strict_types=1);
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Api\RestController;
+use TastyFonts\Cli\Command as CliCommand;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
@@ -393,7 +394,7 @@ $tests['admin_controller_register_menu_uses_the_shared_access_policy_and_read_ca
     $services['controller']->registerMenu();
 
     assertSameValue('read', (string) ($menuPageCalls[0]['capability'] ?? ''), 'Allowed users should receive menu pages registered with the shared read capability.');
-    assertSameValue('read', (string) ($submenuPageCalls[0]['capability'] ?? ''), 'Allowed users should receive submenu pages registered with the shared read capability.');
+    assertSameValue([], $submenuPageCalls, 'Allowed users should not receive retired hidden submenu routes.');
 };
 
 $tests['admin_controller_enqueue_assets_skips_unauthorized_plugin_requests'] = static function (): void {
@@ -548,7 +549,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
     assertContainsValue('primary font preloads enabled', $message, 'Settings save messages should explain preload setting changes.');
     assertContainsValue('Block Editor Font Library sync enabled', $message, 'Settings save messages should explain editor sync changes.');
     assertContainsValue('activity log shown', $message, 'Settings save messages should explain activity log visibility changes.');
-    assertContainsValue('onboarding hints hidden', $message, 'Settings save messages should explain plugin behavior changes.');
+    assertContainsValue('onboarding hints turned off', $message, 'Settings save messages should explain plugin behavior changes with the positive setting label.');
     assertContainsValue('preview text updated', $message, 'Settings save messages should explain preview text changes.');
     assertContainsValue('Reload the page to apply this change.', $message, 'Settings save messages should mention reload-only behavior changes.');
 };
@@ -1777,7 +1778,7 @@ $tests['admin_controller_localizes_role_family_catalog_from_active_deliveries'] 
     );
 };
 
-$tests['admin_controller_registers_hidden_legacy_admin_routes'] = static function (): void {
+$tests['admin_controller_registers_single_canonical_admin_route'] = static function (): void {
     resetTestState();
 
     global $menuPageCalls;
@@ -1792,25 +1793,16 @@ $tests['admin_controller_registers_hidden_legacy_admin_routes'] = static functio
         (string) ($menuPageCalls[0]['icon_url'] ?? ''),
         'The top-level Tasty Fonts menu should use the custom SVG icon instead of a dashicon.'
     );
-    assertSameValue(
-        [
-            AdminController::MENU_SLUG_LIBRARY,
-            AdminController::MENU_SLUG_SETTINGS,
-            AdminController::MENU_SLUG_DIAGNOSTICS,
-        ],
-        array_map(static fn (array $entry): string => (string) ($entry['menu_slug'] ?? ''), $submenuPageCalls),
-        'The admin menu should keep hidden legacy routes for Library, Settings, and Diagnostics.'
-    );
+    assertSameValue([], $submenuPageCalls, 'Version 2 should expose only the canonical single admin route.');
 };
 
 $tests['admin_controller_recognizes_task_based_admin_hooks'] = static function (): void {
     resetTestState();
 
     assertSameValue(true, AdminController::isPluginAdminHook('toplevel_page_' . AdminController::MENU_SLUG), 'The top-level roles page hook should be recognized.');
-    assertSameValue(true, AdminController::isPluginAdminHook('tasty-fonts_page_' . AdminController::MENU_SLUG_LIBRARY), 'The Library submenu hook should be recognized.');
-    assertSameValue(true, AdminController::isPluginAdminHook('tasty-fonts_page_' . AdminController::MENU_SLUG_SETTINGS), 'The Settings submenu hook should be recognized.');
-    assertSameValue(true, AdminController::isPluginAdminHook('tasty-fonts_page_' . AdminController::MENU_SLUG_DIAGNOSTICS), 'The Diagnostics submenu hook should be recognized.');
-    assertSameValue(true, AdminController::isPluginAdminHook('custom-parent_page_' . AdminController::MENU_SLUG_SETTINGS), 'Submenu hooks should be recognized by their page slug even when the parent hook prefix differs.');
+    assertSameValue(false, AdminController::isPluginAdminHook('tasty-fonts_page_tasty-custom-fonts-library'), 'Retired hidden Library submenu hooks should not load plugin assets.');
+    assertSameValue(false, AdminController::isPluginAdminHook('tasty-fonts_page_tasty-custom-fonts-settings'), 'Retired hidden Settings submenu hooks should not load plugin assets.');
+    assertSameValue(false, AdminController::isPluginAdminHook('tasty-fonts_page_tasty-custom-fonts-diagnostics'), 'Retired hidden Diagnostics submenu hooks should not load plugin assets.');
     assertSameValue(false, AdminController::isPluginAdminHook('settings_page_general'), 'Unrelated admin hooks should not load plugin assets.');
 };
 
@@ -2052,16 +2044,75 @@ $tests['rest_controller_runs_safe_advanced_tools_action_and_returns_refreshed_pa
 
     $services = makeServiceGraph();
     $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/tools/action');
-    $request->set_param('action', 'reset_suppressed_notices');
+    $request->set_param('action', 'repair_storage_scaffold');
 
     $response = $services['rest']->runToolsAction($request);
     $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'The tools action route should return a native REST response object.');
-    assertSameValue('Suppressed notices reset. Hidden reminders can appear again.', (string) ($data['message'] ?? ''), 'The tools action route should run the requested safe action.');
+    assertSameValue('Storage scaffold repaired.', (string) ($data['message'] ?? ''), 'The tools action route should run the requested safe action.');
     assertSameValue(true, is_array($data['advanced_tools']['health_checks'] ?? null), 'The tools action route should return refreshed Advanced Tools health state.');
     assertSameValue(true, is_array($data['generated_css_panel'] ?? null), 'The tools action route should return refreshed generated CSS data.');
     assertSameValue(true, is_array($data['logs'] ?? null), 'The tools action route should return refreshed activity entries.');
+};
+
+$tests['rest_controller_lists_rollback_snapshots_from_snapshot_service'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $create = $services['controller']->createRollbackSnapshot('manual');
+    assertFalseValue(is_wp_error($create), 'Creating a rollback snapshot should succeed before listing snapshots through REST.');
+
+    $response = $services['rest']->snapshots(
+        new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/tools/snapshots')
+    );
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+    $snapshots = is_array($data['snapshots'] ?? null) ? $data['snapshots'] : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The snapshots route should return a native REST response object.');
+    assertSameValue(1, count($snapshots), 'The snapshots route should return persisted rollback snapshots.');
+    assertSameValue((string) ($create['snapshot']['id'] ?? ''), (string) ($snapshots[0]['id'] ?? ''), 'The snapshots route should return the snapshot service entries, not an empty Advanced Tools payload.');
+};
+
+$tests['cli_command_routes_phase_four_actions_through_admin_controller'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $command = new CliCommand($services['controller']);
+
+    ob_start();
+    $command->doctor([], []);
+    $doctorOutput = (string) ob_get_clean();
+
+    assertContainsValue('Tasty Fonts doctor:', $doctorOutput, 'The WP-CLI doctor command should summarize Advanced Tools health checks.');
+
+    ob_start();
+    $command->css(['regenerate'], []);
+    $cssOutput = (string) ob_get_clean();
+
+    assertContainsValue('Generated CSS regenerated.', $cssOutput, 'The WP-CLI CSS command should route through the shared regenerate CSS action.');
+
+    ob_start();
+    $command->library(['rescan'], []);
+    $libraryOutput = (string) ob_get_clean();
+
+    assertContainsValue('Fonts rescanned.', $libraryOutput, 'The WP-CLI library command should route through the shared rescan action.');
+
+    ob_start();
+    $command->supportBundle([], ['format' => 'json']);
+    $supportBundleOutput = (string) ob_get_clean();
+    $supportBundlePayload = json_decode($supportBundleOutput, true);
+
+    assertContainsValue('"bundle"', $supportBundleOutput, 'The WP-CLI support-bundle alias should expose support bundle JSON for automation.');
+    if (is_array($supportBundlePayload)) {
+        @unlink((string) ($supportBundlePayload['bundle']['path'] ?? ''));
+    }
+
+    ob_start();
+    $command->snapshot(['list'], ['format' => 'json']);
+    $snapshotOutput = (string) ob_get_clean();
+
+    assertContainsValue('"snapshots": []', $snapshotOutput, 'The WP-CLI snapshot list command should expose JSON output for automation.');
 };
 
 $tests['rest_controller_family_fallback_returns_refreshed_generated_css_panel'] = static function (): void {
@@ -2601,9 +2652,6 @@ $tests['rest_controller_roles_draft_accepts_saved_static_role_weights'] = static
         'heading' => 'Inter',
         'body' => 'Inter',
         'monospace' => 'JetBrains Mono',
-        'heading_delivery_id' => 'local-self_hosted',
-        'body_delivery_id' => 'local-self_hosted',
-        'monospace_delivery_id' => 'local-self_hosted-mono',
         'heading_fallback' => 'sans-serif',
         'body_fallback' => 'sans-serif',
         'monospace_fallback' => 'monospace',
@@ -2619,9 +2667,9 @@ $tests['rest_controller_roles_draft_accepts_saved_static_role_weights'] = static
     assertSameValue('600', (string) ($data['roles']['heading_weight'] ?? ''), 'The roles/draft route should preserve saved heading weight overrides.');
     assertSameValue('400', (string) ($data['roles']['body_weight'] ?? ''), 'The roles/draft route should preserve saved body weight overrides.');
     assertSameValue('500', (string) ($data['roles']['monospace_weight'] ?? ''), 'The roles/draft route should preserve saved monospace weight overrides.');
-    assertSameValue('', (string) ($data['roles']['heading_delivery_id'] ?? ''), 'The roles/draft route should ignore legacy heading delivery overrides.');
-    assertSameValue('', (string) ($data['roles']['body_delivery_id'] ?? ''), 'The roles/draft route should ignore legacy body delivery overrides.');
-    assertSameValue('', (string) ($data['roles']['monospace_delivery_id'] ?? ''), 'The roles/draft route should ignore legacy monospace delivery overrides.');
+    assertSameValue(false, array_key_exists('heading_delivery_id', (array) ($data['roles'] ?? [])), 'The roles/draft route should not return retired role delivery override fields.');
+    assertSameValue(false, array_key_exists('body_delivery_id', (array) ($data['roles'] ?? [])), 'The roles/draft route should not return retired role delivery override fields.');
+    assertSameValue(false, array_key_exists('monospace_delivery_id', (array) ($data['roles'] ?? [])), 'The roles/draft route should not return retired role delivery override fields.');
 };
 
 $tests['rest_controller_roles_draft_returns_current_applied_roles_for_client_resync'] = static function (): void {
@@ -3233,8 +3281,28 @@ $tests['admin_controller_preserves_transfer_studio_tab_in_redirect_urls'] = stat
 
     parse_str((string) ($parts['query'] ?? ''), $query);
 
-    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Old Settings Transfer URLs should redirect to Advanced Tools.');
-    assertSameValue('transfer', (string) ($query['tf_studio'] ?? ''), 'Old Settings Transfer URLs should preserve the Transfer panel.');
+    assertSameValue(AdminController::PAGE_SETTINGS, (string) ($query['tf_page'] ?? ''), 'Version 2 should not reroute old Settings Transfer URLs to Advanced Tools.');
+    assertSameValue(false, isset($query['tf_studio']), 'Version 2 should drop unsupported Settings Transfer tab state.');
+};
+
+$tests['admin_controller_preserves_cli_studio_tab_in_redirect_urls'] = static function (): void {
+    resetTestState();
+
+    $_GET = [
+        'page' => AdminController::MENU_SLUG,
+        'tf_studio' => 'cli',
+    ];
+
+    $controller = makeAdminControllerTestInstance();
+    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
+    $parts = parse_url($url);
+    $query = [];
+
+    parse_str((string) ($parts['query'] ?? ''), $query);
+
+    assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'CLI deep links should canonicalize to the single admin page.');
+    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'CLI deep links should activate the Advanced Tools top-level tab.');
+    assertSameValue('cli', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the CLI tab selection when it is active.');
 };
 
 $tests['admin_controller_builds_site_transfer_download_urls_for_the_transfer_tab'] = static function (): void {
@@ -3304,42 +3372,6 @@ $tests['admin_controller_build_page_context_formats_activity_log_times_in_site_t
         (string) ($firstLog['time'] ?? ''),
         'Activity log entries should render in the configured site timezone instead of raw UTC.'
     );
-};
-
-$tests['admin_controller_maps_legacy_diagnostics_tabs_to_the_diagnostics_page'] = static function (): void {
-    resetTestState();
-
-    $_GET = [
-        'page' => AdminController::MENU_SLUG,
-        'tf_advanced' => '1',
-        'tf_studio' => 'generated',
-    ];
-
-    $controller = makeAdminControllerTestInstance();
-    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
-    $parts = parse_url($url);
-    $query = [];
-
-    parse_str((string) ($parts['query'] ?? ''), $query);
-
-    assertSameValue(AdminController::MENU_SLUG, (string) ($query['page'] ?? ''), 'Legacy diagnostics tabs should canonicalize to the single admin page.');
-    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Legacy diagnostics tabs should activate the Diagnostics top-level tab.');
-    assertSameValue('generated', (string) ($query['tf_studio'] ?? ''), 'Redirect URLs should preserve the requested diagnostics tab.');
-
-    $_GET = [
-        'page' => AdminController::MENU_SLUG,
-        'tf_advanced' => '1',
-        'tf_studio' => 'system',
-    ];
-
-    $url = invokePrivateMethod($controller, 'buildAdminPageUrl');
-    $parts = parse_url($url);
-    $query = [];
-
-    parse_str((string) ($parts['query'] ?? ''), $query);
-
-    assertSameValue(AdminController::PAGE_DIAGNOSTICS, (string) ($query['tf_page'] ?? ''), 'Legacy System Details URLs should still land on Advanced Tools.');
-    assertSameValue('overview', (string) ($query['tf_studio'] ?? ''), 'Legacy System Details URLs should resolve to Overview because system details now live there.');
 };
 
 $tests['admin_controller_maps_snippets_disclosure_state_to_the_roles_page'] = static function (): void {

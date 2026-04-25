@@ -56,9 +56,6 @@ use WP_Error;
 final class AdminController
 {
     public const MENU_SLUG = 'tasty-custom-fonts';
-    public const MENU_SLUG_LIBRARY = 'tasty-custom-fonts-library';
-    public const MENU_SLUG_SETTINGS = 'tasty-custom-fonts-settings';
-    public const MENU_SLUG_DIAGNOSTICS = 'tasty-custom-fonts-diagnostics';
     public const PAGE_ROLES = 'roles';
     public const PAGE_LIBRARY = 'library';
     public const PAGE_SETTINGS = 'settings';
@@ -92,7 +89,7 @@ final class AdminController
     public const ACTION_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_action_cooldown_';
     private const ACTION_COOLDOWN_DEFAULT_WINDOW_SECONDS = 2.0;
     private const SETTINGS_STUDIO_TABS = ['output-settings', 'integrations', 'plugin-behavior'];
-    private const DIAGNOSTICS_STUDIO_TABS = ['overview', 'generated', 'system', 'maintenance', 'developer', 'transfer', 'activity'];
+    private const DIAGNOSTICS_STUDIO_TABS = ['overview', 'generated', 'system', 'maintenance', 'developer', 'cli', 'transfer', 'activity'];
     private readonly AdminPageRenderer $renderer;
     private readonly AdminPageContextBuilder $pageContextBuilder;
     private readonly AdminAccessService $adminAccess;
@@ -159,32 +156,6 @@ final class AdminController
             999
         );
 
-        add_submenu_page(
-            '',
-            __('Font Library', 'tasty-fonts'),
-            __('Font Library', 'tasty-fonts'),
-            $capability,
-            self::MENU_SLUG_LIBRARY,
-            [$this, 'renderPage']
-        );
-
-        add_submenu_page(
-            '',
-            __('Settings', 'tasty-fonts'),
-            __('Settings', 'tasty-fonts'),
-            $capability,
-            self::MENU_SLUG_SETTINGS,
-            [$this, 'renderPage']
-        );
-
-        add_submenu_page(
-            '',
-            __('Advanced Tools', 'tasty-fonts'),
-            __('Advanced Tools', 'tasty-fonts'),
-            $capability,
-            self::MENU_SLUG_DIAGNOSTICS,
-            [$this, 'renderPage']
-        );
     }
 
     public function enqueueAssets(string $hookSuffix): void
@@ -331,6 +302,10 @@ final class AdminController
         }
 
         if ($this->handleRegenerateCssAction()) {
+            return;
+        }
+
+        if ($this->handleRepairStorageScaffoldAction()) {
             return;
         }
 
@@ -959,6 +934,36 @@ final class AdminController
     /**
      * @return Payload
      */
+    public function rescanFontLibrary(): array
+    {
+        $this->assets->refreshGeneratedAssets(true, false);
+        $message = __('Fonts rescanned.', 'tasty-fonts');
+        $this->log->add($message);
+
+        return ['message' => $message];
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function repairStorageScaffold(): array|WP_Error
+    {
+        if (!$this->developerTools->ensureStorageScaffolding()) {
+            return new WP_Error(
+                'tasty_fonts_storage_scaffold_repair_failed',
+                __('Storage scaffold could not be repaired.', 'tasty-fonts')
+            );
+        }
+
+        $message = __('Storage scaffold repaired.', 'tasty-fonts');
+        $this->log->add($message);
+
+        return ['message' => $message];
+    }
+
+    /**
+     * @return Payload
+     */
     public function resetIntegrationDetectionState(): array
     {
         $settings = $this->developerTools->resetIntegrationDetectionState();
@@ -1003,6 +1008,14 @@ final class AdminController
             'snapshot' => $snapshot,
             'snapshots' => $this->snapshots->listSnapshots(),
         ];
+    }
+
+    /**
+     * @return Payload
+     */
+    public function listRollbackSnapshots(): array
+    {
+        return ['snapshots' => $this->snapshots->listSnapshots()];
     }
 
     /**
@@ -1108,6 +1121,8 @@ final class AdminController
         $result = match ($action) {
             'clear_plugin_caches' => $this->clearPluginCachesAndRegenerateAssets(),
             'regenerate_css' => $this->regenerateCss(),
+            'rescan_font_library' => $this->rescanFontLibrary(),
+            'repair_storage_scaffold' => $this->repairStorageScaffold(),
             'reset_integration_detection_state' => $this->resetIntegrationDetectionState(),
             'reset_suppressed_notices' => $this->resetSuppressedNotices(),
             default => new WP_Error(
@@ -1337,6 +1352,71 @@ final class AdminController
         return $this->finalizeImportedSiteTransferResult(
             $this->applyFreshTransferGoogleApiKeyStatus(
                 $this->siteTransfer->importBundleReplacingCurrentState($uploadedFile, $freshGoogleApiKey),
+                $googleApiKeyValidation
+            )
+        );
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function dryRunSiteTransferBundlePath(string $bundlePath, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        $googleApiKeyValidation = $this->validateFreshTransferGoogleApiKey($freshGoogleApiKey);
+
+        if (is_wp_error($googleApiKeyValidation)) {
+            return $googleApiKeyValidation;
+        }
+
+        $result = $this->siteTransfer->previewImportBundlePath($bundlePath);
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $familyCount = $result['families'];
+        $fileCount = $result['files'];
+
+        return [
+            'status' => 'validated',
+            'message' => sprintf(
+                __('Dry run succeeded. Ready to import %1$d famil%2$s and %3$d file%4$s.', 'tasty-fonts'),
+                $familyCount,
+                $familyCount === 1 ? 'y' : 'ies',
+                $fileCount,
+                $fileCount === 1 ? '' : 's'
+            ),
+            'bundle_name' => $result['bundle_name'],
+            'plugin_version' => $result['plugin_version'],
+            'exported_at' => $result['exported_at'],
+            'families' => $familyCount,
+            'files' => $fileCount,
+            'diff' => $result['diff'],
+            'google_api_key_state' => $googleApiKeyValidation['state'],
+            'google_api_key_message' => $googleApiKeyValidation['message'],
+        ];
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function importSiteTransferBundlePath(string $bundlePath, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        $googleApiKeyValidation = $this->validateFreshTransferGoogleApiKey($freshGoogleApiKey);
+
+        if (is_wp_error($googleApiKeyValidation)) {
+            return $googleApiKeyValidation;
+        }
+
+        $snapshot = $this->snapshots->createSnapshot('before_transfer_import');
+
+        if (is_wp_error($snapshot)) {
+            return $snapshot;
+        }
+
+        return $this->finalizeImportedSiteTransferResult(
+            $this->applyFreshTransferGoogleApiKeyStatus(
+                $this->siteTransfer->importBundlePathReplacingCurrentState($bundlePath, $freshGoogleApiKey),
                 $googleApiKeyValidation
             )
         );
@@ -1693,6 +1773,23 @@ final class AdminController
         }
 
         $this->redirectWithSuccess($this->stringValue($result, 'message', __('Generated CSS regenerated.', 'tasty-fonts')));
+    }
+
+    private function handleRepairStorageScaffoldAction(): bool
+    {
+        if (!isset($_POST['tasty_fonts_repair_storage_scaffold'])) {
+            return false;
+        }
+
+        check_admin_referer('tasty_fonts_repair_storage_scaffold');
+
+        $result = $this->repairStorageScaffold();
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
+
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Storage scaffold repaired.', 'tasty-fonts')));
     }
 
     private function handleResetIntegrationDetectionStateAction(): bool
@@ -2290,7 +2387,6 @@ final class AdminController
             $baseContext,
             [
                 'current_page' => $pageType,
-                'current_page_slug' => self::pageSlugForType($pageType),
                 'page_urls' => [
                     self::PAGE_ROLES => $this->buildPageUrl(self::PAGE_ROLES),
                     self::PAGE_LIBRARY => $this->buildPageUrl(self::PAGE_LIBRARY),
@@ -2311,6 +2407,9 @@ final class AdminController
                     ]),
                     self::PAGE_DIAGNOSTICS . '_developer' => $this->buildPageUrl(self::PAGE_DIAGNOSTICS, [
                         'tf_studio' => 'maintenance',
+                    ]),
+                    self::PAGE_DIAGNOSTICS . '_cli' => $this->buildPageUrl(self::PAGE_DIAGNOSTICS, [
+                        'tf_studio' => 'cli',
                     ]),
                 ],
                 'advanced_tools' => $advancedTools,
@@ -2571,7 +2670,7 @@ final class AdminController
 
         if (!empty($before['training_wheels_off']) !== !empty($after['training_wheels_off'])) {
             $changes[] = !empty($after['training_wheels_off'])
-                ? __('onboarding hints hidden', 'tasty-fonts')
+                ? __('onboarding hints turned off', 'tasty-fonts')
                 : __('onboarding hints shown', 'tasty-fonts');
         }
 
@@ -2605,8 +2704,8 @@ final class AdminController
 
         if (!empty($before['delete_uploaded_files_on_uninstall']) !== !empty($after['delete_uploaded_files_on_uninstall'])) {
             $changes[] = !empty($after['delete_uploaded_files_on_uninstall'])
-                ? __('uninstall file cleanup enabled', 'tasty-fonts')
-                : __('uninstall file cleanup disabled', 'tasty-fonts');
+                ? __('uploaded font retention turned off', 'tasty-fonts')
+                : __('uploaded font retention enabled', 'tasty-fonts');
         }
 
         $message = $changes === []
@@ -3187,9 +3286,6 @@ final class AdminController
             'heading' => '',
             'body' => '',
             'monospace' => '',
-            'heading_delivery_id' => '',
-            'body_delivery_id' => '',
-            'monospace_delivery_id' => '',
             'heading_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
             'body_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
             'monospace_fallback' => 'monospace',
@@ -3230,15 +3326,10 @@ final class AdminController
         foreach (['heading', 'body', 'monospace'] as $roleKey) {
             $familyName = $sanitized[$roleKey];
             $profile = $this->roleProfileForFamily($familyName, $catalog);
-            $deliveryKey = $roleKey . '_delivery_id';
             $weightKey = $roleKey . '_weight';
             $axisKey = $roleKey . '_axes';
             $supportsVariableAxes = $variableFontsEnabled && $this->profileVariationAxes($profile) !== [];
             $supportsStaticWeightOverride = $profile !== [] && !$this->profileHasWeightAxis($profile);
-
-            if (array_key_exists($deliveryKey, $roleValues)) {
-                $sanitized[$deliveryKey] = sanitize_text_field(FontUtils::scalarStringValue($roleValues[$deliveryKey]));
-            }
 
             if (array_key_exists($weightKey, $roleValues)) {
                 $sanitized[$weightKey] = $this->sanitizeRoleWeightValue(
@@ -3265,9 +3356,6 @@ final class AdminController
             'heading' => FontUtils::scalarStringValue($sanitized['heading']),
             'body' => FontUtils::scalarStringValue($sanitized['body']),
             'monospace' => FontUtils::scalarStringValue($sanitized['monospace']),
-            'heading_delivery_id' => FontUtils::scalarStringValue($sanitized['heading_delivery_id']),
-            'body_delivery_id' => FontUtils::scalarStringValue($sanitized['body_delivery_id']),
-            'monospace_delivery_id' => FontUtils::scalarStringValue($sanitized['monospace_delivery_id']),
             'heading_fallback' => FontUtils::scalarStringValue($sanitized['heading_fallback']),
             'body_fallback' => FontUtils::scalarStringValue($sanitized['body_fallback']),
             'monospace_fallback' => FontUtils::scalarStringValue($sanitized['monospace_fallback']),
@@ -4076,10 +4164,7 @@ final class AdminController
 
         $current = $this->acssIntegration->getCurrentSettings();
 
-        if (
-            ($settings['acss_font_role_sync_enabled'] ?? null) !== null
-            && !$this->shouldRecoverLegacyAcssDetectionState($settings, $current)
-        ) {
+        if (($settings['acss_font_role_sync_enabled'] ?? null) !== null) {
             return;
         }
 
@@ -4124,25 +4209,6 @@ final class AdminController
         $this->settings->saveSettings([$settingsKey => '1']);
         $this->queueNoticeToast('success', $toastMessage, 'status');
         $this->log->add($logMessage);
-    }
-
-    /**
-     * @param NormalizedSettings $settings
-     * @param NormalizedSettings $current
-     */
-    private function shouldRecoverLegacyAcssDetectionState(array $settings, array $current): bool
-    {
-        return empty($settings['acss_font_role_sync_opted_out'])
-            && ($settings['acss_font_role_sync_enabled'] ?? null) === false
-            && empty($settings['acss_font_role_sync_applied'])
-            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family')) === ''
-            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family')) === ''
-            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight')) === ''
-            && trim($this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')) === ''
-            && trim($this->stringValue($current, 'heading')) === ''
-            && trim($this->stringValue($current, 'body')) === ''
-            && trim($this->stringValue($current, 'heading_weight')) === ''
-            && trim($this->stringValue($current, 'body_weight')) === '';
     }
 
     private function reconcileAcssIntegrationDrift(): void
@@ -4191,11 +4257,6 @@ final class AdminController
         $targetMode = $this->stringValue($settings, 'bricks_theme_style_target_mode', BricksIntegrationService::TARGET_MODE_MANAGED);
         $targetStyleId = $this->stringValue($settings, 'bricks_theme_style_target_id', BricksIntegrationService::MANAGED_THEME_STYLE_ID);
         $state = $this->bricksIntegration->readState($settings);
-
-        if ($this->bricksIntegration->hasLegacyManagedVariables()) {
-            $this->bricksIntegration->removeLegacyManagedVariables();
-            $this->log->add(__('Removed legacy Bricks alias variables so Bricks Theme Styles can use the Tasty role variables directly.', 'tasty-fonts'));
-        }
 
         if (
             $masterEnabled
@@ -4400,11 +4461,6 @@ final class AdminController
 
         $messages = [];
 
-        if ($this->bricksIntegration->hasLegacyManagedVariables()) {
-            $this->bricksIntegration->removeLegacyManagedVariables();
-            $messages[] = __('Legacy Bricks alias variables were removed.', 'tasty-fonts');
-        }
-
         $state = $this->bricksIntegration->getSyncState();
 
         if (!empty($state['theme_styles']['applied'])) {
@@ -4476,13 +4532,6 @@ final class AdminController
         $targetMode = $this->stringValue($settings, 'bricks_theme_style_target_mode', BricksIntegrationService::TARGET_MODE_MANAGED);
         $targetStyleId = $this->stringValue($settings, 'bricks_theme_style_target_id', BricksIntegrationService::MANAGED_THEME_STYLE_ID);
 
-        if ($this->bricksIntegration->hasLegacyManagedVariables()) {
-            $this->bricksIntegration->removeLegacyManagedVariables();
-            $messages[] = __('Legacy Bricks alias variables were removed so Theme Styles can use the existing Tasty role variables directly.', 'tasty-fonts');
-        }
-
-        $bricksState = $this->bricksIntegration->readState($settings);
-
         if (!$masterEnabled || !$themeStylesEnabled || !$sitewideRolesEnabled) {
             if (!empty($bricksState['theme_styles']['applied'])) {
                 $restore = $this->bricksIntegration->restoreThemeStylesSync();
@@ -4520,8 +4569,8 @@ final class AdminController
                 }
 
                 $messages[] = !$masterEnabled
-                    ? __('Bricks Google fonts control was restored because the Bricks integration is off.', 'tasty-fonts')
-                    : __('Bricks Google fonts control was turned off and the previous Bricks setting was restored.', 'tasty-fonts');
+                    ? __('Bricks picker focus was restored because the Bricks integration is off.', 'tasty-fonts')
+                    : __('Bricks picker focus was turned off and the previous Bricks setting was restored.', 'tasty-fonts');
             }
         } elseif (($bricksState['google_fonts']['status'] ?? '') !== 'synced') {
             $result = $this->bricksIntegration->applyGoogleFontsSetting();
@@ -4530,7 +4579,7 @@ final class AdminController
                 return $result;
             }
 
-            $messages[] = __('Bricks Google fonts are now disabled so Bricks font pickers show only Tasty-supplied fonts.', 'tasty-fonts');
+            $messages[] = __('Bricks font pickers now show only Tasty-supplied fonts.', 'tasty-fonts');
         }
 
         return implode(' ', array_values(array_unique(array_filter($messages, static fn (string $message): bool => $message !== ''))));
@@ -5380,18 +5429,7 @@ final class AdminController
 
     private function resolveRequestedPageType(): string
     {
-        $pageSlug = $this->getCurrentPageSlug();
         $studio = $this->getAllowedTrackedUiTabValue('tf_studio');
-
-        if ($studio === 'transfer' || $studio === 'developer') {
-            if ($pageSlug === self::MENU_SLUG_SETTINGS || $this->getAllowedTrackedUiTabValue('tf_page') === self::PAGE_SETTINGS) {
-                return self::PAGE_DIAGNOSTICS;
-            }
-        }
-
-        if ($pageSlug !== self::MENU_SLUG) {
-            return self::pageTypeForSlug($pageSlug);
-        }
 
         $pageType = $this->getAllowedTrackedUiTabValue('tf_page');
 
@@ -5432,57 +5470,12 @@ final class AdminController
 
     public static function isPluginAdminHook(string $hookSuffix): bool
     {
-        foreach (self::pluginPageSlugs() as $pageSlug) {
-            if ($hookSuffix === 'toplevel_page_' . $pageSlug) {
-                return true;
-            }
-
-            if (str_ends_with($hookSuffix, '_page_' . $pageSlug)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $hookSuffix === 'toplevel_page_' . self::MENU_SLUG
+            || str_ends_with($hookSuffix, '_page_' . self::MENU_SLUG);
     }
 
     public static function isPluginPageSlug(string $pageSlug): bool
     {
-        return in_array($pageSlug, self::pluginPageSlugs(), true);
-    }
-
-    public static function pageSlugForType(string $pageType): string
-    {
-        return match ($pageType) {
-            self::PAGE_LIBRARY => self::MENU_SLUG_LIBRARY,
-            self::PAGE_SETTINGS => self::MENU_SLUG_SETTINGS,
-            self::PAGE_DIAGNOSTICS => self::MENU_SLUG_DIAGNOSTICS,
-            default => self::MENU_SLUG,
-        };
-    }
-
-    public static function pageTypeForSlug(string $pageSlug): string
-    {
-        return match ($pageSlug) {
-            self::MENU_SLUG_LIBRARY => self::PAGE_LIBRARY,
-            self::MENU_SLUG_SETTINGS => self::PAGE_SETTINGS,
-            self::MENU_SLUG_DIAGNOSTICS => self::PAGE_DIAGNOSTICS,
-            default => self::PAGE_ROLES,
-        };
-    }
-
-    /**
-     * @return string[]
-     */
-    /**
-     * @return list<string>
-     */
-    private static function pluginPageSlugs(): array
-    {
-        return [
-            self::MENU_SLUG,
-            self::MENU_SLUG_LIBRARY,
-            self::MENU_SLUG_SETTINGS,
-            self::MENU_SLUG_DIAGNOSTICS,
-        ];
+        return $pageSlug === self::MENU_SLUG;
     }
 }

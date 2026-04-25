@@ -340,39 +340,6 @@ $tests['css_builder_suppresses_only_the_targeted_class_output_flags'] = static f
     assertContainsValue('.font-lora {', $css, 'Disabling specific class groups should not suppress family classes.');
 };
 
-$tests['css_builder_honors_legacy_class_output_mode_migration'] = static function (): void {
-    $builder = new CssBuilder();
-    $roles = [
-        'heading' => 'Lora',
-        'body' => 'Inter',
-        'heading_fallback' => 'serif',
-        'body_fallback' => 'sans-serif',
-    ];
-    $families = [
-        ['family' => 'Lora', 'font_category' => 'serif'],
-        ['family' => 'Inter', 'font_category' => 'sans-serif'],
-    ];
-    $settings = [
-        'class_output_enabled' => true,
-        'class_output_role_heading_enabled' => false,
-        'class_output_role_body_enabled' => false,
-        'class_output_role_monospace_enabled' => false,
-        'class_output_role_alias_interface_enabled' => false,
-        'class_output_role_alias_ui_enabled' => false,
-        'class_output_role_alias_code_enabled' => false,
-        'class_output_category_sans_enabled' => false,
-        'class_output_category_serif_enabled' => false,
-        'class_output_category_mono_enabled' => false,
-        'class_output_families_enabled' => true,
-    ];
-
-    $css = $builder->buildClassOutputSnippet($roles, false, $families, $settings);
-
-    assertNotContainsValue('.font-heading {', $css, 'Migrated legacy families mode should suppress role classes.');
-    assertContainsValue('.font-lora {', $css, 'Migrated legacy families mode should still emit family classes.');
-    assertContainsValue('.font-inter {', $css, 'Migrated legacy families mode should still emit all family classes.');
-};
-
 $tests['css_builder_omits_mono_and_code_classes_when_monospace_role_is_disabled'] = static function (): void {
     $builder = new CssBuilder();
     $roles = [

@@ -49,8 +49,6 @@ use TastyFonts\Support\FontUtils;
 final class ImportRepository
 {
     public const OPTION_LIBRARY = 'tasty_fonts_library';
-    public const OPTION_IMPORTS = 'tasty_fonts_imports';
-    public const LEGACY_OPTION_IMPORTS = 'etch_fonts_imports';
     private const SUPPORTED_PUBLISH_STATES = ['library_only', 'published', 'role_active'];
     private const SUPPORTED_DELIVERY_TYPES = ['self_hosted', 'cdn', 'adobe_hosted'];
     private const SUPPORTED_PROVIDERS = ['local', 'google', 'bunny', 'adobe'];
@@ -391,8 +389,6 @@ final class ImportRepository
     public function clearLibrary(): void
     {
         delete_option(self::OPTION_LIBRARY);
-        delete_option(self::OPTION_IMPORTS);
-        delete_option(self::LEGACY_OPTION_IMPORTS);
     }
 
     /**
@@ -427,20 +423,7 @@ final class ImportRepository
             return $this->normalizeLibrary($value);
         }
 
-        $legacyImports = get_option(self::OPTION_IMPORTS, null);
-
-        if (!is_array($legacyImports)) {
-            $legacyImports = get_option(self::LEGACY_OPTION_IMPORTS, null);
-        }
-
-        if (!is_array($legacyImports)) {
-            return [];
-        }
-
-        $library = $this->migrateLegacyImports($legacyImports);
-        $this->persistLibrary($library);
-
-        return $library;
+        return [];
     }
 
     /**
@@ -777,84 +760,6 @@ final class ImportRepository
             'adobe:adobe_hosted' => 'Adobe-hosted',
             default => ucfirst($provider),
         };
-    }
-
-    /**
-     * @param array<int|string, mixed> $imports
-     * @return LibraryMap
-     */
-    private function migrateLegacyImports(array $imports): array
-    {
-        $library = [];
-
-        foreach ($imports as $slug => $import) {
-            if (!is_array($import)) {
-                continue;
-            }
-
-            $familyName = sanitize_text_field($this->stringValue($import, 'family'));
-            $familySlug = FontUtils::slugify(is_string($slug) && $slug !== '' ? $slug : $this->stringValue($import, 'slug', $familyName));
-            $provider = $this->normalizeProvider($this->stringValue($import, 'provider'));
-
-            if ($provider === '') {
-                $provider = $this->inferProviderFromFaces($this->normalizeFaceList($import['faces'] ?? []));
-            }
-
-            if ($familyName === '' || $familySlug === '' || $provider === '') {
-                continue;
-            }
-
-            $type = $provider === 'adobe' ? 'adobe_hosted' : 'self_hosted';
-            $profileId = $this->defaultProfileId($provider, $type);
-
-            $family = $this->normalizeFamilyRecord(
-                [
-                    'family' => $familyName,
-                    'slug' => $familySlug,
-                    'publish_state' => 'published',
-                    'active_delivery_id' => $profileId,
-                    'delivery_profiles' => [
-                        $profileId => [
-                            'id' => $profileId,
-                            'provider' => $provider,
-                            'type' => $type,
-                            'label' => $this->defaultProfileLabel($provider, $type),
-                            'variants' => is_array($import['variants'] ?? null) ? $import['variants'] : [],
-                            'faces' => is_array($import['faces'] ?? null) ? $import['faces'] : [],
-                            'meta' => [
-                                'category' => $this->stringValue($import, 'category'),
-                                'imported_at' => $this->stringValue($import, 'imported_at'),
-                            ],
-                        ],
-                    ],
-                ],
-                null
-            );
-
-            if ($family === []) {
-                continue;
-            }
-
-            $library[$familySlug] = $family;
-        }
-
-        return $library;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $faces
-     */
-    private function inferProviderFromFaces(array $faces): string
-    {
-        foreach ($faces as $face) {
-            $provider = $this->normalizeProvider($this->stringValue($face, 'source'));
-
-            if ($provider !== '') {
-                return $provider;
-            }
-        }
-
-        return '';
     }
 
     /**

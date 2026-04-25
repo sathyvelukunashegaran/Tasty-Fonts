@@ -56,7 +56,7 @@ A role assignment saved as a working selection that does not affect live output.
 The design principle that separates "what you are experimenting with" from "what the site is currently serving." Draft roles are your working state; applied roles are what visitors see.
 
 **Dry Run (site transfer)**
-A non-destructive validation pass that checks a site-transfer bundle for corruption, checksum mismatches, and compatibility issues without making any changes to the destination site. Since 1.13.0, a successful dry run is required before the destructive import step can be armed.
+A non-destructive validation pass that checks a site-transfer bundle for corruption, checksum mismatches, and compatibility issues without making any changes to the destination site. A successful dry run is required before the destructive import step can be armed.
 
 ## E
 

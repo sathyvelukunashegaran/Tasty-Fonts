@@ -122,6 +122,8 @@ final class RestController
             'action' => $this->buildTextArg(true, [
                 'clear_plugin_caches',
                 'regenerate_css',
+                'rescan_font_library',
+                'repair_storage_scaffold',
                 'reset_integration_detection_state',
                 'reset_suppressed_notices',
             ]),
@@ -330,12 +332,7 @@ final class RestController
     {
         unset($request);
 
-        $payload = $this->admin->buildAdvancedToolsPayload();
-        $advancedTools = is_array($payload['advanced_tools'] ?? null) ? $payload['advanced_tools'] : [];
-
-        return $this->restResult([
-            'snapshots' => is_array($advancedTools['snapshots'] ?? null) ? $advancedTools['snapshots'] : [],
-        ]);
+        return $this->restResult($this->admin->listRollbackSnapshots());
     }
 
     public function snapshots(WP_REST_Request $request): mixed
@@ -531,9 +528,6 @@ final class RestController
                 'heading_fallback',
                 'body_fallback',
                 'monospace_fallback',
-                'heading_delivery_id',
-                'body_delivery_id',
-                'monospace_delivery_id',
                 'heading_weight',
                 'body_weight',
                 'monospace_weight',

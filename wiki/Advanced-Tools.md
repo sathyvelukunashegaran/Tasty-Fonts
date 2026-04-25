@@ -44,12 +44,18 @@ The `Developer` tab contains guarded maintenance actions that run immediately:
 
 - clear plugin caches and rebuild assets
 - regenerate only the generated CSS file
+- rescan the font library and refresh generated assets
+- repair the storage scaffold
 - re-run integration detection
 - restore dismissed notices
 - reset plugin settings while preserving the managed font library
 - wipe the managed font library during testing or support cleanup
 
 Destructive actions require typed confirmation. Save pending settings before running developer tools.
+
+### CLI
+
+The `CLI` tab lists copy-ready WP-CLI commands for diagnostics, generated asset maintenance, transfer bundles, support bundles, and rollback snapshots.
 
 ### Transfer
 
@@ -68,11 +74,33 @@ The `Activity` tab shows recent scans, imports, deletes, settings changes, gener
 
 If the Activity tab says the log is hidden, enable `Settings -> Behavior -> Show Activity Log`. The plugin records events regardless of whether the panel is visible, so you can re-enable the setting at any time to view past history.
 
+## WP-CLI
+
+Advanced Tools also exposes command-line equivalents for maintenance and support workflows. The same commands are available from the `CLI` tab with copy buttons.
+
+```bash
+wp tasty-fonts doctor
+wp tasty-fonts doctor --format=json
+wp tasty-fonts css regenerate
+wp tasty-fonts cache clear
+wp tasty-fonts library rescan
+wp tasty-fonts transfer export
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes
+wp tasty-fonts support-bundle
+wp tasty-fonts snapshot create
+wp tasty-fonts snapshot list
+wp tasty-fonts snapshot restore <snapshot-id> --yes
+```
+
+Destructive CLI actions require `--yes`. Transfer imports and snapshot restores still create rollback snapshots first, matching the admin UI safety behavior.
+
 ## Notes
 
 - The generated stylesheet is normally written to `wp-content/uploads/fonts/.generated/tasty-fonts.css` when file delivery is available.
 - The plugin can fall back to inline CSS if file delivery is disabled or unavailable.
 - Diagnostics are especially useful when runtime output looks stale or provider imports appear correct in the library but not on the site.
+- REST clients can discover Advanced Tools actions from the structured `tool_actions` payload and run safe maintenance actions through `tools/action`.
 - Maintenance actions are guarded but can change state immediately.
 
 ## Related Docs

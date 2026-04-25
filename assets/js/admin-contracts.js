@@ -524,6 +524,26 @@
         return matchesActor && matchesQuery;
     }
 
+    function resolveLogPagination(visibleCount = 0, currentPage = 1, pageSize = 5) {
+        const normalizedVisibleCount = Math.max(0, Number.parseInt(visibleCount, 10) || 0);
+        const normalizedPageSize = Math.max(1, Number.parseInt(pageSize, 10) || 5);
+        const totalPages = Math.max(1, Math.ceil(normalizedVisibleCount / normalizedPageSize));
+        const normalizedPage = Math.max(1, Number.parseInt(currentPage, 10) || 1);
+        const page = Math.min(normalizedPage, totalPages);
+        const start = normalizedVisibleCount === 0 ? 0 : (page - 1) * normalizedPageSize;
+        const end = normalizedVisibleCount === 0 ? 0 : Math.min(start + normalizedPageSize, normalizedVisibleCount);
+
+        return {
+            page,
+            pageSize: normalizedPageSize,
+            totalPages,
+            start,
+            end,
+            hasPrevious: page > 1,
+            hasNext: page < totalPages,
+        };
+    }
+
     return {
         canDisableOutputLayer,
         describeFontType,
@@ -537,6 +557,7 @@
         normalizeOutputQuickModePreference,
         parsePhpIniSizeToBytes,
         rowMatchesLibraryFilters,
+        resolveLogPagination,
         resolveStatusAnnouncement,
         resolveAssignedRoleState,
         roleStatesMatch,

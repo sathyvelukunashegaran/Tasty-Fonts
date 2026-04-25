@@ -72,6 +72,26 @@
 
             return matchesActor && matchesQuery;
         };
+    const resolveLogPagination = typeof adminContracts.resolveLogPagination === 'function'
+        ? adminContracts.resolveLogPagination
+        : (visibleCount = 0, requestedPage = 1, pageSize = 5) => {
+            const normalizedVisibleCount = Math.max(0, Number.parseInt(visibleCount, 10) || 0);
+            const normalizedPageSize = Math.max(1, Number.parseInt(pageSize, 10) || 5);
+            const totalPages = Math.max(1, Math.ceil(normalizedVisibleCount / normalizedPageSize));
+            const page = Math.min(Math.max(1, Number.parseInt(requestedPage, 10) || 1), totalPages);
+            const start = normalizedVisibleCount === 0 ? 0 : (page - 1) * normalizedPageSize;
+            const end = normalizedVisibleCount === 0 ? 0 : Math.min(start + normalizedPageSize, normalizedVisibleCount);
+
+            return {
+                page,
+                pageSize: normalizedPageSize,
+                totalPages,
+                start,
+                end,
+                hasPrevious: page > 1,
+                hasNext: page < totalPages,
+            };
+        };
     const parsePhpIniSizeToBytes = typeof adminContracts.parsePhpIniSizeToBytes === 'function'
         ? adminContracts.parsePhpIniSizeToBytes
         : (value = '') => {
@@ -467,6 +487,8 @@
         activityCountMultiple: __('%1$d entries', 'tasty-fonts'),
         activityCountFilteredSingle: __('%1$d of %2$d entry', 'tasty-fonts'),
         activityCountFilteredMultiple: __('%1$d of %2$d entries', 'tasty-fonts'),
+        activityPageStatus: __('Page %1$d of %2$d', 'tasty-fonts'),
+        activityRangeStatus: __('Showing %1$d-%2$d of %3$d', 'tasty-fonts'),
         siteTransferLimitNeutral: __('%s Upload Limit', 'tasty-fonts'),
         siteTransferLimitNeutralFallback: __('Upload Limit Available', 'tasty-fonts'),
         siteTransferLimitReady: __('%s Selected', 'tasty-fonts'),
@@ -5508,7 +5530,7 @@
             [__('Output Preset', 'tasty-fonts'), __('Chooses the generated output shape. Minimal keeps the core role variables lean, Variables only exposes token layers, Classes only exposes helper classes, and Custom lets you decide exactly which groups Tasty Fonts should emit.', 'tasty-fonts')],
             [__('Sitewide Role Weights', 'tasty-fonts'), __('Adds saved role font weights and variation settings to the sitewide body, heading, and code rules. This changes the default rendered role styles, while utility class styling is controlled separately.', 'tasty-fonts')],
             [__('Utility Classes', 'tasty-fonts'), __('Generates .font-* helper classes that themes, builders, or custom markup can use directly. The groups below decide which role, alias, category, and per-family class selectors are included.', 'tasty-fonts')],
-            [__('Utility Class Groups', 'tasty-fonts'), __('Controls which utility class groups are generated when class output is active. Disable groups you do not plan to use to keep the generated CSS smaller and easier to scan.', 'tasty-fonts')],
+            [__('Utility Class Groups', 'tasty-fonts'), __('Controls which utility class groups are generated when class output is active. Keep the groups you plan to use so generated CSS stays smaller and easier to scan.', 'tasty-fonts')],
             [__('Role Weights in Classes', 'tasty-fonts'), __('Adds each role weight and variable-axis settings to the matching .font-heading, .font-body, and optional monospace class rules. This affects class output only, not the sitewide role rules.', 'tasty-fonts')],
             [__('Heading Class', 'tasty-fonts'), __('Generates the .font-heading helper so content can opt into the active heading role font without relying on global selectors.', 'tasty-fonts')],
             [__('Body Class', 'tasty-fonts'), __('Generates the .font-body helper so content can opt into the active body role font in templates, builder fields, or custom markup.', 'tasty-fonts')],
@@ -5521,7 +5543,7 @@
             [__('Mono Class', 'tasty-fonts'), __('Generates .font-mono as a category helper when the monospace role is enabled. It follows the plugin-managed mono family rather than a hard-coded stack.', 'tasty-fonts')],
             [__('Per-Family Classes', 'tasty-fonts'), __('Generates one helper class per available font family, such as .font-inter. This is convenient for hand-authored templates but can create more selectors on sites with large libraries.', 'tasty-fonts')],
             [__('CSS Variables', 'tasty-fonts'), __('Generates --font-* custom properties for roles, aliases, categories, and optional weights. These variables are the safest integration surface for themes, builders, and design systems that consume Tasty Fonts output.', 'tasty-fonts')],
-            [__('CSS Variable Groups', 'tasty-fonts'), __('Controls which CSS variable groups are emitted when variable output is active. Keep the groups your theme or integrations consume, and disable unused groups to reduce generated output.', 'tasty-fonts')],
+            [__('CSS Variable Groups', 'tasty-fonts'), __('Controls which CSS variable groups are emitted when variable output is active. Keep the groups your theme or integrations consume, and leave unused groups off to reduce generated output.', 'tasty-fonts')],
             [__('Role Weight Variables', 'tasty-fonts'), __('Generates role-specific weight variables such as --font-heading-weight and --font-body-weight. Some integrations, including Automatic.css role sync, depend on these tokens when weight mapping is active.', 'tasty-fonts')],
             [__('Global Weight Tokens', 'tasty-fonts'), __('Generates reusable global weight tokens such as --weight-400 and --weight-bold, plus related snippets. Use these when your design system references named weight tokens independently of font roles.', 'tasty-fonts')],
             [__('Role Alias Variables', 'tasty-fonts'), __('Generates alias variables such as --font-interface, --font-ui, and optionally --font-code. Aliases let other tools use semantic names while still following the active Tasty Fonts role assignments.', 'tasty-fonts')],
@@ -5531,17 +5553,17 @@
             [__('Etch Canvas Bridge', 'tasty-fonts'), __('Shows whether the Etch Canvas bridge can read the fonts and role tokens managed by Tasty Fonts. This row is informational because the bridge state is detected from the current WordPress environment.', 'tasty-fonts')],
             [__('Bricks Builder', 'tasty-fonts'), __('Enables Bricks-specific typography integration. When active, the nested controls can map Tasty role variables into Bricks Theme Styles and prevent Bricks from loading its own Google Fonts.', 'tasty-fonts')],
             [__('Sync Bricks Theme Styles', 'tasty-fonts'), __('Writes Tasty Fonts role variables into the selected Bricks Theme Style target. Use this when Bricks typography controls should follow the same heading and body roles used by the rest of the site.', 'tasty-fonts')],
-            [__('Disable Bricks Google Fonts', 'tasty-fonts'), __('Turns off Bricks Google Fonts in Bricks font pickers so typography stays controlled by Tasty Fonts. This helps avoid duplicate provider requests and conflicting font sources.', 'tasty-fonts')],
+            [__('Use Tasty Fonts in Bricks Pickers', 'tasty-fonts'), __('Keeps Bricks font pickers focused on Tasty-managed fonts. This helps avoid duplicate provider requests and conflicting font sources.', 'tasty-fonts')],
             [__('Oxygen Builder', 'tasty-fonts'), __('Enables Oxygen integration when Oxygen is available. The integration keeps Oxygen typography usage aligned with the active Tasty Fonts role output.', 'tasty-fonts')],
             [__('Gutenberg Font Library', 'tasty-fonts'), __('Syncs the active Tasty Fonts library into the WordPress Font Library so block editor typography controls can use the managed families.', 'tasty-fonts')],
             [__('Automatic.css', 'tasty-fonts'), __('Maps Automatic.css heading and body font settings to Tasty Fonts role variables. Keep sitewide role output and required weight variables enabled so ACSS receives stable tokens.', 'tasty-fonts')],
             [__('Update Channel', 'tasty-fonts'), __('Chooses which GitHub release rail this site follows. Stable is recommended for production, Beta previews upcoming releases, and Nightly is intended for development or testing environments.', 'tasty-fonts')],
             [__('Enable Monospace Role', 'tasty-fonts'), __('Adds a dedicated monospace role for code, preformatted text, and mono utility output. Turning it on also unlocks mono class and variable options elsewhere in settings.', 'tasty-fonts')],
             [__('Enable Variable Fonts', 'tasty-fonts'), __('Allows variable font uploads and axis controls throughout the plugin. Keep it enabled when you want to save or output variable-axis settings such as weight, width, or optical size.', 'tasty-fonts')],
-            [__('Hide Onboarding Hints', 'tasty-fonts'), __('Hides the short row descriptions and passive help tooltips across the admin UI. Use it once the workflow feels familiar and you want a denser settings screen.', 'tasty-fonts')],
+            [__('Show Onboarding Hints', 'tasty-fonts'), __('Shows the short row descriptions and passive help tooltips across the admin UI. Keep it on while learning the workflow, or turn it off for a denser settings screen.', 'tasty-fonts')],
             [__('Show Activity Log', 'tasty-fonts'), __('Shows the full activity log in Advanced Tools. Tasty Fonts still records relevant events while this is hidden, so you can turn the log back on later for troubleshooting.', 'tasty-fonts')],
-            [__('Delete Uploaded Fonts on Uninstall', 'tasty-fonts'), __('Deletes plugin-managed uploaded font files during uninstall. Leave this off if you might reinstall the plugin or want to preserve font assets after removing the plugin.', 'tasty-fonts')],
-            [__('Enable custom access rules', 'tasty-fonts'), __('Controls whether non-administrator roles or specific users can open Tasty Fonts. Administrators always keep access; turning this on only grants additional access below.', 'tasty-fonts')],
+            [__('Keep Uploaded Fonts on Uninstall', 'tasty-fonts'), __('Keeps plugin-managed uploaded font files during uninstall. Leave this on if you might reinstall the plugin or want to preserve font assets after removing the plugin.', 'tasty-fonts')],
+            [__('Enable Additional Access Rules', 'tasty-fonts'), __('Grants Tasty Fonts access to non-administrator roles or specific users. Administrators always keep access; turning this on only adds access below.', 'tasty-fonts')],
         ].map(([title, copy]) => [normalizeSettingsHelpTitle(title), copy]));
 
         return settingsDetailedHelpByTitle;
@@ -9951,7 +9973,16 @@
             const count = root.querySelector('[data-activity-count], [data-log-count]');
             const filteredEmpty = root.querySelector('[data-activity-empty-filtered], #tasty-fonts-activity-empty-filtered, [data-log-empty-filtered]');
             const entries = Array.from(list.querySelectorAll('[data-activity-entry]'));
+            const pagination = root.querySelector('[data-activity-pagination]');
+            const previousButton = pagination ? pagination.querySelector('[data-activity-page-previous]') : null;
+            const nextButton = pagination ? pagination.querySelector('[data-activity-page-next]') : null;
+            const pageStatus = pagination ? pagination.querySelector('[data-activity-page-status]') : null;
+            const rangeStatus = pagination ? pagination.querySelector('[data-activity-range-status]') : null;
+            const pageSizeSelect = pagination ? pagination.querySelector('[data-activity-page-size-select]') : null;
+            const defaultPageSize = Math.max(1, Number.parseInt(list.getAttribute('data-activity-page-size') || '5', 10) || 5);
             const totalCount = entries.length;
+            let currentActivityPage = 1;
+            let currentPageSize = defaultPageSize;
 
             if (entries.length === 0) {
                 return;
@@ -9960,7 +9991,7 @@
             const applyActivityFilter = () => {
                 const actorFilterValue = actorFilter ? actorFilter.value : '';
                 const query = search ? search.value : '';
-                let visibleCount = 0;
+                const matchingEntries = [];
 
                 entries.forEach((entry) => {
                     const matches = logEntryMatchesFilters(
@@ -9970,11 +10001,18 @@
                         query
                     );
 
-                    entry.hidden = !matches;
-
                     if (matches) {
-                        visibleCount += 1;
+                        matchingEntries.push(entry);
                     }
+                });
+
+                const visibleCount = matchingEntries.length;
+                const paginationState = resolveLogPagination(visibleCount, currentActivityPage, currentPageSize);
+                currentActivityPage = paginationState.page;
+                const pagedEntries = new Set(matchingEntries.slice(paginationState.start, paginationState.end));
+
+                entries.forEach((entry) => {
+                    entry.hidden = !pagedEntries.has(entry);
                 });
 
                 if (count) {
@@ -9986,14 +10024,69 @@
                 }
 
                 list.hidden = visibleCount === 0;
+
+                if (pagination) {
+                    pagination.hidden = visibleCount === 0;
+                }
+
+                if (pageStatus) {
+                    pageStatus.textContent = formatMessage(
+                        getString('activityPageStatus', 'Page %1$d of %2$d'),
+                        [paginationState.page, paginationState.totalPages]
+                    );
+                }
+
+                if (rangeStatus) {
+                    rangeStatus.textContent = visibleCount === 0
+                        ? formatActivityCount(0, totalCount)
+                        : formatMessage(
+                            getString('activityRangeStatus', 'Showing %1$d-%2$d of %3$d'),
+                            [paginationState.start + 1, paginationState.end, visibleCount]
+                        );
+                }
+
+                if (previousButton) {
+                    previousButton.disabled = !paginationState.hasPrevious;
+                }
+
+                if (nextButton) {
+                    nextButton.disabled = !paginationState.hasNext;
+                }
+            };
+
+            const resetActivityPage = () => {
+                currentActivityPage = 1;
+                applyActivityFilter();
             };
 
             if (actorFilter) {
-                actorFilter.addEventListener('change', applyActivityFilter);
+                actorFilter.addEventListener('change', resetActivityPage);
             }
 
             if (search) {
-                search.addEventListener('input', applyActivityFilter);
+                search.addEventListener('input', resetActivityPage);
+                search.addEventListener('search', resetActivityPage);
+            }
+
+            if (pageSizeSelect) {
+                pageSizeSelect.addEventListener('change', () => {
+                    currentPageSize = Math.max(1, Number.parseInt(pageSizeSelect.value || String(defaultPageSize), 10) || defaultPageSize);
+                    resetActivityPage();
+                });
+            }
+
+            if (previousButton) {
+                previousButton.addEventListener('click', () => {
+                    currentActivityPage -= 1;
+                    applyActivityFilter();
+                });
+            }
+
+            if (nextButton) {
+                nextButton.addEventListener('click', () => {
+                    currentActivityPage += 1;
+                    applyActivityFilter();
+                });
             }
 
             applyActivityFilter();

@@ -582,65 +582,7 @@ $tests['import_repository_clear_library_empties_all_stored_families'] = static f
     $repo->clearLibrary();
 
     assertSameValue(false, isset($optionStore[ImportRepository::OPTION_LIBRARY]), 'clearLibrary should delete the primary library option.');
-    assertSameValue(false, isset($optionStore[ImportRepository::OPTION_IMPORTS]), 'clearLibrary should delete the legacy imports option.');
     assertSameValue([], $repo->allFamilies(), 'allFamilies should return an empty array after clearLibrary.');
-};
-
-// ---------------------------------------------------------------------------
-// ImportRepository – legacy import migration
-// ---------------------------------------------------------------------------
-
-$tests['import_repository_migrates_legacy_tasty_fonts_imports_option_on_first_read'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $optionStore[ImportRepository::OPTION_IMPORTS] = [
-        'inter' => [
-            'family'      => 'Inter',
-            'slug'        => 'inter',
-            'provider'    => 'google',
-            'variants'    => ['regular'],
-            'faces'       => [
-                ['family' => 'Inter', 'slug' => 'inter', 'source' => 'google', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'], 'paths' => []],
-            ],
-            'category'    => 'sans-serif',
-            'imported_at' => '2024-01-01 00:00:00',
-        ],
-    ];
-
-    $repo = new ImportRepository();
-    $families = $repo->allFamilies();
-
-    assertSameValue(true, isset($families['inter']), 'Legacy tasty_fonts_imports data should be migrated to the new library format on first read.');
-    assertSameValue('Inter', (string) ($families['inter']['family'] ?? ''), 'Migrated family should retain its original family name.');
-    assertSameValue(true, isset($optionStore[ImportRepository::OPTION_LIBRARY]), 'Migration should persist the converted data to the new option key.');
-};
-
-$tests['import_repository_migrates_legacy_etch_fonts_imports_option_on_first_read'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $optionStore[ImportRepository::LEGACY_OPTION_IMPORTS] = [
-        'lora' => [
-            'family'   => 'Lora',
-            'slug'     => 'lora',
-            'provider' => 'google',
-            'variants' => ['regular'],
-            'faces'    => [
-                ['family' => 'Lora', 'slug' => 'lora', 'source' => 'google', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'google/lora/lora-400-normal.woff2'], 'paths' => []],
-            ],
-            'category' => 'serif',
-            'imported_at' => '2024-01-01 00:00:00',
-        ],
-    ];
-
-    $repo = new ImportRepository();
-    $families = $repo->allFamilies();
-
-    assertSameValue(true, isset($families['lora']), 'Legacy etch_fonts_imports data should be migrated to the new library format on first read.');
-    assertSameValue('Lora', (string) ($families['lora']['family'] ?? ''), 'Migrated family from etch_fonts_imports should retain its original family name.');
 };
 
 // ---------------------------------------------------------------------------

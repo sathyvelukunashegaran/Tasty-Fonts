@@ -113,7 +113,6 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_css_hash_v2',
         'tasty_fonts_regenerate_css_queued',
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_CATALOG,
-        TastyFonts\Google\GoogleFontsClient::LEGACY_TRANSIENT_CATALOG,
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_METADATA,
         'tasty_fonts_bunny_catalog_v1',
         'tasty_fonts_github_release_manifest_v1',
@@ -130,7 +129,6 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
         'tasty_fonts_css_hash_v2',
         'tasty_fonts_regenerate_css_queued',
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_CATALOG,
-        TastyFonts\Google\GoogleFontsClient::LEGACY_TRANSIENT_CATALOG,
         TastyFonts\Google\GoogleFontsClient::TRANSIENT_METADATA,
         'tasty_fonts_bunny_catalog_v1',
         'tasty_fonts_github_release_manifest_v1',
@@ -1420,7 +1418,6 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
             'google_api_key_checked_at' => 123,
         ],
         'tasty_fonts_library' => ['Inter' => ['delivery_profiles' => []]],
-        'tasty_fonts_imports' => ['legacy' => true],
         'tasty_fonts_local_environment_notice_preferences' => [1 => ['hidden_until' => 123456, 'dismissed_forever' => true]],
     ];
     $transientStore = [
@@ -1431,7 +1428,6 @@ $tests['uninstall_cleans_library_and_runtime_transients'] = static function (): 
 
     assertSameValue(true, in_array('tasty_fonts_library', $optionDeleted, true), 'Uninstall should delete the live library option key.');
     assertSameValue(true, in_array('tasty_fonts_google_api_key_data', $optionDeleted, true), 'Uninstall should delete the dedicated Google API key option.');
-    assertSameValue(true, in_array('tasty_fonts_imports', $optionDeleted, true), 'Uninstall should continue deleting the legacy imports option key.');
     assertSameValue(true, in_array('tasty_fonts_local_environment_notice_preferences', $optionDeleted, true), 'Uninstall should delete persisted local-environment reminder preferences.');
     assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_bunny_catalog_v1'), $transientDeleted, true), 'Uninstall should delete the Bunny catalog transient.');
     assertSameValue(2, count($wpdbQueries), 'Uninstall should issue wildcard cleanup queries for Bunny family and admin notice transients.');

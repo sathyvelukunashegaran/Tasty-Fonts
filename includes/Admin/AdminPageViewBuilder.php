@@ -38,7 +38,6 @@ final class AdminPageViewBuilder
         $this->trainingWheelsOff = !empty($context['training_wheels_off']);
         $storage = $this->mapValue($context, 'storage');
         $currentPage = $this->stringValue($context, 'current_page', AdminController::PAGE_ROLES);
-        $currentPageSlug = $this->stringValue($context, 'current_page_slug');
         $pageUrls = $this->stringMapValue($context, 'page_urls');
         $catalog = $this->catalogMapValue($context, 'catalog');
         $libraryCategoryOptions = $this->buildLibraryCategoryOptions();
@@ -576,10 +575,10 @@ final class AdminPageViewBuilder
                 default => __('Tasty is not managing Bricks Theme Styles right now.', 'tasty-fonts'),
             },
             'bricks_disable_google_fonts_enabled' => match ($status) {
-                'synced' => __('Bricks Google Fonts are disabled in Bricks pickers.', 'tasty-fonts'),
-                'ready' => __('Save settings to update the Bricks Google Fonts toggle.', 'tasty-fonts'),
+                'synced' => __('Bricks pickers are focused on Tasty Fonts.', 'tasty-fonts'),
+                'ready' => __('Save settings to update Bricks picker focus.', 'tasty-fonts'),
                 'unavailable' => __('Bricks is not active, so font settings cannot sync.', 'tasty-fonts'),
-                default => __('Tasty is not managing the Bricks Google Fonts setting right now.', 'tasty-fonts'),
+                default => __('Tasty is not managing Bricks picker focus right now.', 'tasty-fonts'),
             },
             default => '',
         };

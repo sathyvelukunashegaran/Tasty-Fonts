@@ -995,7 +995,7 @@
                                                                 <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                                 <span class="tasty-fonts-toggle-copy">
                                                                     <span class="tasty-fonts-toggle-title-line">
-                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Disable Bricks Google Fonts', 'tasty-fonts'); ?></span>
+                                                                        <span class="tasty-fonts-toggle-title"><?php esc_html_e('Use Tasty Fonts in Bricks Pickers', 'tasty-fonts'); ?></span>
                                                                         <span class="<?php echo esc_attr($googleFontsBadgeClass); ?>" <?php $this->renderPassiveHelpAttributes($googleFontsStatusHelp); ?>>
                                                                             <?php echo esc_html((string) ($googleFontsUi['status_label'] ?? __('Off', 'tasty-fonts'))); ?>
                                                                         </span>
@@ -1046,7 +1046,7 @@
                                                         </details>
                                                     <?php elseif (!$bricksManagedControlsEnabled): ?>
                                                         <div class="tasty-fonts-integration-note">
-                                                            <?php esc_html_e('Enable Theme Style sync or Disable Bricks Google Fonts to see the current Bricks state here.', 'tasty-fonts'); ?>
+                                                            <?php esc_html_e('Enable Theme Style sync or Use Tasty Fonts in Bricks Pickers to see the current Bricks state here.', 'tasty-fonts'); ?>
                                                         </div>
                                                     <?php endif; ?>
 
@@ -1353,14 +1353,14 @@
                                             <span class="tasty-fonts-health-group-count"><?php esc_html_e('Guidance & Logs', 'tasty-fonts'); ?></span>
                                         </div>
                                         <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
-                                        <input type="hidden" name="training_wheels_off" value="0">
+                                        <input type="hidden" name="training_wheels_off" value="1">
                                         <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
-                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="training_wheels_off" value="1" <?php checked($trainingWheelsOff); ?>>
+                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="training_wheels_off" value="0" <?php checked(!$trainingWheelsOff); ?>>
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">
-                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Hide Onboarding Hints', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Show Onboarding Hints', 'tasty-fonts'); ?></span>
                                                 <?php if ($showSettingsDescriptions): ?>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Hides helper tips and info buttons.', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Shows helper tips and info buttons across the admin UI.', 'tasty-fonts'); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                         </label>
@@ -1383,14 +1383,14 @@
                                             <span class="tasty-fonts-health-group-count"><?php esc_html_e('Files & Permissions', 'tasty-fonts'); ?></span>
                                         </div>
                                         <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
-                                        <input type="hidden" name="delete_uploaded_files_on_uninstall" value="0">
+                                        <input type="hidden" name="delete_uploaded_files_on_uninstall" value="1">
                                         <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
-                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="delete_uploaded_files_on_uninstall" value="1" <?php checked($deleteUploadedFilesOnUninstall); ?>>
+                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="delete_uploaded_files_on_uninstall" value="0" <?php checked(!$deleteUploadedFilesOnUninstall); ?>>
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">
-                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Delete Uploaded Fonts on Uninstall', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Keep Uploaded Fonts on Uninstall', 'tasty-fonts'); ?></span>
                                                 <?php if ($showSettingsDescriptions): ?>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Deletes plugin-managed font files when uninstalling.', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Keeps plugin-managed font files in place when uninstalling.', 'tasty-fonts'); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                         </label>
@@ -1418,8 +1418,8 @@
                                             >
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">
-                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable custom access rules', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-admin-access-mode-copy"><?php esc_html_e('Off: only administrators can open Tasty Fonts. On: choose extra roles and users below.', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Additional Access Rules', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-admin-access-mode-copy"><?php esc_html_e('Grant Tasty Fonts access to extra roles and users. Administrators always keep access.', 'tasty-fonts'); ?></span>
                                             </span>
                                         </label>
                                         <div class="tasty-fonts-admin-access-summary-bar<?php echo $showSettingsDescriptions ? '' : ' is-compact'; ?>">

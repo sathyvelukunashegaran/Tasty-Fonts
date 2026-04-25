@@ -45,25 +45,13 @@ use WP_Error;
  * @phpstan-type ThemeStyleChoiceMap array<string, string>
  * @phpstan-type TypographyMap array<string, array<string, mixed>>
  * @phpstan-type TypographyValueMap array<string, string>
- * @phpstan-type VariableEntry array<string, mixed>
- * @phpstan-type VariableList list<VariableEntry>
- * @phpstan-type VariableCategoryList list<array<string, mixed>>
  */
 final class BricksIntegrationService
 {
     public const OPTION_SYNC_STATE = 'tasty_fonts_bricks_sync_state_v1';
     public const OPTION_GLOBAL_SETTINGS = 'bricks_global_settings';
-    public const OPTION_GLOBAL_VARIABLES = 'bricks_global_variables';
-    public const OPTION_GLOBAL_VARIABLE_CATEGORIES = 'bricks_global_variables_categories';
-    public const FEATURE_SELECTORS = 'bricks_selector_fonts_enabled';
-    public const FEATURE_BUILDER_PREVIEW = 'bricks_builder_preview_enabled';
     public const FEATURE_THEME_STYLES = 'bricks_theme_styles_sync_enabled';
     public const FEATURE_DISABLE_GOOGLE_FONTS = 'bricks_disable_google_fonts_enabled';
-    public const VARIABLE_CATEGORY_ID = 'tasty-fonts';
-    public const VARIABLE_NAME_HEADING = 'tasty-font-heading';
-    public const VARIABLE_NAME_BODY = 'tasty-font-body';
-    public const VARIABLE_NAME_HEADING_WEIGHT = 'tasty-font-heading-weight';
-    public const VARIABLE_NAME_BODY_WEIGHT = 'tasty-font-body-weight';
     public const DESIRED_HEADING_VALUE = 'var(--font-heading)';
     public const DESIRED_BODY_VALUE = 'var(--font-body)';
     public const DESIRED_HEADING_WEIGHT_VALUE = 'var(--font-heading-weight)';
@@ -525,17 +513,6 @@ final class BricksIntegrationService
         return $this->themeStyleMatchesDesired($styles[$targetStyleId]);
     }
 
-    public function hasLegacyManagedVariables(): bool
-    {
-        return $this->getLegacyManagedVariableValues() !== [];
-    }
-
-    public function removeLegacyManagedVariables(): void
-    {
-        $this->saveGlobalVariables($this->removeManagedVariables($this->getGlobalVariables()));
-        $this->saveGlobalVariableCategories($this->removeManagedVariableCategory($this->getGlobalVariableCategories()));
-    }
-
     /**
      * @return ThemeStyleChoiceMap
      */
@@ -844,72 +821,6 @@ final class BricksIntegrationService
     }
 
     /**
-     * @return array<string, string>
-     */
-    private function getLegacyManagedVariableValues(): array
-    {
-        $values = [];
-
-        foreach ($this->getGlobalVariables() as $variable) {
-            $name = trim($this->stringValue($variable, 'name'));
-
-            if ($name === '') {
-                continue;
-            }
-
-            if (!in_array($name, [
-                self::VARIABLE_NAME_HEADING,
-                self::VARIABLE_NAME_BODY,
-                self::VARIABLE_NAME_HEADING_WEIGHT,
-                self::VARIABLE_NAME_BODY_WEIGHT,
-            ], true)) {
-                continue;
-            }
-
-            $values[$name] = trim($this->stringValue($variable, 'value'));
-        }
-
-        ksort($values, SORT_STRING);
-
-        return $values;
-    }
-
-    /**
-     * @param VariableList $variables
-     * @return VariableList
-     */
-    private function removeManagedVariables(array $variables): array
-    {
-        $managedNames = [
-            self::VARIABLE_NAME_HEADING,
-            self::VARIABLE_NAME_BODY,
-            self::VARIABLE_NAME_HEADING_WEIGHT,
-            self::VARIABLE_NAME_BODY_WEIGHT,
-        ];
-
-        return array_values(
-            array_filter(
-                $variables,
-                fn (array $variable): bool => !in_array(trim($this->stringValue($variable, 'name')), $managedNames, true)
-            )
-        );
-    }
-
-    /**
-     * @param VariableCategoryList $categories
-     * @return VariableCategoryList
-     */
-    private function removeManagedVariableCategory(array $categories): array
-    {
-        return array_values(
-            array_filter(
-                $categories,
-                fn (array $category): bool => trim($this->stringValue($category, 'id')) !== self::VARIABLE_CATEGORY_ID
-            )
-        );
-    }
-
-    /**
      * @return ThemeStyle
      */
     private function defaultManagedThemeStyle(): array
@@ -1149,59 +1060,6 @@ final class BricksIntegrationService
     }
 
     /**
-     * @return VariableList
-     */
-    private function getGlobalVariables(): array
-    {
-        $variables = [];
-
-        foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES')) : self::OPTION_GLOBAL_VARIABLES) as $variable) {
-            $variables[] = $this->normalizeVariableEntry($variable);
-        }
-
-        return $variables;
-    }
-
-    /**
-     * @param VariableList $variables
-     */
-    private function saveGlobalVariables(array $variables): void
-    {
-        update_option(defined('BRICKS_DB_GLOBAL_VARIABLES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES')) : self::OPTION_GLOBAL_VARIABLES, $variables, false);
-    }
-
-    /**
-     * @return VariableCategoryList
-     */
-    private function getGlobalVariableCategories(): array
-    {
-        $categories = [];
-
-        foreach ($this->getOptionArray(defined('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES') ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES')) : self::OPTION_GLOBAL_VARIABLE_CATEGORIES) as $category) {
-            $categories[] = $this->normalizeVariableCategoryEntry($category);
-        }
-
-        return $categories;
-    }
-
-    /**
-     * @param VariableCategoryList $categories
-     */
-    private function saveGlobalVariableCategories(array $categories): void
-    {
-        $optionName = defined('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES')
-            ? FontUtils::scalarStringValue(constant('BRICKS_DB_GLOBAL_VARIABLES_CATEGORIES'))
-            : self::OPTION_GLOBAL_VARIABLE_CATEGORIES;
-
-        if ($categories === []) {
-            delete_option($optionName);
-            return;
-        }
-
-        update_option($optionName, $categories, false);
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function getGlobalSettings(): array
@@ -1395,40 +1253,6 @@ final class BricksIntegrationService
         }
 
         return '';
-    }
-
-    /**
-     * @param mixed $variable
-     * @return VariableEntry
-     */
-    private function normalizeVariableEntry(mixed $variable): array
-    {
-        $normalized = $this->optionMap($variable);
-
-        if (array_key_exists('name', $normalized)) {
-            $normalized['name'] = $this->stringValue($normalized, 'name');
-        }
-
-        if (array_key_exists('value', $normalized)) {
-            $normalized['value'] = $this->stringValue($normalized, 'value');
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param mixed $category
-     * @return array<string, mixed>
-     */
-    private function normalizeVariableCategoryEntry(mixed $category): array
-    {
-        $normalized = $this->optionMap($category);
-
-        if (array_key_exists('id', $normalized)) {
-            $normalized['id'] = $this->stringValue($normalized, 'id');
-        }
-
-        return $normalized;
     }
 
     /**

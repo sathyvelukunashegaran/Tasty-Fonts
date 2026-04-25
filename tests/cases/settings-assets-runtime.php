@@ -132,56 +132,6 @@ $tests['settings_repository_persists_google_api_key_data_in_dedicated_option'] =
     assertSameValue('live-key', $settings->getSettings()['google_api_key'] ?? '', 'Google API key reads should transparently decrypt the stored ciphertext.');
 };
 
-$tests['settings_repository_migrates_legacy_google_api_key_data_when_saving_other_settings'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
-        'preview_sentence' => 'Legacy preview',
-        'google_api_key' => 'legacy-key',
-        'google_api_key_status' => 'valid',
-        'google_api_key_status_message' => 'Ready',
-        'google_api_key_checked_at' => 123,
-    ];
-
-    $settings = new SettingsRepository();
-    $saved = $settings->saveSettings(['preview_sentence' => 'Updated preview']);
-
-    assertSameValue('legacy-key', $saved['google_api_key'], 'Saving unrelated settings should preserve the existing Google API key during migration.');
-    assertSameValue(
-        false,
-        array_key_exists('google_api_key', (array) ($optionStore[SettingsRepository::OPTION_SETTINGS] ?? [])),
-        'Migrated main settings should no longer keep Google API key fields in the shared settings blob.'
-    );
-    assertSameValue('Updated preview', (string) ($optionStore[SettingsRepository::OPTION_SETTINGS]['preview_sentence'] ?? ''), 'Unrelated settings should still save into the main settings option.');
-    assertSameValue(
-        false,
-        array_key_exists('google_api_key', (array) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA] ?? [])),
-        'Saving unrelated settings should migrate legacy Google API key data out of plaintext storage.'
-    );
-    assertTrueValue(
-        is_string($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_encrypted'] ?? null)
-        && $optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_encrypted'] !== '',
-        'Saving unrelated settings should migrate legacy Google API key data into encrypted dedicated storage.'
-    );
-    assertSameValue(
-        'valid',
-        (string) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_status'] ?? ''),
-        'Saving unrelated settings should preserve the migrated Google API key validation state.'
-    );
-    assertSameValue(
-        'Ready',
-        (string) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_status_message'] ?? ''),
-        'Saving unrelated settings should preserve the migrated Google API key validation message.'
-    );
-    assertSameValue(
-        123,
-        (int) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_checked_at'] ?? 0),
-        'Saving unrelated settings should preserve the migrated Google API key validation timestamp.'
-    );
-};
-
 $tests['settings_repository_updates_google_key_status_without_rewriting_main_settings'] = static function (): void {
     resetTestState();
 
@@ -213,7 +163,7 @@ $tests['settings_repository_updates_google_key_status_without_rewriting_main_set
     assertSameValue(
         false,
         array_key_exists('google_api_key', (array) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA] ?? [])),
-        'Updating Google API key validation state should migrate any remaining plaintext Google API key storage to ciphertext.'
+        'Updating Google API key validation state should store existing plaintext key material as ciphertext.'
     );
     assertTrueValue(
         is_string($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_encrypted'] ?? null)
@@ -222,7 +172,7 @@ $tests['settings_repository_updates_google_key_status_without_rewriting_main_set
     );
 };
 
-$tests['settings_repository_decrypts_and_rewrites_plaintext_google_key_option_rows'] = static function (): void {
+$tests['settings_repository_encrypts_plaintext_google_key_option_rows'] = static function (): void {
     resetTestState();
 
     global $optionStore;
@@ -237,16 +187,16 @@ $tests['settings_repository_decrypts_and_rewrites_plaintext_google_key_option_ro
     $settings = new SettingsRepository();
     $loaded = $settings->getSettings();
 
-    assertSameValue('live-key', (string) ($loaded['google_api_key'] ?? ''), 'Reading Google API key settings should transparently decrypt or migrate stored key material.');
+    assertSameValue('live-key', (string) ($loaded['google_api_key'] ?? ''), 'Reading Google API key settings should transparently decrypt stored key material.');
     assertSameValue(
         false,
         array_key_exists('google_api_key', (array) ($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA] ?? [])),
-        'Reading legacy plaintext Google API key option rows should rewrite them without the plaintext key.'
+        'Reading plaintext Google API key option rows should rewrite them without the plaintext key.'
     );
     assertTrueValue(
         is_string($optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_encrypted'] ?? null)
         && $optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_encrypted'] !== '',
-        'Reading legacy plaintext Google API key option rows should migrate them to encrypted storage.'
+        'Reading plaintext Google API key option rows should store them as encrypted data.'
     );
 };
 
@@ -313,7 +263,7 @@ $tests['settings_repository_normalizes_preview_sentence_before_saving'] = static
     assertContainsValue('Hello world ', $previewSentence, 'Preview sentence saving should preserve readable text with normalized spacing.');
 };
 
-$tests['settings_repository_normalizes_legacy_preview_sentence_values_on_read'] = static function (): void {
+$tests['settings_repository_normalizes_stored_preview_sentence_values_on_read'] = static function (): void {
     resetTestState();
 
     global $optionStore;
@@ -328,7 +278,7 @@ $tests['settings_repository_normalizes_legacy_preview_sentence_values_on_read'] 
     assertSameValue(
         'alert(1) Preview text',
         (string) ($loaded['preview_sentence'] ?? ''),
-        'Reading stored preview text should normalize legacy values into printable single-line content.'
+        'Reading stored preview text should normalize values into printable single-line content.'
     );
 };
 
@@ -837,13 +787,13 @@ $tests['site_transfer_service_retains_recent_export_bundles_and_respects_protect
     assertSameValue(['Inter'], (array) ($afterProtect[0]['family_names'] ?? []), 'Retained export metadata should include captured family names.');
     assertSameValue(['Inter'], (array) ($afterProtect[0]['role_families'] ?? []), 'Retained export metadata should include captured live role families.');
 
-    $renameResult = $services['site_transfer']->renameExportBundle($protectedId, 'Before migration');
+    $renameResult = $services['site_transfer']->renameExportBundle($protectedId, 'Before rename');
     $renamedRows = $services['site_transfer']->listExportBundles();
     $renamedIndex = array_search($protectedId, array_column($renamedRows, 'id'), true);
 
     assertFalseValue(is_wp_error($renameResult), 'Protected export bundles should still be renameable.');
     assertSameValue(
-        'Before migration',
+        'Before rename',
         (string) (is_int($renamedIndex) ? ($renamedRows[$renamedIndex]['label'] ?? '') : ''),
         'Renaming should persist the saved export bundle label.'
     );
@@ -1323,7 +1273,12 @@ $tests['support_bundle_service_exports_sanitized_diagnostics_without_secrets'] =
     $bundle = $services['support_bundles']->buildBundle([
         'advanced_tools' => [
             'google_api_key' => 'secret-google-key',
-            'health_checks' => [],
+            'health_checks' => [
+                [
+                    'slug' => 'generated_css',
+                    'message' => 'Generated CSS is present.',
+                ],
+            ],
         ],
     ]);
 
@@ -1337,6 +1292,7 @@ $tests['support_bundle_service_exports_sanitized_diagnostics_without_secrets'] =
     $zip->close();
 
     assertNotContainsValue('secret-google-key', $settingsJson . $advancedToolsJson, 'Support bundles should exclude saved and payload API keys.');
+    assertContainsValue('generated_css', $advancedToolsJson, 'Support bundles should preserve list-shaped Advanced Tools diagnostics.');
     assertContainsValue('body{font-family:Inter;}', $generatedCss, 'Support bundles should include generated CSS when available.');
 
     @unlink((string) ($bundle['path'] ?? ''));
@@ -1583,8 +1539,6 @@ $tests['site_transfer_service_validation_rejects_unexpected_root_entries'] = sta
 $tests['settings_repository_defaults_and_persists_class_output_settings'] = static function (): void {
     resetTestState();
 
-    global $optionStore;
-
     $settings = new SettingsRepository();
     $defaults = $settings->getSettings();
 
@@ -1613,75 +1567,6 @@ $tests['settings_repository_defaults_and_persists_class_output_settings'] = stat
     assertSameValue(false, $saved['class_output_role_alias_ui_enabled'], 'Settings should persist disabled UI alias class output.');
     assertSameValue(false, $saved['class_output_category_sans_enabled'], 'Settings should persist disabled sans category class output.');
     assertSameValue(true, $saved['class_output_families_enabled'], 'Settings should persist enabled family classes.');
-    assertSameValue(
-        false,
-        array_key_exists('class_output_mode', (array) ($optionStore[SettingsRepository::OPTION_SETTINGS] ?? [])),
-        'Saving class output settings should not persist the legacy class_output_mode key.'
-    );
-};
-
-$tests['settings_repository_migrates_legacy_class_output_mode_on_read'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $settings = new SettingsRepository();
-
-    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'off'];
-    assertSameValue(false, $settings->getSettings()['class_output_enabled'], 'Legacy off mode should normalize to disabled class output.');
-
-    resetTestState();
-    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'roles'];
-    $settings = new SettingsRepository();
-    $roles = $settings->getSettings();
-    assertSameValue(true, $roles['class_output_enabled'], 'Legacy roles mode should enable class output.');
-    assertSameValue(false, $roles['class_output_families_enabled'], 'Legacy roles mode should disable family classes.');
-
-    resetTestState();
-    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'families'];
-    $settings = new SettingsRepository();
-    $families = $settings->getSettings();
-    assertSameValue(true, $families['class_output_enabled'], 'Legacy families mode should enable class output.');
-    assertSameValue(false, $families['class_output_role_heading_enabled'], 'Legacy families mode should disable role classes.');
-    assertSameValue(true, $families['class_output_families_enabled'], 'Legacy families mode should keep family classes on.');
-
-    resetTestState();
-    $optionStore[SettingsRepository::OPTION_SETTINGS] = ['class_output_mode' => 'all'];
-    $settings = new SettingsRepository();
-    $all = $settings->getSettings();
-    assertSameValue(true, $all['class_output_enabled'], 'Legacy all mode should enable class output.');
-    assertSameValue(true, $all['class_output_role_alias_ui_enabled'], 'Legacy all mode should keep alias classes enabled.');
-    assertSameValue(true, $all['class_output_category_serif_enabled'], 'Legacy all mode should keep category classes enabled.');
-    assertSameValue(true, $all['class_output_families_enabled'], 'Legacy all mode should keep family classes enabled.');
-};
-
-$tests['settings_repository_prefers_new_class_output_fields_over_legacy_mode'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
-        'class_output_mode' => 'off',
-        'class_output_enabled' => true,
-        'class_output_role_heading_enabled' => false,
-        'class_output_role_body_enabled' => true,
-        'class_output_role_monospace_enabled' => true,
-        'class_output_role_alias_interface_enabled' => true,
-        'class_output_role_alias_ui_enabled' => true,
-        'class_output_role_alias_code_enabled' => true,
-        'class_output_category_sans_enabled' => true,
-        'class_output_category_serif_enabled' => false,
-        'class_output_category_mono_enabled' => true,
-        'class_output_families_enabled' => false,
-    ];
-
-    $settings = new SettingsRepository();
-    $normalized = $settings->getSettings();
-
-    assertSameValue(true, $normalized['class_output_enabled'], 'Explicit class output booleans should take precedence over the legacy mode.');
-    assertSameValue(false, $normalized['class_output_role_heading_enabled'], 'Explicit class output booleans should not be overridden by the legacy mode.');
-    assertSameValue(false, $normalized['class_output_category_serif_enabled'], 'Explicit category class flags should win over the legacy mode.');
-    assertSameValue(false, $normalized['class_output_families_enabled'], 'Explicit family class flags should win over the legacy mode.');
 };
 
 $tests['settings_repository_enables_per_variant_font_variables_by_default_and_persists_changes'] = static function (): void {
@@ -1757,7 +1642,7 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
     assertSameValue('minimal', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Saving the minimal preset should persist the matching quick-mode preference.');
 };
 
-$tests['settings_repository_preserves_legacy_output_modes_when_minimal_flag_is_missing'] = static function (): void {
+$tests['settings_repository_preserves_custom_output_modes_when_minimal_flag_is_missing'] = static function (): void {
     resetTestState();
 
     global $optionStore;
@@ -1771,10 +1656,10 @@ $tests['settings_repository_preserves_legacy_output_modes_when_minimal_flag_is_m
     $settings = new SettingsRepository();
     $normalized = $settings->getSettings();
 
-    assertSameValue(false, !empty($normalized['minimal_output_preset_enabled']), 'Legacy saved output settings should not silently opt into the new minimal preset.');
-    assertSameValue(true, !empty($normalized['class_output_enabled']), 'Legacy saved class output settings should be preserved when the minimal flag is missing.');
-    assertSameValue(true, !empty($normalized['per_variant_font_variables_enabled']), 'Legacy saved variable output settings should be preserved when the minimal flag is missing.');
-    assertSameValue('custom', (string) ($normalized['output_quick_mode_preference'] ?? ''), 'Legacy mixed output settings should derive a custom quick-mode preference when no explicit preference was stored.');
+    assertSameValue(false, !empty($normalized['minimal_output_preset_enabled']), 'Saved custom output settings should not silently opt into the minimal preset.');
+    assertSameValue(true, !empty($normalized['class_output_enabled']), 'Saved class output settings should be preserved when the minimal flag is missing.');
+    assertSameValue(true, !empty($normalized['per_variant_font_variables_enabled']), 'Saved variable output settings should be preserved when the minimal flag is missing.');
+    assertSameValue('custom', (string) ($normalized['output_quick_mode_preference'] ?? ''), 'Mixed output settings should derive a custom quick-mode preference when no explicit preference was stored.');
 };
 
 $tests['settings_repository_keeps_custom_output_quick_mode_sticky_and_coerces_stale_presets'] = static function (): void {
@@ -2090,45 +1975,6 @@ $tests['settings_repository_defaults_and_persists_optional_monospace_role_settin
     assertSameValue('monospace', $savedRoles['monospace_fallback'], 'Blank monospace fallback input should normalize back to the generic monospace fallback.');
 };
 
-$tests['settings_repository_migrates_legacy_fallback_only_role_defaults_once'] = static function (): void {
-    resetTestState();
-
-    update_option(
-        SettingsRepository::OPTION_ROLES,
-        [
-            'heading' => '',
-            'body' => '',
-            'heading_fallback' => 'sans-serif',
-            'body_fallback' => 'sans-serif',
-        ],
-        false
-    );
-    update_option(
-        SettingsRepository::OPTION_SETTINGS,
-        [
-            'auto_apply_roles' => true,
-            'applied_roles' => [
-                'heading' => '',
-                'body' => '',
-                'heading_fallback' => 'sans-serif',
-                'body_fallback' => 'sans-serif',
-            ],
-        ],
-        false
-    );
-
-    $settings = new SettingsRepository();
-    $draftRoles = $settings->getRoles([]);
-    $appliedRoles = $settings->getAppliedRoles([]);
-    $savedSettings = $settings->getSettings();
-
-    assertSameValue('system-ui, sans-serif', $draftRoles['heading_fallback'], 'Legacy fallback-only heading defaults should migrate to the new system fallback stack once the role fallback UI becomes editable.');
-    assertSameValue('system-ui, sans-serif', $draftRoles['body_fallback'], 'Legacy fallback-only body defaults should migrate to the new system fallback stack once the role fallback UI becomes editable.');
-    assertSameValue('system-ui, sans-serif', $appliedRoles['heading_fallback'], 'Legacy applied heading fallbacks should migrate alongside draft roles.');
-    assertSameValue('system-ui, sans-serif', $appliedRoles['body_fallback'], 'Legacy applied body fallbacks should migrate alongside draft roles.');
-    assertSameValue(true, !empty($savedSettings['role_fallback_defaults_migrated']), 'Legacy role fallback default migration should mark itself complete after running once.');
-};
-
 $tests['settings_repository_reenables_monospace_class_outputs_when_the_role_is_first_enabled'] = static function (): void {
     resetTestState();
 
@@ -2221,48 +2067,6 @@ $tests['settings_repository_bootstraps_applied_roles_before_draft_changes'] = st
     assertSameValue('Inter', $appliedRoles['heading'], 'Draft-only saves should not replace the bootstrapped live heading.');
     assertSameValue('Inter', $appliedRoles['body'], 'Draft-only saves should not replace the bootstrapped live body.');
     assertSameValue('Lora', $draftRoles['heading'], 'Draft roles should still update independently after bootstrapping applied roles.');
-};
-
-$tests['repositories_migrate_legacy_option_keys'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $optionStore['etch_fonts_settings'] = [
-        'preview_sentence' => 'Legacy preview',
-        'google_api_key' => 'legacy-key',
-    ];
-    $optionStore['etch_fonts_roles'] = [
-        'heading' => 'Inter',
-        'body' => 'Lora',
-        'heading_fallback' => 'serif',
-        'body_fallback' => 'sans-serif',
-    ];
-    $optionStore['etch_fonts_imports'] = [
-        'inter' => ['slug' => 'inter', 'family' => 'Inter', 'provider' => 'google'],
-    ];
-    $optionStore['etch_fonts_log'] = [
-        ['time' => '2026-04-04 00:00:00', 'message' => 'Legacy log entry', 'actor' => 'System'],
-    ];
-
-    $settings = new SettingsRepository();
-    $roles = $settings->getRoles(
-        [
-            ['family' => 'Inter'],
-            ['family' => 'Lora'],
-        ]
-    );
-    $imports = (new ImportRepository())->all();
-    $log = (new LogRepository())->all();
-
-    assertSameValue('Legacy preview', $settings->getSettings()['preview_sentence'], 'Settings should fall back to the legacy option key during upgrade.');
-    assertSameValue('Inter', $roles['heading'], 'Role settings should migrate from the legacy option key during upgrade.');
-    assertSameValue(true, isset($optionStore[SettingsRepository::OPTION_SETTINGS]), 'Settings migration should seed the renamed option key.');
-    assertSameValue(true, isset($optionStore[SettingsRepository::OPTION_ROLES]), 'Role migration should seed the renamed option key.');
-    assertSameValue(true, isset($optionStore[ImportRepository::OPTION_LIBRARY]), 'Import migration should seed the renamed option key.');
-    assertSameValue(true, isset($optionStore[LogRepository::OPTION_LOG]), 'Log migration should seed the renamed option key.');
-    assertSameValue('Inter', (string) ($imports['inter']['family'] ?? ''), 'Imports should remain available after migrating the option key.');
-    assertSameValue('Legacy log entry', (string) ($log[0]['message'] ?? ''), 'Logs should remain available after migrating the option key.');
 };
 
 $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css_regeneration'] = static function (): void {
@@ -2518,52 +2322,52 @@ $tests['asset_service_can_refresh_generated_assets_without_logging_file_writes']
     assertSameValue(0, count($entries), 'Deferred CSS regeneration should honor the no-log file write option.');
 };
 
-$tests['asset_service_status_falls_back_to_legacy_generated_stylesheet_when_canonical_file_is_missing'] = static function (): void {
+$tests['asset_service_status_ignores_retired_generated_stylesheet_when_canonical_file_is_missing'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
-    $legacyPath = trailingslashit((string) $services['storage']->getRoot()) . 'tasty-fonts.css';
-    $legacyUrl = untrailingslashit((string) $services['storage']->getRootUrlFull()) . '/tasty-fonts.css';
+    $retiredPath = trailingslashit((string) $services['storage']->getRoot()) . 'tasty-fonts.css';
+    $canonicalPath = (string) $services['storage']->getGeneratedCssPath();
+    $canonicalUrl = (string) $services['storage']->getGeneratedCssUrl();
     $contents = "/* Version: " . TASTY_FONTS_VERSION . " */\n" . $services['assets']->getCss();
-    $lastModified = 1710000000;
 
-    wp_mkdir_p(dirname($legacyPath));
-    file_put_contents($legacyPath, $contents);
-    touch($legacyPath, $lastModified);
-    clearstatcache(true, $legacyPath);
+    wp_mkdir_p(dirname($retiredPath));
+    file_put_contents($retiredPath, $contents);
+    clearstatcache(true, $retiredPath);
+    clearstatcache(true, $canonicalPath);
 
     $status = $services['assets']->getStatus();
 
-    assertSameValue($legacyPath, (string) ($status['path'] ?? ''), 'Generated stylesheet status should fall back to the legacy file path when the canonical .generated file is absent.');
-    assertSameValue($legacyUrl, (string) ($status['url'] ?? ''), 'Generated stylesheet status should expose the legacy request URL when the legacy file is the only generated stylesheet on disk.');
-    assertSameValue(true, !empty($status['exists']), 'Generated stylesheet status should treat the legacy file as an existing generated asset.');
-    assertSameValue(filesize($legacyPath), (int) ($status['size'] ?? 0), 'Generated stylesheet status should report the legacy file size.');
-    assertSameValue($lastModified, (int) ($status['last_modified'] ?? 0), 'Generated stylesheet status should report the legacy file modification time.');
+    assertSameValue($canonicalPath, (string) ($status['path'] ?? ''), 'Generated stylesheet status should stay on the canonical v2 path.');
+    assertSameValue($canonicalUrl, (string) ($status['url'] ?? ''), 'Generated stylesheet status should stay on the canonical v2 URL.');
+    assertSameValue(false, !empty($status['exists']), 'Retired generated CSS should not make canonical status look available.');
+    assertSameValue(0, (int) ($status['size'] ?? -1), 'Missing canonical generated CSS should report an empty file size.');
+    assertSameValue(0, (int) ($status['last_modified'] ?? -1), 'Missing canonical generated CSS should report no modified time.');
 };
 
-$tests['asset_service_enqueue_migrates_a_current_legacy_generated_stylesheet_to_the_canonical_location'] = static function (): void {
+$tests['asset_service_enqueue_ignores_retired_generated_stylesheet_contents'] = static function (): void {
     resetTestState();
 
     global $enqueuedStyles;
     global $inlineStyles;
 
     $services = makeServiceGraph();
-    $legacyPath = trailingslashit((string) $services['storage']->getRoot()) . 'tasty-fonts.css';
+    $retiredPath = trailingslashit((string) $services['storage']->getRoot()) . 'tasty-fonts.css';
     $canonicalPath = (string) $services['storage']->getGeneratedCssPath();
-    $canonicalUrl = (string) $services['storage']->getGeneratedCssUrl();
-    $contents = "/* Version: " . TASTY_FONTS_VERSION . " */\n" . $services['assets']->getCss();
+    $currentContents = "/* Version: " . TASTY_FONTS_VERSION . " */\n" . $services['assets']->getCss();
+    $retiredContents = "/* Version: " . TASTY_FONTS_VERSION . " */\nbody{font-family:RetiredOnly;}";
 
-    wp_mkdir_p(dirname($legacyPath));
-    file_put_contents($legacyPath, $contents);
-    clearstatcache(true, $legacyPath);
+    wp_mkdir_p(dirname($retiredPath));
+    file_put_contents($retiredPath, $retiredContents);
+    clearstatcache(true, $retiredPath);
+    clearstatcache(true, $canonicalPath);
 
     $services['assets']->enqueue('tasty-fonts-runtime');
 
-    assertSameValue(true, is_file($canonicalPath), 'Enqueue should rewrite a current legacy generated stylesheet into the canonical .generated location.');
-    assertSameValue($contents, (string) file_get_contents($canonicalPath), 'Canonical generated stylesheet migration should preserve the generated CSS contents.');
-    assertSameValue($canonicalUrl, (string) ($enqueuedStyles['tasty-fonts-runtime']['src'] ?? ''), 'File delivery should switch to the canonical generated stylesheet URL after migration.');
-    assertSameValue('', (string) ($inlineStyles['tasty-fonts-runtime'] ?? ''), 'A current legacy generated stylesheet should not force inline fallback during migration.');
-    assertSameValue(true, is_file($legacyPath), 'Migrating the generated stylesheet should not delete the legacy file.');
+    assertSameValue(true, is_file($canonicalPath), 'Enqueue should keep the normal canonical generated CSS write path available.');
+    assertSameValue($currentContents, (string) file_get_contents($canonicalPath), 'Enqueue should write freshly generated CSS instead of copying retired generated CSS contents.');
+    assertSameValue('', (string) ($enqueuedStyles['tasty-fonts-runtime']['src'] ?? ''), 'Retired generated CSS should not be enqueued as a file delivery URL.');
+    assertSameValue(true, is_file($retiredPath), 'Ignoring the retired generated stylesheet path should leave the old file untouched.');
 };
 
 $tests['admin_page_context_builder_uses_asset_status_metadata_for_generated_css_diagnostics'] = static function (): void {
@@ -2674,8 +2478,15 @@ $tests['admin_page_context_builder_exposes_advanced_tools_context'] = static fun
     $manifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
     $healthChecks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
     $healthSummary = is_array($advancedTools['health_summary'] ?? null) ? $advancedTools['health_summary'] : [];
+    $toolActions = is_array($advancedTools['tool_actions'] ?? null) ? $advancedTools['tool_actions'] : [];
+    $toolActionIds = array_map(
+        static fn (mixed $action): string => is_array($action) ? (string) ($action['id'] ?? '') : '',
+        $toolActions
+    );
 
     assertSameValue(false, $advancedTools === [], 'The page context should expose a structured Advanced Tools payload.');
+    assertSameValue(true, in_array('repair_storage_scaffold', $toolActionIds, true), 'Advanced Tools should expose structured safe action descriptors.');
+    assertSameValue(true, in_array('site_transfer_import', $toolActionIds, true), 'Advanced Tools should expose structured destructive action descriptors.');
     assertSameValue(true, isset($manifest['roles']), 'The runtime manifest should expose the role resolution matrix.');
     assertSameValue(true, isset($manifest['families']), 'The runtime manifest should expose the active delivery matrix.');
     assertSameValue(true, isset($manifest['preload_urls']), 'The runtime manifest should expose runtime preload URLs.');
@@ -2770,93 +2581,6 @@ $tests['admin_page_context_builder_treats_unavailable_integrations_as_inactive_e
     assertSameValue('unavailable', (string) ($context['oxygen_integration']['status'] ?? ''), 'Oxygen should report an unavailable status when the plugin is inactive.');
 };
 
-$tests['admin_page_context_builder_ignores_legacy_role_delivery_ids_when_comparing_live_roles'] = static function (): void {
-    resetTestState();
-
-    $services = makeServiceGraph();
-    $services['imports']->saveProfile(
-        'Lora',
-        'lora',
-        [
-            'id' => 'bunny-cdn-static',
-            'label' => 'Bunny CDN',
-            'provider' => 'bunny',
-            'type' => 'cdn',
-            'format' => 'static',
-            'variants' => ['regular'],
-            'faces' => [],
-        ],
-        'published',
-        true
-    );
-    $services['imports']->saveProfile(
-        'Lora',
-        'lora',
-        [
-            'id' => 'self-hosted-static',
-            'label' => 'Self-hosted',
-            'provider' => 'local',
-            'type' => 'self_hosted',
-            'format' => 'static',
-            'variants' => ['regular'],
-            'faces' => [],
-        ],
-        'published',
-        false
-    );
-    $services['imports']->saveProfile(
-        'Inter',
-        'inter',
-        [
-            'id' => 'inter-static',
-            'label' => 'Self-hosted',
-            'provider' => 'local',
-            'type' => 'self_hosted',
-            'format' => 'static',
-            'variants' => ['regular'],
-            'faces' => [],
-        ],
-        'published',
-        true
-    );
-    $services['settings']->saveSettings([
-        'heading_font' => 'Lora',
-        'body_font' => 'Inter',
-        'heading_fallback' => 'sans-serif',
-        'body_fallback' => 'sans-serif',
-        'heading_delivery_id' => 'bunny-cdn-static',
-        'body_delivery_id' => 'inter-static',
-        'applied_roles' => [
-            'heading' => 'Lora',
-            'body' => 'Inter',
-            'heading_fallback' => 'sans-serif',
-            'body_fallback' => 'sans-serif',
-            'heading_delivery_id' => '',
-            'body_delivery_id' => '',
-        ],
-    ]);
-    $services['settings']->setAutoApplyRoles(true);
-
-    $builder = new AdminPageContextBuilder(
-        $services['storage'],
-        $services['settings'],
-        $services['log'],
-        $services['catalog'],
-        $services['assets'],
-        new CssBuilder(),
-        $services['adobe'],
-        $services['google'],
-        $services['acss_integration'],
-        $services['bricks_integration'],
-        $services['oxygen_integration']
-    );
-
-    $context = $builder->build();
-
-    assertSameValue('Live', (string) ($context['role_deployment']['badge'] ?? ''), 'Role deployment should stay live when draft and applied roles only differ by legacy delivery IDs.');
-    assertSameValue('Live Roles Active', (string) ($context['role_deployment']['title'] ?? ''), 'Role deployment should ignore legacy delivery ID differences.');
-};
-
 $tests['admin_page_context_builder_uses_catalog_family_count_for_delete_library_summary'] = static function (): void {
     resetTestState();
 
@@ -2942,39 +2666,6 @@ $tests['admin_controller_applies_acss_font_mapping_when_sync_is_enabled'] = stat
     assertSameValue('Inter, sans-serif', (string) ($result['settings']['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'The previous ACSS heading value should be backed up before Tasty Fonts overwrites it.');
     assertSameValue('700', (string) ($result['settings']['acss_font_role_sync_previous_heading_font_weight'] ?? ''), 'The previous ACSS heading weight value should be backed up before Tasty Fonts overwrites it.');
     assertContainsValue('Automatic.css now uses Tasty Fonts role variables', (string) ($result['message'] ?? ''), 'The settings response should explain that Automatic.css is now mapped to Tasty Fonts variables.');
-};
-
-$tests['admin_controller_recovers_legacy_acss_detection_state_when_acss_is_activated_later'] = static function (): void {
-    resetTestState();
-
-    global $automaticCssSettings;
-    global $optionStore;
-
-    $automaticCssSettings = [
-        'heading-font-family' => '',
-        'text-font-family' => '',
-    ];
-
-    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
-        'auto_apply_roles' => true,
-        'acss_font_role_sync_enabled' => false,
-        'acss_font_role_sync_applied' => false,
-        'acss_font_role_sync_previous_heading_font_family' => '',
-        'acss_font_role_sync_previous_text_font_family' => '',
-    ];
-
-    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
-
-    $services = makeServiceGraph();
-
-    invokePrivateMethod($services['controller'], 'initializeDetectedIntegrations');
-
-    $saved = $services['settings']->getSettings();
-
-    assertSameValue(true, $saved['acss_font_role_sync_enabled'], 'Automatic.css should auto-enable when the stored state was stuck false from legacy unavailable detection and ACSS is activated later.');
-    assertSameValue(true, $saved['acss_font_role_sync_applied'], 'Automatic.css should mark the managed mapping applied after recovering the legacy detection state.');
-    assertSameValue('var(--font-heading)', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Recovering the legacy Automatic.css detection state should apply the heading role variable.');
-    assertSameValue('var(--font-body)', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Recovering the legacy Automatic.css detection state should apply the body role variable.');
 };
 
 $tests['admin_controller_does_not_reenable_explicitly_disabled_acss_sync_after_restoring_defaults'] = static function (): void {
@@ -4065,7 +3756,6 @@ $tests['runtime_service_uses_the_active_family_delivery_for_primary_preloads'] =
             'body' => 'Lora',
             'heading_fallback' => 'sans-serif',
             'body_fallback' => 'serif',
-            'heading_delivery_id' => 'local-self_hosted-static',
         ],
         ['Inter', 'Lora']
     );
@@ -4079,8 +3769,8 @@ $tests['runtime_service_uses_the_active_family_delivery_for_primary_preloads'] =
     $services['runtime']->outputPreloadHints();
     $output = (string) ob_get_clean();
 
-    assertContainsValue('href="/wp-content/uploads/fonts/inter/Inter-Variable.woff2"', $output, 'Frontend preload output should follow the family active delivery even when legacy role delivery IDs still exist in stored role data.');
-    assertNotContainsValue('href="/wp-content/uploads/fonts/inter/Inter-700-static.woff2"', $output, 'Frontend preload output should ignore legacy role delivery overrides.');
+    assertContainsValue('href="/wp-content/uploads/fonts/inter/Inter-Variable.woff2"', $output, 'Frontend preload output should follow the family active delivery.');
+    assertNotContainsValue('href="/wp-content/uploads/fonts/inter/Inter-700-static.woff2"', $output, 'Frontend preload output should not use inactive delivery profiles.');
 };
 
 $tests['runtime_service_preloads_variable_faces_when_their_weight_axis_covers_role_targets'] = static function (): void {
@@ -4383,9 +4073,6 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
 
     assertSameValue(null, $defaults['bricks_integration_enabled'], 'Bricks integration should start unconfigured so supported sites can default on once detected.');
     assertSameValue(null, $defaults['oxygen_integration_enabled'], 'Oxygen integration should start unconfigured so supported sites can default on once detected.');
-    assertSameValue(true, $defaults['bricks_selector_fonts_enabled'], 'Bricks selector font exposure should stay enabled as part of the Bricks baseline.');
-    assertSameValue(true, $defaults['bricks_builder_preview_enabled'], 'Bricks builder preview loading should stay enabled as part of the Bricks baseline.');
-    assertSameValue(false, array_key_exists('bricks_variables_sync_enabled', $defaults), 'Bricks should no longer persist the removed legacy variable-sync setting.');
     assertSameValue(false, $defaults['bricks_theme_styles_sync_enabled'], 'Bricks Theme Style sync should default off until the user opts into deeper integration.');
     assertSameValue('managed', $defaults['bricks_theme_style_target_mode'], 'Bricks Theme Style sync should default to the managed target mode.');
     assertSameValue('managed', $defaults['bricks_theme_style_target_id'], 'Bricks Theme Style sync should default to the managed Tasty Theme Style target.');
@@ -4401,8 +4088,6 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
     ]);
 
     assertSameValue(true, $saved['bricks_integration_enabled'], 'Saving the Bricks integration toggle should persist an explicit enabled state.');
-    assertSameValue(true, $saved['bricks_selector_fonts_enabled'], 'Saving the Bricks integration toggle should keep selector exposure enabled as part of the baseline.');
-    assertSameValue(true, $saved['bricks_builder_preview_enabled'], 'Saving the Bricks integration toggle should keep builder preview loading enabled as part of the baseline.');
     assertSameValue(true, $saved['bricks_theme_styles_sync_enabled'], 'Saving Bricks Theme Style sync should persist an explicit enabled state.');
     assertSameValue('selected', $saved['bricks_theme_style_target_mode'], 'Saving the Bricks Theme Style mode should persist the selected targeting strategy.');
     assertSameValue('sitewide-primary', $saved['bricks_theme_style_target_id'], 'Saving the Bricks Theme Style target should persist the selected style ID.');
@@ -4523,12 +4208,6 @@ $tests['admin_controller_resets_bricks_integration_state_and_restores_bricks_opt
         'bricks_disable_google_fonts_enabled' => '1',
     ]);
     $services['settings']->setAutoApplyRoles(true);
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLES] = [
-        ['id' => BricksIntegrationService::VARIABLE_NAME_BODY, 'name' => BricksIntegrationService::VARIABLE_NAME_BODY, 'value' => 'var(--font-body)', 'category' => BricksIntegrationService::VARIABLE_CATEGORY_ID],
-    ];
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLE_CATEGORIES] = [
-        ['id' => BricksIntegrationService::VARIABLE_CATEGORY_ID, 'name' => 'Tasty Fonts'],
-    ];
     $services['bricks_integration']->applyThemeStylesSync('sitewide-primary');
     $services['bricks_integration']->applyGoogleFontsSetting();
 
@@ -4549,83 +4228,6 @@ $tests['admin_controller_resets_bricks_integration_state_and_restores_bricks_opt
         ['builderHeaderSticky' => true],
         (array) ($optionStore[BricksIntegrationService::OPTION_GLOBAL_SETTINGS] ?? []),
         'Resetting Bricks integration should restore the previous Bricks global settings.'
-    );
-    assertSameValue(
-        [],
-        array_values(
-            array_filter(
-                (array) ($optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLES] ?? []),
-                static fn (array $variable): bool => strpos((string) ($variable['name'] ?? ''), 'tasty-font-') === 0
-            )
-        ),
-        'Resetting Bricks integration should remove legacy Bricks alias variables.'
-    );
-};
-
-$tests['admin_controller_reconciles_legacy_bricks_alias_variables_into_direct_role_variables'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $services = makeServiceGraph();
-    $services['settings']->saveSettings([
-        'bricks_integration_enabled' => '1',
-        'bricks_theme_styles_sync_enabled' => '1',
-        'bricks_theme_style_target_mode' => BricksIntegrationService::TARGET_MODE_MANAGED,
-        'bricks_theme_style_target_id' => BricksIntegrationService::MANAGED_THEME_STYLE_ID,
-    ]);
-    $services['settings']->setAutoApplyRoles(true);
-
-    $optionStore[BRICKS_DB_THEME_STYLES] = [
-        BricksIntegrationService::MANAGED_THEME_STYLE_ID => [
-            'label' => 'Tasty Fonts',
-            'settings' => [
-                'conditions' => [
-                    'conditions' => [
-                        ['key' => 'main', 'compare' => '==', 'value' => 'any', 'priority' => 10],
-                    ],
-                ],
-                'typography' => [
-                    'typographyBody' => ['font-family' => 'var(--tasty-font-body)', 'font-weight' => 'var(--tasty-font-body-weight)'],
-                    'typographyHeadings' => ['font-family' => 'var(--tasty-font-heading)', 'font-weight' => 'var(--tasty-font-heading-weight)'],
-                ],
-            ],
-        ],
-    ];
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLES] = [
-        ['id' => BricksIntegrationService::VARIABLE_NAME_BODY, 'name' => BricksIntegrationService::VARIABLE_NAME_BODY, 'value' => 'var(--font-body)', 'category' => BricksIntegrationService::VARIABLE_CATEGORY_ID],
-        ['id' => BricksIntegrationService::VARIABLE_NAME_HEADING, 'name' => BricksIntegrationService::VARIABLE_NAME_HEADING, 'value' => 'var(--font-heading)', 'category' => BricksIntegrationService::VARIABLE_CATEGORY_ID],
-        ['id' => BricksIntegrationService::VARIABLE_NAME_BODY_WEIGHT, 'name' => BricksIntegrationService::VARIABLE_NAME_BODY_WEIGHT, 'value' => 'var(--font-body-weight)', 'category' => BricksIntegrationService::VARIABLE_CATEGORY_ID],
-        ['id' => BricksIntegrationService::VARIABLE_NAME_HEADING_WEIGHT, 'name' => BricksIntegrationService::VARIABLE_NAME_HEADING_WEIGHT, 'value' => 'var(--font-heading-weight)', 'category' => BricksIntegrationService::VARIABLE_CATEGORY_ID],
-    ];
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLE_CATEGORIES] = [
-        ['id' => BricksIntegrationService::VARIABLE_CATEGORY_ID, 'name' => 'Tasty Fonts'],
-    ];
-    update_option(
-        BricksIntegrationService::OPTION_SYNC_STATE,
-        [
-            'theme_styles' => ['applied' => true, 'target_mode' => BricksIntegrationService::TARGET_MODE_MANAGED, 'target_style_id' => BricksIntegrationService::MANAGED_THEME_STYLE_ID],
-            'google_fonts' => ['applied' => false],
-        ],
-        false
-    );
-
-    invokePrivateMethod($services['controller'], 'reconcileBricksIntegrationState');
-
-    assertSameValue(
-        BricksIntegrationService::DESIRED_BODY_VALUE,
-        (string) (($optionStore[BRICKS_DB_THEME_STYLES][BricksIntegrationService::MANAGED_THEME_STYLE_ID]['settings']['typography']['typographyBody']['font-family'] ?? '')),
-        'Bricks reconciliation should migrate stored Theme Styles from legacy alias variables to the direct Tasty role variables.'
-    );
-    assertSameValue(
-        [],
-        array_values(
-            array_filter(
-                (array) ($optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLES] ?? []),
-                static fn (array $variable): bool => strpos((string) ($variable['name'] ?? ''), 'tasty-font-') === 0
-            )
-        ),
-        'Bricks reconciliation should remove the legacy Bricks alias variables after migrating Theme Styles.'
     );
 };
 
@@ -4666,64 +4268,6 @@ $tests['runtime_service_adds_only_runtime_families_to_bricks_standard_fonts'] = 
     $fonts = $services['runtime']->filterBricksStandardFonts(['Arial']);
 
     assertSameValue(['Inter', 'Arial'], $fonts, 'Bricks should receive published Tasty Fonts runtime families first, followed by existing standard fonts.');
-};
-
-$tests['bricks_integration_service_removes_legacy_managed_variables'] = static function (): void {
-    resetTestState();
-
-    global $optionStore;
-
-    $services = makeServiceGraph();
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLES] = [
-        [
-            'id' => 'brand-primary',
-            'name' => 'brand-primary',
-            'value' => '#222',
-            'category' => 'colors',
-        ],
-    ];
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLE_CATEGORIES] = [
-        [
-            'id' => 'colors',
-            'name' => 'Colors',
-        ],
-    ];
-
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLES][] = [
-        'id' => BricksIntegrationService::VARIABLE_NAME_BODY,
-        'name' => BricksIntegrationService::VARIABLE_NAME_BODY,
-        'value' => 'var(--font-body)',
-        'category' => BricksIntegrationService::VARIABLE_CATEGORY_ID,
-    ];
-    $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLE_CATEGORIES][] = [
-        'id' => BricksIntegrationService::VARIABLE_CATEGORY_ID,
-        'name' => 'Tasty Fonts',
-    ];
-
-    $services['bricks_integration']->removeLegacyManagedVariables();
-
-    assertSameValue(
-        [
-            [
-                'id' => 'brand-primary',
-                'name' => 'brand-primary',
-                'value' => '#222',
-                'category' => 'colors',
-            ],
-        ],
-        $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLES] ?? [],
-        'Removing legacy Bricks variables should preserve the unrelated Bricks global variables.'
-    );
-    assertSameValue(
-        [
-            [
-                'id' => 'colors',
-                'name' => 'Colors',
-            ],
-        ],
-        $optionStore[BricksIntegrationService::OPTION_GLOBAL_VARIABLE_CATEGORIES] ?? [],
-        'Removing legacy Bricks variables should preserve the unrelated Bricks variable categories.'
-    );
 };
 
 $tests['bricks_integration_service_applies_and_restores_managed_theme_styles'] = static function (): void {
@@ -5129,49 +4673,6 @@ $tests['runtime_service_enqueues_bricks_builder_assets_when_preview_loading_is_e
     assertSameValue(true, isset($inlineScripts['bricks-builder'][0]), 'Bricks selector exposure should inject a builder script so Tasty Fonts appear in their own top-level picker group.');
     assertSameValue('before', (string) ($inlineScripts['bricks-builder'][0]['position'] ?? ''), 'The Bricks picker grouping script should run before the builder app boots.');
     assertContainsValue('var tastyFamilies = ["JetBrains Mono"];', (string) ($inlineScripts['bricks-builder'][0]['data'] ?? ''), 'The Bricks picker grouping script should include the published Tasty runtime family names.');
-};
-
-$tests['runtime_service_keeps_bricks_builder_baseline_enabled_even_when_legacy_child_flags_are_disabled'] = static function (): void {
-    resetTestState();
-
-    global $enqueuedStyles;
-    global $inlineScripts;
-
-    $services = makeServiceGraph();
-    $services['settings']->saveSettings([
-        'bricks_integration_enabled' => true,
-        'bricks_builder_preview_enabled' => false,
-        'bricks_selector_fonts_enabled' => false,
-    ]);
-    $services['imports']->saveProfile(
-        'Inter',
-        'inter',
-        [
-            'id' => 'local-self-hosted',
-            'label' => 'Local upload',
-            'provider' => 'local',
-            'type' => 'self_hosted',
-            'variants' => ['400'],
-            'faces' => [[
-                'family' => 'Inter',
-                'slug' => 'inter',
-                'source' => 'local',
-                'weight' => '400',
-                'style' => 'normal',
-                'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
-                'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
-            ]],
-        ],
-        'published',
-        true
-    );
-    $_GET['bricks'] = 'run';
-
-    $services['runtime']->enqueueBricksBuilder();
-
-    assertSameValue(true, isset($enqueuedStyles['tasty-fonts-bricks-builder']), 'The main Bricks toggle should keep builder preview assets enabled even when legacy child flags are disabled.');
-    assertSameValue(true, isset($inlineScripts['bricks-builder'][0]), 'The main Bricks toggle should keep the builder picker grouping script enabled even when legacy child flags are disabled.');
-    assertContainsValue("data.i18n.fontsCustom = hasExistingCustom ? 'Tasty Fonts + Custom' : 'Tasty Fonts';", (string) ($inlineScripts['bricks-builder'][0]['data'] ?? ''), 'The Bricks picker grouping script should relabel the top picker group for Tasty Fonts.');
 };
 
 $tests['runtime_service_appends_managed_bricks_editor_styles_when_theme_style_sync_is_active'] = static function (): void {

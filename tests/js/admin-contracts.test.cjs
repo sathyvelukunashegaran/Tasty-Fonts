@@ -14,6 +14,7 @@ const {
     normalizeOutputQuickModePreference,
     parsePhpIniSizeToBytes,
     rowMatchesLibraryFilters,
+    resolveLogPagination,
     resolveStatusAnnouncement,
     resolveAssignedRoleState,
     roleStatesMatch,
@@ -93,6 +94,45 @@ test('admin contracts match log entries against actor and search filters', () =>
     assert.equal(logEntryMatchesFilters('System', 'Imported the site transfer bundle.', '', 'deleted'), false);
 });
 
+test('admin contracts resolve activity log pagination windows', () => {
+    assert.deepEqual(resolveLogPagination(17, 1, 6), {
+        page: 1,
+        pageSize: 6,
+        totalPages: 3,
+        start: 0,
+        end: 6,
+        hasPrevious: false,
+        hasNext: true,
+    });
+    assert.deepEqual(resolveLogPagination(17, 99, 6), {
+        page: 3,
+        pageSize: 6,
+        totalPages: 3,
+        start: 12,
+        end: 17,
+        hasPrevious: true,
+        hasNext: false,
+    });
+    assert.deepEqual(resolveLogPagination(0, 4, 0), {
+        page: 1,
+        pageSize: 5,
+        totalPages: 1,
+        start: 0,
+        end: 0,
+        hasPrevious: false,
+        hasNext: false,
+    });
+    assert.deepEqual(resolveLogPagination(49, 2, 25), {
+        page: 2,
+        pageSize: 25,
+        totalPages: 2,
+        start: 25,
+        end: 49,
+        hasPrevious: true,
+        hasNext: false,
+    });
+});
+
 test('admin contracts parse PHP ini byte shorthand for upload limits', () => {
     assert.equal(parsePhpIniSizeToBytes('512'), 512);
     assert.equal(parsePhpIniSizeToBytes('2K'), 2048);
@@ -110,10 +150,12 @@ test('admin contracts serialize settings entries with array fields and empty sen
             ['admin_access_role_slugs[]', 'author'],
             ['admin_access_user_ids[]', ''],
             ['admin_access_user_ids[]', '3'],
-            ['training_wheels_off', '0'],
             ['training_wheels_off', '1'],
+            ['training_wheels_off', '0'],
             ['show_activity_log', '0'],
             ['show_activity_log', '1'],
+            ['delete_uploaded_files_on_uninstall', '1'],
+            ['delete_uploaded_files_on_uninstall', '0'],
             ['font_display', 'swap'],
         ], {
             ignoredKeys: ['_wpnonce'],
@@ -121,8 +163,9 @@ test('admin contracts serialize settings entries with array fields and empty sen
         {
             admin_access_role_slugs: ['editor', 'author'],
             admin_access_user_ids: ['3'],
-            training_wheels_off: '1',
+            training_wheels_off: '0',
             show_activity_log: '1',
+            delete_uploaded_files_on_uninstall: '0',
             font_display: 'swap',
         }
     );
@@ -202,28 +245,6 @@ test('admin contracts describe font type with provider-aware nuance', () => {
     assert.deepEqual(
         describeFontType({ faces: [{ weight: '400' }] }, 'google'),
         { type: 'static', hasVariable: false, hasStatic: true, isSourceOnly: false }
-    );
-});
-
-test('admin contracts ignore legacy role delivery ids when comparing role state', () => {
-    assert.equal(
-        roleStatesMatch(
-            {
-                heading: 'Lora',
-                body: 'Inter',
-                heading_fallback: 'sans-serif',
-                body_fallback: 'sans-serif',
-                heading_delivery_id: 'bunny-cdn-static',
-            },
-            {
-                heading: 'Lora',
-                body: 'Inter',
-                heading_fallback: 'sans-serif',
-                body_fallback: 'sans-serif',
-                heading_delivery_id: 'self-hosted-static',
-            }
-        ),
-        true
     );
 });
 

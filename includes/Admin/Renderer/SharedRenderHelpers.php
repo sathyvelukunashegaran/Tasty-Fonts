@@ -18,10 +18,17 @@ trait SharedRenderHelpers
     /**
      * @param list<ActivityLogEntry> $entries
      */
-    public function renderLogList(array $entries, string $className = 'tasty-fonts-log-list'): void
+    public function renderLogList(array $entries, string $className = 'tasty-fonts-log-list', int $pageSize = 5): void
     {
+        $pageSize = max(1, $pageSize);
+        $pageSizeOptions = [5, 10, 25, 100];
+
+        if (!in_array($pageSize, $pageSizeOptions, true)) {
+            $pageSizeOptions[] = $pageSize;
+            sort($pageSizeOptions);
+        }
         ?>
-        <ol class="<?php echo esc_attr($className); ?>" data-activity-list>
+        <ol class="<?php echo esc_attr($className); ?>" data-activity-list data-activity-page-size="<?php echo esc_attr((string) $pageSize); ?>">
             <?php foreach ($entries as $entry): ?>
                 <?php
                 $time = $this->stringValue($entry, 'time');
@@ -57,6 +64,35 @@ trait SharedRenderHelpers
                 </li>
             <?php endforeach; ?>
         </ol>
+        <nav class="tasty-fonts-activity-pagination" data-activity-pagination hidden aria-label="<?php esc_attr_e('Activity log pages', 'tasty-fonts'); ?>">
+            <span class="tasty-fonts-activity-range-status" data-activity-range-status aria-live="polite">
+                <?php esc_html_e('Showing activity entries', 'tasty-fonts'); ?>
+            </span>
+            <span class="tasty-fonts-activity-pagination-actions">
+                <label class="tasty-fonts-activity-page-size">
+                    <span><?php esc_html_e('Rows', 'tasty-fonts'); ?></span>
+                    <select data-activity-page-size-select aria-label="<?php esc_attr_e('Activity entries per page', 'tasty-fonts'); ?>">
+                        <?php foreach ($pageSizeOptions as $option): ?>
+                            <option value="<?php echo esc_attr((string) $option); ?>" <?php selected($pageSize, $option); ?>>
+                                <?php echo esc_html((string) $option); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <span class="screen-reader-text"><?php esc_html_e('entries per page', 'tasty-fonts'); ?></span>
+                </label>
+                <span class="tasty-fonts-activity-page-controls">
+                    <button type="button" class="button button-secondary tasty-fonts-activity-page-button" data-activity-page-previous aria-label="<?php esc_attr_e('Previous activity page', 'tasty-fonts'); ?>">
+                        <span aria-hidden="true">&larr;</span>
+                    </button>
+                    <span class="tasty-fonts-activity-page-status" data-activity-page-status aria-live="polite">
+                        <?php esc_html_e('Page 1 of 1', 'tasty-fonts'); ?>
+                    </span>
+                    <button type="button" class="button button-secondary tasty-fonts-activity-page-button" data-activity-page-next aria-label="<?php esc_attr_e('Next activity page', 'tasty-fonts'); ?>">
+                        <span aria-hidden="true">&rarr;</span>
+                    </button>
+                </span>
+            </span>
+        </nav>
         <?php
     }
 

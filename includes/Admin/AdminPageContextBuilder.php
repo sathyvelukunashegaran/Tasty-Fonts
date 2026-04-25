@@ -291,6 +291,7 @@ final class AdminPageContextBuilder
             'health_checks' => $healthChecks,
             'health_summary' => $this->healthChecks->summarize($healthChecks),
             'runtime_manifest' => $runtimeManifest,
+            'tool_actions' => $this->buildAdvancedToolActionDescriptors(),
             'diagnostic_items' => $diagnosticItems,
             'overview_metrics' => $overviewMetrics,
             'developer_tool_statuses' => $developerToolStatuses,
@@ -298,6 +299,111 @@ final class AdminPageContextBuilder
             'activity' => [
                 'entries' => $logs,
                 'count' => count($logs),
+            ],
+        ];
+    }
+
+    /**
+     * @return list<array<string, bool|string>>
+     */
+    private function buildAdvancedToolActionDescriptors(): array
+    {
+        return [
+            [
+                'id' => 'clear_plugin_caches',
+                'kind' => 'maintenance',
+                'label' => __('Clear caches and rebuild assets', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'regenerate_css',
+                'kind' => 'maintenance',
+                'label' => __('Regenerate CSS file', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'rescan_font_library',
+                'kind' => 'maintenance',
+                'label' => __('Rescan font library', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'repair_storage_scaffold',
+                'kind' => 'maintenance',
+                'label' => __('Repair storage scaffold', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'reset_integration_detection_state',
+                'kind' => 'maintenance',
+                'label' => __('Run integration scan', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'reset_suppressed_notices',
+                'kind' => 'maintenance',
+                'label' => __('Restore notices', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'reset_plugin_settings',
+                'kind' => 'destructive',
+                'label' => __('Reset plugin settings only', 'tasty-fonts'),
+                'confirm_phrase' => 'RESET',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'wipe_managed_font_library',
+                'kind' => 'destructive',
+                'label' => __('Delete managed font library', 'tasty-fonts'),
+                'confirm_phrase' => 'DELETE',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'create_rollback_snapshot',
+                'kind' => 'snapshot',
+                'label' => __('Create rollback snapshot', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => false,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'restore_rollback_snapshot',
+                'kind' => 'destructive',
+                'label' => __('Restore rollback snapshot', 'tasty-fonts'),
+                'confirm_phrase' => 'RESTORE',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => true,
+            ],
+            [
+                'id' => 'support_bundle',
+                'kind' => 'export',
+                'label' => __('Download support bundle', 'tasty-fonts'),
+                'confirm_phrase' => '',
+                'blocks_when_dirty' => false,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'site_transfer_import',
+                'kind' => 'destructive',
+                'label' => __('Import site transfer bundle', 'tasty-fonts'),
+                'confirm_phrase' => 'IMPORT',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => true,
             ],
         ];
     }
@@ -1271,13 +1377,13 @@ final class AdminPageContextBuilder
             'title' => __('Gutenberg Font Library', 'tasty-fonts'),
             'description' => $enabled
                 ? ($isLocal
-                    ? __('Sync imported families to WordPress. Disable if local SSL or loopback checks fail.', 'tasty-fonts')
+                    ? __('Sync imported families to WordPress. Keep it on unless local SSL or loopback checks fail.', 'tasty-fonts')
                     : __('Sync imported families to the WordPress Font Library.', 'tasty-fonts'))
                 : __('Sync imported families to WordPress typography controls.', 'tasty-fonts'),
             'status_label' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
             'status_copy' => $enabled
                 ? ($isLocal
-                    ? __('On. Disable if local SSL or loopback checks fail.', 'tasty-fonts')
+                    ? __('On. Keep it on unless local SSL or loopback checks fail.', 'tasty-fonts')
                     : __('On. Imported families sync to WordPress.', 'tasty-fonts'))
                 : __('Off. Imported families stay inside Tasty.', 'tasty-fonts'),
         ];
@@ -1360,7 +1466,7 @@ final class AdminPageContextBuilder
                     'selectors' => __('Show published families in Bricks controls.', 'tasty-fonts'),
                     'builder_preview' => __('Load active fonts in Bricks previews.', 'tasty-fonts'),
                     'theme_styles' => __('Sync role fonts to Bricks Theme Styles.', 'tasty-fonts'),
-                    'google_fonts' => __('Hide Bricks Google Fonts from pickers.', 'tasty-fonts'),
+                    'google_fonts' => __('Keep Bricks pickers focused on Tasty Fonts.', 'tasty-fonts'),
                 ],
             ]
         );
@@ -1773,6 +1879,14 @@ final class AdminPageContextBuilder
                 'summary' => '',
                 'last_run' => '',
             ],
+            'rescan_font_library' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
+            'repair_storage_scaffold' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
             'reset_plugin_settings' => [
                 'summary' => '',
                 'last_run' => '',
@@ -1796,6 +1910,8 @@ final class AdminPageContextBuilder
             'regenerate_css' => __('Generated CSS regenerated.', 'tasty-fonts'),
             'reset_integration_detection_state' => __('Integration detection state reset.', 'tasty-fonts'),
             'reset_suppressed_notices' => __('Suppressed notices reset. Hidden reminders can appear again.', 'tasty-fonts'),
+            'rescan_font_library' => __('Fonts rescanned.', 'tasty-fonts'),
+            'repair_storage_scaffold' => __('Storage scaffold repaired.', 'tasty-fonts'),
             'reset_plugin_settings' => __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts'),
             'wipe_managed_font_library' => __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts'),
         ];

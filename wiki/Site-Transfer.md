@@ -41,7 +41,7 @@ A Site Transfer bundle contains everything Tasty Fonts manages:
 Before you begin, confirm all of the following:
 
 1. **PHP's ZipArchive extension is installed and enabled** on both the source and destination servers. Most managed WordPress hosts include it by default. If the Transfer tab shows a warning about ZipArchive being unavailable, contact your host.
-2. **Both sites are running Tasty Custom Fonts 1.13.0 or later.** Bundle schema compatibility is not guaranteed across major schema versions.
+2. **Both sites are running Tasty Custom Fonts 2.0.0 or later.** Version 2 transfer bundles are the supported starting point.
 3. **You have admin-level access** on both the source site (to export) and the destination site (to import).
 4. **The destination site's `wp-content/uploads/fonts/` directory is writable** by the web server process.
 
@@ -120,6 +120,18 @@ The plugin performs these actions automatically after a successful import:
 - Rebuilds the generated runtime stylesheet (`wp-content/uploads/fonts/.generated/tasty-fonts.css`)
 - Attempts a Block Editor Font Library sync if that integration is enabled
 - Records a transfer import event in the activity log (`Advanced Tools → Activity`)
+
+## WP-CLI
+
+Power users can export, dry-run, and import bundles without opening the admin UI:
+
+```bash
+wp tasty-fonts transfer export
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run
+wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --yes
+```
+
+Use `--google-api-key=<key>` during dry-run or import when the destination site should save a fresh Google Fonts API key. Destructive imports require `--yes` and create a rollback snapshot before replacing the current Tasty Fonts state.
 
 ---
 

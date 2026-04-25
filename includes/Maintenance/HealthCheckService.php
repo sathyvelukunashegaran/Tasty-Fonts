@@ -567,10 +567,13 @@ final class HealthCheckService
         string $helpLabel = ''
     ): array {
         return [
+            'id' => $slug,
             'slug' => $slug,
             'group' => $group,
             'severity' => $severity,
+            'label' => $title,
             'title' => $title,
+            'summary' => $message,
             'message' => $message,
             'guidance' => $guidance,
             'help_url' => $helpUrl,

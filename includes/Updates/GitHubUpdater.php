@@ -39,7 +39,6 @@ final class GitHubUpdater
     private const REPOSITORY = 'sathyvelukunashegaran/Tasty-Custom-Fonts';
     private const REPOSITORY_URL = 'https://github.com/' . self::REPOSITORY;
     private const API_RELEASES_URL = 'https://api.github.com/repos/' . self::REPOSITORY . '/releases';
-    private const TRANSIENT_LEGACY_RELEASE = 'tasty_fonts_github_release_v1';
     private const TRANSIENT_RELEASE_MANIFEST = 'tasty_fonts_github_release_manifest_v1';
     private const TRANSIENT_INSTALLED_VERSION = 'tasty_fonts_github_release_version_v1';
     private const TRANSIENT_RELEASE_BACKOFF = 'tasty_fonts_github_release_backoff_v1';
@@ -376,7 +375,6 @@ final class GitHubUpdater
 
     private function clearReleaseCache(): void
     {
-        delete_transient($this->legacyReleaseTransientKey());
         delete_transient($this->releaseManifestTransientKey());
         delete_transient($this->releaseBackoffTransientKey());
     }
@@ -970,11 +968,6 @@ final class GitHubUpdater
         $this->installedVersion = (string) ($metadata['version'] ?? TASTY_FONTS_VERSION);
 
         return $this->installedVersion;
-    }
-
-    private function legacyReleaseTransientKey(): string
-    {
-        return TransientKey::forSite(self::TRANSIENT_LEGACY_RELEASE);
     }
 
     private function releaseManifestTransientKey(): string

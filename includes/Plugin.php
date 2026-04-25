@@ -14,6 +14,7 @@ use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyCssParser;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
+use TastyFonts\Cli\Command as CliCommand;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
@@ -270,6 +271,7 @@ final class Plugin
         $this->registerAdminHooks();
         $this->registerRestHooks();
         $this->registerCatalogHooks();
+        $this->registerCliCommand();
     }
 
     public function loadTextdomain(): void
@@ -316,6 +318,18 @@ final class Plugin
     private function registerRestHooks(): void
     {
         add_action('rest_api_init', [$this->rest, 'registerRoutes']);
+    }
+
+    private function registerCliCommand(): void
+    {
+        if (!defined('WP_CLI') || !WP_CLI || !class_exists('\WP_CLI')) {
+            return;
+        }
+
+        $cliCommand = new CliCommand($this->admin);
+
+        \WP_CLI::add_command('tasty-fonts', $cliCommand);
+        \WP_CLI::add_command('tasty-fonts support-bundle', [$cliCommand, 'supportBundle']);
     }
 
     /**

@@ -753,6 +753,40 @@ final class SiteTransferService
     }
 
     /**
+     * @return StagedBundleSummary|WP_Error
+     */
+    public function previewImportBundlePath(string $zipPath): array|WP_Error
+    {
+        $zipPath = wp_normalize_path($zipPath);
+        $validation = $this->validateImportBundle($zipPath);
+
+        if (is_wp_error($validation)) {
+            return $validation;
+        }
+
+        try {
+            return $this->buildStagedBundleSummary(
+                [
+                    'path' => $zipPath,
+                    'name' => basename($zipPath),
+                ],
+                $validation['manifest'],
+                $validation['files']
+            );
+        } finally {
+            $this->deleteDirectory($validation['extract_dir']);
+        }
+    }
+
+    /**
+     * @return ImportResult|WP_Error
+     */
+    public function importBundlePathReplacingCurrentState(string $zipPath, string $freshGoogleApiKey = ''): array|WP_Error
+    {
+        return $this->importPreparedBundle(wp_normalize_path($zipPath), $freshGoogleApiKey, false);
+    }
+
+    /**
      * @return ImportResult|WP_Error
      */
     private function importPreparedBundle(string $zipPath, string $freshGoogleApiKey = '', bool $deleteZipWhenDone = false): array|WP_Error
@@ -966,7 +1000,6 @@ final class SiteTransferService
 
             if (
                 str_ends_with($roleKey, '_fallback')
-                || str_ends_with($roleKey, '_delivery_id')
                 || str_ends_with($roleKey, '_weight')
                 || str_ends_with($roleKey, '_axes')
             ) {
@@ -1609,9 +1642,6 @@ final class SiteTransferService
             'heading' => $this->scalarStringValue($roles, 'heading'),
             'body' => $this->scalarStringValue($roles, 'body'),
             'monospace' => $this->scalarStringValue($roles, 'monospace'),
-            'heading_delivery_id' => $this->scalarStringValue($roles, 'heading_delivery_id'),
-            'body_delivery_id' => $this->scalarStringValue($roles, 'body_delivery_id'),
-            'monospace_delivery_id' => $this->scalarStringValue($roles, 'monospace_delivery_id'),
             'heading_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'heading_fallback', FontUtils::DEFAULT_ROLE_SANS_FALLBACK)),
             'body_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'body_fallback', FontUtils::DEFAULT_ROLE_SANS_FALLBACK)),
             'monospace_fallback' => FontUtils::sanitizeFallback($this->scalarStringValue($roles, 'monospace_fallback', 'monospace')),

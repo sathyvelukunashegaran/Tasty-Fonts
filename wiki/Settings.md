@@ -6,7 +6,7 @@ Control the plugin’s output model, integrations, behavior defaults, and mainte
 
 - you need to change CSS delivery or output format
 - you need to configure integrations with Gutenberg, Automatic.css, Bricks, or Oxygen
-- you want to enable or disable behavior features
+- you want to manage behavior features
 - you need to understand what the autosaving settings panels affect
 - you need to reset cached or detected plugin state during development or support work
 
@@ -126,7 +126,7 @@ Only applies to self-hosted WOFF2 variants. CDN and Adobe deliveries use remote 
 
 #### Remote Connection Hints
 
-When enabled, the plugin emits `<link rel="preconnect">` tags for active Google, Bunny, and Adobe CDN origins. This tells the browser to open TCP/TLS connections to those origins early, reducing latency for the first CDN stylesheet request. Disable if all your active deliveries are self-hosted.
+When enabled, the plugin emits `<link rel="preconnect">` tags for active Google, Bunny, and Adobe CDN origins. This tells the browser to open TCP/TLS connections to those origins early, reducing latency for the first CDN stylesheet request. Leave this off if all your active deliveries are self-hosted.
 
 #### Variable Font Support
 
@@ -192,8 +192,8 @@ Key controls include:
 - `Update Channel`
 - `Enable Monospace Role`
 - `Show Activity Log`
-- `Hide Onboarding Hints`
-- `Delete uploaded fonts on uninstall`
+- `Show Onboarding Hints`
+- `Keep Uploaded Fonts on Uninstall`
 
 #### Admin Access
 
@@ -226,11 +226,11 @@ If the selected channel points to an older version than the one currently instal
 
 #### Enable Monospace Role
 
-Turns on the third role slot (`Monospace`). When enabled, the role selector, output variables (`--font-monospace`), and related class/alias controls become available. Disable this if you do not need a managed monospace family.
+Turns on the third role slot (`Monospace`). When enabled, the role selector, output variables (`--font-monospace`), and related class/alias controls become available. Leave this off if you do not need a managed monospace family.
 
-#### Delete Uploaded Fonts On Uninstall
+#### Keep Uploaded Fonts On Uninstall
 
-When enabled, uninstalling the plugin also removes plugin-managed font files from `wp-content/uploads/fonts/`. Disable this if you want to keep the files for use with other plugins or after reinstallation.
+When enabled, uninstalling the plugin leaves plugin-managed font files in `wp-content/uploads/fonts/`. Leave this off when uninstalling should remove plugin-managed font files too.
 
 #### Show Activity Log
 

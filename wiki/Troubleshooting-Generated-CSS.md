@@ -68,14 +68,23 @@ Use `Advanced Tools → Overview` to confirm:
 If the generated CSS looks stale or missing:
 
 1. Go to `Advanced Tools → Developer`.
-2. Use **Clear Cache** to delete the cached stylesheet and transients.
+2. Use **Clear Caches & Rebuild** to delete plugin caches and rebuild generated assets.
 3. Then apply sitewide again (or save any Output setting) to trigger a fresh generation.
+
+From WP-CLI, the equivalent checks and repair commands are:
+
+```bash
+wp tasty-fonts doctor
+wp tasty-fonts css regenerate
+wp tasty-fonts cache clear
+wp tasty-fonts library rescan
+```
 
 ---
 
 ## Notes
 
-- The plugin can recognize and migrate a current legacy generated stylesheet from `wp-content/uploads/fonts/tasty-fonts.css` into the canonical `.generated` location.
+- Version 2 writes generated stylesheets only to the canonical `.generated` location. Files left at the old `wp-content/uploads/fonts/tasty-fonts.css` path are ignored.
 - Inline delivery is the fallback path when file delivery is disabled or unavailable.
 - Output-affecting settings such as `font-display`, unicode-range output, minification, variable generation, and utility class generation all change what appears in the generated runtime CSS.
 - If the generated stylesheet shows an unexpected `unicode-range`, check `Settings -> Output -> Unicode Range Output` before assuming the imported face metadata is wrong.

@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added WP-CLI parity for Advanced Tools diagnostics, generated CSS regeneration, cache clears, library rescans, site-transfer export/import, support bundles, and rollback snapshots.
+- Added an Advanced Tools CLI tab with copy-ready WP-CLI commands for diagnostics, maintenance, transfers, support bundles, and snapshots.
+- Added paginated Advanced Tools activity logs with account filters, search, page controls, and selectable 5, 10, 25, or 100 entry page sizes.
+
+### Changed
+
+- Added compatibility aliases to structured health checks and guarded snapshot restores with the shared Advanced Tools confirmation flow.
+- Exposed structured Advanced Tools action descriptors and added safe REST/admin actions for library rescans and storage scaffold repair.
+- Restyled the Advanced Tools Activity and Transfer logs around the shared row-board design, including cleaner filters, card-style entries, footer controls, and consistent destructive-action styling.
+- Reworded settings controls toward positive enabled-state labels, including onboarding hints, uploaded font retention, and related Behavior settings.
+- Removed v1 migration-only and backward-support paths for legacy option keys, old import/log storage, retired generated CSS paths, role delivery overrides, class output aliases, stale Automatic.css recovery, and retired Bricks alias cleanup.
+
+### Fixed
+
+- Fixed the Advanced Tools snapshots REST route so it returns persisted rollback snapshots.
+- Fixed support bundles so list-shaped diagnostics such as health checks are preserved while secrets are still removed.
+- Fixed Advanced Tools health badges, CLI command help, activity pagination spacing, and settings row control alignment so the admin UI stays consistent with the current design system.
+
 ## [1.14.0-beta.2] - 2026-04-25
 
 ### Added
@@ -533,7 +553,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Made `Hide Onboarding Hints` suppress settings helper descriptions consistently at render time across Output, Integrations, and Behavior instead of relying only on CSS hiding.
+- Made `Show Onboarding Hints` control settings helper descriptions consistently at render time across Output, Integrations, and Behavior instead of relying only on CSS hiding.
 - Improved generated CSS filesystem context resolution so writes can fall back to the nearest existing parent directory when the final target path does not exist yet.
 - Added renderer regression coverage for the streamlined integrations layout and the no-descriptions settings state when onboarding hints are disabled.
 - Preserved unavailable Bricks, Oxygen, and Automatic.css integration detection state during settings saves so companion plugins can still auto-enable later when they become available.

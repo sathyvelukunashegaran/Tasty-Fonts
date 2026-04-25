@@ -108,7 +108,7 @@ See [Site Transfer](Site-Transfer) for the full step-by-step walkthrough.
 
 ### What is the dry-run step in Site Transfer?
 
-Since 1.13.0, importing a transfer bundle requires a **dry-run validation** before the destructive import can proceed. After you select your bundle file, click **Dry Run Bundle** first. The plugin checks the archive for corruption, missing files, checksum mismatches, and version compatibility — without making any changes to the destination site. The activity log shows the results. If the dry run passes, the **Import Bundle** button becomes available.
+Importing a transfer bundle requires a **dry-run validation** before the destructive import can proceed. After you select your bundle file, click **Dry Run Bundle** first. The plugin checks the archive for corruption, missing files, checksum mismatches, and version compatibility without making any changes to the destination site. The activity log shows the results. If the dry run passes, the **Import Bundle** button becomes available.
 
 This two-phase approach prevents a bad bundle from overwriting your destination site's data before you know there is a problem.
 

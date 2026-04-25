@@ -72,6 +72,7 @@ Published fonts reach every layer of your WordPress site automatically.
 - Optionally sync published families into the core Block Editor Font Library
 - Push typography to Etch, Bricks, Oxygen, and Automatic.css through dedicated integrations
 - Inspect generated CSS, download the runtime stylesheet, and trace changes through the activity log
+- Run Advanced Tools workflows from WP-CLI for scripted diagnostics, CSS regeneration, transfer bundles, snapshots, and support exports
 
 ---
 

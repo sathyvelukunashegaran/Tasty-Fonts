@@ -41,7 +41,6 @@ Options -Indexes
     </IfModule>
 </FilesMatch>
 HTACCESS;
-    private const UPDATER_LEGACY_RELEASE_TRANSIENT = 'tasty_fonts_github_release_v1';
     private const UPDATER_RELEASE_TRANSIENT = 'tasty_fonts_github_release_manifest_v1';
     private const UPDATER_INSTALLED_VERSION_TRANSIENT = 'tasty_fonts_github_release_version_v1';
 
@@ -263,7 +262,6 @@ HTACCESS;
                 AssetService::TRANSIENT_REGENERATE_CSS_QUEUED,
                 GoogleFontsClient::TRANSIENT_API_KEY_REVALIDATION_QUEUED,
                 BunnyFontsClient::TRANSIENT_CATALOG,
-                self::UPDATER_LEGACY_RELEASE_TRANSIENT,
                 self::UPDATER_RELEASE_TRANSIENT,
                 self::UPDATER_INSTALLED_VERSION_TRANSIENT,
             ] as $transientKey

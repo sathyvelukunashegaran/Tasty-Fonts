@@ -14,7 +14,6 @@ defined('ABSPATH') || exit;
 final class LogRepository
 {
     public const OPTION_LOG = 'tasty_fonts_log';
-    public const LEGACY_OPTION_LOG = 'etch_fonts_log';
     public const CATEGORY_TRANSFER = 'transfer';
     public const EVENT_SITE_TRANSFER_EXPORT = 'site_transfer_export';
     public const EVENT_SITE_TRANSFER_IMPORT_SUCCESS = 'site_transfer_import_success';
@@ -82,15 +81,7 @@ final class LogRepository
             return $this->normalizeLogEntryList($value);
         }
 
-        $legacyValue = get_option(self::LEGACY_OPTION_LOG, null);
-
-        if (!is_array($legacyValue)) {
-            return [];
-        }
-
-        update_option($option, $legacyValue, false);
-
-        return $this->normalizeLogEntryList($legacyValue);
+        return [];
     }
 
     /**

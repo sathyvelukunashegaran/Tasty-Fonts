@@ -2461,7 +2461,9 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Automatic.css', $output, 'The Integrations tab should expose the Automatic.css integration card.');
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Integrations tab should no longer render a duplicate Gutenberg sync row title.');
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Integrations tab should no longer render a duplicate Automatic.css sync row title.');
-    assertContainsValue('Hide Onboarding Hints', $output, 'The Behavior tab should expose the onboarding-hints toggle.');
+    assertContainsValue('Show Onboarding Hints', $output, 'The Behavior tab should expose the onboarding-hints toggle with positive wording.');
+    assertNotContainsValue('Hide Onboarding Hints', $output, 'The Behavior tab should not frame onboarding hints as a hide setting.');
+    assertSameValue(1, preg_match('/name="training_wheels_off" value="1"[\s\S]*name="training_wheels_off" value="0"/', $output), 'The positive onboarding hints toggle should still submit the stored inverse setting correctly.');
     assertContainsValue('Update Channel', $output, 'The Behavior tab should expose the update channel selector.');
     assertContainsValue('Stable', $output, 'The Behavior tab should render the stable update channel option inline.');
     assertContainsValue('Beta', $output, 'The Behavior tab should render the beta update channel option inline.');
@@ -2481,9 +2483,11 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Files &amp; Permissions', $output, 'The Behavior tab should label cleanup/access controls with their shared permission scope.');
     assertContainsValue('Enable Monospace Role', $output, 'The Behavior panel should still render the monospace toggle.');
     assertContainsValue('Enable Variable Fonts', $output, 'The Behavior panel should render the opt-in variable font toggle.');
-    assertContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should still render the uninstall cleanup toggle.');
-    assertContainsValue('Enable custom access rules', $output, 'The admin-access panel should expose the master toggle for fine-grained access.');
-    assertContainsValue('Off: only administrators can open Tasty Fonts. On: choose extra roles and users below.', $output, 'The admin-access toggle should explain the two access modes inline like the other Behavior settings.');
+    assertContainsValue('Keep Uploaded Fonts on Uninstall', $output, 'The Behavior panel should render the uninstall retention toggle with positive wording.');
+    assertNotContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should not frame uploaded font retention as a delete setting.');
+    assertSameValue(1, preg_match('/name="delete_uploaded_files_on_uninstall" value="1"[\s\S]*name="delete_uploaded_files_on_uninstall" value="0"/', $output), 'The positive uninstall retention toggle should still submit the stored inverse setting correctly.');
+    assertContainsValue('Enable Additional Access Rules', $output, 'The admin-access panel should expose the master toggle for fine-grained access with positive wording.');
+    assertContainsValue('Grant Tasty Fonts access to extra roles and users. Administrators always keep access.', $output, 'The admin-access toggle should describe the enabled behavior instead of off/on modes.');
     assertNotContainsValue('Custom access is on.', $output, 'The admin-access row should no longer render a separate status summary line.');
     assertNotContainsValue('Administrators:', $output, 'The admin-access row should no longer render a separate summary bar above the detailed controls.');
     assertNotContainsValue('Specific users:', $output, 'The admin-access row should no longer render the removed summary bar labels.');
@@ -2506,6 +2510,15 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertSameValue(1, preg_match('/<input(?=[^>]*name="admin_access_user_ids\[\]")(?=[^>]*value="3")(?=[^>]*checked="checked")[^>]*>/', $output), 'Saved admin-access user grants should remain selected in the searchable Behavior-tab checklist.');
     assertContainsValue('Reset plugin settings only', $output, 'The Developer tab should expose the explicit settings-reset action.');
     assertContainsValue('Delete managed font library', $output, 'The Developer tab should expose the explicit library-delete action.');
+    assertContainsValue('id="tasty-fonts-diagnostics-tab-cli"', $output, 'The Advanced Tools switcher should expose the CLI tab.');
+    assertContainsValue('id="tasty-fonts-diagnostics-panel-cli"', $output, 'The Advanced Tools page should render a dedicated CLI panel.');
+    assertContainsValue('tasty-fonts-cli-command-group', $output, 'The CLI tab should group copyable WP-CLI commands.');
+    assertContainsValue('wp tasty-fonts doctor --format=json', $output, 'The CLI tab should expose the doctor JSON command.');
+    assertContainsValue('wp tasty-fonts css regenerate', $output, 'The CLI tab should expose the generated CSS regeneration command.');
+    assertContainsValue('wp tasty-fonts transfer import /path/to/tasty-fonts-transfer.zip --dry-run', $output, 'The CLI tab should expose the transfer dry-run command.');
+    assertContainsValue('data-copy-text="wp tasty-fonts support-bundle --format=json"', $output, 'The CLI tab should make support bundle commands copy-ready.');
+    assertContainsValue('data-copy-text="wp tasty-fonts snapshot restore &lt;snapshot-id&gt; --yes"', $output, 'The CLI tab should make destructive snapshot commands copy-ready.');
+    assertContainsValue('Command copied.', $output, 'The CLI tab should use the shared copy feedback contract.');
     assertContainsValue('Transfer &amp; Recovery', $output, 'The Transfer tab should render the transfer and recovery workbench.');
     assertNotContainsValue('Workbench Status', $output, 'The Transfer tab should avoid a redundant status board above the actual tools.');
     assertContainsValue('Portable Transfer', $output, 'The Transfer tab should group export and import validation together.');
@@ -2559,7 +2572,7 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--rebuild tasty-fonts-developer-action-button', $output, 'Developer maintenance actions should use the shared Advanced Tools row action contract.');
     assertContainsValue('tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--generate tasty-fonts-developer-action-button', $output, 'Developer CSS actions should use the shared Advanced Tools row action contract.');
     assertContainsValue('tasty-fonts-button-danger tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--delete tasty-fonts-developer-action-button', $output, 'Developer destructive actions should use the shared danger row action contract.');
-    assertNotContainsValue('These tools run immediately and do not use Save changes.', $output, 'Hide Onboarding Hints should omit developer maintenance helper copy.');
+    assertNotContainsValue('These tools run immediately and do not use Save changes.', $output, 'Show Onboarding Hints should omit developer maintenance helper copy when turned off.');
     assertContainsValue('Maintenance', $output, 'The Developer tab should group routine cleanup tools into a maintenance section.');
     assertContainsValue('Danger Zone', $output, 'The Developer tab should separate destructive tools into a dedicated danger zone.');
     assertNotContainsValue('Immediate actions', $output, 'The Developer tab should remove the redundant immediate-actions heading.');
@@ -2593,31 +2606,31 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Beta', $output, 'The masthead version pill should disclose the selected update channel.');
     assertContainsValue('Beta · Update Available', $output, 'The masthead version pill should summarize channel and update status together.');
     assertContainsValue('Latest available: 1.7.1-beta.2.', $output, 'The masthead version pill tooltip should expose the latest package for the selected channel.');
-    assertContainsValue('is-training-wheels-off', $output, 'Hide Onboarding Hints should add the admin state class used to suppress descriptive copy.');
+    assertContainsValue('is-training-wheels-off', $output, 'Show Onboarding Hints should add the admin state class used to suppress descriptive copy when turned off.');
     assertNotContainsValue('Typography Workspace', $output, 'The masthead should omit the eyebrow label in the streamlined header layout.');
     assertNotContainsValue('Professional Typography Management For WordPress', $output, 'The streamlined masthead should omit the legacy hero tagline.');
     assertNotContainsValue('Deploy fonts, manage your library, and fine-tune output from one polished workspace.', $output, 'The streamlined masthead should omit the supporting summary copy.');
-    assertNotContainsValue('Choose whether the generated stylesheet loads as a file or is printed inline in the page head.', $output, 'Hide Onboarding Hints should omit output setting descriptions from the rendered HTML.');
-    assertNotContainsValue('Keep builder and framework integrations aligned with Tasty Fonts role variables.', $output, 'Hide Onboarding Hints should omit integrations tab summary descriptions from the rendered HTML.');
+    assertNotContainsValue('Choose whether the generated stylesheet loads as a file or is printed inline in the page head.', $output, 'Show Onboarding Hints should omit output setting descriptions from the rendered HTML when turned off.');
+    assertNotContainsValue('Keep builder and framework integrations aligned with Tasty Fonts role variables.', $output, 'Show Onboarding Hints should omit integrations tab summary descriptions from the rendered HTML when turned off.');
     assertNotContainsValue('Tasty Fonts manages only the two base ACSS font-family settings needed for heading and body text.', $output, 'The Integrations tab should omit the redundant ACSS desired mapping description.');
     assertNotContainsValue('Control optional roles, guidance, and uninstall cleanup.', $output, 'The Behavior tab should omit the redundant summary description.');
     assertNotContainsValue('Manual reset and maintenance tools for plugin development, troubleshooting, and integration work.', $output, 'The Developer tab should omit the redundant summary description.');
-    assertNotContainsValue('Hides helper tips and extra info buttons.', $output, 'Hide Onboarding Hints should omit behavior toggle descriptions from the rendered HTML.');
-    assertNotContainsValue('tasty-fonts-toggle-description', $output, 'Hide Onboarding Hints should omit settings toggle description elements from the rendered HTML.');
-    assertNotContainsValue('tasty-fonts-help-button', $output, 'Hide Onboarding Hints should remove inline help buttons from the rendered admin UI.');
-    assertNotContainsValue('data-role-deployment-pill data-help-tooltip=', $output, 'Hide Onboarding Hints should omit passive role-deployment hover help from the rendered admin UI.');
-    assertNotContainsValue('data-help-tooltip=', $output, 'Hide Onboarding Hints should omit passive hover help across every rendered panel.');
-    assertNotContainsValue('Export this setup or dry-run an incoming bundle before anything is replaced.', $output, 'Hide Onboarding Hints should omit transfer status helper copy.');
-    assertNotContainsValue('Packages sanitized diagnostics, storage metadata, generated CSS, and recent activity without API keys.', $output, 'Hide Onboarding Hints should omit transfer support helper copy.');
-    assertNotContainsValue('Downloads settings, live roles, library metadata, and managed font files.', $output, 'Hide Onboarding Hints should omit transfer export helper copy.');
-    assertNotContainsValue('Choose a transfer ZIP, validate the diff, then import only after the dry-run is clear.', $output, 'Hide Onboarding Hints should omit transfer dry-run helper copy.');
-    assertNotContainsValue('Required for dry run', $output, 'Hide Onboarding Hints should omit transfer field helper copy.');
-    assertNotContainsValue('Optional for Google font imports', $output, 'Hide Onboarding Hints should omit transfer field helper copy.');
-    assertNotContainsValue('Paste a fresh Google API key for this site', $output, 'Hide Onboarding Hints should omit transfer placeholder helper copy.');
-    assertNotContainsValue('Paste a Google Fonts API key if this bundle needs one', $output, 'Hide Onboarding Hints should omit transfer placeholder helper copy.');
-    assertNotContainsValue('Create a local restore point before manual work.', $output, 'Hide Onboarding Hints should omit snapshot helper copy.');
-    assertNotContainsValue('Downloads one sanitized ZIP for troubleshooting', $output, 'Hide Onboarding Hints should omit support bundle helper copy.');
-    assertNotContainsValue('Exports, imports, snapshots, support bundles, and transfer recovery messages will appear here.', $output, 'Hide Onboarding Hints should omit transfer activity helper copy.');
+    assertNotContainsValue('Shows helper tips and info buttons across the admin UI.', $output, 'Show Onboarding Hints should omit behavior toggle descriptions from the rendered HTML when turned off.');
+    assertNotContainsValue('tasty-fonts-toggle-description', $output, 'Show Onboarding Hints should omit settings toggle description elements from the rendered HTML when turned off.');
+    assertNotContainsValue('tasty-fonts-help-button', $output, 'Show Onboarding Hints should remove inline help buttons from the rendered admin UI when turned off.');
+    assertNotContainsValue('data-role-deployment-pill data-help-tooltip=', $output, 'Show Onboarding Hints should omit passive role-deployment hover help from the rendered admin UI when turned off.');
+    assertNotContainsValue('data-help-tooltip=', $output, 'Show Onboarding Hints should omit passive hover help across every rendered panel when turned off.');
+    assertNotContainsValue('Export this setup or dry-run an incoming bundle before anything is replaced.', $output, 'Show Onboarding Hints should omit transfer status helper copy when turned off.');
+    assertNotContainsValue('Packages sanitized diagnostics, storage metadata, generated CSS, and recent activity without API keys.', $output, 'Show Onboarding Hints should omit transfer support helper copy when turned off.');
+    assertNotContainsValue('Downloads settings, live roles, library metadata, and managed font files.', $output, 'Show Onboarding Hints should omit transfer export helper copy when turned off.');
+    assertNotContainsValue('Choose a transfer ZIP, validate the diff, then import only after the dry-run is clear.', $output, 'Show Onboarding Hints should omit transfer dry-run helper copy when turned off.');
+    assertNotContainsValue('Required for dry run', $output, 'Show Onboarding Hints should omit transfer field helper copy when turned off.');
+    assertNotContainsValue('Optional for Google font imports', $output, 'Show Onboarding Hints should omit transfer field helper copy when turned off.');
+    assertNotContainsValue('Paste a fresh Google API key for this site', $output, 'Show Onboarding Hints should omit transfer placeholder helper copy when turned off.');
+    assertNotContainsValue('Paste a Google Fonts API key if this bundle needs one', $output, 'Show Onboarding Hints should omit transfer placeholder helper copy when turned off.');
+    assertNotContainsValue('Create a local restore point before manual work.', $output, 'Show Onboarding Hints should omit snapshot helper copy when turned off.');
+    assertNotContainsValue('Downloads one sanitized ZIP for troubleshooting', $output, 'Show Onboarding Hints should omit support bundle helper copy when turned off.');
+    assertNotContainsValue('Exports, imports, snapshots, support bundles, and transfer recovery messages will appear here.', $output, 'Show Onboarding Hints should omit transfer activity helper copy when turned off.');
 };
 
 $tests['admin_page_renderer_attaches_update_channel_rollback_action_to_the_field'] = static function (): void {
@@ -2882,7 +2895,7 @@ $tests['admin_page_renderer_keeps_dashboard_titles_and_buttons_in_title_case'] =
         'Remote Connection Hints',
         'Utility Classes',
         'Role Classes',
-        'Delete Uploaded Fonts on Uninstall',
+        'Keep Uploaded Fonts on Uninstall',
         'No Fonts Yet',
         'No Activity Yet',
         'Readable Preview',
@@ -2910,7 +2923,7 @@ $tests['admin_page_renderer_keeps_dashboard_titles_and_buttons_in_title_case'] =
         'Remote connection hints',
         'Emit font utility classes',
         'Role classes',
-        'Delete uploaded fonts on uninstall',
+        'Keep uploaded fonts on uninstall',
         'Your library is empty',
         'No activity yet',
         'Readable preview',
@@ -3141,8 +3154,8 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
                 'feature_descriptions' => [
                     'selectors' => 'Show published Tasty families directly inside Bricks font controls.',
                     'builder_preview' => 'Load the active Tasty delivery in Bricks builder previews for local, CDN, and Adobe fonts.',
-'theme_styles' => 'Sync Tasty role fonts to one Theme Style or all Theme Styles.',
-                    'google_fonts' => 'Hide Bricks’ built-in Google Fonts so only Tasty-managed fonts appear.',
+                    'theme_styles' => 'Sync Tasty role fonts to one Theme Style or all Theme Styles.',
+                    'google_fonts' => 'Keep Bricks font pickers focused on Tasty-managed fonts.',
                 ],
                 'selectors' => ['enabled' => true, 'status' => 'active'],
                 'builder_preview' => ['enabled' => true, 'status' => 'active'],
@@ -3232,6 +3245,8 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
     assertContainsValue('data-bricks-theme-style-target-select', $output, 'The Bricks integration card should expose the Theme Style target select for immediate client-side updates.');
     assertContainsValue('Delete Tasty Theme Style', $output, 'The Bricks integration card should render the delete action for the managed Tasty Theme Style.');
     assertContainsValue('name="bricks_disable_google_fonts_enabled"', $output, 'The Bricks integration card should render the Bricks Google font toggle.');
+    assertContainsValue('Use Tasty Fonts in Bricks Pickers', $output, 'The Bricks integration card should frame the picker setting as a positive Tasty Fonts behavior.');
+    assertNotContainsValue('Disable Bricks Google Fonts', $output, 'The Bricks integration card should not frame the picker setting as a disable action.');
     assertContainsValue('Reset Bricks Integration', $output, 'The Bricks integration card should render the reset action.');
     assertContainsValue('Theme Style', $output, 'The Bricks integration card should keep the Theme Style controls under a clearer heading.');
     assertContainsValue('Choose Theme Style', $output, 'The Bricks integration card should label the existing Theme Style selector clearly.');
@@ -3241,7 +3256,7 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
     assertContainsValue('Maintenance', $output, 'The Bricks integration card should group destructive actions into a quieter maintenance area.');
     assertNotContainsValue('Bricks Controls', $output, 'The Bricks integration card should remove the redundant internal Bricks heading.');
     assertContainsValue('data-help-tooltip="Bricks Theme Style sync is active."', $output, 'The Bricks Theme Style status badge should explain the synced state on hover.');
-    assertContainsValue('data-help-tooltip="Bricks Google Fonts are disabled in Bricks pickers."', $output, 'The Bricks Google Fonts status badge should explain the synced state on hover.');
+    assertContainsValue('data-help-tooltip="Bricks pickers are focused on Tasty Fonts."', $output, 'The Bricks picker status badge should explain the synced state on hover.');
     assertContainsValue('Updating &quot;Sitewide Primary&quot;.', $output, 'The Bricks integration card should explain which existing Theme Style Tasty is updating.');
     assertContainsValue('Managed Tasty style', $output, 'The Bricks integration card should render the managed Theme Style radio label.');
     assertContainsValue('One existing style', $output, 'The Bricks integration card should render the single-style target radio label.');
@@ -3295,7 +3310,7 @@ $tests['admin_page_renderer_exposes_bricks_waiting_badge_help'] = static functio
                     'selectors' => 'Show published Tasty families directly inside Bricks font controls.',
                     'builder_preview' => 'Load the active Tasty delivery in Bricks builder previews for local, CDN, and Adobe fonts.',
                     'theme_styles' => 'Update only the font-family and font-weight fields on one selected Bricks Theme Style.',
-                    'google_fonts' => 'Turn on Bricks’ own “disable Google Fonts” setting so Bricks pickers show only Tasty-supplied fonts.',
+                    'google_fonts' => 'Keep Bricks pickers focused on Tasty-supplied fonts.',
                 ],
                 'selectors' => ['enabled' => true, 'status' => 'active'],
                 'builder_preview' => ['enabled' => true, 'status' => 'active'],
@@ -3423,7 +3438,7 @@ $tests['admin_page_renderer_offers_to_create_a_bricks_theme_style_when_none_exis
                     'selectors' => 'Show published Tasty families directly inside Bricks font controls.',
                     'builder_preview' => 'Load the active Tasty delivery in Bricks builder previews for local, CDN, and Adobe fonts.',
                     'theme_styles' => 'Update only the font-family and font-weight fields on one selected Bricks Theme Style.',
-                    'google_fonts' => 'Turn on Bricks’ own “disable Google Fonts” setting so Bricks pickers show only Tasty-supplied fonts.',
+                    'google_fonts' => 'Keep Bricks pickers focused on Tasty-supplied fonts.',
                 ],
                 'selectors' => ['enabled' => true, 'status' => 'active'],
                 'builder_preview' => ['enabled' => true, 'status' => 'active'],
@@ -3739,92 +3754,6 @@ $tests['admin_page_renderer_only_highlights_publish_roles_when_changes_are_pendi
     assertContainsValue('No role changes to publish.', $matchedOutput, 'The disabled Publish Roles action should explain why it is unavailable.');
     assertContainsValue('data-role-save-draft aria-disabled="true" disabled', $matchedOutput, 'Save Draft should start disabled until the draft changes.');
     assertContainsValue('No draft changes to save.', $matchedOutput, 'The disabled Save Draft action should explain why it is unavailable.');
-};
-
-$tests['admin_page_renderer_ignores_legacy_delivery_ids_when_comparing_role_changes'] = static function (): void {
-    resetTestState();
-
-    $renderer = new AdminPageRenderer(new Storage());
-
-    ob_start();
-    try {
-        $renderer->renderPage([
-            'storage' => ['root' => '/tmp/uploads/fonts'],
-            'catalog' => [
-                'Lora' => [
-                    'family' => 'Lora',
-                    'active_delivery_id' => 'bunny-cdn-static',
-                    'available_deliveries' => [
-                        [
-                            'id' => 'bunny-cdn-static',
-                            'label' => 'Bunny CDN',
-                        ],
-                        [
-                            'id' => 'self-hosted-static',
-                            'label' => 'Self-hosted',
-                        ],
-                    ],
-                ],
-                'Inter' => [
-                    'family' => 'Inter',
-                    'active_delivery_id' => 'inter-static',
-                    'available_deliveries' => [
-                        [
-                            'id' => 'inter-static',
-                            'label' => 'Self-hosted',
-                        ],
-                    ],
-                ],
-            ],
-            'available_families' => ['Inter', 'Lora'],
-            'roles' => [
-                'heading' => 'Lora',
-                'body' => 'Inter',
-                'heading_fallback' => 'sans-serif',
-                'body_fallback' => 'sans-serif',
-                'heading_delivery_id' => 'bunny-cdn-static',
-                'body_delivery_id' => 'inter-static',
-            ],
-            'applied_roles' => [
-                'heading' => 'Lora',
-                'body' => 'Inter',
-                'heading_fallback' => 'sans-serif',
-                'body_fallback' => 'sans-serif',
-                'heading_delivery_id' => '',
-                'body_delivery_id' => '',
-            ],
-            'logs' => [],
-            'activity_actor_options' => [],
-            'family_fallbacks' => [],
-            'family_font_displays' => [],
-            'family_font_display_options' => [],
-            'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
-            'preview_size' => 32,
-            'font_display' => 'optional',
-            'font_display_options' => [],
-            'minify_css_output' => true,
-            'preload_primary_fonts' => true,
-            'remote_connection_hints' => true,
-            'training_wheels_off' => false,
-            'delete_uploaded_files_on_uninstall' => false,
-            'diagnostic_items' => [],
-            'overview_metrics' => [],
-            'output_panels' => [],
-            'generated_css_panel' => [],
-            'preview_panels' => [],
-            'toasts' => [],
-            'apply_everywhere' => true,
-            'variable_fonts_enabled' => true,
-            'role_deployment' => [],
-        ]);
-    } catch (\Throwable $e) {
-        ob_end_clean();
-        throw $e;
-    }
-    $output = (string) ob_get_clean();
-
-    assertContainsValue('data-role-apply-live aria-disabled="true" disabled', $output, 'Publish Roles should stay disabled when legacy role delivery IDs are the only difference from the live roles.');
-    assertNotContainsValue('is-pending-live-change', $output, 'Publish Roles should not show a pending-live highlight when only ignored legacy delivery IDs differ.');
 };
 
 $tests['admin_page_renderer_keeps_deployment_and_role_selection_ahead_of_library_and_activity'] = static function (): void {
@@ -4700,10 +4629,15 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('id="tasty-fonts-diagnostics-tab-overview"', $output, 'Advanced Tools should render the command center overview tab.');
-    assertNotContainsValue('id="tasty-fonts-diagnostics-tab-system"', $output, 'Advanced Tools should fold system details into Overview instead of rendering a redundant tab.');
-    assertContainsValue('id="tasty-fonts-diagnostics-tab-maintenance"', $output, 'Advanced Tools should expose maintenance as a first-class tab.');
-    assertContainsValue('id="tasty-fonts-diagnostics-tab-transfer"', $output, 'Advanced Tools should expose transfer as a first-class tab.');
+	    assertContainsValue('id="tasty-fonts-diagnostics-tab-overview"', $output, 'Advanced Tools should render the command center overview tab.');
+	    assertNotContainsValue('id="tasty-fonts-diagnostics-tab-system"', $output, 'Advanced Tools should fold system details into Overview instead of rendering a redundant tab.');
+	    assertContainsValue('id="tasty-fonts-diagnostics-tab-maintenance"', $output, 'Advanced Tools should expose maintenance as a first-class tab.');
+    assertContainsValue('id="tasty-fonts-diagnostics-tab-cli"', $output, 'Advanced Tools should expose CLI as a first-class tab.');
+    assertContainsValue('tasty-fonts-cli-help-trigger', $output, 'The CLI tab should expose contextual help triggers for command rows.');
+    assertContainsValue('data-help-tooltip="Runs Advanced Tools health checks and prints a readable pass, warning, and critical summary."', $output, 'The CLI doctor command should explain what it does.');
+    assertContainsValue('aria-label="Explain Doctor summary"', $output, 'The CLI command help trigger should be labelled by command.');
+    assertContainsValue('data-help-tooltip="Imports a validated transfer ZIP, creates a rollback snapshot first, and replaces current Tasty Fonts data."', $output, 'Riskier CLI commands should include specific help copy.');
+	    assertContainsValue('id="tasty-fonts-diagnostics-tab-transfer"', $output, 'Advanced Tools should expose transfer as a first-class tab.');
     assertContainsValue('data-tab-heading-group="diagnostics"', $output, 'Advanced Tools should render contextual tab headings in the shared card header.');
     assertContainsValue('data-tab-heading="transfer"', $output, 'Advanced Tools should include the transfer contextual heading.');
     assertNotContainsValue('Command center for runtime inspection, maintenance, transfer, and activity review.', $output, 'Advanced Tools should avoid repeating the masthead copy inside the diagnostics card.');
@@ -4937,6 +4871,10 @@ $tests['admin_page_renderer_renders_activity_log_action_links'] = static functio
 
     assertContainsValue('Open Integrations', $output, 'Activity log entries should render an inline action link when one is provided.');
     assertContainsValue('tasty-fonts-log-action', $output, 'Activity log action links should use the dedicated styling hook.');
+    assertContainsValue('data-activity-page-size="5"', $output, 'Activity logs should expose the shared pagination page-size hook.');
+    assertContainsValue('data-activity-page-size-select', $output, 'Activity logs should let admins choose how many entries appear per page.');
+    assertContainsValue('<option value="100"', $output, 'Activity log page-size options should include the largest review batch.');
+    assertContainsValue('data-activity-pagination', $output, 'Activity logs should render pagination controls instead of relying on an internal scrollbar.');
     assertContainsValue('class="button tasty-fonts-button-danger tasty-fonts-font-action-button--icon tasty-fonts-activity-clear-button"', $output, 'The activity toolbar should render the clear-log action as an icon-only destructive button.');
     assertContainsValue('<span class="screen-reader-text">Clear Log</span>', $output, 'The icon-only clear-log action should keep an accessible text label.');
 };

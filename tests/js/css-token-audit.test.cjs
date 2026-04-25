@@ -35,6 +35,19 @@ function stripTokenFunctions(value) {
   return current;
 }
 
+function cssBlockForSelector(source, selector) {
+  const selectorIndex = source.indexOf(selector);
+  assert.notEqual(selectorIndex, -1, `Missing CSS selector: ${selector}`);
+
+  const blockStart = source.indexOf('{', selectorIndex);
+  assert.notEqual(blockStart, -1, `Missing CSS block for selector: ${selector}`);
+
+  const blockEnd = source.indexOf('}', blockStart);
+  assert.notEqual(blockEnd, -1, `Unclosed CSS block for selector: ${selector}`);
+
+  return source.slice(blockStart + 1, blockEnd);
+}
+
 test('admin CSS only references known Tasty design tokens', () => {
   const files = readCssFiles();
   const defined = new Set();
@@ -126,4 +139,31 @@ test('admin CSS keeps numeric declaration values on design tokens', () => {
   }
 
   assert.deepEqual(violations, []);
+});
+
+test('admin CSS keeps settings row help and controls vertically centered', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+  const centeredControlSelectors = [
+    '#tasty-fonts-settings-page .tasty-fonts-settings-row-help',
+    '#tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch',
+    '#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration > .tasty-fonts-toggle-field--integration > .tasty-fonts-toggle-switch',
+    '#tasty-fonts-settings-page .tasty-fonts-settings-flat-row-form--channel-control',
+    '#tasty-fonts-settings-page .tasty-fonts-settings-flat-row-form--channel-action',
+    '#tasty-fonts-settings-page .tasty-fonts-admin-access-mode-toggle .tasty-fonts-toggle-switch'
+  ];
+
+  const missing = centeredControlSelectors.filter((selector) => !/align-self:\s*center;/.test(cssBlockForSelector(adminCss, selector)));
+
+  assert.deepEqual(missing, []);
+});
+
+test('admin CSS keeps settings group headers in title case', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+  const block = cssBlockForSelector(
+    adminCss,
+    '#tasty-fonts-settings-page .tasty-fonts-output-settings-submenu > .tasty-fonts-output-settings-submenu-copy h4'
+  );
+
+  assert.match(block, /letter-spacing:\s*var\(--tasty-type-letter-spacing-none\);/);
+  assert.match(block, /text-transform:\s*none;/);
 });
