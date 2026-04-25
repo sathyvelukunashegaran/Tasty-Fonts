@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.14.0-beta.4] - 2026-04-26
+
 ### Added
 
 - Added a repo-local `bin/lint-css` Stylelint wrapper and wired the beta release helper to run CSS linting when npm dependencies are installed.
