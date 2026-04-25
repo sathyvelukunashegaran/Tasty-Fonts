@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.14.0-beta.3] - 2026-04-25
+
 ### Added
 
 - Added WP-CLI parity for Advanced Tools diagnostics, generated CSS regeneration, cache clears, library rescans, site-transfer export/import, support bundles, and rollback snapshots.
