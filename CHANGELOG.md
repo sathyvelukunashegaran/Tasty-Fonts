@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Promoted the validated `1.14.0` beta line to stable.
+
 ## [1.14.0-beta.4] - 2026-04-26
 
 ### Added
