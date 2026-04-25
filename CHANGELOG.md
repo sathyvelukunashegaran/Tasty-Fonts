@@ -4,7 +4,61 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-04-26
+
 - Promoted the validated `1.14.0` beta line to stable.
+
+### Changed
+
+- Reworked Advanced Tools into a power-user command center with Overview, Generated CSS, Developer, Transfer, and Activity tabs while preserving existing guarded maintenance and transfer workflows.
+- Redesigned the Advanced Tools Overview around consistent board-and-row patterns for next-step guidance, health status, runtime details, and copyable debug paths.
+- Moved generated CSS download controls into the Generated CSS panel and aligned diagnostics tab headers, spacing, typography, and button placement across the Advanced Tools dashboard.
+- Expanded Advanced Tools health checks with clearer status logic, plain-language guidance, knowledge-base links, and hover help so warnings, advisories, and verified checks are easier to scan.
+- Changed optional Google Fonts API readiness so a missing saved API key is reported as an advisory instead of a passing verified check.
+- Expanded Advanced Tools with runtime manifest inspection and REST endpoints for refreshing diagnostics and running safe maintenance actions.
+- Reworked Settings into shared row-board layouts for Output, Integrations, and Behavior, with contextual tab headers, compact select proxies, centralized clear/save actions, and shared passive help placement.
+- Refined Advanced Tools Transfer & Recovery around a single row-action system for exports, imports, snapshots, support bundles, recovery notices, and transfer activity.
+- Expanded site-transfer dry runs with import diff details, Google API key validation state, and clear notice that a rollback snapshot will be created before import.
+- Documented the Settings row, status-dot, and Advanced Tools row-action design contracts so future admin UI work uses the same tokenized layout rules.
+- Added compatibility aliases to structured health checks and guarded snapshot restores with the shared Advanced Tools confirmation flow.
+- Exposed structured Advanced Tools action descriptors and added safe REST/admin actions for library rescans and storage scaffold repair.
+- Restyled the Advanced Tools Activity and Transfer logs around the shared row-board design, including cleaner filters, card-style entries, footer controls, and consistent destructive-action styling.
+- Reworded settings controls toward positive enabled-state labels, including onboarding hints, uploaded font retention, and related Behavior settings.
+- Removed v1 migration-only and backward-support paths for legacy option keys, old import/log storage, retired generated CSS paths, role delivery overrides, class output aliases, stale Automatic.css recovery, and retired Bricks alias cleanup.
+- Refined the admin UI around the shared surface system, warmed page-header/preview/snippet treatments, simplified collapsed library family cards to a single source pill, and moved update-channel controls into the Advanced Tools Developer release rail.
+- Reworked the admin CSS token set around the Tasty Blue, Warm Amber, and Soft Cream palette, removed dead or hand-rolled card CSS, and documented the surface/three-color rules in the design guide.
+- Centralized managed-storage file metadata scanning for rollback snapshots and support bundles, removing the actionable duplicate-code reported by jscpd.
+- Moved Bunny Fonts cache reads to a fresh v2 transient namespace so stale pre-v2 cached family metadata is ignored.
+- Removed the deprecated plaintext WP-CLI `--google-api-key=<key>` input path; use `--prompt-google-api-key` or `--google-api-key-stdin` instead.
+- Removed AI-agent instruction files from Git tracking while keeping them local-only via ignore rules, and expanded ignores for local Playwright, prompt-export, report, zip, and research screenshot artifacts.
+
+### Fixed
+
+- Removed redundant Advanced Tools overview content, duplicate evidence lines, and repeated status details so Overview, Health, Runtime Details, and Copyable Paths do not restate the same information.
+- Fixed legacy Settings links for Developer and Transfer so those workflows live under Advanced Tools instead of remaining duplicated under Settings.
+- Fixed custom access rules detail spacing so expanded role and user controls use the shared Settings row gutter instead of sitting flush to the edge.
+- Removed unused admin CSS and tightened Stylelint so admin spacing properties reject hardcoded numeric values in favor of Tasty design tokens.
+- Added automatic rollback snapshots before settings reset, managed library deletion, transfer imports, and snapshot restores so destructive maintenance paths have a local recovery point.
+- Fixed the Advanced Tools snapshots REST route so it returns persisted rollback snapshots.
+- Fixed support bundles so list-shaped diagnostics such as health checks are preserved while secrets are still removed.
+- Fixed Advanced Tools health badges, CLI command help, activity pagination spacing, and settings row control alignment so the admin UI stays consistent with the current design system.
+- Fixed Advanced Tools self-hosted font diagnostics so hydrated upload URLs resolve back to managed relative paths before reporting missing files.
+- Fixed generated CSS fallback handling so explicit role fallback stacks are preserved when a family fallback changes.
+- Fixed managed-file cleanup so it also clears retained transfer export bundles and rollback snapshots while preserving unrelated settings.
+- Fixed CLI and activity-log output so Google API keys and other secret-like payload fields are redacted from JSON responses.
+
+### Added
+
+- Added rollback snapshots for Tasty Fonts settings, role assignments, library metadata, generated CSS, and managed font files, including manual create, rename, restore, delete, retention, and automatic pre-destructive-operation checkpoints.
+- Added saved site-transfer export bundle management with download, rename, protect, delete, and retention controls.
+- Added sanitized support bundles for diagnostics, generated CSS, storage metadata, activity, settings, and library state without exposing Google API keys.
+- Added WP-CLI parity for Advanced Tools diagnostics, generated CSS regeneration, cache clears, library rescans, site-transfer export/import, support bundles, and rollback snapshots.
+- Added an Advanced Tools CLI tab with copy-ready WP-CLI commands for diagnostics, maintenance, transfers, support bundles, and snapshots.
+- Added paginated Advanced Tools activity logs with account filters, search, page controls, and selectable 5, 10, 25, or 100 entry page sizes.
+- Added a repo-local `bin/lint-css` Stylelint wrapper and wired the beta release helper to run CSS linting when npm dependencies are installed.
+- Added CSS surface-system and Three-Color palette audits, alongside broader CSS token audit coverage, so admin CSS stays on approved design tokens.
+- Added WP-CLI commands for Google API key status/save, settings reset, and plugin-managed file deletion, with redacted JSON output and prompt/stdin secret input.
+- Added richer structured activity metadata for settings, roles, library actions, imports, uploads, integrations, updates, maintenance, and transfers so Advanced Tools Activity rows can be filtered, searched, and expanded with useful details.
 
 ## [1.14.0-beta.4] - 2026-04-26
 
