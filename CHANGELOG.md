@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.14.0-beta.2] - 2026-04-25
+
 ### Added
 
 - Added rollback snapshots for Tasty Fonts settings, role assignments, library metadata, generated CSS, and managed font files, including manual create, rename, restore, delete, retention, and automatic pre-destructive-operation checkpoints.
