@@ -30,13 +30,13 @@ Once you have a working font deployment, revisit Settings and adjust from these 
 
 ## Settings Tabs At A Glance
 
-The Settings page is split into five tabs:
+The Settings page has three tabs:
 
 - `Output`: what CSS gets generated and how it is delivered
 - `Integrations`: how the plugin cooperates with editor and builder ecosystems
-- `Behavior`: plugin-level feature defaults and uninstall behavior
-- `Transfer`: portable export and import bundles for cross-site migrations
-- `Developer`: maintenance and reset workflows intended for advanced users, testers, and support
+- `Behavior`: plugin-level feature defaults, variable font support, admin access, and uninstall behavior
+
+> **Developer maintenance and Site Transfer** moved to **[Advanced Tools](Advanced-Tools)** in 1.14.0. Use `Advanced Tools → Developer` for cache clearing, resets, and rollback snapshots; use `Advanced Tools → Transfer` for export and import bundles.
 
 ## Steps
 
@@ -57,7 +57,6 @@ Advanced output controls also cover:
 
 - the `Minimal` output preset
 - `Emit Role Font Weights`
-- `Variable Font Support`
 - utility class generation
 - class sub-controls by role, alias, category, and family
 - variable generation
@@ -130,20 +129,7 @@ When enabled, the plugin emits `<link rel="preconnect">` tags for active Google,
 
 #### Variable Font Support
 
-When enabled, the plugin activates variable font features across uploads, imports, and runtime delivery.
-
-- **Off** (default): the plugin operates in static-only mode. No variable-font UI, axis controls, or `font-variation-settings` are emitted. Variable font files can still be uploaded and will work, but no axis metadata is stored or used.
-- **On**: unlocks variable font features:
-  - axis metadata (e.g., `wght`, `wdth`, `ital`) is stored on imported faces from Google, Bunny, and local uploads
-  - the Upload Files builder shows a variable column and an axis editor per file
-  - each role (Heading, Body, Monospace) gains per-role axis controls and a static weight override in the Deploy Fonts interface
-  - the generated runtime CSS includes `font-variation-settings` where variable faces are active
-  - editor font presets and Block Editor sync payloads carry variation metadata
-  - the Font Library shows `Variable` family type badges and a variable filter
-
-> **When to enable this:** turn it on only if you are using actual variable font files (fonts with a `wght` or other design axis). For static fonts (separate files per weight/style), leave it off — the static workflow is simpler and the output is identical.
-
-> **Beginner tip:** if you are not sure whether your font is a variable font, check the filename. Variable fonts often include `VariableFont` or `VF` in the filename (e.g., `Inter-VariableFont_wght.woff2`). You can also check the Google Fonts or Bunny Fonts catalog — variable families are marked with a `Variable` badge in search results when variable font support is enabled.
+Variable Font Support lives in `Settings → Behavior → Font Capabilities`. See [the Behavior section below](#3-use-the-behavior-tab) for the full reference.
 
 ### 2. Use The Integrations Tab
 
@@ -188,12 +174,31 @@ The `Behavior` tab controls plugin-level features that are not primarily about g
 
 Key controls include:
 
-- `Admin Access`
-- `Update Channel`
+- `Enable Variable Fonts`
 - `Enable Monospace Role`
+- `Admin Access`
 - `Show Activity Log`
 - `Show Onboarding Hints`
 - `Keep Uploaded Fonts on Uninstall`
+
+> **Update Channel** moved to `Advanced Tools → Developer` in 1.14.0. See [Advanced Tools](Advanced-Tools) for the update channel and rollback reinstall controls.
+
+#### Enable Variable Fonts
+
+When enabled, the plugin activates variable font features across uploads, imports, and runtime delivery.
+
+- **Off** (default): the plugin operates in static-only mode. No variable-font UI, axis controls, or `font-variation-settings` are emitted. Variable font files can still be uploaded and will work, but no axis metadata is stored or used.
+- **On**: unlocks variable font features:
+  - axis metadata (e.g., `wght`, `wdth`, `ital`) is stored on imported faces from Google, Bunny, and local uploads
+  - the Upload Files builder shows a variable column and an axis editor per file
+  - each role (Heading, Body, Monospace) gains per-role axis controls and a static weight override in the Deploy Fonts interface
+  - the generated runtime CSS includes `font-variation-settings` where variable faces are active
+  - editor font presets and Block Editor sync payloads carry variation metadata
+  - the Font Library shows `Variable` family type badges and a variable filter
+
+> **When to enable this:** turn it on only if you are using actual variable font files (fonts with a `wght` or other design axis). For static fonts (separate files per weight/style), leave it off — the static workflow is simpler and the output is identical.
+
+> **Beginner tip:** if you are not sure whether your font is a variable font, check the filename. Variable fonts often include `VariableFont` or `VF` in the filename (e.g., `Inter-VariableFont_wght.woff2`). You can also check the Google Fonts or Bunny Fonts catalog — variable families are marked with a `Variable` badge in search results when variable font support is enabled.
 
 #### Admin Access
 
@@ -214,16 +219,6 @@ By default, only WordPress administrators can open the Tasty Fonts admin pages a
 
 > **Beginner tip:** if you are managing a client site where the client needs to change fonts but should not be a site administrator, add the client's WordPress user under Specific Users instead of granting them admin access to the whole site.
 
-#### Update Channel
-
-Choose which GitHub release rail the updater should follow:
-
-- `Stable` only accepts final `X.Y.Z` releases
-- `Beta` accepts stable releases plus `X.Y.Z-beta.N` prereleases
-- `Nightly` accepts stable, beta, and stamped nightly builds from `main`
-
-If the selected channel points to an older version than the one currently installed, the Behavior tab exposes a rollback reinstall button so you can switch channels immediately instead of waiting for the lower channel to catch up.
-
 #### Enable Monospace Role
 
 Turns on the third role slot (`Monospace`). When enabled, the role selector, output variables (`--font-monospace`), and related class/alias controls become available. Leave this off if you do not need a managed monospace family.
@@ -238,75 +233,15 @@ When enabled, the full diagnostics activity log is visible in Advanced Tools. Wh
 
 > **Tip:** turning this off keeps Advanced Tools cleaner on production sites where you do not need a persistent log view. Events are still recorded so you can turn it back on and inspect history at any time.
 
-### 4. Use The Developer Tab Carefully
+### 4. Developer Maintenance and Site Transfer
 
-The `Developer` tab is intended for maintenance, troubleshooting, and repeated testing workflows.
+Developer maintenance tools and the Site Transfer workflow are in **[Advanced Tools](Advanced-Tools)**, not in Settings.
 
-Available actions include:
+- **`Advanced Tools → Developer`** — cache clearing, asset regeneration, rollback snapshots, settings reset, library wipe, and integration detection reset. Destructive actions use a two-step arm/confirm flow and create automatic rollback snapshots.
+- **`Advanced Tools → Transfer`** — export a portable ZIP bundle from the source site, dry-run it on the destination, and import it. See [Site Transfer](Site-Transfer) for the full step-by-step walkthrough.
+- **`Advanced Tools → CLI`** — copy-ready WP-CLI commands for all maintenance and transfer operations.
 
-- clearing plugin caches and regenerating assets
-- resetting suppressed notices
-- resetting plugin settings to defaults while preserving the library
-- wiping the managed font library and rebuilding an empty storage scaffold
-- resetting integration detection state
-
-The destructive actions require explicit confirmation phrases. That is intentional and should stay that way.
-
-### 5. Use The Transfer Tab
-
-The `Transfer` tab lets you move your complete Tasty Fonts setup between WordPress sites using a single portable ZIP bundle — without manually re-importing fonts or reconfiguring settings on the destination.
-
-> **Beginner tip:** the most common use cases are pushing a finished font setup from staging to production, handing off a client build, and quickly cloning your typography to a second site.
-
-> **Prerequisite:** PHP's ZipArchive extension must be installed and enabled on both the source and destination servers. Most managed WordPress hosts include it by default. If the tab shows an unavailability warning, contact your host.
-
-#### Export Card
-
-The **Export Site Transfer Bundle** card generates a downloadable ZIP that contains:
-
-- all managed font files from `wp-content/uploads/fonts/`
-- a manifest (`tasty-fonts-export.json`) recording library data, settings, role assignments, and file checksums
-- **does not include** the Google Fonts API key, WordPress user accounts, theme or plugin files, or the `.generated/tasty-fonts.css` file (which is regenerated on import)
-
-To export:
-
-1. Open the `Transfer` tab.
-2. Confirm the export action is available (not disabled).
-3. Click **Export Bundle**. Your browser downloads the ZIP.
-
-#### Import Card
-
-> ⚠️ **Warning:** importing a bundle **replaces** the current Tasty Fonts library, settings, and role assignments on the destination site. This cannot be undone from within the plugin. Take a database backup before importing onto a live production site.
-
-The import flow is protected by a mandatory **dry-run validation step** before the destructive import can be armed. This two-phase approach lets the plugin verify the bundle before anything is changed.
-
-**Phase 1 — Dry Run:**
-
-1. Open the `Transfer` tab on the **destination site**.
-2. In the **Import Site Transfer Bundle** card, click the file picker and choose the ZIP you exported.
-3. (Optional) Paste a **Google Fonts API key** into the key field if this destination site needs Google catalog search.
-4. Click **Dry Run Bundle**.
-5. The plugin validates the bundle, checks file checksums, and surfaces any warnings or errors in the Transfer activity log — without making any changes to your site.
-6. If the dry run passes, the **Import Bundle** button becomes available.
-
-**Phase 2 — Destructive Import (after a successful dry run):**
-
-1. Click **Import Bundle** and use the two-step arm/confirm button flow to confirm the destructive action.
-2. The plugin extracts and verifies font files, restores library data, applies settings and role assignments, and rebuilds the generated CSS.
-
-> **Why two phases?** The dry-run step catches problems like corrupted files, version mismatches, and oversized uploads before they touch your live database or font files. If the dry run reports any errors, fix them at the source and export a new bundle before retrying.
-
-#### Why Google API Keys Are Excluded
-
-Google Fonts API keys are never bundled because they are tied to a specific Google Cloud project on the source site. Including a key in a portable bundle would risk sharing source-site credentials and quota with the destination site owner. Since 1.12.0, keys are stored in a dedicated **encrypted** WordPress option (`tasty_fonts_google_api_key_data`) that is isolated from the main settings record and excluded from all exports.
-
-To restore Google Fonts search access on the destination, supply a fresh key in the Import card's optional key field before importing, or add one later in `Settings → Output`.
-
-> **Beginner tip:** if you are not planning to use Google Fonts search on the destination, you can skip the key entirely. Transferred fonts that were already imported will still load and display correctly.
-
-See [Site Transfer](Site-Transfer) for the full step-by-step guide and troubleshooting reference.
-
-### 6. Understand Autosave
+### 5. Understand Autosave
 
 The standard settings tabs autosave through the plugin REST API. That means:
 
@@ -316,7 +251,7 @@ The standard settings tabs autosave through the plugin REST API. That means:
 
 The main autosave path applies to standard settings toggles. The destructive Developer actions still use deliberate form submissions and confirmations.
 
-### 7. Know What Changes Runtime Output
+### 6. Know What Changes Runtime Output
 
 Output settings can affect:
 
@@ -338,25 +273,21 @@ Integration settings can affect:
 
 Behavior settings can affect:
 
-- which release rail the GitHub updater follows
-- whether a rollback reinstall action is exposed for channel switches
 - whether monospace-specific roles and output exist
+- whether variable font features are active across uploads, imports, and runtime delivery
 - whether onboarding hints remain visible
 - whether plugin-managed uploaded files are removed during uninstall
 
-Developer actions can affect:
+Developer and Transfer actions (in Advanced Tools) can affect:
 
 - whether cached transients and generated assets are rebuilt
 - whether stored integration detection state is reset
 - whether saved notices remain hidden
 - whether plugin settings or the entire managed library are reset
-
-Transfer actions can affect:
-
-- the entire managed font library (replaced by the bundle's library data)
-- all plugin settings (replaced by the bundle's settings)
-- live and draft role assignments (replaced by the bundle's role data)
-- managed font files on disk (replaced by the bundle's font files)
+- the entire managed font library (replaced by an imported bundle's library data)
+- all plugin settings (replaced by a bundle's settings)
+- live and draft role assignments (replaced by a bundle's role data)
+- managed font files on disk (replaced by a bundle's font files)
 - the Google Fonts API key on the destination (if a fresh key was supplied during import)
 
 ## Notes
@@ -364,10 +295,10 @@ Transfer actions can affect:
 - Per-family `font-display` overrides from the library take precedence over the global default for that family.
 - If the monospace role is off, related output controls are disabled or hidden.
 - Block Editor sync is intentionally cautious on local development environments because loopback TLS trust issues are common there.
-- Variable Font Support is off by default. Enable it only when you are actively using variable font files so static-only installs stay clean.
+- Enable Variable Fonts (`Settings → Behavior`) only when you are actively using variable font files so static-only installs stay clean.
 - WordPress 6.5 or later is required. The minimum was raised from 6.1 to align with the Block Editor Font Library APIs used in this release.
-- The Transfer tab requires PHP's ZipArchive extension. If the tab shows an unavailability warning, contact your hosting provider to enable the `zip` PHP extension.
-- Google Fonts API keys supplied during a bundle import are stored using the same encrypted option storage as keys saved manually in `Settings → Output`.
+- Site Transfer and Developer maintenance tools are in Advanced Tools, not in Settings. PHP's ZipArchive extension is required for transfer bundles — if the Transfer tab shows an unavailability warning, contact your hosting provider to enable the `zip` PHP extension.
+- Google Fonts API keys supplied during a bundle import are stored using the same encrypted option storage as keys saved manually in the Font Library's Google source panel.
 
 ## Related Docs
 

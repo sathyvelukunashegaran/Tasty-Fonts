@@ -16,7 +16,7 @@ Set up Tasty Custom Fonts, add your first families, and understand how the curre
 
 ## Before You Start
 
-`1.13.0` is the current stable build. If you want to test upcoming prerelease builds, go to `Settings → Behavior → Update Channel` and switch to `Beta` or `Nightly`.
+`1.14.0` is the current stable build. If you want to test upcoming prerelease builds, go to `Advanced Tools → Developer → Update Channel` and switch to `Beta` or `Nightly`.
 
 **Requirements:** WordPress 6.5 or later, PHP 8.1 or later. No build step and no npm install are required for normal plugin use. `composer install` and `npm install`/`npm ci` are only for repository dev tooling and CI.
 
@@ -45,16 +45,23 @@ Open `Tasty Fonts` and explore the four sections:
 |---|---|
 | **Deploy Fonts** | Assign fonts to roles (Heading, Body, Monospace), preview pairings, and publish sitewide |
 | **Font Library** | See every managed family, switch delivery profiles, and control publish state |
-| **Settings** | Control CSS output, integrations with builders and editors, behavior options, and developer tools |
-| **Advanced Tools** | Inspect generated CSS, review system details, and read activity history |
+| **Settings** | Control CSS output, integrations with builders and editors, and behavior options |
+| **Advanced Tools** | Inspect generated CSS, run maintenance, manage transfers and rollback snapshots, review activity, and access WP-CLI commands |
 
-Inside `Settings`, five tabs group related controls:
+Inside `Settings`, three tabs group related controls:
 
 - `Output` — what CSS gets generated and how
 - `Integrations` — Gutenberg, Automatic.css, Bricks, Oxygen
-- `Behavior` — feature flags and uninstall behavior
+- `Behavior` — feature flags, variable font support, admin access, and uninstall behavior
+
+Inside `Advanced Tools`, six tabs provide power-user controls:
+
+- `Overview` — health status, runtime details, and copyable debug paths
+- `Generated CSS` — inspect and download the runtime stylesheet
+- `Developer` — cache clearing, resets, rollback snapshots, and maintenance
 - `Transfer` — export and import portable site bundles
-- `Developer` — cache clearing, resets, and maintenance (proceed carefully)
+- `Activity` — paginated log of imports, settings changes, and events
+- `CLI` — copy-ready WP-CLI commands for all maintenance and transfer actions
 
 ### 3. Add Families To The Library
 
@@ -118,9 +125,10 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 - switch to the **Minimal output preset** if you only need the core role variables (`--font-heading` and `--font-body`)
 - enable only the **integrations** that match the actual stack on the site
 - review **Block Editor sync** behavior on local or staging environments (it often needs to be turned off on local)
-- use the **Developer tab** when you need to reset caches or re-bootstrap integration detection during testing
-- enable **Variable Font Support** (in `Settings → Output`) if any of your families are variable fonts — this unlocks axis controls, per-role weight overrides, and `font-variation-settings` in the generated CSS
+- enable **Variable Fonts** (in `Settings → Behavior`) if any of your families are variable fonts — this unlocks axis controls, per-role weight overrides, and `font-variation-settings` in the generated CSS
 - use **Site Transfer** (`Advanced Tools → Transfer`) when you need to replicate your fonts to a staging, production, or client site — export a bundle from the source site and import it on the destination
+- use the **Developer tab** in `Advanced Tools` when you need to reset caches or re-bootstrap integration detection during testing
+- manage **Update Channel** from `Advanced Tools → Developer` to switch between Stable, Beta, and Nightly builds
 
 ---
 

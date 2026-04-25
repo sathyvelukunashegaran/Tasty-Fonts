@@ -49,7 +49,7 @@ A **variable font** is a single font file that contains a continuous range of de
 - you only need one or two specific weights and want the simplest possible setup
 - your theme or builder already specifies weights through its own variables
 
-To enable variable font features in the plugin, go to `Settings → Output → Variable Font Support` and turn it on. See [Settings](Settings) for full details.
+To enable variable font features in the plugin, go to `Settings → Behavior → Enable Variable Fonts` and turn it on. See [Settings](Settings) for full details.
 
 ---
 
@@ -57,9 +57,8 @@ To enable variable font features in the plugin, go to `Settings → Output → V
 
 ### How do I get fonts from Google Fonts?
 
-1. Go to `Settings` and save your Google Fonts API key in the Google key field.
-2. On the `Font Library` page, open the add-font flow and select `Google Fonts`.
-3. Search for the family you want and choose `Self-hosted` (downloads files to your server) or `CDN` (serves from Google's servers).
+1. On the `Font Library` page, open the add-font flow and select `Google Fonts`. If you have not yet saved an API key, expand the Google source panel at the top and save your key.
+2. Search for the family you want and choose `Self-hosted` (downloads files to your server) or `CDN` (serves from Google's servers).
 
 You need an API key only for the live search step. If you already have an imported family saved, it keeps working even if you remove the key later.
 
@@ -69,7 +68,7 @@ You need an API key only for the live search step. If you already have an import
 2. Create a project (or select an existing one).
 3. Enable the **Web Fonts Developer API** from the API Library.
 4. Create a credential → API Key.
-5. Copy the key and paste it into the Google key settings inside the plugin.
+5. Copy the key and paste it into the Google source panel at the top of the Font Library page.
 
 Restrict the key to the Web Fonts API to keep it secure.
 
@@ -102,7 +101,7 @@ Having multiple profiles on one family means you can switch between them without
 
 ### Can I move my font setup from one WordPress site to another?
 
-Yes. Use `Advanced Tools → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.13.0 or later, and PHP's ZipArchive extension must be available on both servers.
+Yes. Use `Advanced Tools → Transfer`. Export a bundle on the source site (click **Export Bundle** in the **Export Site Transfer Bundle** card on the Transfer tab) and import it on the destination site using the same tab's Import card. Both sites need to be running Tasty Custom Fonts 1.14.0 or later, and PHP's ZipArchive extension must be available on both servers.
 
 See [Site Transfer](Site-Transfer) for the full step-by-step walkthrough.
 
@@ -130,7 +129,7 @@ By design. API keys are excluded from bundles because they are tied to a Google 
 To restore Google Fonts search access on the destination:
 
 - **Option A:** paste a key into the optional Google Fonts API Key field in the Import card before importing.
-- **Option B:** go to `Settings → Output` after the import and save a key there.
+- **Option B:** go to the `Font Library` after the import, expand the Google source panel, and save a key there.
 
 Already-imported families continue to work without a key — you only need one for the live search feature.
 
@@ -148,7 +147,7 @@ The import replaces your current Tasty Fonts library, settings, and role assignm
 
 ### How do I enable variable font support?
 
-Go to `Settings → Output → Variable Font Support` and turn it on. Once enabled:
+Go to `Settings → Behavior → Enable Variable Fonts` and turn it on. Once enabled:
 
 - the Font Library shows a `Variable` badge on families with variable delivery profiles and a variable filter tab
 - the Upload Files builder shows an axis editor column for variable font files
@@ -169,7 +168,7 @@ Yes. You can assign a variable font to the Heading role and a static font to the
 
 Check:
 
-1. Variable Font Support is **on** in `Settings → Output`.
+1. Variable Font Support is **on** in `Settings → Behavior`.
 2. The family assigned to the role has a variable delivery profile (confirmed by the `Variable` badge in the Font Library).
 3. The family was imported or uploaded after Variable Font Support was enabled. If the family was already in the library before you enabled the setting, try re-importing it to capture axis metadata.
 
@@ -254,11 +253,11 @@ It turns on a third role slot for code and `pre` elements. When enabled, you can
 
 ### How is my Google Fonts API key stored?
 
-Since 1.12.0, the key is stored in a dedicated encrypted WordPress option (`tasty_fonts_google_api_key_data`) rather than in the main settings record. It is isolated from normal settings and never included in [Site Transfer](Site-Transfer) exports. If you supply a fresh key during a bundle import, it is stored using the same encrypted model as a key saved manually in `Settings → Output`.
+Since 1.12.0, the key is stored in a dedicated encrypted WordPress option (`tasty_fonts_google_api_key_data`) rather than in the main settings record. It is isolated from normal settings and never included in [Site Transfer](Site-Transfer) exports. If you supply a fresh key during a bundle import, it is stored using the same encrypted model as a key saved manually in the Font Library's Google source panel.
 
 ### Can I give non-administrator users access to Tasty Fonts?
 
-Yes, since 1.13.0. By default only WordPress administrators can open Tasty Fonts. To expand access:
+Yes. By default only WordPress administrators can open Tasty Fonts. To expand access:
 
 1. Go to `Settings → Behavior → Admin Access`.
 2. Toggle **Enable custom access**.

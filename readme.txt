@@ -3,7 +3,7 @@ Tags: fonts, typography, google fonts, adobe fonts, bunny fonts
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.13.0
+Stable tag: 1.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,11 +43,15 @@ The plugin is designed for single-site activation and per-site activation inside
 
 = Release channels =
 
-The latest stable release is 1.13.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
+The latest stable release is 1.14.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
 
-= What is planned after 1.13.0 stable? =
+= What is new in 1.14.0? =
 
-The post-1.13.0 line continues with power-user and agency improvements: command-line maintenance tools, stronger bulk library management, richer diagnostics, scheduled Adobe project refreshes, and more polished distribution surfaces.
+1.14.0 ships a fully reworked Advanced Tools command center with dedicated tabs for Overview, Generated CSS, Developer, Transfer, Activity, and CLI. It adds rollback snapshots (automatic safety checkpoints before destructive operations), sanitized support bundles for diagnostics handoffs, full WP-CLI parity for all maintenance and transfer workflows, paginated and searchable activity logs, and a streamlined Settings page reduced to three focused tabs: Output, Integrations, and Behavior. Developer maintenance and Transfer workflows now live entirely in Advanced Tools.
+
+= What is planned after 1.14.0 stable? =
+
+The post-1.14.0 line continues with power-user and agency improvements: bulk library management, richer diagnostics, scheduled Adobe project refreshes, and more polished distribution surfaces.
 
 If you want to help shape that roadmap, open a feature request or feedback issue on GitHub:
 
@@ -96,6 +100,23 @@ https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues
 4. Advanced Tools screen for generated CSS, diagnostics, and activity history.
 
 == Changelog ==
+
+= 1.14.0 =
+
+* Reworked Advanced Tools into a power-user command center with Overview, Generated CSS, Developer, Transfer, Activity, and CLI tabs.
+* Added rollback snapshots with automatic pre-destructive-operation checkpoints and full manual create, rename, restore, delete, and retention controls.
+* Added sanitized support bundles for diagnostics, CSS, storage metadata, activity, settings, and library state — with Google API keys excluded.
+* Added full WP-CLI parity for diagnostics, CSS regeneration, cache clears, library rescans, site-transfer export/import, support bundles, and rollback snapshots.
+* Added paginated Advanced Tools activity logs with account filters, search, and selectable 5, 10, 25, or 100 entry page sizes.
+* Streamlined Settings to three focused tabs: Output, Integrations, and Behavior. Developer maintenance and Transfer workflows moved to Advanced Tools.
+* Moved Update Channel control to Advanced Tools → Developer release rail.
+* Expanded site-transfer dry runs with import diff details, Google API key validation state, and rollback snapshot notice.
+* Added saved site-transfer export bundle management with download, rename, protect, and delete controls.
+* Reworked Settings panels to row-board layouts with contextual headers and shared save/clear actions.
+* Improved Advanced Tools health checks with plain-language guidance, knowledge-base links, and hover help.
+* Fixed generated CSS fallback handling so explicit role fallback stacks are preserved when a family fallback changes.
+* Fixed support bundles to preserve list-shaped diagnostics while removing secrets.
+* Fixed self-hosted font diagnostics so hydrated upload URLs resolve correctly to managed relative paths.
 
 = 1.13.0 =
 

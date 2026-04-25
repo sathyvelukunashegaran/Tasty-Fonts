@@ -41,7 +41,7 @@ A Site Transfer bundle contains everything Tasty Fonts manages:
 Before you begin, confirm all of the following:
 
 1. **PHP's ZipArchive extension is installed and enabled** on both the source and destination servers. Most managed WordPress hosts include it by default. If the Transfer tab shows a warning about ZipArchive being unavailable, contact your host.
-2. **Both sites are running Tasty Custom Fonts 2.0.0 or later.** Version 2 transfer bundles are the supported starting point.
+2. **Both sites are running Tasty Custom Fonts 1.14.0 or later.** Transfer bundles from the current version are the supported format.
 3. **You have admin-level access** on both the source site (to export) and the destination site (to import).
 4. **The destination site's `wp-content/uploads/fonts/` directory is writable** by the web server process.
 
@@ -49,11 +49,11 @@ Before you begin, confirm all of the following:
 
 ## Step 1 — Export From the Source Site
 
-1. Go to `Tasty Fonts → Settings` on the **source site**.
+1. Go to `Tasty Fonts → Advanced Tools` on the **source site**.
 2. Click the **Transfer** tab.
 3. In the **Export Site Transfer Bundle** card, confirm the export action is available (not greyed out). If it is greyed out, a ZipArchive error message will explain why.
 4. Click **Export Bundle**.
-5. Your browser downloads a ZIP file named something like `tasty-fonts-transfer-1.13.0-20260424-100000.zip`.
+5. Your browser downloads a ZIP file named something like `tasty-fonts-transfer-1.14.0-20260426-100000.zip`.
 
 > **What's in the ZIP:** the archive contains a manifest file (`tasty-fonts-export.json`) plus your managed font files under a `fonts/` subdirectory. The manifest records your library state, settings, roles, and a checksum for every included file.
 
@@ -65,7 +65,7 @@ Keep this ZIP somewhere safe — it is your portable bundle.
 
 Before the destructive import can be armed, you must run a **dry-run validation**. This step checks the bundle for corruption, checksum mismatches, and compatibility issues without changing anything on the destination site.
 
-1. Go to `Tasty Fonts → Settings` on the **destination site**.
+1. Go to `Tasty Fonts → Advanced Tools` on the **destination site**.
 2. Click the **Transfer** tab.
 3. In the **Import Site Transfer Bundle** card:
    - Click **Choose File** and select the ZIP you exported.
@@ -103,7 +103,7 @@ Google Fonts API keys are intentionally never included in transfer bundles, for 
 
 - Families that were already imported and are included in the bundle **continue to work** — no key is needed to serve an already-imported self-hosted or CDN family.
 - The Google Fonts catalog **search feature** on the destination site requires its own API key.
-- You can supply a key during import (optional field in the Import card) or add it later via `Settings → Output → Google Fonts API Key`.
+- You can supply a key during import (optional field in the Import card) or add it later via the Font Library's Google source panel.
 
 > **Beginner tip:** if you are not planning to use Google Fonts search on the destination site, you can skip the key entirely. Your transferred fonts will still load and display correctly.
 
@@ -182,7 +182,7 @@ This is expected. The `.generated/tasty-fonts.css` file is excluded by design be
 API keys are excluded from bundles by design. To restore Google search access:
 
 - Option A: paste a key into the Google Fonts API Key field in the Import card before importing.
-- Option B: go to `Settings → Output` after import and save a Google Fonts API key there.
+- Option B: go to the `Font Library` after import and save a Google Fonts API key in the Google source panel.
 - Option C: run `wp tasty-fonts google-api-key save` and enter the key at the hidden CLI prompt.
 
 See [Google Fonts](Provider-Google-Fonts) for how to create an API key.

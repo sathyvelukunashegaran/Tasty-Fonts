@@ -29,7 +29,7 @@ If search is unavailable, open the Google key settings from the add-font workflo
 
 ### 2. Search For A Family
 
-Use the Google add-font flow to search for the family you want and review available variants. When Variable Font Support is enabled in `Settings → Output`, families that offer a variable version are marked with a **Variable** badge in the search results.
+Use the Google add-font flow to search for the family you want and review available variants. When Variable Font Support is enabled in `Settings → Behavior`, families that offer a variable version are marked with a **Variable** badge in the search results.
 
 ### 3. Choose A Delivery Mode
 

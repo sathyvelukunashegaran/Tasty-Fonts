@@ -99,9 +99,9 @@ Nightly publishing also prunes older nightly prereleases so the rail keeps only 
 
 - The plugin advertises the GitHub repository as its `Update URI`
 - the bundled updater now supports three channels: `Stable`, `Beta`, and `Nightly`
-- installs choose the channel from `Settings -> Behavior -> Update Channel`
+- installs choose the channel from `Advanced Tools → Developer → Update Channel`
 - normal WordPress update checks continue to handle upgrades
-- when a selected channel points to an older version than the one installed now, the Behavior tab exposes a rollback reinstall action
+- when a selected channel points to an older version than the one installed now, the Developer tab exposes a rollback reinstall action
 - release asset naming still matters because the updater expects `tasty-fonts-<version>.zip`
 - the packaged plugin directory is `tasty-fonts/` to match the current product branding
 

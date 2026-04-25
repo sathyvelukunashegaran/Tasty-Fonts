@@ -216,10 +216,10 @@ A WordPress plugin header field the plugin uses to advertise its GitHub reposito
 ## V
 
 **Variable font**
-A font file format that encodes a continuous range of design variations (such as weight, width, or slant) as named axes within a single file. A single variable WOFF2 file can replace multiple separate static weight files. Variable font support in the plugin is opt-in; enable it in `Settings → Output → Variable Font Support`.
+A font file format that encodes a continuous range of design variations (such as weight, width, or slant) as named axes within a single file. A single variable WOFF2 file can replace multiple separate static weight files. Variable font support in the plugin is opt-in; enable it in `Settings → Behavior → Enable Variable Fonts`.
 
 **Variable Font Support**
-The opt-in Output setting that activates variable font features across uploads, imports, library display, Deploy Fonts role controls, and generated CSS. Off by default to keep static-only installs simple and unaffected.
+The opt-in Behavior setting that activates variable font features across uploads, imports, library display, Deploy Fonts role controls, and generated CSS. Off by default to keep static-only installs simple and unaffected. Enable it in `Settings → Behavior → Enable Variable Fonts`.
 
 **Variant**
 A single font file associated with a specific weight, style, or subset of a family. For example, `Inter 400 normal`, `Inter 700 italic`. The plugin stores variants within delivery profiles.
