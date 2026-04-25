@@ -197,7 +197,7 @@ A `font-display` value that shows a fallback font until the custom font loads, t
 The identifier used to namespace translatable strings in WordPress plugins. Tasty Custom Fonts uses the text domain `tasty-fonts`.
 
 **Transfer Bundle**
-Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.13.0 or later.
+Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.14.0 or later.
 
 **Transfer Tab**
 The Transfer tab in Advanced Tools. Contains the Export and Import cards for the Site Transfer workflow.
