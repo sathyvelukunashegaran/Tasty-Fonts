@@ -1,5 +1,4 @@
 .tasty-fonts-admin .tasty-fonts-log-action,
-.tasty-fonts-admin .tasty-fonts-activity-filter-actions,
 .tasty-fonts-admin .tasty-fonts-developer-action-row,
 .tasty-fonts-admin .tasty-fonts-settings-flat-row-actions,
 .tasty-fonts-admin .tasty-fonts-role-command-actions,
@@ -8,17 +7,14 @@
 }
 
 .tasty-fonts-admin .tasty-fonts-log-action,
-.tasty-fonts-admin .tasty-fonts-library-meta,
 .tasty-fonts-admin .tasty-fonts-settings-head-actions,
 .tasty-fonts-admin .tasty-fonts-preview-toolbar-actions {
     margin-right: auto;
-    margin-left: 0;
+    margin-left: var(--tasty-layout-0);
 }
 
 .tasty-fonts-admin .tasty-fonts-output,
 .tasty-fonts-admin .tasty-fonts-code-panel-body,
-.tasty-fonts-admin .tasty-fonts-settings-flat-row-summary,
-.tasty-fonts-admin .tasty-fonts-diagnostic-value,
 .tasty-fonts-admin .tasty-fonts-detail-card-summary {
     text-align: right;
 }

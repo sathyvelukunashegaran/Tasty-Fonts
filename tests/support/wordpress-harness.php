@@ -123,7 +123,9 @@ use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Maintenance\DeveloperToolsService;
+use TastyFonts\Maintenance\SnapshotService;
 use TastyFonts\Maintenance\SiteTransferService;
+use TastyFonts\Maintenance\SupportBundleService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
@@ -1983,6 +1985,15 @@ function makeServiceGraph(): array
         $blockEditorFontLibrary,
         new StubUploadedFileValidator()
     );
+    $snapshots = new SnapshotService(
+        $storage,
+        $settings,
+        $imports,
+        $developerTools,
+        $library,
+        $blockEditorFontLibrary
+    );
+    $supportBundles = new SupportBundleService($storage, $settings, $imports, $log);
     $adminAccess = new AdminAccessService($settings);
     $updater = new GitHubUpdater($settings, $adminAccess);
     $controller = new AdminController(
@@ -2004,6 +2015,8 @@ function makeServiceGraph(): array
         $oxygenIntegration,
         $developerTools,
         $siteTransfer,
+        $snapshots,
+        $supportBundles,
         $updater,
         $adminAccess,
         $planner
@@ -2032,6 +2045,8 @@ function makeServiceGraph(): array
         'block_editor_font_library' => $blockEditorFontLibrary,
         'developer_tools' => $developerTools,
         'site_transfer' => $siteTransfer,
+        'snapshots' => $snapshots,
+        'support_bundles' => $supportBundles,
         'admin_access' => $adminAccess,
         'updater' => $updater,
         'controller' => $controller,

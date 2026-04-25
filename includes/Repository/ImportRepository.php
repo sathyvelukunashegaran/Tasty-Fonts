@@ -408,6 +408,15 @@ final class ImportRepository
     }
 
     /**
+     * @param array<string, mixed> $library
+     * @return LibraryMap
+     */
+    public function replaceLibraryPreview(array $library): array
+    {
+        return $this->normalizeLibrary($library);
+    }
+
+    /**
      * @return LibraryMap
      */
     private function getLibrary(): array

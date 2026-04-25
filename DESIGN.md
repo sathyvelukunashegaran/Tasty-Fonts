@@ -122,9 +122,43 @@ Cards are reserved for top-level page sections and repeated interactive inventor
 
 Pills are only for status, counts, role chips, copied states, and compact inline tokens. Use semantic color roles for state. Avoid using pills for normal buttons or card containers. The default pill treatment is a quiet white-to-off-white surface with a faint inset highlight; accent pills add blue/cyan tint without becoming candy-colored.
 
+### Status Dots
+
+Small status dots use the `--tasty-status-dot-*` token family. They are 8px markers with a soft two-ring halo, using semantic shadow tokens for accent, success, warning, danger, and muted states. Dense bullets may use `--tasty-status-dot-size-small`, but they should keep the same radius and halo language. Do not hand-roll dot sizes, raw shadows, or flat marker colors in component CSS; set the semantic background and matching `--tasty-status-dot-shadow-*` value instead.
+
 ### Forms And Controls
 
-Inputs, selects, textareas, and segmented controls use 6px radius, 38px regular height, and tokenized focus shadows. Field surfaces use the shared control gradient, border-gradient, and shadow tokens so every form reads as one Stripe-like system. Segmented controls use `--tasty-segmented-*` tokens for the outer well and active options. Toggles use `--tasty-toggle-*` tokens with a blue primary-on state and a restrained slate off state. Labels use meta typography only when they behave like scan labels; otherwise use normal sentence case body text.
+Inputs, selects, textareas, and segmented controls use 6px radius, 38px regular height, and tokenized focus shadows. Field surfaces use the shared control gradient, border-gradient, and shadow tokens so every form reads as one Stripe-like system. Segmented controls use `--tasty-segmented-*` tokens for the outer well and active options. Toggles use `--tasty-toggle-*` tokens with a blue primary-on state, restrained slate off state, and the same rectangular rounded-corner language as other controls rather than pill-shaped tracks. Labels use meta typography only when they behave like scan labels; otherwise use normal sentence case body text.
+
+### Settings Row Tables
+
+Settings screens use the same compact row-board language as Advanced Tools Transfer. The Settings wrapper uses a contextual header with the active tab title and description on the left, plus the segmented tab group and paired clear/save actions on the right. Clear changes discards unsaved local edits and Save changes commits them; both stay disabled until the form is dirty. The contextual header must not have its own divider below it; the table board below keeps its normal full border and group-header rules. Each Settings tab renders as a `tasty-fonts-health-board` plus `tasty-fonts-settings-board`, with `tasty-fonts-health-group` headers, a white table surface, faint row dividers, semantic status dots, concise copy on the left, and controls aligned on the right. Output, Integrations, and Behavior must share this contract; do not style them as separate loose panels.
+
+Option-heavy Settings rows should read like Transfer rows, not like wide control belts. Keep the submit-compatible radio inputs available when needed, but present the visible row control as a compact `tasty-fonts-select` proxy in the right control column. Use segmented controls only when the user is making an immediate mode switch in a small toolbar.
+
+Output settings are grouped by the decision the user is making, not by implementation jargon. Use `Stylesheet Delivery` for file/inline loading, `Font Face Rules` for font-display and unicode-range behavior, `Runtime Loading` for minification/preload/preconnect performance controls, and `Output Layers` for variables/classes presets and their nested groups. Avoid one catch-all heading such as `Generated CSS`.
+
+Behavior settings use the same grouped table logic. Use `Release Updates` for update rail selection, `Font Capabilities` for role and variable-font capabilities, `Admin Experience` for guidance and activity visibility, and `Cleanup & Access` for uninstall cleanup plus custom admin access. The custom access master toggle is a first-class table row: its dot, title, passive help, and switch align with every other Settings row, while expanded role/user controls live as quiet detail content underneath.
+
+Integrations settings use categories that match the external surface being controlled, not a generic plugin bucket. Use `Etch Canvas` for the local preview bridge connection, `Builder Sync` for Bricks and Oxygen builder controls, `WordPress Font Library` for Gutenberg library publishing, and `Framework Tokens` for Automatic.css role-variable mapping. Each group keeps the same Transfer-style header: left side names the surface, right side names the action or state such as `Connection`, `Theme Controls`, `Library Sync`, or `Role Mapping`.
+
+The custom access editor is one inset Settings sub-board, not a pair of nested cards. Role and user selectors use compact group headers, white table surfaces, row dividers, selected-only filters, and checkbox rows that share the same spacing and status language as the rest of Settings. Avoid blue-tinted panels or independent card chrome inside this editor.
+
+Settings board spacing is tokenized in `tokens.css`:
+
+- `--tasty-settings-board-row-min-height`
+- `--tasty-settings-board-row-padding-block`
+- `--tasty-settings-board-row-padding-inline`
+- `--tasty-settings-board-row-gap`
+- `--tasty-settings-board-detail-indent`
+- `--tasty-settings-board-detail-padding-block`
+- `--tasty-settings-board-detail-padding-inline`
+- `--tasty-settings-board-control-min-width`
+- `--tasty-settings-board-control-max-width`
+
+Nested settings may use inset rows or quiet soft panels inside the board, but they should keep the same dividers, status-dot language, and control baselines. Row actions inside Settings use the Advanced Tools row action tokens when they behave like Transfer row actions.
+
+Output layer details are not accordions. Variable and class group controls should flatten into the Settings row table with concise subsection headers, status dots, right-aligned toggles, and passive `?` help. Rows with passive help should not also show the same explanatory sentence inline; keep the copy available to the tooltip and leave the table row itself compact. Do not reintroduce nested disclosure chrome for generated token/class groups. Advanced output rows, including nested variable/class rows, must use the shared Settings row gutter tokens directly on the row surface; do not override them with submenu-specific zero-inline-padding rules.
 
 ### Preview Workspace
 
@@ -133,6 +167,23 @@ The preview workspace is a workbench inside the admin workspace. It should make 
 ### Diagnostics And Code
 
 Diagnostics use a code-editor treatment with high contrast, readable 12px-13px monospace text, and clear copy buttons. Syntax palettes may define local raw colors because they are a self-contained code theme.
+
+### Advanced Tools Row Interface
+
+Advanced Tools rows use one compact action system across Overview, Transfer, Generated CSS, Developer, and Activity surfaces. Row actions use `tasty-fonts-advanced-row-action` plus a modifier for the icon intent, such as `--navigate`, `--download`, `--validate`, `--import`, `--snapshot`, `--restore`, or `--support`. Do not use the larger developer action button treatment inside health-board rows.
+
+The shared row action contract is tokenized in `tokens.css`:
+
+- `--tasty-advanced-row-action-height`
+- `--tasty-advanced-row-action-min-width`
+- `--tasty-advanced-row-action-padding-inline`
+- `--tasty-advanced-row-action-gap`
+- `--tasty-advanced-row-action-icon-size`
+- `--tasty-advanced-row-help-size`
+- `--tasty-advanced-row-status-height`
+- `--tasty-advanced-row-status-padding-inline`
+
+Help buttons, status chips, and row action buttons should align on the same row baseline and use these tokens for stable sizing. Settings rows use the same passive `?` help affordance as Advanced Tools, with hover/focus copy powered by `data-help-tooltip` rather than a separate tooltip system. Place Settings help in the right-side row action rail immediately before the row control, never inline with the title text. Training-wheels-off mode may hide helper affordances, but it must not change action button dimensions or row alignment.
 
 ## CSS Governance
 
@@ -143,6 +194,7 @@ Diagnostics use a code-editor treatment with high contrast, readable 12px-13px m
 - New plugin classes and IDs must use the `tasty-fonts-*` namespace unless they are WordPress-provided classes or state classes like `is-active`.
 - Avoid raw hex/rgb/hsl values in `admin.css`; define tokens first unless the value is embedded in a data URI. Token-derived `rgba(var(--tasty-*-rgb), …)` composition is allowed only when the source color is a Tasty token.
 - Avoid raw typography values in `admin.css`; `font-family`, `font-size`, `font-weight`, `line-height`, and `letter-spacing` declarations must use `var(--tasty-*)`.
+- Settings row geometry is centralized in the transfer-aligned Settings row block in `admin.css`. Earlier Settings sections may style copy, marks, badges, detail bodies, and integration content, but must not re-declare row grids, row gutters, toggle sizing, help placement, or advanced-output nested row padding. Add new row surfaces to the shared selector list instead of creating a more specific submenu override.
 - Use Stylelint with `npm run lint:css` for CSS syntax and convention checks.
 - Use the Node CSS-token audit through `node --test tests/js/*.test.cjs` to catch cross-file `var(--tasty-*)` references, raw component color values, and raw typography declarations that Stylelint cannot fully validate across separate files.
 

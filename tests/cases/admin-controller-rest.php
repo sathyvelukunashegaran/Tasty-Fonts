@@ -1944,6 +1944,9 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/tools/health' => 'GET',
         'tasty-fonts/v1/tools/runtime-manifest' => 'GET',
         'tasty-fonts/v1/tools/action' => 'POST',
+        'tasty-fonts/v1/tools/support-bundle' => 'POST',
+        'tasty-fonts/v1/tools/snapshots' => 'GET,POST',
+        'tasty-fonts/v1/tools/snapshots/restore' => 'POST',
     ];
 
     assertSameValue(

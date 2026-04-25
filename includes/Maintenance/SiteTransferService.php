@@ -46,7 +46,22 @@ use ZipArchive;
  *     filename: string,
  *     content_type: string,
  *     size: int,
- *     manifest: TransferManifest
+ *     manifest: TransferManifest,
+ *     retained?: bool
+ * }
+ * @phpstan-type TransferExportSummary array{
+ *     id: string,
+ *     created_at: string,
+ *     plugin_version: string,
+ *     families: int,
+ *     files: int,
+ *     size: int,
+ *     label: string,
+ *     filename: string,
+ *     protected: bool,
+ *     created_sequence: float,
+ *     family_names: list<string>,
+ *     role_families: list<string>
  * }
  * @phpstan-type PreparedUpload array{path: string, name: string}
  * @phpstan-type ValidatedImportBundle array{
@@ -60,7 +75,8 @@ use ZipArchive;
  *     plugin_version: string,
  *     exported_at: string,
  *     families: int,
- *     files: int
+ *     files: int,
+ *     diff: array<string, mixed>
  * }
  * @phpstan-type StagedImportState array{
  *     token: string,
@@ -69,7 +85,8 @@ use ZipArchive;
  *     plugin_version: string,
  *     exported_at: string,
  *     families: int,
- *     files: int
+ *     files: int,
+ *     diff: array<string, mixed>
  * }
  * @phpstan-type StagedImportResult array{
  *     stage_token: string,
@@ -77,7 +94,8 @@ use ZipArchive;
  *     plugin_version: string,
  *     exported_at: string,
  *     families: int,
- *     files: int
+ *     files: int,
+ *     diff: array<string, mixed>
  * }
  * @phpstan-type ImportResult array{
  *     settings: NormalizedSettings,
@@ -92,7 +110,12 @@ final class SiteTransferService
 {
     public const SCHEMA_VERSION = 1;
     public const MANIFEST_FILENAME = 'tasty-fonts-export.json';
+    public const OPTION_EXPORT_BUNDLES = 'tasty_fonts_site_transfer_export_bundles';
+    public const MIN_EXPORT_RETENTION_LIMIT = 1;
+    public const MAX_EXPORT_RETENTION_LIMIT = 10;
+    public const DEFAULT_EXPORT_RETENTION_LIMIT = 5;
     private const ARCHIVE_FONTS_DIRECTORY = 'fonts/';
+    private const EXPORT_DIRECTORY = 'tasty-fonts-export-bundles';
     private const GENERATED_CSS_RELATIVE_PATH = '.generated/tasty-fonts.css';
     private const TEMP_DIRECTORY_PREFIX = 'tasty-fonts-transfer-';
     private const TEMP_ZIP_PREFIX = 'tasty-fonts-transfer-';
@@ -132,7 +155,7 @@ final class SiteTransferService
     /**
      * @return TransferExportBundle|WP_Error
      */
-    public function buildExportBundle(): array|WP_Error
+    public function buildExportBundle(bool $remember = false): array|WP_Error
     {
         if (!$this->zipSupported()) {
             return $this->error(
@@ -206,12 +229,254 @@ final class SiteTransferService
 
         $zip->close();
 
+        $filename = $this->buildExportFilename();
+        $size = is_file($zipPath) ? (int) filesize($zipPath) : 0;
+
+        if ($remember) {
+            $exportId = $this->newExportBundleId();
+            $exportPath = $this->exportBundlePath($exportId);
+
+            if (!$this->ensureExportBundleDirectory()) {
+                @unlink($zipPath);
+
+                return $this->error(
+                    'tasty_fonts_transfer_export_storage_unavailable',
+                    __('The export bundle could not be saved for later download.', 'tasty-fonts')
+                );
+            }
+
+            if (!@rename($zipPath, $exportPath)) {
+                if (!@copy($zipPath, $exportPath)) {
+                    @unlink($zipPath);
+
+                    return $this->error(
+                        'tasty_fonts_transfer_export_persist_failed',
+                        __('The export bundle could not be saved for later download.', 'tasty-fonts')
+                    );
+                }
+
+                @unlink($zipPath);
+            }
+
+            $zipPath = $exportPath;
+            $size = is_file($zipPath) ? (int) filesize($zipPath) : $size;
+            $this->rememberExportBundle($this->buildExportSummary($exportId, $manifest, $filename, $size));
+        }
+
         return [
             'path' => $zipPath,
-            'filename' => $this->buildExportFilename(),
+            'filename' => $filename,
             'content_type' => 'application/zip',
-            'size' => is_file($zipPath) ? (int) filesize($zipPath) : 0,
+            'size' => $size,
             'manifest' => $manifest,
+            'retained' => $remember,
+        ];
+    }
+
+    /**
+     * @return list<TransferExportSummary>
+     */
+    public function listExportBundles(): array
+    {
+        $bundles = [];
+        $changed = false;
+
+        foreach ($this->storedExportBundles() as $bundle) {
+            if (!is_readable($this->exportBundlePath($bundle['id']))) {
+                continue;
+            }
+
+            $hydrated = $this->hydrateExportBundleSummary($bundle);
+
+            if ($hydrated !== $bundle) {
+                $changed = true;
+            }
+
+            $bundle = $hydrated;
+            $bundles[] = $bundle;
+        }
+
+        $this->sortExportBundles($bundles);
+
+        if ($changed) {
+            $this->storeExportBundles($bundles);
+        }
+
+        return $bundles;
+    }
+
+    /**
+     * @return array{path: string, filename: string, content_type: string, size: int}|WP_Error
+     */
+    public function exportBundleDownload(string $exportId): array|WP_Error
+    {
+        $exportId = sanitize_key($exportId);
+
+        foreach ($this->storedExportBundles() as $bundle) {
+            if ($bundle['id'] !== $exportId) {
+                continue;
+            }
+
+            $path = $this->exportBundlePath($exportId);
+
+            if ($path === '' || !is_readable($path)) {
+                return $this->error(
+                    'tasty_fonts_transfer_export_missing',
+                    __('The saved export bundle could not be found.', 'tasty-fonts')
+                );
+            }
+
+            return [
+                'path' => $path,
+                'filename' => $bundle['filename'] !== '' ? $bundle['filename'] : $this->buildExportFilename(),
+                'content_type' => 'application/zip',
+                'size' => is_file($path) ? (int) filesize($path) : $bundle['size'],
+            ];
+        }
+
+        return $this->error(
+            'tasty_fonts_transfer_export_not_found',
+            __('The saved export bundle could not be found.', 'tasty-fonts')
+        );
+    }
+
+    public function retentionLimit(): int
+    {
+        return self::normalizeRetentionLimit($this->settings->getSettings()['site_transfer_export_retention_limit'] ?? self::DEFAULT_EXPORT_RETENTION_LIMIT);
+    }
+
+    public static function normalizeRetentionLimit(mixed $limit): int
+    {
+        $normalized = is_scalar($limit) || $limit === null ? absint($limit) : 0;
+
+        return max(
+            self::MIN_EXPORT_RETENTION_LIMIT,
+            min(self::MAX_EXPORT_RETENTION_LIMIT, $normalized ?: self::DEFAULT_EXPORT_RETENTION_LIMIT)
+        );
+    }
+
+    public function pruneExportBundlesToRetentionLimit(): void
+    {
+        $this->storeExportBundles($this->pruneExportBundles($this->storedExportBundles()));
+    }
+
+    /**
+     * @return array{message: string}
+     */
+    public function renameExportBundle(string $exportId, string $label): array|WP_Error
+    {
+        $exportId = sanitize_key($exportId);
+        $label = $this->normalizeExportLabel($label);
+        $bundles = $this->storedExportBundles();
+        $updated = false;
+
+        foreach ($bundles as &$bundle) {
+            if ($bundle['id'] !== $exportId) {
+                continue;
+            }
+
+            $bundle['label'] = $label;
+            $updated = true;
+            break;
+        }
+        unset($bundle);
+
+        if (!$updated) {
+            return $this->error(
+                'tasty_fonts_transfer_export_not_found',
+                __('The saved export bundle could not be found.', 'tasty-fonts')
+            );
+        }
+
+        $this->storeExportBundles($bundles);
+
+        return [
+            'message' => $label === ''
+                ? __('Export bundle name cleared.', 'tasty-fonts')
+                : __('Export bundle renamed.', 'tasty-fonts'),
+        ];
+    }
+
+    /**
+     * @return array{message: string}
+     */
+    public function setExportBundleProtected(string $exportId, bool $protected): array|WP_Error
+    {
+        $exportId = sanitize_key($exportId);
+        $bundles = $this->storedExportBundles();
+        $updated = false;
+
+        foreach ($bundles as &$bundle) {
+            if ($bundle['id'] !== $exportId) {
+                continue;
+            }
+
+            $bundle['protected'] = $protected;
+            $updated = true;
+            break;
+        }
+        unset($bundle);
+
+        if (!$updated) {
+            return $this->error(
+                'tasty_fonts_transfer_export_not_found',
+                __('The saved export bundle could not be found.', 'tasty-fonts')
+            );
+        }
+
+        $this->storeExportBundles($bundles);
+
+        return [
+            'message' => $protected
+                ? __('Export bundle protected.', 'tasty-fonts')
+                : __('Export bundle unprotected.', 'tasty-fonts'),
+        ];
+    }
+
+    /**
+     * @return array{message: string}
+     */
+    public function deleteExportBundle(string $exportId): array|WP_Error
+    {
+        $exportId = sanitize_key($exportId);
+        $bundles = $this->storedExportBundles();
+        $remaining = [];
+        $found = false;
+        $path = '';
+
+        foreach ($bundles as $bundle) {
+            if ($bundle['id'] !== $exportId) {
+                $remaining[] = $bundle;
+                continue;
+            }
+
+            $found = true;
+
+            if ($bundle['protected']) {
+                return $this->error(
+                    'tasty_fonts_transfer_export_protected',
+                    __('Unprotect this export bundle before deleting it.', 'tasty-fonts')
+                );
+            }
+
+            $path = $this->exportBundlePath($exportId);
+        }
+
+        if (!$found) {
+            return $this->error(
+                'tasty_fonts_transfer_export_not_found',
+                __('The saved export bundle could not be found.', 'tasty-fonts')
+            );
+        }
+
+        if ($path !== '' && file_exists($path)) {
+            @unlink($path);
+        }
+
+        $this->storeExportBundles($remaining);
+
+        return [
+            'message' => __('Export bundle deleted.', 'tasty-fonts'),
         ];
     }
 
@@ -603,6 +868,294 @@ final class SiteTransferService
     }
 
     /**
+     * @param TransferManifest $manifest
+     * @return TransferExportSummary
+     */
+    private function buildExportSummary(string $exportId, array $manifest, string $filename, int $size): array
+    {
+        return [
+            'id' => sanitize_key($exportId),
+            'created_at' => $manifest['exported_at'],
+            'plugin_version' => $manifest['plugin_version'],
+            'families' => count($manifest['library']),
+            'files' => count($manifest['files']),
+            'size' => max(0, $size),
+            'label' => '',
+            'filename' => sanitize_file_name($filename),
+            'protected' => false,
+            'created_sequence' => microtime(true),
+            'family_names' => $this->manifestFamilyNames($manifest),
+            'role_families' => $this->manifestRoleFamilies($manifest),
+        ];
+    }
+
+    /**
+     * @param TransferExportSummary $bundle
+     * @return TransferExportSummary
+     */
+    private function hydrateExportBundleSummary(array $bundle): array
+    {
+        $path = $this->exportBundlePath($bundle['id']);
+
+        if ($path === '' || !is_readable($path) || !$this->zipSupported()) {
+            return $bundle;
+        }
+
+        $zip = new ZipArchive();
+
+        if ($zip->open($path) !== true) {
+            return $bundle;
+        }
+
+        $manifestJson = $zip->getFromName(self::MANIFEST_FILENAME);
+        $zip->close();
+
+        if (!is_string($manifestJson) || $manifestJson === '') {
+            return $bundle;
+        }
+
+        $decoded = json_decode($manifestJson, true);
+
+        if (!is_array($decoded)) {
+            return $bundle;
+        }
+
+        $manifest = $this->normalizeTransferManifest($this->normalizeStringKeyedMap($decoded));
+
+        if (is_wp_error($manifest)) {
+            return $bundle;
+        }
+
+        $bundle['family_names'] = $this->manifestFamilyNames($manifest);
+        $bundle['role_families'] = $this->manifestRoleFamilies($manifest);
+
+        return $bundle;
+    }
+
+    /**
+     * @param TransferManifest $manifest
+     * @return list<string>
+     */
+    private function manifestFamilyNames(array $manifest): array
+    {
+        $names = [];
+
+        foreach ($manifest['library'] as $slug => $family) {
+            $familyName = trim($this->scalarStringValue($family, 'family'));
+            $names[] = $familyName !== '' ? $familyName : (string) $slug;
+        }
+
+        $names = array_values(array_unique(array_filter($names, static fn (string $name): bool => $name !== '')));
+        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $names;
+    }
+
+    /**
+     * @param TransferManifest $manifest
+     * @return list<string>
+     */
+    private function manifestRoleFamilies(array $manifest): array
+    {
+        $families = [];
+
+        foreach ($manifest['applied_roles'] as $roleKey => $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            if (
+                str_ends_with($roleKey, '_fallback')
+                || str_ends_with($roleKey, '_delivery_id')
+                || str_ends_with($roleKey, '_weight')
+                || str_ends_with($roleKey, '_axes')
+            ) {
+                continue;
+            }
+
+            $family = trim((string) $value);
+
+            if ($family !== '') {
+                $families[] = $family;
+            }
+        }
+
+        $families = array_values(array_unique($families));
+        sort($families, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $families;
+    }
+
+    /**
+     * @param TransferExportSummary $bundle
+     */
+    private function rememberExportBundle(array $bundle): void
+    {
+        $bundles = array_values(
+            array_filter(
+                $this->storedExportBundles(),
+                static fn (array $stored): bool => $stored['id'] !== $bundle['id']
+            )
+        );
+        array_unshift($bundles, $bundle);
+
+        $this->storeExportBundles($this->pruneExportBundles($bundles));
+    }
+
+    /**
+     * @param list<TransferExportSummary> $bundles
+     * @return list<TransferExportSummary>
+     */
+    private function pruneExportBundles(array $bundles): array
+    {
+        $this->sortExportBundles($bundles);
+
+        $retained = [];
+        $retainedUnprotected = 0;
+
+        foreach ($bundles as $bundle) {
+            if ($bundle['protected'] || $retainedUnprotected < $this->retentionLimit()) {
+                $retained[] = $bundle;
+
+                if (!$bundle['protected']) {
+                    $retainedUnprotected++;
+                }
+
+                continue;
+            }
+
+            $path = $this->exportBundlePath($bundle['id']);
+
+            if ($path !== '' && file_exists($path)) {
+                @unlink($path);
+            }
+        }
+
+        return $retained;
+    }
+
+    /**
+     * @return list<TransferExportSummary>
+     */
+    private function storedExportBundles(): array
+    {
+        $stored = get_option(self::OPTION_EXPORT_BUNDLES, []);
+
+        if (!is_array($stored)) {
+            return [];
+        }
+
+        $bundles = [];
+
+        foreach ($stored as $bundle) {
+            if (!is_array($bundle)) {
+                continue;
+            }
+
+            $map = $this->normalizeStringKeyedMap($bundle);
+            $id = sanitize_key($this->scalarStringValue($map, 'id'));
+
+            if ($id === '') {
+                continue;
+            }
+
+            $createdSequence = $map['created_sequence'] ?? 0;
+
+            $bundles[] = [
+                'id' => $id,
+                'created_at' => $this->scalarStringValue($map, 'created_at'),
+                'plugin_version' => $this->scalarStringValue($map, 'plugin_version'),
+                'families' => max(0, $this->scalarIntValue($map, 'families')),
+                'files' => max(0, $this->scalarIntValue($map, 'files')),
+                'size' => max(0, $this->scalarIntValue($map, 'size')),
+                'label' => $this->normalizeExportLabel($this->scalarStringValue($map, 'label')),
+                'filename' => sanitize_file_name($this->scalarStringValue($map, 'filename')),
+                'protected' => !empty($map['protected']),
+                'created_sequence' => is_numeric($createdSequence) ? (float) $createdSequence : 0.0,
+                'family_names' => $this->normalizeStringList($map['family_names'] ?? []),
+                'role_families' => $this->normalizeStringList($map['role_families'] ?? []),
+            ];
+        }
+
+        $this->sortExportBundles($bundles);
+
+        return $bundles;
+    }
+
+    /**
+     * @param list<TransferExportSummary> $bundles
+     */
+    private function storeExportBundles(array $bundles): void
+    {
+        $this->sortExportBundles($bundles);
+        update_option(self::OPTION_EXPORT_BUNDLES, $bundles, false);
+    }
+
+    /**
+     * @param list<TransferExportSummary> $bundles
+     */
+    private function sortExportBundles(array &$bundles): void
+    {
+        usort(
+            $bundles,
+            static function (array $left, array $right): int {
+                $leftSequence = $left['created_sequence'];
+                $rightSequence = $right['created_sequence'];
+
+                if ($leftSequence !== $rightSequence) {
+                    return $rightSequence <=> $leftSequence;
+                }
+
+                $created = strcmp($right['created_at'], $left['created_at']);
+
+                if ($created !== 0) {
+                    return $created;
+                }
+
+                return strcmp($right['id'], $left['id']);
+            }
+        );
+    }
+
+    private function normalizeExportLabel(string $label): string
+    {
+        return substr(trim(sanitize_text_field($label)), 0, 80);
+    }
+
+    private function newExportBundleId(): string
+    {
+        return sanitize_key('export-' . gmdate('Ymd-His') . '-' . substr(md5(uniqid('', true)), 0, 8));
+    }
+
+    private function exportBundlePath(string $exportId): string
+    {
+        $exportId = sanitize_key($exportId);
+
+        if ($exportId === '') {
+            return '';
+        }
+
+        return wp_normalize_path(trailingslashit($this->exportBundleDirectory()) . $exportId . '.zip');
+    }
+
+    private function ensureExportBundleDirectory(): bool
+    {
+        return wp_mkdir_p($this->exportBundleDirectory());
+    }
+
+    private function exportBundleDirectory(): string
+    {
+        $uploads = $this->normalizeStringKeyedMap(wp_get_upload_dir());
+        $baseDir = $this->scalarStringValue($uploads, 'basedir');
+
+        if ($baseDir === '') {
+            $baseDir = function_exists('sys_get_temp_dir') ? sys_get_temp_dir() : ABSPATH;
+        }
+
+        return wp_normalize_path(trailingslashit($baseDir) . self::EXPORT_DIRECTORY);
+    }
+
+    /**
      * @param PreparedUpload $preparedUpload
      * @param TransferManifest $manifest
      * @param TransferFileList $files
@@ -616,7 +1169,73 @@ final class SiteTransferService
             'exported_at' => $manifest['exported_at'],
             'families' => count($manifest['library']),
             'files' => count($files),
+            'diff' => $this->buildImportDiff($manifest, $files),
         ];
+    }
+
+    /**
+     * @param TransferManifest $manifest
+     * @param TransferFileList $files
+     * @return array<string, mixed>
+     */
+    private function buildImportDiff(array $manifest, array $files): array
+    {
+        $currentLibrary = $this->imports->allFamilies();
+        $incomingLibrary = $manifest['library'];
+        $currentSettings = $this->buildPortableSettingsSnapshot();
+        $incomingSettings = $manifest['settings'];
+        $secretRequirements = $manifest['secret_requirements'];
+        $settingsChanged = 0;
+        $secretsRequired = [];
+
+        foreach ($incomingSettings as $key => $value) {
+            if (($currentSettings[$key] ?? null) !== $value) {
+                $settingsChanged++;
+            }
+        }
+
+        foreach ($secretRequirements as $requirement) {
+            if (!empty($requirement['required']) || empty($requirement['exported'])) {
+                $secretsRequired[] = [
+                    'key' => $requirement['key'],
+                    'label' => $requirement['label'],
+                    'required' => $requirement['required'],
+                    'exported' => $requirement['exported'],
+                ];
+            }
+        }
+
+        return [
+            'incoming_plugin_version' => $manifest['plugin_version'],
+            'family_count' => count($incomingLibrary),
+            'file_count' => count($files),
+            'families_added' => array_values(array_diff(array_keys($incomingLibrary), array_keys($currentLibrary))),
+            'families_removed' => array_values(array_diff(array_keys($currentLibrary), array_keys($incomingLibrary))),
+            'families_changed' => $this->changedFamilySlugs($currentLibrary, $incomingLibrary),
+            'settings_changed' => $settingsChanged,
+            'secrets_required' => $secretsRequired,
+            'snapshot_will_be_created' => true,
+        ];
+    }
+
+    /**
+     * @param LibraryMap $currentLibrary
+     * @param LibraryMap $incomingLibrary
+     * @return list<string>
+     */
+    private function changedFamilySlugs(array $currentLibrary, array $incomingLibrary): array
+    {
+        $changed = [];
+
+        foreach ($incomingLibrary as $slug => $family) {
+            if (isset($currentLibrary[$slug]) && $currentLibrary[$slug] !== $family) {
+                $changed[] = $slug;
+            }
+        }
+
+        sort($changed, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $changed;
     }
 
     /**
@@ -928,6 +1547,7 @@ final class SiteTransferService
                 'exported_at' => '',
                 'families' => 0,
                 'files' => 0,
+                'diff' => [],
             ];
         }
 
@@ -941,6 +1561,7 @@ final class SiteTransferService
             'exported_at' => $this->scalarStringValue($storedMap, 'exported_at'),
             'families' => max(0, $this->scalarIntValue($storedMap, 'families')),
             'files' => max(0, $this->scalarIntValue($storedMap, 'files')),
+            'diff' => $this->normalizeStringKeyedMap($storedMap['diff'] ?? []),
         ];
     }
 

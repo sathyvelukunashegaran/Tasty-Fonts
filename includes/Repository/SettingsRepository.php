@@ -7,6 +7,8 @@ namespace TastyFonts\Repository;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\AdminAccessService;
+use TastyFonts\Maintenance\SnapshotService;
+use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Support\FontUtils;
 
 /**
@@ -136,6 +138,8 @@ final class SettingsRepository
         'bricks_disable_google_fonts_enabled' => false,
         'oxygen_integration_enabled' => null,
         'show_activity_log' => false,
+        'snapshot_retention_limit' => SnapshotService::DEFAULT_SNAPSHOT_RETENTION_LIMIT,
+        'site_transfer_export_retention_limit' => SiteTransferService::DEFAULT_EXPORT_RETENTION_LIMIT,
         'training_wheels_off' => false,
         'monospace_role_enabled' => false,
         'variable_fonts_enabled' => false,
@@ -233,6 +237,8 @@ final class SettingsRepository
         $settings['bricks_disable_google_fonts_enabled'] = !empty($settings['bricks_disable_google_fonts_enabled']);
         $settings['oxygen_integration_enabled'] = $this->normalizeOptionalBoolean($settings['oxygen_integration_enabled'] ?? null);
         $settings['show_activity_log'] = !empty($settings['show_activity_log']);
+        $settings['snapshot_retention_limit'] = SnapshotService::normalizeRetentionLimit($settings['snapshot_retention_limit'] ?? SnapshotService::DEFAULT_SNAPSHOT_RETENTION_LIMIT);
+        $settings['site_transfer_export_retention_limit'] = SiteTransferService::normalizeRetentionLimit($settings['site_transfer_export_retention_limit'] ?? SiteTransferService::DEFAULT_EXPORT_RETENTION_LIMIT);
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
         $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);
@@ -471,6 +477,16 @@ final class SettingsRepository
 
         if (array_key_exists('show_activity_log', $input)) {
             $settings['show_activity_log'] = !empty($input['show_activity_log']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('snapshot_retention_limit', $input)) {
+            $settings['snapshot_retention_limit'] = SnapshotService::normalizeRetentionLimit($input['snapshot_retention_limit']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('site_transfer_export_retention_limit', $input)) {
+            $settings['site_transfer_export_retention_limit'] = SiteTransferService::normalizeRetentionLimit($input['site_transfer_export_retention_limit']);
             $settingsChanged = true;
         }
 

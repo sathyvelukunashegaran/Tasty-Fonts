@@ -1,6 +1,39 @@
+                    <?php
+                    $showSettingsDescriptions = !$trainingWheelsOff;
+                    $settingsHeadings = [
+	                        'output-settings' => [
+	                            'title' => __('Output', 'tasty-fonts'),
+	                            'description' => __('Control stylesheet delivery, font-face rules, loading hints, and generated token or class layers.', 'tasty-fonts'),
+	                        ],
+                        'integrations' => [
+                            'title' => __('Integrations', 'tasty-fonts'),
+                            'description' => __('Sync typography with Etch, builders, the WordPress font library, and Automatic.css.', 'tasty-fonts'),
+                        ],
+                        'plugin-behavior' => [
+                            'title' => __('Behavior', 'tasty-fonts'),
+                            'description' => __('Configure update rail, onboarding hints, activity visibility, and admin access.', 'tasty-fonts'),
+                        ],
+                    ];
+                    ?>
                     <section class="tasty-fonts-card tasty-fonts-settings-card" id="tasty-fonts-settings-page" aria-labelledby="tasty-fonts-settings-panel-title">
                         <div class="tasty-fonts-card-head tasty-fonts-card-head--activity">
-                            <h2 class="screen-reader-text" id="tasty-fonts-settings-panel-title"><?php esc_html_e('Settings', 'tasty-fonts'); ?></h2>
+                            <div class="tasty-fonts-diagnostics-context tasty-fonts-settings-context">
+                                <h2 class="screen-reader-text" id="tasty-fonts-settings-panel-title"><?php esc_html_e('Settings', 'tasty-fonts'); ?></h2>
+                                <?php foreach ($settingsHeadings as $headingKey => $heading): ?>
+                                    <?php $isActiveHeading = $headingKey === 'output-settings'; ?>
+                                    <div
+                                        class="tasty-fonts-diagnostics-context-item tasty-fonts-settings-context-item <?php echo $isActiveHeading ? 'is-active' : ''; ?>"
+                                        data-tab-heading-group="settings"
+                                        data-tab-heading="<?php echo esc_attr($headingKey); ?>"
+                                        <?php if (!$isActiveHeading): ?>hidden<?php endif; ?>
+                                    >
+                                        <h2><?php echo esc_html((string) ($heading['title'] ?? '')); ?></h2>
+                                        <?php if ($showSettingsDescriptions && !empty($heading['description'])): ?>
+                                            <p><?php echo esc_html((string) $heading['description']); ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
                             <div class="tasty-fonts-settings-head-actions">
                                 <div class="tasty-fonts-studio-switcher tasty-fonts-tab-list" role="tablist" aria-label="<?php esc_attr_e('Settings sections', 'tasty-fonts'); ?>" aria-orientation="horizontal">
                                     <button
@@ -44,12 +77,12 @@
                                     </button>
                                 </div>
                                 <div class="tasty-fonts-settings-save-shell" data-settings-save-shell>
+                                    <button type="button" class="button tasty-fonts-tab-button tasty-fonts-settings-clear-button" data-settings-clear-button data-settings-form-id="tasty-fonts-settings-form" disabled><?php esc_html_e('Clear changes', 'tasty-fonts'); ?></button>
                                     <button type="submit" class="button tasty-fonts-tab-button tasty-fonts-settings-save-button" form="tasty-fonts-settings-form" data-settings-save-button disabled><?php esc_html_e('Save changes', 'tasty-fonts'); ?></button>
                                 </div>
                             </div>
                         </div>
 
-                        <?php $showSettingsDescriptions = !$trainingWheelsOff; ?>
                         <?php $updateChannel = isset($updateChannel) ? (string) $updateChannel : 'stable'; ?>
                         <?php $updateChannelOptions = isset($updateChannelOptions) && is_array($updateChannelOptions) ? $updateChannelOptions : []; ?>
                         <?php $classOutputRoleStylesEnabled = !empty($classOutputRoleStylesEnabled); ?>
@@ -68,7 +101,13 @@
                         >
                             <div class="tasty-fonts-output-settings-panel tasty-fonts-developer-panel">
                                 <div class="tasty-fonts-output-settings-form">
-                                    <div class="tasty-fonts-output-settings-list">
+	                                    <article class="tasty-fonts-health-board tasty-fonts-settings-board tasty-fonts-settings-board--output">
+	                                        <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Stylesheet delivery settings', 'tasty-fonts'); ?>">
+	                                            <div class="tasty-fonts-health-group-head">
+	                                                <h4><?php esc_html_e('Stylesheet Delivery', 'tasty-fonts'); ?></h4>
+	                                                <span class="tasty-fonts-health-group-count"><?php esc_html_e('File or Inline', 'tasty-fonts'); ?></span>
+	                                            </div>
+	                                            <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list">
                                             <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice">
                                                 <div class="tasty-fonts-output-settings-submenu-copy">
                                                     <h4><?php esc_html_e('CSS Delivery', 'tasty-fonts'); ?></h4>
@@ -76,7 +115,7 @@
                                                         <p><?php esc_html_e('Choose whether the generated stylesheet loads as a file or is printed inline in the page head.', 'tasty-fonts'); ?></p>
                                                     <?php endif; ?>
                                                 </div>
-                                                <div class="tasty-fonts-output-quick-options" role="radiogroup" aria-label="<?php esc_attr_e('CSS delivery', 'tasty-fonts'); ?>">
+                                                <div class="tasty-fonts-output-quick-options tasty-fonts-output-quick-options--proxy-source" role="radiogroup" aria-label="<?php esc_attr_e('CSS delivery', 'tasty-fonts'); ?>">
                                                     <?php foreach ($cssDeliveryModeOptions as $option): ?>
                                                         <?php $optionValue = (string) ($option['value'] ?? ''); ?>
                                                         <label class="tasty-fonts-output-quick-option<?php echo $cssDeliveryMode === $optionValue ? ' is-active' : ''; ?>" data-pill-option>
@@ -92,15 +131,33 @@
                                                         </label>
                                                     <?php endforeach; ?>
                                                 </div>
-                                            </div>
-                                            <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice">
-                                                <div class="tasty-fonts-output-settings-submenu-copy">
+                                                <span class="tasty-fonts-select-field tasty-fonts-settings-row-select">
+                                                    <select class="tasty-fonts-select" data-settings-radio-proxy="css_delivery_mode" aria-label="<?php esc_attr_e('CSS delivery', 'tasty-fonts'); ?>">
+                                                        <?php foreach ($cssDeliveryModeOptions as $option): ?>
+                                                            <?php $optionValue = (string) ($option['value'] ?? ''); ?>
+                                                            <option value="<?php echo esc_attr($optionValue); ?>" <?php selected($cssDeliveryMode, $optionValue); ?>>
+                                                                <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+	                                                    </select>
+	                                                </span>
+	                                            </div>
+	                                            </div>
+	                                        </section>
+	                                        <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Font face rule settings', 'tasty-fonts'); ?>">
+	                                            <div class="tasty-fonts-health-group-head">
+	                                                <h4><?php esc_html_e('Font Face Rules', 'tasty-fonts'); ?></h4>
+	                                                <span class="tasty-fonts-health-group-count"><?php esc_html_e('Rendering Defaults', 'tasty-fonts'); ?></span>
+	                                            </div>
+	                                            <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list">
+	                                            <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice">
+	                                                <div class="tasty-fonts-output-settings-submenu-copy">
                                                     <h4><?php esc_html_e('Default Font Display', 'tasty-fonts'); ?></h4>
                                                     <?php if ($showSettingsDescriptions): ?>
                                                         <p><?php esc_html_e('Default font-display value for generated @font-face rules.', 'tasty-fonts'); ?></p>
                                                     <?php endif; ?>
                                                 </div>
-                                                <div class="tasty-fonts-output-quick-options" role="radiogroup" aria-label="<?php esc_attr_e('Default font display', 'tasty-fonts'); ?>">
+                                                <div class="tasty-fonts-output-quick-options tasty-fonts-output-quick-options--proxy-source" role="radiogroup" aria-label="<?php esc_attr_e('Default font display', 'tasty-fonts'); ?>">
                                                     <?php foreach ($fontDisplayOptions as $option): ?>
                                                         <?php $optionValue = (string) ($option['value'] ?? ''); ?>
                                                         <label class="tasty-fonts-output-quick-option<?php echo $fontDisplay === $optionValue ? ' is-active' : ''; ?>" data-pill-option>
@@ -116,6 +173,16 @@
                                                         </label>
                                                     <?php endforeach; ?>
                                                 </div>
+                                                <span class="tasty-fonts-select-field tasty-fonts-settings-row-select">
+                                                    <select class="tasty-fonts-select" data-settings-radio-proxy="font_display" aria-label="<?php esc_attr_e('Default font display', 'tasty-fonts'); ?>">
+                                                        <?php foreach ($fontDisplayOptions as $option): ?>
+                                                            <?php $optionValue = (string) ($option['value'] ?? ''); ?>
+                                                            <option value="<?php echo esc_attr($optionValue); ?>" <?php selected($fontDisplay, $optionValue); ?>>
+                                                                <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </span>
                                             </div>
                                             <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice">
                                                 <div class="tasty-fonts-output-settings-submenu-copy">
@@ -124,7 +191,7 @@
                                                         <p><?php esc_html_e('Controls how unicode-range is emitted in generated output. This affects emitted CSS and editor payloads only, not the stored library metadata.', 'tasty-fonts'); ?></p>
                                                     <?php endif; ?>
                                                 </div>
-                                                <div class="tasty-fonts-output-quick-options" role="radiogroup" aria-label="<?php esc_attr_e('Unicode range output', 'tasty-fonts'); ?>">
+                                                <div class="tasty-fonts-output-quick-options tasty-fonts-output-quick-options--proxy-source" role="radiogroup" aria-label="<?php esc_attr_e('Unicode range output', 'tasty-fonts'); ?>">
                                                     <?php foreach ($unicodeRangeModeOptions as $option): ?>
                                                         <?php $optionValue = (string) ($option['value'] ?? ''); ?>
                                                         <label class="tasty-fonts-output-quick-option<?php echo $unicodeRangeMode === $optionValue ? ' is-active' : ''; ?>" data-pill-option>
@@ -141,6 +208,16 @@
                                                         </label>
                                                     <?php endforeach; ?>
                                                 </div>
+                                                <span class="tasty-fonts-select-field tasty-fonts-settings-row-select">
+                                                    <select class="tasty-fonts-select" data-settings-radio-proxy="unicode_range_mode" aria-label="<?php esc_attr_e('Unicode range output', 'tasty-fonts'); ?>">
+                                                        <?php foreach ($unicodeRangeModeOptions as $option): ?>
+                                                            <?php $optionValue = (string) ($option['value'] ?? ''); ?>
+                                                            <option value="<?php echo esc_attr($optionValue); ?>" <?php selected($unicodeRangeMode, $optionValue); ?>>
+                                                                <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </span>
                                             </div>
                                             <div class="tasty-fonts-output-settings-text-field" data-unicode-range-custom-wrap <?php echo $unicodeRangeCustomVisible ? '' : 'hidden'; ?>>
                                                 <label class="tasty-fonts-output-settings-text-label" for="tasty-fonts-unicode-range-custom-value">
@@ -154,11 +231,19 @@
                                                     name="unicode_range_custom_value"
                                                     rows="3"
                                                     class="tasty-fonts-text-control tasty-fonts-output-settings-textarea"
-                                                    data-unicode-range-custom
-                                                ><?php echo esc_textarea($unicodeRangeCustomValue); ?></textarea>
-                                            </div>
-                                            <input type="hidden" name="minify_css_output" value="0">
-                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+	                                                    data-unicode-range-custom
+	                                                ><?php echo esc_textarea($unicodeRangeCustomValue); ?></textarea>
+	                                            </div>
+	                                            </div>
+	                                        </section>
+	                                        <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Runtime loading settings', 'tasty-fonts'); ?>">
+	                                            <div class="tasty-fonts-health-group-head">
+	                                                <h4><?php esc_html_e('Runtime Loading', 'tasty-fonts'); ?></h4>
+	                                                <span class="tasty-fonts-health-group-count"><?php esc_html_e('Performance Hints', 'tasty-fonts'); ?></span>
+	                                            </div>
+	                                            <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list">
+	                                            <input type="hidden" name="minify_css_output" value="0">
+	                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                                 <input
                                                     type="checkbox"
                                                     class="tasty-fonts-toggle-input"
@@ -205,10 +290,18 @@
                                                     <span class="tasty-fonts-toggle-title"><?php esc_html_e('Remote Connection Hints', 'tasty-fonts'); ?></span>
                                                     <?php if ($showSettingsDescriptions): ?>
                                                         <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds preconnect hints for live Google, Bunny, and Adobe deliveries.', 'tasty-fonts'); ?></span>
-                                                    <?php endif; ?>
-                                                </span>
-                                            </label>
-                                        <div class="tasty-fonts-output-settings-section tasty-fonts-output-settings-section--advanced">
+	                                                    <?php endif; ?>
+	                                                </span>
+	                                            </label>
+	                                            </div>
+	                                        </section>
+	                                        <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Output layer settings', 'tasty-fonts'); ?>">
+	                                            <div class="tasty-fonts-health-group-head">
+	                                                <h4><?php esc_html_e('Output Layers', 'tasty-fonts'); ?></h4>
+	                                                <span class="tasty-fonts-health-group-count"><?php esc_html_e('Variables & Classes', 'tasty-fonts'); ?></span>
+	                                            </div>
+	                                            <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list">
+	                                        <div class="tasty-fonts-output-settings-section tasty-fonts-output-settings-section--advanced">
                                                 <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice tasty-fonts-output-settings-choice--advanced" data-output-quick-mode-wrap>
                                                 <div class="tasty-fonts-output-settings-submenu-copy">
                                                     <h4><?php esc_html_e('Output Preset', 'tasty-fonts'); ?></h4>
@@ -226,7 +319,7 @@
                                                     data-output-quick-mode-preference
                                                     data-output-quick-mode-saved-preference="<?php echo esc_attr($outputQuickModePreference); ?>"
                                                 >
-                                                <div class="tasty-fonts-output-quick-options" role="radiogroup" aria-label="<?php esc_attr_e('Output quick mode', 'tasty-fonts'); ?>">
+                                                <div class="tasty-fonts-output-quick-options tasty-fonts-output-quick-options--proxy-source" role="radiogroup" aria-label="<?php esc_attr_e('Output quick mode', 'tasty-fonts'); ?>">
                                                     <?php foreach ([
                                                         'minimal' => __('Minimal', 'tasty-fonts'),
                                                         'variables' => __('Variables only', 'tasty-fonts'),
@@ -246,6 +339,20 @@
                                                         </label>
                                                     <?php endforeach; ?>
                                                 </div>
+                                                <span class="tasty-fonts-select-field tasty-fonts-settings-row-select">
+                                                    <select class="tasty-fonts-select" data-settings-radio-proxy="tasty_fonts_output_quick_mode" aria-label="<?php esc_attr_e('Output quick mode', 'tasty-fonts'); ?>">
+                                                        <?php foreach ([
+                                                            'minimal' => __('Minimal', 'tasty-fonts'),
+                                                            'variables' => __('Variables only', 'tasty-fonts'),
+                                                            'classes' => __('Classes only', 'tasty-fonts'),
+                                                            'custom' => __('Custom', 'tasty-fonts'),
+                                                        ] as $quickModeValue => $quickModeLabel): ?>
+                                                            <option value="<?php echo esc_attr($quickModeValue); ?>" <?php selected($outputQuickMode, $quickModeValue); ?>>
+                                                                <?php echo esc_html($quickModeLabel); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </span>
                                                 <div
                                                     class="tasty-fonts-page-notice tasty-fonts-inline-note--warning tasty-fonts-output-quick-notice"
                                                     data-output-quick-mode-notice
@@ -305,7 +412,7 @@
                                                         <?php endif; ?>
                                                     </div>
                                                     <div class="tasty-fonts-output-settings-submenu-list">
-                                                        <details class="tasty-fonts-output-settings-details tasty-fonts-output-settings-submenu-group--role-styling" data-output-role-class-styles-option <?php echo ($outputQuickMode === 'classes' || ($outputQuickMode === 'custom' && $classOutputEnabled)) ? '' : 'hidden'; ?>>
+                                                        <details open class="tasty-fonts-output-settings-details tasty-fonts-output-settings-submenu-group--role-styling" data-output-role-class-styles-option <?php echo ($outputQuickMode === 'classes' || ($outputQuickMode === 'custom' && $classOutputEnabled)) ? '' : 'hidden'; ?>>
                                                             <summary>
                                                                 <span><?php esc_html_e('Role Styling', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php esc_html_e('Weights and variation settings in role classes', 'tasty-fonts'); ?></span>
@@ -324,7 +431,7 @@
                                                                 </label>
                                                             </div>
                                                         </details>
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Role Classes', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php echo esc_html($monospaceRoleEnabled ? __('.font-heading, .font-body, .font-monospace', 'tasty-fonts') : __('.font-heading, .font-body', 'tasty-fonts')); ?></span>
@@ -365,7 +472,7 @@
                                                                 </label>
                                                             </div>
                                                         </details>
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Role Alias Classes', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php echo esc_html($monospaceRoleEnabled ? __('.font-interface, .font-ui, .font-code', 'tasty-fonts') : __('.font-interface, .font-ui', 'tasty-fonts')); ?></span>
@@ -406,7 +513,7 @@
                                                                 </label>
                                                             </div>
                                                         </details>
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Category Classes', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php echo esc_html($monospaceRoleEnabled ? __('.font-sans, .font-serif, .font-mono', 'tasty-fonts') : __('.font-sans, .font-serif', 'tasty-fonts')); ?></span>
@@ -447,7 +554,7 @@
                                                                 </label>
                                                             </div>
                                                         </details>
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Family Classes', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php esc_html_e('Per-family .font-* helpers', 'tasty-fonts'); ?></span>
@@ -497,7 +604,7 @@
                                                         <?php endif; ?>
                                                     </div>
                                                     <div class="tasty-fonts-output-settings-submenu-list">
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Role Weight Variables', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php echo esc_html($monospaceRoleEnabled ? __('--font-heading-weight, --font-body-weight, --font-monospace-weight', 'tasty-fonts') : __('--font-heading-weight, --font-body-weight', 'tasty-fonts')); ?></span>
@@ -528,7 +635,7 @@
                                                                 </label>
                                                             </div>
                                                         </details>
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Global Weight Tokens', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php esc_html_e('--weight-400, --weight-bold', 'tasty-fonts'); ?></span>
@@ -547,7 +654,7 @@
                                                                 </label>
                                                             </div>
                                                         </details>
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Role Alias Variables', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php echo esc_html($monospaceRoleEnabled ? __('--font-interface, --font-ui, --font-code', 'tasty-fonts') : __('--font-interface, --font-ui', 'tasty-fonts')); ?></span>
@@ -566,7 +673,7 @@
                                                                 </label>
                                                             </div>
                                                         </details>
-                                                        <details class="tasty-fonts-output-settings-details">
+                                                        <details open class="tasty-fonts-output-settings-details">
                                                             <summary>
                                                                 <span><?php esc_html_e('Category Aliases', 'tasty-fonts'); ?></span>
                                                                 <span class="tasty-fonts-output-settings-details-meta"><?php echo esc_html($monospaceRoleEnabled ? __('--font-sans, --font-serif, --font-mono', 'tasty-fonts') : __('--font-sans, --font-serif', 'tasty-fonts')); ?></span>
@@ -612,12 +719,14 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                    </div>
-                                </div>
+                                                </div>
+                                            </div>
+                                            </div>
+                                    </section>
+                                </article>
                             </div>
-                        </section>
+                        </div>
+                    </section>
 
                         <section
                             id="tasty-fonts-settings-panel-integrations"
@@ -674,36 +783,48 @@
                                     <h3><?php esc_html_e('Integrations', 'tasty-fonts'); ?></h3>
                                 </div>
 
-                                <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list">
-                                    <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice tasty-fonts-integration-row--readonly">
-                                        <div class="tasty-fonts-output-settings-submenu-copy">
-                                            <span class="tasty-fonts-toggle-title-line tasty-fonts-integration-heading">
-                                                <span class="tasty-fonts-integration-mark tasty-fonts-integration-mark--etch" aria-hidden="true"></span>
-                                                <span><?php echo esc_html((string) ($etchIntegration['title'] ?? __('Etch Canvas Bridge', 'tasty-fonts'))); ?></span>
-                                                <?php if ($etchBadgeInteractive): ?>
-                                                    <button
-                                                        type="button"
-                                                        class="<?php echo esc_attr($etchBadgeClass); ?>"
-                                                        <?php $this->renderPassiveHelpAttributes($etchStatusHelp); ?>
-                                                        aria-label="<?php esc_attr_e('Etch integration status', 'tasty-fonts'); ?>"
-                                                    >
-                                                        <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
-                                                    </button>
-                                                <?php else: ?>
-                                                    <span class="<?php echo esc_attr($etchBadgeClass); ?>">
-                                                        <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
-                                                    </span>
-                                                <?php endif; ?>
-                                            </span>
-                                            <?php if ($showSettingsDescriptions && (string) ($etchIntegration['description'] ?? '') !== ''): ?>
-                                                <p><?php echo esc_html((string) ($etchIntegration['description'] ?? '')); ?></p>
-                                            <?php endif; ?>
+                                <article class="tasty-fonts-health-board tasty-fonts-settings-board tasty-fonts-settings-board--integrations">
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Etch canvas connection', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('Etch Canvas', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Connection', 'tasty-fonts'); ?></span>
                                         </div>
-                                    </div>
-                                </div>
+                                        <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
+                                            <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice tasty-fonts-integration-row--readonly">
+                                                <div class="tasty-fonts-output-settings-submenu-copy">
+                                                    <span class="tasty-fonts-toggle-title-line tasty-fonts-integration-heading">
+                                                        <span class="tasty-fonts-integration-mark tasty-fonts-integration-mark--etch" aria-hidden="true"></span>
+                                                        <span><?php echo esc_html((string) ($etchIntegration['title'] ?? __('Etch Canvas Bridge', 'tasty-fonts'))); ?></span>
+                                                        <?php if ($etchBadgeInteractive): ?>
+                                                            <button
+                                                                type="button"
+                                                                class="<?php echo esc_attr($etchBadgeClass); ?>"
+                                                                <?php $this->renderPassiveHelpAttributes($etchStatusHelp); ?>
+                                                                aria-label="<?php esc_attr_e('Etch integration status', 'tasty-fonts'); ?>"
+                                                            >
+                                                                <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
+                                                            </button>
+                                                        <?php else: ?>
+                                                            <span class="<?php echo esc_attr($etchBadgeClass); ?>">
+                                                                <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                    <?php if ($showSettingsDescriptions && (string) ($etchIntegration['description'] ?? '') !== ''): ?>
+                                                        <p><?php echo esc_html((string) ($etchIntegration['description'] ?? '')); ?></p>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
 
-                                <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
-                                    <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list">
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Builder sync integrations', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('Builder Sync', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Theme Controls', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
+                                            <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
                                         <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration">
                                             <input type="hidden" name="bricks_integration_enabled" value="0">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration">
@@ -848,7 +969,7 @@
                                                                         <div class="tasty-fonts-bricks-target-actions">
                                                                             <button
                                                                                 type="submit"
-                                                                                class="button button-small tasty-fonts-create-theme-style-button"
+                                                                                class="button button-small tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--generate tasty-fonts-create-theme-style-button"
                                                                                 name="bricks_create_theme_style"
                                                                                 value="1"
                                                                                 data-settings-force-submit
@@ -939,7 +1060,7 @@
                                                                 <?php if (!empty($bricksThemeStyleTargeting['show_delete_action'])): ?>
                                                                     <button
                                                                         type="submit"
-                                                                        class="button button-secondary button-small"
+                                                                        class="button button-secondary button-small tasty-fonts-button-danger tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--delete"
                                                                         name="bricks_delete_theme_style"
                                                                         value="1"
                                                                         data-settings-force-submit
@@ -949,7 +1070,7 @@
                                                                 <?php endif; ?>
                                                                 <button
                                                                     type="submit"
-                                                                    class="button button-secondary button-small"
+                                                                    class="button button-secondary button-small tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--restore"
                                                                     name="bricks_reset_integration"
                                                                     value="1"
                                                                     data-settings-force-submit
@@ -993,6 +1114,17 @@
                                             </label>
                                         </div>
 
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('WordPress font library sync', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('WordPress Font Library', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Library Sync', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
+                                            <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
                                         <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration">
                                             <input type="hidden" name="block_editor_font_library_sync_enabled" value="0">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration">
@@ -1021,6 +1153,17 @@
                                             </label>
                                         </div>
 
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Framework token mapping', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('Framework Tokens', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Role Mapping', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
+                                            <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
                                         <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration">
                                             <input type="hidden" name="acss_font_role_sync_enabled" value="0">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration">
@@ -1050,58 +1193,54 @@
                                             </label>
 
                                             <?php if (($acssIntegration['enabled'] ?? false) === true && ($acssIntegration['available'] ?? false) === true): ?>
-                                            <details class="tasty-fonts-integration-details tasty-fonts-acss-details">
-                                                <summary><?php esc_html_e('Font mapping', 'tasty-fonts'); ?></summary>
-                                                <div class="tasty-fonts-integration-details-body tasty-fonts-integration-details-body--two-column">
-                                                    <section class="tasty-fonts-integration-group" aria-label="<?php esc_attr_e('Current Automatic.css values', 'tasty-fonts'); ?>">
-                                                        <span class="tasty-fonts-integration-group-title"><?php esc_html_e('Current values', 'tasty-fonts'); ?></span>
-                                                        <dl class="tasty-fonts-integration-kv-list">
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Heading', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) (($acssIntegration['current']['heading'] ?? '') !== '' ? $acssIntegration['current']['heading'] : __('empty', 'tasty-fonts'))); ?></span></dd>
-                                                            </div>
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Body', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) (($acssIntegration['current']['body'] ?? '') !== '' ? $acssIntegration['current']['body'] : __('empty', 'tasty-fonts'))); ?></span></dd>
-                                                            </div>
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Heading Weight', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) (($acssIntegration['current']['heading_weight'] ?? '') !== '' ? $acssIntegration['current']['heading_weight'] : __('empty', 'tasty-fonts'))); ?></span></dd>
-                                                            </div>
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Body Weight', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) (($acssIntegration['current']['body_weight'] ?? '') !== '' ? $acssIntegration['current']['body_weight'] : __('empty', 'tasty-fonts'))); ?></span></dd>
-                                                            </div>
-                                                        </dl>
-                                                    </section>
-
-                                                    <section class="tasty-fonts-integration-group" aria-label="<?php esc_attr_e('Automatic.css target mapping', 'tasty-fonts'); ?>">
-                                                        <span class="tasty-fonts-integration-group-title"><?php esc_html_e('Target values', 'tasty-fonts'); ?></span>
-                                                        <dl class="tasty-fonts-integration-kv-list">
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Heading', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_FAMILY] ?? 'var(--font-heading)')); ?></span></dd>
-                                                            </div>
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Body', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_FAMILY] ?? 'var(--font-body)')); ?></span></dd>
-                                                            </div>
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Heading Weight', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_WEIGHT] ?? 'var(--font-heading-weight)')); ?></span></dd>
-                                                            </div>
-                                                            <div class="tasty-fonts-integration-kv">
-                                                                <dt><?php esc_html_e('Body Weight', 'tasty-fonts'); ?></dt>
-                                                                <dd><span class="tasty-fonts-integration-code"><?php echo esc_html((string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_WEIGHT] ?? 'var(--font-body-weight)')); ?></span></dd>
-                                                            </div>
-                                                        </dl>
-                                                    </section>
+                                            <?php
+                                            $acssMappingRows = [
+                                                [
+                                                    'label' => __('Heading', 'tasty-fonts'),
+                                                    'current' => (string) (($acssIntegration['current']['heading'] ?? '') !== '' ? $acssIntegration['current']['heading'] : __('empty', 'tasty-fonts')),
+                                                    'target' => (string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_FAMILY] ?? 'var(--font-heading)'),
+                                                ],
+                                                [
+                                                    'label' => __('Body', 'tasty-fonts'),
+                                                    'current' => (string) (($acssIntegration['current']['body'] ?? '') !== '' ? $acssIntegration['current']['body'] : __('empty', 'tasty-fonts')),
+                                                    'target' => (string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_FAMILY] ?? 'var(--font-body)'),
+                                                ],
+                                                [
+                                                    'label' => __('Heading Weight', 'tasty-fonts'),
+                                                    'current' => (string) (($acssIntegration['current']['heading_weight'] ?? '') !== '' ? $acssIntegration['current']['heading_weight'] : __('empty', 'tasty-fonts')),
+                                                    'target' => (string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_HEADING_FONT_WEIGHT] ?? 'var(--font-heading-weight)'),
+                                                ],
+                                                [
+                                                    'label' => __('Body Weight', 'tasty-fonts'),
+                                                    'current' => (string) (($acssIntegration['current']['body_weight'] ?? '') !== '' ? $acssIntegration['current']['body_weight'] : __('empty', 'tasty-fonts')),
+                                                    'target' => (string) ($acssIntegration['desired'][\TastyFonts\Integrations\AcssIntegrationService::OPTION_TEXT_FONT_WEIGHT] ?? 'var(--font-body-weight)'),
+                                                ],
+                                            ];
+                                            ?>
+                                            <div class="tasty-fonts-integration-mapping tasty-fonts-acss-mapping" aria-label="<?php esc_attr_e('Automatic.css font mapping', 'tasty-fonts'); ?>">
+                                                <div class="tasty-fonts-integration-mapping-head">
+                                                    <span><?php esc_html_e('Font mapping', 'tasty-fonts'); ?></span>
+                                                    <span><?php esc_html_e('Current to Target', 'tasty-fonts'); ?></span>
                                                 </div>
-                                            </details>
+                                                <div class="tasty-fonts-integration-mapping-list">
+                                                    <?php foreach ($acssMappingRows as $acssMappingRow): ?>
+                                                        <div class="tasty-fonts-integration-mapping-row">
+                                                            <span class="tasty-fonts-integration-mapping-label"><?php echo esc_html((string) $acssMappingRow['label']); ?></span>
+                                                            <span class="tasty-fonts-integration-mapping-values">
+                                                                <span class="tasty-fonts-integration-code"><?php echo esc_html((string) $acssMappingRow['current']); ?></span>
+                                                                <span class="tasty-fonts-integration-mapping-to"><?php esc_html_e('to', 'tasty-fonts'); ?></span>
+                                                                <span class="tasty-fonts-integration-code"><?php echo esc_html((string) $acssMappingRow['target']); ?></span>
+                                                            </span>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </div>
                                             <?php endif; ?>
                                         </div>
-                                    </div>
-                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </article>
                             </div>
                         </section>
 
@@ -1119,7 +1258,13 @@
                                     <h3><?php esc_html_e('Behavior', 'tasty-fonts'); ?></h3>
                                 </div>
                                 <div class="tasty-fonts-output-settings-form tasty-fonts-settings-behavior-form<?php echo $showSettingsDescriptions ? '' : ' is-compact'; ?>">
-                                <div class="tasty-fonts-output-settings-list">
+                                <article class="tasty-fonts-health-board tasty-fonts-settings-board tasty-fonts-settings-board--behavior">
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Release updates', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('Release Updates', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Update Rail', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list">
                                     <div class="tasty-fonts-output-settings-detail-group tasty-fonts-settings-flat-row tasty-fonts-settings-flat-row--channel">
                                         <div class="tasty-fonts-output-settings-submenu-copy tasty-fonts-settings-flat-row-copy tasty-fonts-settings-flat-row-copy--channel">
                                             <h4><?php esc_html_e('Update Channel', 'tasty-fonts'); ?></h4>
@@ -1128,7 +1273,7 @@
                                             <?php endif; ?>
                                         </div>
                                         <div class="tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--channel-control">
-                                            <div class="tasty-fonts-output-quick-options tasty-fonts-settings-flat-row-options" role="radiogroup" aria-label="<?php esc_attr_e('Update channel', 'tasty-fonts'); ?>">
+                                            <div class="tasty-fonts-output-quick-options tasty-fonts-settings-flat-row-options tasty-fonts-output-quick-options--proxy-source" role="radiogroup" aria-label="<?php esc_attr_e('Update channel', 'tasty-fonts'); ?>">
                                                 <?php foreach ($updateChannelOptions as $option): ?>
                                                     <?php $optionValue = (string) ($option['value'] ?? 'stable'); ?>
                                                     <label class="tasty-fonts-output-quick-option<?php echo $updateChannel === $optionValue ? ' is-active' : ''; ?>" data-pill-option>
@@ -1143,13 +1288,23 @@
                                                     </label>
                                                 <?php endforeach; ?>
                                             </div>
+                                            <span class="tasty-fonts-select-field tasty-fonts-settings-row-select">
+                                                <select class="tasty-fonts-select" data-settings-radio-proxy="update_channel" aria-label="<?php esc_attr_e('Update channel', 'tasty-fonts'); ?>">
+                                                    <?php foreach ($updateChannelOptions as $option): ?>
+                                                        <?php $optionValue = (string) ($option['value'] ?? 'stable'); ?>
+                                                        <option value="<?php echo esc_attr($optionValue); ?>" <?php selected($updateChannel, $optionValue); ?>>
+                                                            <?php echo esc_html((string) ($option['label'] ?? '')); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </span>
                                         </div>
                                         <?php if (!empty($updateChannelStatus['can_reinstall'])): ?>
                                             <div class="tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--channel-action">
                                                 <div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
                                                     <button
                                                         type="submit"
-                                                        class="button button-small tasty-fonts-developer-action-button"
+                                                        class="button button-small tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--restore tasty-fonts-settings-flat-row-action"
                                                         form="tasty-fonts-reinstall-update-channel-form"
                                                         name="tasty_fonts_reinstall_update_channel"
                                                         value="1"
@@ -1159,27 +1314,15 @@
                                                 </div>
                                             </div>
                                         <?php endif; ?>
-                                        <div class="tasty-fonts-settings-flat-row-support tasty-fonts-settings-flat-row-support--channel">
-                                            <div class="tasty-fonts-settings-flat-row-status tasty-fonts-settings-flat-row-status--channel">
-                                                <span class="tasty-fonts-badge <?php echo esc_attr((string) ($updateChannelStatus['state_class'] ?? '')); ?>">
-                                                    <?php echo esc_html((string) ($updateChannelStatus['state_label'] ?? __('Unavailable', 'tasty-fonts'))); ?>
-                                                </span>
-                                                <p class="tasty-fonts-settings-flat-row-summary">
-                                                    <?php
-                                                    echo esc_html(
-                                                        sprintf(
-                                                            __('Installed: %1$s. Latest for %2$s: %3$s.', 'tasty-fonts'),
-                                                            (string) ($updateChannelStatus['installed_version'] ?? __('Unknown', 'tasty-fonts')),
-                                                            (string) ($updateChannelStatus['selected_channel_label'] ?? __('Stable', 'tasty-fonts')),
-                                                            (string) ($updateChannelStatus['latest_version'] ?? __('Unavailable', 'tasty-fonts'))
-                                                        )
-                                                    );
-                                                    ?>
-                                                </p>
-                                            </div>
-                                        </div>
                                     </div>
-                                    <div class="tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--stack tasty-fonts-settings-behavior-stack">
+                                        </div>
+                                    </section>
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Font capabilities', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('Font Capabilities', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Roles & Axes', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
                                         <input type="hidden" name="monospace_role_enabled" value="0">
                                         <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="monospace_role_enabled" value="1" <?php checked($monospaceRoleEnabled); ?>>
@@ -1202,6 +1345,14 @@
                                                 <?php endif; ?>
                                             </span>
                                         </label>
+                                        </div>
+                                    </section>
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Admin experience', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('Admin Experience', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Guidance & Logs', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
                                         <input type="hidden" name="training_wheels_off" value="0">
                                         <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="training_wheels_off" value="1" <?php checked($trainingWheelsOff); ?>>
@@ -1224,6 +1375,14 @@
                                                 <?php endif; ?>
                                             </span>
                                         </label>
+                                        </div>
+                                    </section>
+                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Cleanup and access', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+                                            <h4><?php esc_html_e('Cleanup & Access', 'tasty-fonts'); ?></h4>
+                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Files & Permissions', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
                                         <input type="hidden" name="delete_uploaded_files_on_uninstall" value="0">
                                         <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="delete_uploaded_files_on_uninstall" value="1" <?php checked($deleteUploadedFilesOnUninstall); ?>>
@@ -1235,7 +1394,6 @@
                                                 <?php endif; ?>
                                             </span>
                                         </label>
-                                    </div>
                                     <?php
                                     $adminAccessSummary = isset($adminAccessSummary) && is_array($adminAccessSummary) ? $adminAccessSummary : [];
                                     $adminAccessCustomEnabled = !empty($adminAccessCustomEnabled);
@@ -1403,6 +1561,8 @@
                                         </div>
                                     </div>
                                 </div>
+                                    </section>
+                                </article>
                                 </div>
                             </div>
                         </section>

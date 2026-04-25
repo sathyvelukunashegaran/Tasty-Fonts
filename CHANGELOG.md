@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added rollback snapshots for Tasty Fonts settings, role assignments, library metadata, generated CSS, and managed font files, including manual create, rename, restore, delete, retention, and automatic pre-destructive-operation checkpoints.
+- Added saved site-transfer export bundle management with download, rename, protect, delete, and retention controls.
+- Added sanitized support bundles for diagnostics, generated CSS, storage metadata, activity, settings, and library state without exposing Google API keys.
+
+### Changed
+
+- Reworked Settings into shared row-board layouts for Output, Integrations, and Behavior, with contextual tab headers, compact select proxies, centralized clear/save actions, and shared passive help placement.
+- Refined Advanced Tools Transfer & Recovery around a single row-action system for exports, imports, snapshots, support bundles, recovery notices, and transfer activity.
+- Expanded site-transfer dry runs with import diff details, Google API key validation state, and clear notice that a rollback snapshot will be created before import.
+- Documented the Settings row, status-dot, and Advanced Tools row-action design contracts so future admin UI work uses the same tokenized layout rules.
+
+### Fixed
+
+- Fixed custom access rules detail spacing so expanded role and user controls use the shared Settings row gutter instead of sitting flush to the edge.
+- Removed unused admin CSS and tightened Stylelint so admin spacing properties reject hardcoded numeric values in favor of Tasty design tokens.
+- Added automatic rollback snapshots before settings reset, managed library deletion, transfer imports, and snapshot restores so destructive maintenance paths have a local recovery point.
+
 ## [1.14.0-beta.1] - 2026-04-25
 
 ### Changed

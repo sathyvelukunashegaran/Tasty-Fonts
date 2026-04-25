@@ -5,6 +5,15 @@ const tastyClassPattern = [
     message: 'Expected plugin CSS classes to use the tasty-fonts-* namespace or an approved WordPress/state class.'
   }
 ];
+const hardcodedGeometryValuePattern =
+  '/(?<![-_a-zA-Z0-9])-?(?:\\d*\\.\\d+|\\d+)(?:px|rem|em|ch|vw|vh|%|deg|fr|ms|s)?(?![-_a-zA-Z0-9])/';
+const spacingPropertyPattern =
+  '/^(?:gap|row-gap|column-gap|margin|margin-(?:top|right|bottom|left)|margin-inline|margin-inline-(?:start|end)|margin-block|margin-block-(?:start|end)|padding|padding-(?:top|right|bottom|left)|padding-inline|padding-inline-(?:start|end)|padding-block|padding-block-(?:start|end))$/';
+const geometryTokenRules = {
+  'declaration-property-value-disallowed-list': {
+    [spacingPropertyPattern]: [hardcodedGeometryValuePattern]
+  }
+};
 
 /** @type {import('stylelint').Config} */
 export default {
@@ -70,6 +79,7 @@ export default {
     {
       files: ['assets/css/admin.css'],
       rules: {
+        ...geometryTokenRules,
         'color-no-hex': [
           true,
           {
@@ -87,6 +97,7 @@ export default {
     {
       files: ['assets/css/admin-rtl.css'],
       rules: {
+        ...geometryTokenRules,
         'color-no-hex': true
       }
     }

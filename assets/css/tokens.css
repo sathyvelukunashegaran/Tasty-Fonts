@@ -11,9 +11,8 @@
  *
  * 3. Hardcoded px values for spacing, sizing, and typography are NOT
  *    permitted in admin.css for values that exist on the token scale.
- *    Use the numeric (--tasty-space-N) or t-shirt (--tasty-space-xs … xxl)
- *    aliases instead. Sub-step values (--tasty-space-1-5, -2-5, -3-5, -4-5)
- *    cover the common in-between gaps.
+ *    Use the numeric (--tasty-space-N) aliases instead. Sub-step values
+ *    (--tasty-space-1-5, -2-5, -3-5, -4-5) cover the common in-between gaps.
  *
  * 4. assets/css/admin-rtl.css is directional overrides only (flex-direction,
  *    margin, text-align). Token evolution stays centralised here.
@@ -28,26 +27,17 @@
     --tasty-gray-100: #eef3f8;
     --tasty-gray-100-rgb: 238, 243, 248;
     --tasty-gray-150: #e7edf4;
-    --tasty-gray-150-rgb: 231, 237, 244;
     --tasty-gray-300: #d9e2ec;
     --tasty-gray-300-rgb: 217, 226, 236;
-    --tasty-gray-600: #6b7c93;
     --tasty-gray-600-rgb: 107, 124, 147;
     --tasty-gray-700: #425466;
     --tasty-gray-700-rgb: 66, 84, 102;
-    --tasty-gray-900: #0a2540;
     --tasty-gray-900-rgb: 10, 37, 64;
     --tasty-brand-blue: #0f6fb7;
     --tasty-brand-blue-hover: #0b5f9e;
     --tasty-brand-blue-active: #084a7d;
     --tasty-brand-blue-rgb: 15, 111, 183;
-    --tasty-brand-blue-soft: #e7f3fb;
-    --tasty-brand-blue-soft-rgb: 231, 243, 251;
-    --tasty-brand-blue-quiet: #cfe9f9;
-    --tasty-brand-cyan: #32c5f4;
     --tasty-brand-cyan-rgb: 50, 197, 244;
-    --tasty-brand-sky: #79d3ff;
-    --tasty-brand-sky-rgb: 121, 211, 255;
     --tasty-ink: #0a2540;
     --tasty-ink-rgb: 10, 37, 64;
     --tasty-slate: #425466;
@@ -85,7 +75,6 @@
     --tasty-surface-accent-subtle: rgba(var(--tasty-accent-rgb), 0.03);
     --tasty-surface-accent-soft: var(--tasty-accent-soft);
     --tasty-surface-success: var(--tasty-success-soft);
-    --tasty-surface-warning-subtle: rgba(var(--tasty-warning-rgb), 0.045);
     --tasty-surface-warning: var(--tasty-warning-soft);
     --tasty-surface-danger: var(--tasty-danger-soft);
     --tasty-surface-danger-strong: rgba(var(--tasty-danger-rgb), 0.1);
@@ -109,7 +98,6 @@
     --tasty-alpha-16: 0.16;
     --tasty-alpha-18: 0.18;
     --tasty-alpha-20: 0.2;
-    --tasty-alpha-22: 0.22;
     --tasty-alpha-24: 0.24;
     --tasty-alpha-26: 0.26;
     --tasty-alpha-28: 0.28;
@@ -120,7 +108,6 @@
     --tasty-alpha-70: 0.7;
     --tasty-alpha-72: 0.72;
     --tasty-alpha-74: 0.74;
-    --tasty-alpha-76: 0.76;
     --tasty-alpha-78: 0.78;
     --tasty-alpha-82: 0.82;
     --tasty-alpha-84: 0.84;
@@ -134,11 +121,9 @@
 
     /* Semantic borders */
     --tasty-border: var(--tasty-gray-300);
-    --tasty-border-strong: var(--tasty-gray-600);
     --tasty-border-subtle: rgba(var(--tasty-gray-600-rgb), 0.16);
     --tasty-border-subtle-strong: rgba(var(--tasty-gray-600-rgb), 0.24);
     --tasty-border-subtle-faint: rgba(var(--tasty-gray-600-rgb), 0.1);
-    --tasty-border-contrast-soft: rgba(var(--tasty-gray-900-rgb), 0.07);
     --tasty-border-accent-soft: rgba(var(--tasty-accent-rgb), 0.2);
     --tasty-border-accent-strong: rgba(var(--tasty-accent-rgb), 0.34);
     --tasty-border-success-soft: rgba(var(--tasty-success-rgb), 0.18);
@@ -170,31 +155,24 @@
     --tasty-space-4-5: 18px;
     --tasty-space-5: 20px;
     --tasty-space-6: 24px;
-    --tasty-space-7: 28px;
     --tasty-space-8: 32px;
     --tasty-space-9: 36px;
-    --tasty-space-10: 40px;
 
     /* Primitive layout values used by tokenized admin CSS declarations */
     --tasty-layout-0: 0;
-    --tasty-layout-0-1: 0.1;
     --tasty-layout-0-5: 0.5;
     --tasty-layout-0-6: 0.6;
     --tasty-layout-0-7fr: 0.7fr;
     --tasty-layout-0-8fr: 0.8fr;
     --tasty-layout-0-9: 0.9;
-    --tasty-layout-0-9fr: 0.9fr;
     --tasty-layout-0-28fr: 0.28fr;
     --tasty-layout-0-42fr: 0.42fr;
     --tasty-layout-0-45: 0.45;
     --tasty-layout-0-45em: 0.45em;
-    --tasty-layout-0-58: 0.58;
-    --tasty-layout-0-58em: 0.58em;
     --tasty-layout-0-58fr: 0.58fr;
     --tasty-layout-0-68: 0.68;
     --tasty-layout-0-72: 0.72;
     --tasty-layout-0-75: 0.75;
-    --tasty-layout-0-78fr: 0.78fr;
     --tasty-layout-0-82: 0.82;
     --tasty-layout-0-88fr: 0.88fr;
     --tasty-layout-0-92: 0.92;
@@ -203,16 +181,12 @@
     --tasty-layout-0-97: 0.97;
     --tasty-layout-0pct: 0%;
     --tasty-layout-1: 1;
-    --tasty-layout-1-1fr: 1.1fr;
     --tasty-layout-1-2fr: 1.2fr;
     --tasty-layout-1-3fr: 1.3fr;
     --tasty-layout-1-4fr: 1.4fr;
     --tasty-layout-1-05fr: 1.05fr;
     --tasty-layout-1-5px: 1.5px;
     --tasty-layout-1-08fr: 1.08fr;
-    --tasty-layout-1-8vw: 1.8vw;
-    --tasty-layout-1-12fr: 1.12fr;
-    --tasty-layout-1-22fr: 1.22fr;
     --tasty-layout-1-35fr: 1.35fr;
     --tasty-layout-1-45fr: 1.45fr;
     --tasty-layout-1fr: 1fr;
@@ -263,12 +237,10 @@
     --tasty-layout-38px: 38px;
     --tasty-layout-38rem: 38rem;
     --tasty-layout-40rem: 40rem;
-    --tasty-layout-42ch: 42ch;
     --tasty-layout-42px: 42px;
     --tasty-layout-42rem: 42rem;
     --tasty-layout-44px: 44px;
     --tasty-layout-45deg: 45deg;
-    --tasty-layout-46rem: 46rem;
     --tasty-layout-48ch: 48ch;
     --tasty-layout-48px: 48px;
     --tasty-layout-48rem: 48rem;
@@ -276,15 +248,11 @@
     --tasty-layout-52rem: 52rem;
     --tasty-layout-54px: 54px;
     --tasty-layout-54rem: 54rem;
-    --tasty-layout-56ch: 56ch;
     --tasty-layout-56px: 56px;
     --tasty-layout-58px: 58px;
     --tasty-layout-58vh: 58vh;
-    --tasty-layout-64ch: 64ch;
-    --tasty-layout-68ch: 68ch;
     --tasty-layout-68px: 68px;
     --tasty-layout-68vh: 68vh;
-    --tasty-layout-72ch: 72ch;
     --tasty-layout-72vh: 72vh;
     --tasty-layout-76px: 76px;
     --tasty-layout-88px: 88px;
@@ -298,7 +266,6 @@
     --tasty-layout-132px: 132px;
     --tasty-layout-135deg: 135deg;
     --tasty-layout-140px: 140px;
-    --tasty-layout-144px: 144px;
     --tasty-layout-160deg: 160deg;
     --tasty-layout-160px: 160px;
     --tasty-layout-164px: 164px;
@@ -308,7 +275,6 @@
     --tasty-layout-180px: 180px;
     --tasty-layout-190pct: 190%;
     --tasty-layout-192px: 192px;
-    --tasty-layout-200px: 200px;
     --tasty-layout-208px: 208px;
     --tasty-layout-220px: 220px;
     --tasty-layout-225deg: 225deg;
@@ -333,7 +299,6 @@
     --tasty-layout-720px: 720px;
     --tasty-layout-780px: 780px;
     --tasty-layout-860px: 860px;
-    --tasty-layout-960px: 960px;
     --tasty-layout-999px: 999px;
     --tasty-layout-neg-1: -1;
     --tasty-layout-neg-1px: -1px;
@@ -343,15 +308,6 @@
     --tasty-layout-neg-50pct: -50%;
     --tasty-layout-neg-95pct: -95%;
     --tasty-layout-neg-135deg: -135deg;
-
-    /* Spacing — t-shirt size semantic aliases */
-    --tasty-space-xs: var(--tasty-space-1);    /* 4px  */
-    --tasty-space-s: var(--tasty-space-2);     /* 8px  */
-    --tasty-space-m: var(--tasty-space-4);     /* 16px */
-    --tasty-space-l: var(--tasty-space-6);     /* 24px */
-    --tasty-space-xl: var(--tasty-space-8);    /* 32px */
-    --tasty-space-xxl: var(--tasty-space-10);  /* 40px */
-
 
     /* Radius */
     --tasty-radius-s: 4px;
@@ -388,12 +344,9 @@
     --tasty-control-text: var(--tasty-ctrl-text);
     --tasty-control-text-muted: var(--tasty-ctrl-text-muted);
     --tasty-control-divider: rgba(var(--tasty-ctrl-text-muted-rgb), 0.2);
-    --tasty-control-divider-on-accent: rgba(var(--tasty-white-rgb), 0.26);
     --tasty-control-surface-elevated: var(--tasty-control-surface);
     --tasty-control-surface-hover: var(--tasty-white);
     --tasty-control-surface-focus: var(--tasty-white);
-    --tasty-control-border-gradient: var(--tasty-control-border);
-    --tasty-control-border-gradient-strong: var(--tasty-control-border-strong);
     --tasty-control-shadow: 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.04);
     --tasty-control-shadow-hover: 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.06);
     --tasty-control-padding-inline: 12px;
@@ -410,8 +363,6 @@
     --tasty-font-size-sm: var(--tasty-font-size-s);
     --tasty-font-size-m: 13px;
     --tasty-font-size-l: 14px;
-    --tasty-font-size-xl: 16px;
-    --tasty-font-size-2xl: 18px;
     --tasty-font-weight-regular: 400;
     --tasty-font-weight-medium: 500;
     --tasty-font-weight-semibold: 600;
@@ -438,7 +389,6 @@
     --tasty-line-height-label: 1.2;
     --tasty-line-height-control-compact: 1.25;
     --tasty-line-height-control: 1.3;
-    --tasty-line-height-meta: var(--tasty-line-height-label);
     --tasty-line-height-tooltip: 1.72;
     --tasty-type-meta-size: var(--tasty-font-size-xs);
     --tasty-type-meta-weight: var(--tasty-font-weight-semibold);
@@ -454,8 +404,6 @@
     --tasty-type-label-dense-size: var(--tasty-font-size-2xs);
     --tasty-type-label-micro-size: var(--tasty-font-size-3xs);
     --tasty-type-code-output-size: 12.5px;
-    --tasty-type-metric-size: clamp(22px, 1.7vw, 28px);
-    --tasty-type-page-title-size: clamp(28px, 2.2vw, 36px);
     --tasty-type-section-title-size: clamp(18px, 1.25vw, 22px);
     --tasty-type-section-title-size-mobile: clamp(18px, 5vw, 22px);
     --tasty-type-panel-title-size: clamp(17px, 1.05vw, 19px);
@@ -469,7 +417,6 @@
     --tasty-type-section-title-line-height: var(--tasty-line-height-heading);
     --tasty-type-panel-title-line-height: var(--tasty-line-height-panel-title);
     --tasty-type-card-title-line-height: var(--tasty-line-height-title);
-    --tasty-type-detail-title-line-height: var(--tasty-line-height-label);
     --tasty-type-overline-size: var(--tasty-font-size-xs);
     --tasty-type-overline-weight: var(--tasty-font-weight-semibold);
     --tasty-type-overline-spacing: 0.14em;
@@ -480,7 +427,6 @@
     --tasty-type-letter-spacing-dense: 0.04em;
     --tasty-type-letter-spacing-badge: 0.06em;
     --tasty-type-letter-spacing-status: 0.08em;
-    --tasty-type-letter-spacing-step: 0.1em;
     --tasty-type-letter-spacing-kicker: 0.11em;
     --tasty-type-letter-spacing-overline: var(--tasty-type-overline-spacing);
     --tasty-font-variant-numeric: tabular-nums;
@@ -492,7 +438,6 @@
     --tasty-type-preview-scale-6-size: clamp(16px, calc(var(--tasty-preview-base, 32px) * 0.58), 18px);
     --tasty-type-preview-glyph-size: clamp(72px, calc(var(--tasty-preview-base, 32px) * 2.5), 104px);
     --tasty-type-preview-lead-size: clamp(20px, calc(var(--tasty-preview-base, 32px) * 0.7), 24px);
-    --tasty-type-preview-lede-size: clamp(19px, calc(var(--tasty-preview-base, 32px) * 0.72), 26px);
     --tasty-type-preview-body-large-size: clamp(16px, calc(var(--tasty-preview-base, 32px) * 0.5), 18px);
     --tasty-type-preview-body-size: clamp(14px, calc(var(--tasty-preview-base, 32px) * 0.44), 16px);
     --tasty-type-preview-body-fixed-size: 17px;
@@ -503,10 +448,7 @@
     --tasty-type-preview-support-title-size: clamp(24px, calc(var(--tasty-preview-base, 32px) * 0.86), 32px);
     --tasty-type-preview-stat-size: clamp(20px, calc(var(--tasty-preview-base, 32px) * 0.76), 28px);
     --tasty-type-preview-ui-title-size: clamp(26px, calc(var(--tasty-preview-base, 32px) * 0.88), 32px);
-    --tasty-type-preview-scene-title-size: clamp(22px, calc(var(--tasty-preview-base, 32px) * 0.9), 30px);
-    --tasty-type-preview-subheading-size: clamp(18px, calc(var(--tasty-preview-base, 32px) * 0.66), 22px);
     --tasty-type-preview-metric-size: clamp(22px, calc(var(--tasty-preview-base, 32px) * 0.95), 34px);
-    --tasty-type-preview-heading-size: clamp(32px, calc(var(--tasty-preview-base, 32px) * 1.35), 50px);
     --tasty-icon-size-regular: 18px;
     --tasty-icon-size-preview: 44px;
 
@@ -535,33 +477,16 @@
     --tasty-panel-gap: var(--tasty-space-5);
     --tasty-section-gap: var(--tasty-space-5);
     --tasty-section-gap-tight: var(--tasty-space-4);
-    --tasty-section-copy-width: 40rem;
-    --tasty-sidebar-width: 300px;
-    --tasty-action-cluster-width: 344px;
-    --tasty-toolbar-search-width: 32rem;
     --tasty-toolbar-field-width: clamp(208px, 20vw, 236px);
-    --tasty-dashboard-intro-primary-min: 280px;
-    --tasty-dashboard-intro-secondary-min: 520px;
-    --tasty-dashboard-hero-copy-basis: 420px;
-    --tasty-dashboard-hero-copy-width: 520px;
-    --tasty-dashboard-hero-text-width: 460px;
     --tasty-dashboard-summary-width: 44rem;
     --tasty-dashboard-summary-width-narrow: 38rem;
     --tasty-dashboard-selection-meta-min: 24rem;
     --tasty-dashboard-selection-meta-width: 32rem;
     --tasty-dashboard-title-gap-row: 6px;
-    --tasty-dashboard-title-gap-column: 10px;
-    --tasty-dashboard-version-height: 28px;
-    --tasty-dashboard-version-padding-inline: 10px;
-    --tasty-dashboard-metrics-min-column: 132px;
-    --tasty-dashboard-metric-padding-block: var(--tasty-space-3);
-    --tasty-dashboard-metric-padding-inline: 14px;
-    --tasty-library-card-min-width: 18rem;
     --tasty-library-card-padding: var(--tasty-card-padding-tight);
     --tasty-library-card-gap: var(--tasty-space-4);
     --tasty-library-card-section-gap: var(--tasty-space-3);
     --tasty-library-card-inline-gap: var(--tasty-space-2);
-    --tasty-library-card-title-size: var(--tasty-type-card-title-size);
     --tasty-library-search-preview-size: clamp(15px, 0.98vw, 16px);
     --tasty-library-preview-padding: var(--tasty-space-4);
     --tasty-library-preview-size: clamp(22px, 2.2vw, 30px);
@@ -581,33 +506,21 @@
     --tasty-library-monospace-preview-padding-inline: var(--tasty-space-5);
     --tasty-library-monospace-preview-size: clamp(15px, 1.15vw, 18px);
     --tasty-role-card-padding: var(--tasty-space-5);
-    --tasty-role-card-grid-gap: var(--tasty-space-4);
     --tasty-role-card-gap: var(--tasty-space-3);
     --tasty-role-card-head-gap: var(--tasty-space-3);
-    --tasty-role-card-copy-width: 32rem;
     --tasty-role-card-meta-inline-size: clamp(10.5rem, 42%, 12.5rem);
     --tasty-role-card-field-gap: var(--tasty-space-4);
     --tasty-role-card-field-row-gap: var(--tasty-space-3);
     --tasty-role-card-meta-gap: var(--tasty-space-1);
-    --tasty-role-card-divider-gap: var(--tasty-space-3);
-    --tasty-role-card-shell-radius: var(--tasty-radius-card);
-    --tasty-role-card-shell-background: var(--tasty-surface);
-    --tasty-role-card-shell-border: var(--tasty-border-subtle);
-    --tasty-role-card-shell-shadow: none;
     --tasty-role-card-section-padding: var(--tasty-space-4);
     --tasty-role-card-section-gap: var(--tasty-space-3);
     --tasty-role-card-section-radius: var(--tasty-radius-inner);
     --tasty-role-card-section-border: var(--tasty-border-subtle);
     --tasty-role-card-section-background: var(--tasty-surface-soft);
-    --tasty-role-card-section-background-accent: var(--tasty-surface-accent-subtle);
     --tasty-role-card-title-size: var(--tasty-type-card-title-size);
     --tasty-role-card-title-line-height: var(--tasty-line-height-tight);
-    --tasty-role-card-description-size: var(--tasty-type-caption-size);
-    --tasty-role-card-description-line-height: var(--tasty-type-caption-line-height);
     --tasty-role-card-section-title-size: var(--tasty-type-meta-size);
     --tasty-role-card-section-title-line-height: 1.2;
-    --tasty-role-card-helper-size: var(--tasty-type-caption-size);
-    --tasty-role-card-helper-line-height: var(--tasty-type-caption-line-height);
     --tasty-role-card-current-value-height: var(--tasty-pill-height-regular);
     --tasty-role-card-current-value-padding-inline: var(--tasty-pill-padding-x-regular);
     --tasty-role-card-current-value-gap: var(--tasty-pill-gap);
@@ -616,11 +529,38 @@
     --tasty-activity-shell-max-height: clamp(220px, 34vh, 360px);
     --tasty-activity-shell-max-height-mobile: min(44vh, 320px);
     --tasty-activity-empty-min-height: 108px;
-    --tasty-activity-log-marker-column: 12px;
-    --tasty-activity-log-marker-size: var(--tasty-space-2);
-    --tasty-activity-log-marker-offset: 5px;
+    --tasty-status-dot-column: var(--tasty-layout-12px);
+    --tasty-status-dot-size: var(--tasty-layout-8px);
+    --tasty-status-dot-offset: var(--tasty-layout-5px);
+    --tasty-status-dot-radius: var(--tasty-radius-pill);
+    --tasty-status-dot-color: var(--tasty-accent);
+    --tasty-status-dot-shadow-accent: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-accent-rgb), var(--tasty-alpha-12)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-accent-rgb), var(--tasty-alpha-04));
+    --tasty-status-dot-shadow-success: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-success-rgb), var(--tasty-alpha-12)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-success-rgb), var(--tasty-alpha-04));
+    --tasty-status-dot-shadow-warning: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-warning-rgb), var(--tasty-alpha-12)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-warning-rgb), var(--tasty-alpha-04));
+    --tasty-status-dot-shadow-danger: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-danger-rgb), var(--tasty-alpha-12)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-danger-rgb), var(--tasty-alpha-04));
+    --tasty-status-dot-shadow-muted: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-3px) rgba(var(--tasty-gray-600-rgb), var(--tasty-alpha-10)), var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-5px) rgba(var(--tasty-gray-600-rgb), var(--tasty-alpha-04));
+    --tasty-status-dot-shadow: var(--tasty-status-dot-shadow-accent);
+    --tasty-activity-log-marker-column: var(--tasty-status-dot-column);
+    --tasty-activity-log-marker-size: var(--tasty-status-dot-size);
+    --tasty-activity-log-marker-offset: var(--tasty-status-dot-offset);
     --tasty-activity-log-actor-height: 20px;
     --tasty-activity-log-actor-padding-inline: 7px;
+    --tasty-advanced-row-action-height: var(--tasty-layout-32px);
+    --tasty-advanced-row-action-min-width: var(--tasty-layout-160px);
+    --tasty-advanced-row-action-padding-inline: var(--tasty-layout-12px);
+    --tasty-advanced-row-action-gap: var(--tasty-space-1-5);
+    --tasty-advanced-row-action-icon-size: var(--tasty-layout-14px);
+    --tasty-advanced-row-help-size: var(--tasty-layout-24px);
+    --tasty-advanced-row-status-height: var(--tasty-layout-24px);
+    --tasty-advanced-row-status-padding-inline: var(--tasty-layout-10px);
+    --tasty-settings-board-row-min-height: var(--tasty-layout-58px);
+    --tasty-settings-board-row-padding-block: var(--tasty-layout-12px);
+    --tasty-settings-board-row-padding-inline: var(--tasty-layout-14px);
+    --tasty-settings-board-row-gap: var(--tasty-space-3);
+    --tasty-settings-board-detail-indent: var(--tasty-layout-32px);
+    --tasty-settings-board-detail-padding-block: var(--tasty-layout-14px);
+    --tasty-settings-board-control-min-width: var(--tasty-layout-220px);
+    --tasty-settings-board-control-max-width: var(--tasty-layout-520px);
 
     /* Masthead and structural gradients */
     --tasty-shell-gap: var(--tasty-space-4);
@@ -646,10 +586,7 @@
     --tasty-masthead-gap: var(--tasty-space-4);
     --tasty-masthead-row-gap: var(--tasty-space-2);
     --tasty-masthead-brand-gap: var(--tasty-space-1);
-    --tasty-masthead-brand-max-width: 52rem;
-    --tasty-masthead-brand-padding-block: 22px;
-    --tasty-masthead-brand-padding-inline: 24px;
-    --tasty-masthead-nav-max-width: var(--tasty-layout-30rem);
+    --tasty-masthead-nav-max-width: var(--tasty-layout-640px);
     --tasty-masthead-nav-width: min(100%, var(--tasty-masthead-nav-max-width));
     --tasty-masthead-switcher-padding: var(--tasty-layout-3px);
     --tasty-masthead-tab-count: 4;
@@ -683,25 +620,17 @@
     --tasty-header-logo-height-mobile: clamp(42px, 9vw, 50px);
     --tasty-header-glow-cyan: radial-gradient(circle, rgba(var(--tasty-brand-cyan-rgb), 0.14) 0%, rgba(var(--tasty-brand-cyan-rgb), 0.045) 42%, rgba(var(--tasty-brand-cyan-rgb), 0) 72%);
     --tasty-header-glow-accent: radial-gradient(circle, rgba(var(--tasty-accent-rgb), 0.18) 0%, rgba(var(--tasty-accent-rgb), 0.055) 46%, rgba(var(--tasty-accent-rgb), 0) 76%);
-    --tasty-gradient-cool-glow: rgba(var(--tasty-brand-cyan-rgb), 0.12);
-    --tasty-gradient-cool-wash: rgba(var(--tasty-accent-rgb), 0.04);
-    --tasty-gradient-warm-glow: rgba(var(--tasty-brand-blue-rgb), 0.035);
-    --tasty-gradient-warm-wash: rgba(var(--tasty-brand-sky-rgb), 0.025);
     --tasty-gradient-fuse: linear-gradient(115deg, rgba(var(--tasty-brand-cyan-rgb), 0.46) 0%, rgba(var(--tasty-accent-rgb), 0.72) 52%, rgba(var(--tasty-brand-blue-rgb), 0.28) 100%);
     --tasty-gradient-page: radial-gradient(circle at 9% -16%, rgba(var(--tasty-brand-cyan-rgb), 0.09) 0%, rgba(var(--tasty-brand-cyan-rgb), 0) 32%), radial-gradient(circle at 82% -12%, rgba(var(--tasty-accent-rgb), 0.08) 0%, rgba(var(--tasty-accent-rgb), 0) 30%), linear-gradient(180deg, var(--tasty-gray-50) 0%, var(--tasty-white) 48%, var(--tasty-gray-50) 100%);
     --tasty-gradient-header: radial-gradient(circle at 5% -32%, rgba(var(--tasty-brand-cyan-rgb), 0.1) 0%, rgba(var(--tasty-brand-cyan-rgb), 0) 36%), linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-white-rgb), 0.96) 100%);
     --tasty-gradient-tab-active: linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-gray-50-rgb), 0.92) 100%);
     --tasty-gradient-border-soft: linear-gradient(135deg, rgba(var(--tasty-brand-cyan-rgb), 0.22) 0%, rgba(var(--tasty-accent-rgb), 0.28) 58%, rgba(var(--tasty-brand-blue-rgb), 0.12) 100%);
     --tasty-gradient-surface-card: linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-white-rgb), 0.96) 100%);
-    --tasty-gradient-surface-section: linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-gray-50-rgb), 0.68) 100%);
     --tasty-gradient-surface-inset: linear-gradient(180deg, rgba(var(--tasty-gray-50-rgb), 0.78) 0%, rgba(var(--tasty-white-rgb), 0.96) 100%);
     --tasty-gradient-surface-accent: linear-gradient(180deg, rgba(var(--tasty-accent-rgb), 0.045) 0%, rgba(var(--tasty-white-rgb), 0.98) 76%);
-    --tasty-gradient-surface-success: linear-gradient(180deg, rgba(var(--tasty-success-rgb), 0.04) 0%, rgba(var(--tasty-white-rgb), 1) 72%);
     --tasty-gradient-surface-warning: linear-gradient(180deg, rgba(var(--tasty-warning-rgb), 0.045) 0%, rgba(var(--tasty-white-rgb), 1) 72%);
     --tasty-gradient-surface-muted: linear-gradient(180deg, rgba(var(--tasty-white-rgb), 0.82) 0%, rgba(var(--tasty-gray-100-rgb), 0.72) 100%);
     --tasty-gradient-primary: var(--tasty-accent);
-    --tasty-gradient-primary-hover: var(--tasty-accent-hover);
-    --tasty-gradient-primary-active: var(--tasty-accent-active);
 
     /* Pill and segmented control treatment */
     --tasty-pill-background: var(--tasty-white);
@@ -716,7 +645,6 @@
     --tasty-segmented-option-active-shadow: 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.06);
 
     /* Semantic one-off colors */
-    --tasty-version-meta-ink: rgba(52, 66, 86, 0.88);
     --tasty-version-pill-default-ink: rgba(var(--tasty-text-rgb), 0.78);
     --tasty-version-pill-default-border: rgba(var(--tasty-gray-700-rgb), 0.14);
     --tasty-version-pill-background: var(--tasty-white);
@@ -744,7 +672,6 @@
     --tasty-preview-code-tab-text: #cbd5e1;
     --tasty-preview-code-tab-icon: #93c5fd;
     --tasty-preview-code-statusbar-text: #94a3b8;
-    --tasty-preview-code-output-text: #dbe4f0;
     --tasty-preview-code-dark-bg: #0f172a;
     --tasty-preview-code-dark-text: #e2e8f0;
     --tasty-preview-code-dark-muted: #64748b;
@@ -789,13 +716,11 @@
     --tasty-integration-acss-bg: linear-gradient(135deg, #eef7ff, #dceefa);
     --tasty-integration-acss-border: rgba(var(--tasty-brand-blue-rgb), 0.2);
     --tasty-integration-acss-color: var(--tasty-brand-blue-hover);
-    --tasty-integration-row-padding-block: var(--tasty-space-3);
     --tasty-integration-row-padding-block-compact: var(--tasty-space-2-5);
     --tasty-integration-row-gap: var(--tasty-space-2);
     --tasty-integration-row-control-gap: var(--tasty-space-6);
     --tasty-integration-row-copy-gap: var(--tasty-space-1-5);
     --tasty-integration-row-min-height: var(--tasty-layout-54px);
-    --tasty-integration-row-divider: var(--tasty-border-subtle-faint);
     --tasty-integration-status-min-width: var(--tasty-layout-76px);
 
     /* Motion */
@@ -816,15 +741,10 @@
 
     /* Button component */
     --tasty-btn-height-sm: 28px;
-    --tasty-btn-height-md: var(--tasty-control-height-compact);  /* 32px */
-    --tasty-btn-height-lg: var(--tasty-control-height-regular);  /* 38px */
-    --tasty-btn-padding-x-sm: var(--tasty-space-2-5);            /* 10px */
-    --tasty-btn-padding-x-md: var(--tasty-space-3-5);            /* 14px */
-    --tasty-btn-padding-x-lg: var(--tasty-control-padding-inline-roomy); /* 14px */
-    --tasty-btn-radius: var(--tasty-radius-control);
+    --tasty-btn-height-md: var(--tasty-control-height-compact);
+    --tasty-btn-padding-x-sm: var(--tasty-space-2-5);
     --tasty-btn-background: var(--tasty-control-surface);
     --tasty-btn-background-hover: var(--tasty-white);
-    --tasty-btn-background-active: var(--tasty-control-surface-muted);
     --tasty-btn-border: var(--tasty-control-border);
     --tasty-btn-border-hover: var(--tasty-control-border-strong);
     --tasty-btn-color: var(--tasty-control-text);
@@ -836,17 +756,14 @@
     --tasty-btn-primary-color: var(--tasty-text-on-accent);
 
     /* Field component */
-    --tasty-field-gap: var(--tasty-space-2);
-    --tasty-field-label-gap: var(--tasty-space-1-5);
-    --tasty-field-row-gap: var(--tasty-space-3);
-    --tasty-field-group-gap: var(--tasty-space-4);
 
     /* Toggle component */
     --tasty-toggle-width: 42px;
     --tasty-toggle-height: 24px;
     --tasty-toggle-thumb-size: 20px;
-    --tasty-toggle-thumb-offset: 2px;
     --tasty-toggle-translate: 18px;
+    --tasty-toggle-track-radius: var(--tasty-radius-control);
+    --tasty-toggle-thumb-radius: var(--tasty-radius-s);
     --tasty-toggle-track-off: linear-gradient(180deg, rgba(var(--tasty-gray-300-rgb), 0.92) 0%, rgba(var(--tasty-gray-600-rgb), 0.26) 100%);
     --tasty-toggle-track-on: var(--tasty-gradient-primary);
     --tasty-toggle-track-shadow: inset 0 1px 2px rgba(var(--tasty-shadow-color-rgb), 0.14), inset 0 1px 0 rgba(var(--tasty-white-rgb), 0.22);
@@ -869,7 +786,6 @@
      */
     /* Panel surface */
     --tasty-syntax-bg: var(--tasty-surface-soft);
-    --tasty-syntax-border: var(--tasty-border-subtle-strong);
     /* Text */
     --tasty-syntax-text: var(--tasty-text);
     --tasty-syntax-comment: var(--tasty-text-muted);

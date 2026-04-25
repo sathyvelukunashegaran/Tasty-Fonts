@@ -44,6 +44,9 @@ final class RestController
         'toolsHealth' => 'tools/health',
         'toolsRuntimeManifest' => 'tools/runtime-manifest',
         'toolsAction' => 'tools/action',
+        'toolsSupportBundle' => 'tools/support-bundle',
+        'toolsSnapshots' => 'tools/snapshots',
+        'toolsSnapshotRestore' => 'tools/snapshots/restore',
     ];
 
     private readonly AdminAccessService $adminAccess;
@@ -123,6 +126,13 @@ final class RestController
                 'reset_suppressed_notices',
             ]),
         ]);
+        $this->registerRoute(self::ROUTES['toolsSupportBundle'], 'POST', [$this, 'buildSupportBundle']);
+        $this->registerRoute(self::ROUTES['toolsSnapshots'], 'GET,POST', [$this, 'snapshots'], [
+            'reason' => $this->buildTextArg(),
+        ]);
+        $this->registerRoute(self::ROUTES['toolsSnapshotRestore'], 'POST', [$this, 'restoreSnapshot'], [
+            'snapshot_id' => $this->buildTextArg(true),
+        ]);
     }
 
     public function canManageOptions(): bool
@@ -186,7 +196,8 @@ final class RestController
 
         return $this->restResult(
             $this->admin->stageSiteTransferBundle(
-                FontUtils::normalizeStringKeyedMap($rawFiles['bundle'] ?? null)
+                FontUtils::normalizeStringKeyedMap($rawFiles['bundle'] ?? null),
+                $this->getTextParam($request, 'google_api_key')
             )
         );
     }
@@ -306,6 +317,42 @@ final class RestController
         return $this->restResult(
             $this->admin->runAdvancedToolsAction($this->getTextParam($request, 'action'))
         );
+    }
+
+    public function buildSupportBundle(WP_REST_Request $request): mixed
+    {
+        unset($request);
+
+        return $this->restResult($this->admin->buildSupportBundle());
+    }
+
+    public function listSnapshots(WP_REST_Request $request): mixed
+    {
+        unset($request);
+
+        $payload = $this->admin->buildAdvancedToolsPayload();
+        $advancedTools = is_array($payload['advanced_tools'] ?? null) ? $payload['advanced_tools'] : [];
+
+        return $this->restResult([
+            'snapshots' => is_array($advancedTools['snapshots'] ?? null) ? $advancedTools['snapshots'] : [],
+        ]);
+    }
+
+    public function snapshots(WP_REST_Request $request): mixed
+    {
+        return strtoupper($request->get_method()) === 'POST'
+            ? $this->createSnapshot($request)
+            : $this->listSnapshots($request);
+    }
+
+    public function createSnapshot(WP_REST_Request $request): mixed
+    {
+        return $this->restResult($this->admin->createRollbackSnapshot($this->getTextParam($request, 'reason', 'manual')));
+    }
+
+    public function restoreSnapshot(WP_REST_Request $request): mixed
+    {
+        return $this->restResult($this->admin->restoreRollbackSnapshot($this->getTextParam($request, 'snapshot_id')));
     }
 
     /**

@@ -255,6 +255,7 @@
     let helpTooltipEventsBound = false;
     const pillOptionInputs = Array.from(document.querySelectorAll('[data-pill-option-input]'));
     const pillOptions = Array.from(document.querySelectorAll('[data-pill-option]'));
+    const radioProxySelects = Array.from(document.querySelectorAll('[data-settings-radio-proxy]'));
     const outputQuickModeInputs = Array.from(document.querySelectorAll('[data-output-quick-mode]'));
     const outputAdvancedPanel = document.getElementById('tasty-fonts-advanced-output-controls');
     const outputMinimalPresetInput = document.querySelector('[data-output-minimal-preset]');
@@ -298,6 +299,7 @@
     const settingsForms = Array.from(document.querySelectorAll('[data-settings-form]'));
     const settingsSaveShell = document.querySelector('[data-settings-save-shell]');
     const settingsSaveButton = settingsSaveShell ? settingsSaveShell.querySelector('[data-settings-save-button]') : null;
+    const settingsClearButton = settingsSaveShell ? settingsSaveShell.querySelector('[data-settings-clear-button]') : null;
     const settingsSaveButtonDefaultLabel = settingsSaveButton ? String(settingsSaveButton.textContent || '').trim() : '';
     const settingsSaveButtonDefaultFormId = settingsSaveButton ? String(settingsSaveButton.getAttribute('form') || '').trim() : '';
     const siteTransferForms = Array.from(document.querySelectorAll('[data-site-transfer-form]'));
@@ -465,11 +467,13 @@
         activityCountMultiple: __('%1$d entries', 'tasty-fonts'),
         activityCountFilteredSingle: __('%1$d of %2$d entry', 'tasty-fonts'),
         activityCountFilteredMultiple: __('%1$d of %2$d entries', 'tasty-fonts'),
-        siteTransferLimitNeutral: __('Ready to validate against the %s upload limit.', 'tasty-fonts'),
-        siteTransferLimitNeutralFallback: __('Ready to validate the selected bundle before import.', 'tasty-fonts'),
-        siteTransferLimitReady: __('Within upload limit', 'tasty-fonts'),
-        siteTransferGoogleSummaryEmpty: __('Optional — not provided', 'tasty-fonts'),
-        siteTransferGoogleSummaryFilled: __('Fresh Google API key will be saved', 'tasty-fonts'),
+        siteTransferLimitNeutral: __('%s Upload Limit', 'tasty-fonts'),
+        siteTransferLimitNeutralFallback: __('Upload Limit Available', 'tasty-fonts'),
+        siteTransferLimitReady: __('%s Selected', 'tasty-fonts'),
+        siteTransferGoogleSummaryEmpty: __('Optional - not provided', 'tasty-fonts'),
+        siteTransferGoogleSummaryEntered: __('Key entered - run dry run', 'tasty-fonts'),
+        siteTransferGoogleSummaryValid: __('Google API key validated', 'tasty-fonts'),
+        siteTransferGoogleSummaryInvalid: __('Google API key invalid', 'tasty-fonts'),
         variantCountSingle: __('%d variant', 'tasty-fonts'),
         variantCountMultiple: __('%d variants', 'tasty-fonts'),
         styleCountSingle: __('%d style', 'tasty-fonts'),
@@ -1252,6 +1256,7 @@
         document.querySelectorAll(`input[type="radio"][name="${name}"]`).forEach((input) => {
             input.checked = input.value === String(value);
         });
+        syncPillOptionUi();
     }
 
     function syncMonoDependentControls(enabled, options = {}) {
@@ -1312,9 +1317,13 @@
         getSettingsFormButtons(form).forEach((button) => {
             button.disabled = !isDirty;
         });
+        getSettingsFormClearButtons(form).forEach((button) => {
+            button.disabled = !isDirty;
+        });
 
         setSettingsFormStatus(form, isDirty);
         syncDeveloperToolAvailability();
+        syncSettingsSaveShell();
 
         return isDirty;
     }
@@ -1334,9 +1343,13 @@
         getSettingsFormButtons(form).forEach((button) => {
             button.disabled = true;
         });
+        getSettingsFormClearButtons(form).forEach((button) => {
+            button.disabled = true;
+        });
 
         setSettingsFormStatus(form, false);
         syncDeveloperToolAvailability();
+        syncSettingsSaveShell();
     }
 
     function getSettingsFormButtons(form) {
@@ -1348,6 +1361,20 @@
         const internalButtons = Array.from(form.querySelectorAll('[data-settings-save-button]'));
         const externalButtons = formId
             ? Array.from(document.querySelectorAll(`[data-settings-save-button][form="${formId}"]`))
+            : [];
+
+        return Array.from(new Set([...internalButtons, ...externalButtons]));
+    }
+
+    function getSettingsFormClearButtons(form) {
+        if (!form) {
+            return [];
+        }
+
+        const formId = String(form.getAttribute('id') || '').trim();
+        const internalButtons = Array.from(form.querySelectorAll('[data-settings-clear-button]'));
+        const externalButtons = formId
+            ? Array.from(document.querySelectorAll(`[data-settings-clear-button][data-settings-form-id="${formId}"]`))
             : [];
 
         return Array.from(new Set([...internalButtons, ...externalButtons]));
@@ -1572,10 +1599,16 @@
         const activeSettingsTab = activeTabKeyForGroup('settings');
         const isTransferTab = activeSettingsTab === 'transfer';
         const siteTransferForm = siteTransferForms[0] instanceof HTMLFormElement ? siteTransferForms[0] : null;
+        const hasUnsavedSettings = anySettingsFormHasUnsavedChanges();
 
         settingsSaveShell.hidden = false;
 
         if (!isTransferTab || !siteTransferForm) {
+            if (settingsClearButton instanceof HTMLButtonElement) {
+                settingsClearButton.hidden = false;
+                settingsClearButton.disabled = !hasUnsavedSettings;
+            }
+
             if (settingsSaveButtonDefaultFormId !== '') {
                 settingsSaveButton.setAttribute('form', settingsSaveButtonDefaultFormId);
             } else {
@@ -1589,8 +1622,13 @@
                 settingsSaveButtonDefaultLabel || getString('settingsSave', 'Save changes'),
                 settingsSaveButtonDefaultLabel || getString('settingsSave', 'Save changes')
             );
-            settingsSaveButton.disabled = !anySettingsFormHasUnsavedChanges();
+            settingsSaveButton.disabled = !hasUnsavedSettings;
             return;
+        }
+
+        if (settingsClearButton instanceof HTMLButtonElement) {
+            settingsClearButton.hidden = true;
+            settingsClearButton.disabled = true;
         }
 
         const { stageTokenInput } = getSiteTransferFieldParts(siteTransferForm);
@@ -5228,7 +5266,9 @@
             button._tastyConfirmTimer = 0;
         }
 
-        if (button.dataset.confirmOriginalLabel) {
+        if (button.dataset.confirmOriginalHtml) {
+            button.innerHTML = button.dataset.confirmOriginalHtml;
+        } else if (button.dataset.confirmOriginalLabel) {
             writeButtonLabel(button, button.dataset.confirmOriginalLabel);
         }
 
@@ -5239,6 +5279,7 @@
         delete button.dataset.confirmOriginalLabel;
         delete button.dataset.confirmOriginalAriaLabel;
         delete button.dataset.confirmOriginalTitle;
+        delete button.dataset.confirmOriginalHtml;
         button.classList.remove('is-awaiting-confirmation');
     }
 
@@ -5258,6 +5299,7 @@
         button.dataset.confirmOriginalLabel = originalLabel;
         button.dataset.confirmOriginalAriaLabel = button.getAttribute('aria-label') || '';
         button.dataset.confirmOriginalTitle = button.getAttribute('title') || '';
+        button.dataset.confirmOriginalHtml = button.innerHTML;
 
         writeButtonLabel(
             button,
@@ -5438,6 +5480,214 @@
         button.setAttribute('data-help-passive', '1');
         button.setAttribute('title', nextCopy);
         prepareHelpTooltipTrigger(button);
+    }
+
+    function settingsRowHelpScope() {
+        return document.getElementById('tasty-fonts-settings-page');
+    }
+
+    let settingsDetailedHelpByTitle = null;
+
+    function normalizeSettingsHelpTitle(title) {
+        return String(title || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function getSettingsDetailedHelpByTitle() {
+        if (settingsDetailedHelpByTitle) {
+            return settingsDetailedHelpByTitle;
+        }
+
+        settingsDetailedHelpByTitle = new Map([
+            [__('CSS Delivery', 'tasty-fonts'), __('File delivery writes one generated stylesheet that browsers can cache and inspect. Inline delivery prints the same generated CSS in the document head, which can help on locked-down hosts but may increase page HTML size.', 'tasty-fonts')],
+            [__('Default Font Display', 'tasty-fonts'), __('Sets the default font-display value used when Tasty Fonts generates @font-face rules. This controls how browsers balance invisible text, fallback text, and late font swaps while your font files load.', 'tasty-fonts')],
+            [__('Unicode Range Output', 'tasty-fonts'), __('Controls whether generated font-face rules include unicode-range declarations. Keep it off for compact CSS, use provider ranges when imported metadata is available, or add a custom range when you intentionally subset by script or character coverage.', 'tasty-fonts')],
+            [__('Custom Unicode Range', 'tasty-fonts'), __('Enter valid CSS unicode-range tokens such as U+0000-00FF or U+4??. Tasty Fonts applies this only when Custom is selected above, and it affects generated CSS output rather than the saved font library metadata.', 'tasty-fonts')],
+            [__('Minify Generated CSS', 'tasty-fonts'), __('Removes extra whitespace from generated CSS before it is served. Leave this enabled for production output, and turn it off temporarily when you need easier-to-read generated CSS during troubleshooting.', 'tasty-fonts')],
+            [__('Preload Primary Fonts', 'tasty-fonts'), __('Adds preload links for the active self-hosted role fonts so the browser can request them earlier. This is most useful for the fonts used by above-the-fold heading and body text.', 'tasty-fonts')],
+            [__('Remote Connection Hints', 'tasty-fonts'), __('Adds preconnect hints for active remote font providers. These hints can reduce connection setup time for live Google, Bunny, or Adobe deliveries, but they only matter when the current delivery profile loads from a remote provider.', 'tasty-fonts')],
+            [__('Output Preset', 'tasty-fonts'), __('Chooses the generated output shape. Minimal keeps the core role variables lean, Variables only exposes token layers, Classes only exposes helper classes, and Custom lets you decide exactly which groups Tasty Fonts should emit.', 'tasty-fonts')],
+            [__('Sitewide Role Weights', 'tasty-fonts'), __('Adds saved role font weights and variation settings to the sitewide body, heading, and code rules. This changes the default rendered role styles, while utility class styling is controlled separately.', 'tasty-fonts')],
+            [__('Utility Classes', 'tasty-fonts'), __('Generates .font-* helper classes that themes, builders, or custom markup can use directly. The groups below decide which role, alias, category, and per-family class selectors are included.', 'tasty-fonts')],
+            [__('Utility Class Groups', 'tasty-fonts'), __('Controls which utility class groups are generated when class output is active. Disable groups you do not plan to use to keep the generated CSS smaller and easier to scan.', 'tasty-fonts')],
+            [__('Role Weights in Classes', 'tasty-fonts'), __('Adds each role weight and variable-axis settings to the matching .font-heading, .font-body, and optional monospace class rules. This affects class output only, not the sitewide role rules.', 'tasty-fonts')],
+            [__('Heading Class', 'tasty-fonts'), __('Generates the .font-heading helper so content can opt into the active heading role font without relying on global selectors.', 'tasty-fonts')],
+            [__('Body Class', 'tasty-fonts'), __('Generates the .font-body helper so content can opt into the active body role font in templates, builder fields, or custom markup.', 'tasty-fonts')],
+            [__('Monospace Class', 'tasty-fonts'), __('Generates .font-monospace when the monospace role is enabled. Use it for code-like content that should follow the plugin-managed monospace role.', 'tasty-fonts')],
+            [__('Interface Alias', 'tasty-fonts'), __('Generates .font-interface as an alias for the body role so interface text can use a semantic helper without coupling to the underlying role name.', 'tasty-fonts')],
+            [__('UI Alias', 'tasty-fonts'), __('Generates .font-ui as a compact alias for the body role. It is useful for builder components, buttons, and other interface fragments.', 'tasty-fonts')],
+            [__('Code Alias', 'tasty-fonts'), __('Generates .font-code as an alias for the monospace role when that role is enabled. It gives code snippets and developer-oriented UI a semantic helper.', 'tasty-fonts')],
+            [__('Sans Class', 'tasty-fonts'), __('Generates .font-sans as a category helper that points to the active sans-style family resolved from your role and library choices.', 'tasty-fonts')],
+            [__('Serif Class', 'tasty-fonts'), __('Generates .font-serif as a category helper that points to the active serif-style family resolved from your role and library choices.', 'tasty-fonts')],
+            [__('Mono Class', 'tasty-fonts'), __('Generates .font-mono as a category helper when the monospace role is enabled. It follows the plugin-managed mono family rather than a hard-coded stack.', 'tasty-fonts')],
+            [__('Per-Family Classes', 'tasty-fonts'), __('Generates one helper class per available font family, such as .font-inter. This is convenient for hand-authored templates but can create more selectors on sites with large libraries.', 'tasty-fonts')],
+            [__('CSS Variables', 'tasty-fonts'), __('Generates --font-* custom properties for roles, aliases, categories, and optional weights. These variables are the safest integration surface for themes, builders, and design systems that consume Tasty Fonts output.', 'tasty-fonts')],
+            [__('CSS Variable Groups', 'tasty-fonts'), __('Controls which CSS variable groups are emitted when variable output is active. Keep the groups your theme or integrations consume, and disable unused groups to reduce generated output.', 'tasty-fonts')],
+            [__('Role Weight Variables', 'tasty-fonts'), __('Generates role-specific weight variables such as --font-heading-weight and --font-body-weight. Some integrations, including Automatic.css role sync, depend on these tokens when weight mapping is active.', 'tasty-fonts')],
+            [__('Global Weight Tokens', 'tasty-fonts'), __('Generates reusable global weight tokens such as --weight-400 and --weight-bold, plus related snippets. Use these when your design system references named weight tokens independently of font roles.', 'tasty-fonts')],
+            [__('Role Alias Variables', 'tasty-fonts'), __('Generates alias variables such as --font-interface, --font-ui, and optionally --font-code. Aliases let other tools use semantic names while still following the active Tasty Fonts role assignments.', 'tasty-fonts')],
+            [__('Sans Alias', 'tasty-fonts'), __('Generates --font-sans as a category alias for the active sans family. This helps external CSS consume category-level typography without hard-coding a family name.', 'tasty-fonts')],
+            [__('Serif Alias', 'tasty-fonts'), __('Generates --font-serif as a category alias for the active serif family. This keeps category-level CSS tied to the managed font library instead of fixed stacks.', 'tasty-fonts')],
+            [__('Mono Alias', 'tasty-fonts'), __('Generates --font-mono when the monospace role is enabled. Use it for category-level mono styling that should follow the managed role configuration.', 'tasty-fonts')],
+            [__('Etch Canvas Bridge', 'tasty-fonts'), __('Shows whether the Etch Canvas bridge can read the fonts and role tokens managed by Tasty Fonts. This row is informational because the bridge state is detected from the current WordPress environment.', 'tasty-fonts')],
+            [__('Bricks Builder', 'tasty-fonts'), __('Enables Bricks-specific typography integration. When active, the nested controls can map Tasty role variables into Bricks Theme Styles and prevent Bricks from loading its own Google Fonts.', 'tasty-fonts')],
+            [__('Sync Bricks Theme Styles', 'tasty-fonts'), __('Writes Tasty Fonts role variables into the selected Bricks Theme Style target. Use this when Bricks typography controls should follow the same heading and body roles used by the rest of the site.', 'tasty-fonts')],
+            [__('Disable Bricks Google Fonts', 'tasty-fonts'), __('Turns off Bricks Google Fonts in Bricks font pickers so typography stays controlled by Tasty Fonts. This helps avoid duplicate provider requests and conflicting font sources.', 'tasty-fonts')],
+            [__('Oxygen Builder', 'tasty-fonts'), __('Enables Oxygen integration when Oxygen is available. The integration keeps Oxygen typography usage aligned with the active Tasty Fonts role output.', 'tasty-fonts')],
+            [__('Gutenberg Font Library', 'tasty-fonts'), __('Syncs the active Tasty Fonts library into the WordPress Font Library so block editor typography controls can use the managed families.', 'tasty-fonts')],
+            [__('Automatic.css', 'tasty-fonts'), __('Maps Automatic.css heading and body font settings to Tasty Fonts role variables. Keep sitewide role output and required weight variables enabled so ACSS receives stable tokens.', 'tasty-fonts')],
+            [__('Update Channel', 'tasty-fonts'), __('Chooses which GitHub release rail this site follows. Stable is recommended for production, Beta previews upcoming releases, and Nightly is intended for development or testing environments.', 'tasty-fonts')],
+            [__('Enable Monospace Role', 'tasty-fonts'), __('Adds a dedicated monospace role for code, preformatted text, and mono utility output. Turning it on also unlocks mono class and variable options elsewhere in settings.', 'tasty-fonts')],
+            [__('Enable Variable Fonts', 'tasty-fonts'), __('Allows variable font uploads and axis controls throughout the plugin. Keep it enabled when you want to save or output variable-axis settings such as weight, width, or optical size.', 'tasty-fonts')],
+            [__('Hide Onboarding Hints', 'tasty-fonts'), __('Hides the short row descriptions and passive help tooltips across the admin UI. Use it once the workflow feels familiar and you want a denser settings screen.', 'tasty-fonts')],
+            [__('Show Activity Log', 'tasty-fonts'), __('Shows the full activity log in Advanced Tools. Tasty Fonts still records relevant events while this is hidden, so you can turn the log back on later for troubleshooting.', 'tasty-fonts')],
+            [__('Delete Uploaded Fonts on Uninstall', 'tasty-fonts'), __('Deletes plugin-managed uploaded font files during uninstall. Leave this off if you might reinstall the plugin or want to preserve font assets after removing the plugin.', 'tasty-fonts')],
+            [__('Enable custom access rules', 'tasty-fonts'), __('Controls whether non-administrator roles or specific users can open Tasty Fonts. Administrators always keep access; turning this on only grants additional access below.', 'tasty-fonts')],
+        ].map(([title, copy]) => [normalizeSettingsHelpTitle(title), copy]));
+
+        return settingsDetailedHelpByTitle;
+    }
+
+    function settingsRowConfiguredHelpText(row) {
+        if (!row) {
+            return '';
+        }
+
+        const configuredSource = row.querySelector('[data-settings-help-tooltip]');
+        const configuredCopy = configuredSource
+            ? String(configuredSource.getAttribute('data-settings-help-tooltip') || '').trim()
+            : String(row.getAttribute('data-settings-help-tooltip') || '').trim();
+
+        return configuredCopy;
+    }
+
+    function settingsRowHelpText(row) {
+        if (!row) {
+            return '';
+        }
+
+        const configuredCopy = settingsRowConfiguredHelpText(row);
+
+        if (configuredCopy) {
+            return configuredCopy;
+        }
+
+        const title = settingsRowHelpTitle(row);
+        const detailedCopy = getSettingsDetailedHelpByTitle().get(normalizeSettingsHelpTitle(title));
+
+        if (detailedCopy) {
+            return detailedCopy;
+        }
+
+        const source = row.querySelector([
+            '.tasty-fonts-settings-flat-row-copy--channel > p',
+            '.tasty-fonts-output-settings-submenu-copy > p',
+            '.tasty-fonts-toggle-description',
+            '.tasty-fonts-output-settings-text-description',
+            '.tasty-fonts-admin-access-mode-copy',
+            '.tasty-fonts-integration-note'
+        ].join(', '));
+
+        return source ? String(source.textContent || '').trim() : '';
+    }
+
+    function settingsRowHelpTitle(row) {
+        if (!row) {
+            return '';
+        }
+
+        const title = row.querySelector([
+            '.tasty-fonts-settings-flat-row-copy--channel > h4',
+            '.tasty-fonts-output-settings-submenu-copy > h4',
+            '.tasty-fonts-toggle-title',
+            '.tasty-fonts-output-settings-text-title',
+            '.tasty-fonts-integration-title'
+        ].join(', '));
+
+        return title ? String(title.textContent || '').trim().replace(/\s+/g, ' ') : '';
+    }
+
+    function settingsRowHelpContainer(row) {
+        if (!row) {
+            return null;
+        }
+
+        return row.querySelector([
+            '.tasty-fonts-settings-flat-row-copy--channel',
+            '.tasty-fonts-output-settings-submenu-copy',
+            '.tasty-fonts-toggle-copy',
+            '.tasty-fonts-output-settings-text-label'
+        ].join(', '));
+    }
+
+    function hydrateSettingsHelpTooltips(scope = document) {
+        if (trainingWheelsOff) {
+            return;
+        }
+
+        const settingsPage = scope === document
+            ? settingsRowHelpScope()
+            : (scope.matches && scope.matches('#tasty-fonts-settings-page')
+                ? scope
+                : (scope.querySelector('#tasty-fonts-settings-page') || (scope.closest ? scope.closest('#tasty-fonts-settings-page') : null)));
+
+        if (!settingsPage) {
+            return;
+        }
+
+        const rows = Array.from(settingsPage.querySelectorAll([
+            '.tasty-fonts-settings-board-list > .tasty-fonts-output-settings-choice',
+            '.tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output',
+            '.tasty-fonts-settings-board-list > .tasty-fonts-output-settings-text-field',
+            '.tasty-fonts-settings-board-list > .tasty-fonts-output-settings-section--advanced > .tasty-fonts-output-settings-choice',
+            '.tasty-fonts-output-settings-advanced-panel > .tasty-fonts-output-settings-detail-group > .tasty-fonts-toggle-field--output',
+            '.tasty-fonts-output-settings-details-body > .tasty-fonts-toggle-field--output',
+            '.tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output',
+            '.tasty-fonts-settings-flat-row--channel',
+            '.tasty-fonts-integrations-panel > .tasty-fonts-settings-board .tasty-fonts-integration-row--readonly',
+            '.tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration',
+            '.tasty-fonts-admin-access-mode-toggle'
+        ].join(', ')));
+
+        rows.forEach((row) => {
+            const existingHelp = row.querySelector('.tasty-fonts-settings-row-help');
+            if (existingHelp) {
+                if (existingHelp.parentElement !== row) {
+                    row.append(existingHelp);
+                }
+                return;
+            }
+
+            const copy = settingsRowHelpText(row);
+
+            if (!copy) {
+                return;
+            }
+
+            const container = settingsRowHelpContainer(row);
+            if (!container) {
+                return;
+            }
+
+            const title = settingsRowHelpTitle(row);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-health-help-trigger tasty-fonts-settings-row-help';
+            button.textContent = '?';
+            button.setAttribute('aria-label', title ? `Explain ${title}` : getString('settingsHelpLabel', 'Explain this setting'));
+            setPassiveHelpTooltip(button, copy);
+
+            if (!button.hasAttribute('data-help-tooltip')) {
+                return;
+            }
+
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            });
+
+            container.classList.add('tasty-fonts-settings-copy-with-help');
+            row.append(button);
+        });
     }
 
     function upgradePillTooltips(scope = document) {
@@ -5627,11 +5877,14 @@
                     return;
                 }
 
-                reject(
-                    new Error(
-                        getApiMessage(payload, fallbackMessage || getString('uploadError', 'The font upload failed.'))
-                    )
+                const requestError = new Error(
+                    getApiMessage(payload, fallbackMessage || getString('uploadError', 'The font upload failed.'))
                 );
+
+                requestError.code = payload && typeof payload.code === 'string' ? payload.code : '';
+                requestError.payload = payload;
+
+                reject(requestError);
             });
 
             request.addEventListener('error', () => {
@@ -8974,6 +9227,7 @@
                 fileInput: null,
                 googleApiKeyInput: null,
                 validateButton: null,
+                importButton: null,
                 stageTokenInput: null,
                 status: null,
                 fileName: null,
@@ -8987,6 +9241,7 @@
             fileInput: form.querySelector('[data-site-transfer-file-input]'),
             googleApiKeyInput: form.querySelector('input[name="tasty_fonts_import_google_api_key"]'),
             validateButton: form.querySelector('[data-site-transfer-validate-submit]'),
+            importButton: form.querySelector('[data-site-transfer-import-submit]'),
             stageTokenInput: form.querySelector('[data-site-transfer-stage-token]'),
             status: form.querySelector('[data-site-transfer-status]'),
             fileName: form.querySelector('[data-site-transfer-file-name]'),
@@ -9009,6 +9264,15 @@
 
         delete form.dataset.siteTransferValidated;
         syncSettingsSaveShell();
+    }
+
+    function clearSiteTransferGoogleApiKeyValidation(form) {
+        if (!form) {
+            return;
+        }
+
+        delete form.dataset.siteTransferGoogleApiKeyState;
+        delete form.dataset.siteTransferGoogleApiKeyMessage;
     }
 
     function getSiteTransferUploadLimitBytes(form) {
@@ -9046,6 +9310,40 @@
         return getString('siteTransferTooLarge', 'The selected bundle is larger than this server allows in one upload.');
     }
 
+    function formatSiteTransferFileSize(bytes) {
+        const size = Number(bytes || 0);
+
+        if (!Number.isFinite(size) || size <= 0) {
+            return '0 KB';
+        }
+
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let scaled = size;
+        let unitIndex = 0;
+
+        while (scaled >= 1024 && unitIndex < units.length - 1) {
+            scaled /= 1024;
+            unitIndex += 1;
+        }
+
+        const precision = scaled >= 10 || unitIndex === 0 ? 0 : 1;
+
+        return `${scaled.toFixed(precision)} ${units[unitIndex]}`;
+    }
+
+    function getSiteTransferSelectedFileSizeMessage(selectedFile) {
+        const sizeLabel = formatSiteTransferFileSize(selectedFile ? selectedFile.size : 0);
+
+        if (wpSprintf) {
+            return wpSprintf(
+                getString('siteTransferLimitReady', '%s Selected'),
+                sizeLabel
+            );
+        }
+
+        return `${sizeLabel} Selected`;
+    }
+
     function setSiteTransferSummaryItem(element, value, state = 'neutral') {
         if (!element) {
             return;
@@ -9056,6 +9354,12 @@
 
         if (item) {
             item.setAttribute('data-state', state);
+            const label = item.querySelector('.tasty-fonts-site-transfer-summary-label');
+            const labelText = label ? String(label.textContent || '').trim() : '';
+            const summaryText = labelText ? `${labelText}: ${value}` : value;
+
+            item.setAttribute('aria-label', summaryText);
+            item.setAttribute('title', summaryText);
         }
     }
 
@@ -9064,16 +9368,16 @@
 
         if (limitLabel && wpSprintf) {
             return wpSprintf(
-                getString('siteTransferLimitNeutral', 'Ready to validate against the %s upload limit.'),
+                getString('siteTransferLimitNeutral', '%s Upload Limit'),
                 limitLabel
             );
         }
 
         if (limitLabel) {
-            return `Ready to validate against the ${limitLabel} upload limit.`;
+            return `${limitLabel} Upload Limit`;
         }
 
-        return getString('siteTransferLimitNeutralFallback', 'Ready to validate the selected bundle before import.');
+        return getString('siteTransferLimitNeutralFallback', 'Upload Limit Available');
     }
 
     function syncSiteTransferFormState(form, options = {}) {
@@ -9085,6 +9389,7 @@
             fileInput,
             googleApiKeyInput,
             validateButton,
+            importButton,
             stageTokenInput,
             status,
             fileName,
@@ -9102,6 +9407,20 @@
         const isValidating = form.dataset.siteTransferValidating === '1';
         const hasGoogleApiKey = !!(googleApiKeyInput && String(googleApiKeyInput.value || '').trim() !== '');
         const hasStagedBundle = !!(stageTokenInput && String(stageTokenInput.value || '').trim() !== '');
+        const googleApiKeyState = String(form.dataset.siteTransferGoogleApiKeyState || '');
+        const googleApiKeyMessage = String(form.dataset.siteTransferGoogleApiKeyMessage || '');
+        let googleSummaryText = getString('siteTransferGoogleSummaryEmpty', 'Optional - not provided');
+        let googleSummaryState = 'neutral';
+
+        if (hasGoogleApiKey && googleApiKeyState === 'valid') {
+            googleSummaryText = googleApiKeyMessage || getString('siteTransferGoogleSummaryValid', 'Google API key validated');
+            googleSummaryState = 'ready';
+        } else if (hasGoogleApiKey && googleApiKeyState === 'invalid') {
+            googleSummaryText = googleApiKeyMessage || getString('siteTransferGoogleSummaryInvalid', 'Google API key invalid');
+            googleSummaryState = 'error';
+        } else if (hasGoogleApiKey) {
+            googleSummaryText = getString('siteTransferGoogleSummaryEntered', 'Key entered - run dry run');
+        }
 
         form.classList.toggle('has-selected-file', hasFile);
         form.classList.toggle('is-ready-to-import', hasStagedBundle && !isSubmitting);
@@ -9117,29 +9436,27 @@
         setSiteTransferSummaryItem(
             summaryBundle,
             hasFile ? (selectedFile.name || getString('siteTransferNoFile', 'No bundle selected')) : getString('siteTransferNoFile', 'No bundle selected'),
-            hasFile ? (isTooLarge ? 'warning' : (hasStagedBundle ? 'ready' : 'neutral')) : 'neutral'
+            hasFile ? (isTooLarge ? 'warning' : 'ready') : 'neutral'
         );
         setSiteTransferSummaryItem(
             summaryLimit,
             isTooLarge
                 ? getSiteTransferFileTooLargeMessage(form)
-                : (hasFile
-                    ? (hasStagedBundle
-                        ? getString('siteTransferLimitReady', 'Within upload limit')
-                        : buildSiteTransferNeutralLimitSummary(form))
-                    : buildSiteTransferNeutralLimitSummary(form)),
-            isTooLarge ? 'warning' : (hasStagedBundle ? 'ready' : 'neutral')
+                : (hasFile ? getSiteTransferSelectedFileSizeMessage(selectedFile) : buildSiteTransferNeutralLimitSummary(form)),
+            isTooLarge ? 'warning' : (hasFile ? 'ready' : 'neutral')
         );
         setSiteTransferSummaryItem(
             summaryGoogle,
-            hasGoogleApiKey
-                ? getString('siteTransferGoogleSummaryFilled', 'Fresh Google API key will be saved')
-                : getString('siteTransferGoogleSummaryEmpty', 'Optional — not provided'),
-            hasGoogleApiKey ? 'ready' : 'neutral'
+            googleSummaryText,
+            googleSummaryState
         );
 
         if (validateButton) {
             validateButton.disabled = !hasFile || isTooLarge || isSubmitting || isValidating || !hasRestConfig();
+        }
+
+        if (importButton) {
+            importButton.disabled = !hasStagedBundle || isSubmitting || isValidating;
         }
 
         syncSettingsSaveShell();
@@ -9162,6 +9479,7 @@
 
         const {
             fileInput,
+            googleApiKeyInput,
             validateButton,
             status,
             stageTokenInput,
@@ -9176,8 +9494,12 @@
 
         const formData = new FormData();
         formData.append('bundle', selectedFile, selectedFile.name || 'tasty-fonts-transfer.zip');
+        if (googleApiKeyInput && String(googleApiKeyInput.value || '').trim() !== '') {
+            formData.append('google_api_key', String(googleApiKeyInput.value || '').trim());
+        }
 
         form.dataset.siteTransferValidating = '1';
+        clearSiteTransferGoogleApiKeyValidation(form);
         syncSiteTransferFormState(form, { clearStatus: false });
         setButtonBusyState(
             validateButton,
@@ -9208,6 +9530,11 @@
                 stageTokenInput.value = String(payload.stage_token || '').trim();
             }
 
+            if (String(payload.google_api_key_state || '') === 'valid') {
+                form.dataset.siteTransferGoogleApiKeyState = 'valid';
+                form.dataset.siteTransferGoogleApiKeyMessage = String(payload.google_api_key_message || '');
+            }
+
             form.dataset.siteTransferValidated = '1';
             syncSiteTransferFormState(form, { clearStatus: false });
             setStatus(status, getApiMessage(payload, getString('requestFailed', 'Request failed.')), 'success', 100);
@@ -9216,6 +9543,18 @@
             return true;
         } catch (error) {
             clearSiteTransferStagedBundle(form);
+            if (
+                googleApiKeyInput
+                && String(googleApiKeyInput.value || '').trim() !== ''
+                && error
+                && (
+                    error.code === 'tasty_fonts_transfer_google_api_key_invalid'
+                    || error.code === 'tasty_fonts_google_api_key_invalid'
+                )
+            ) {
+                form.dataset.siteTransferGoogleApiKeyState = 'invalid';
+                form.dataset.siteTransferGoogleApiKeyMessage = getErrorMessage(error, getString('siteTransferGoogleSummaryInvalid', 'Google API key invalid'));
+            }
             syncSiteTransferFormState(form, { clearStatus: false });
             const message = getErrorMessage(error, getString('requestFailed', 'Request failed.'));
 
@@ -11114,6 +11453,36 @@
             const input = option.querySelector('[data-pill-option-input]');
             option.classList.toggle('is-active', !!(input && input.checked));
         });
+        syncRadioProxySelectUi();
+    }
+
+    function getRadioInputsByName(name) {
+        return Array.from(document.querySelectorAll('input[type="radio"]')).filter((input) => input.name === name);
+    }
+
+    function syncRadioProxySelectUi() {
+        radioProxySelects.forEach((select) => {
+            const name = select.getAttribute('data-settings-radio-proxy') || '';
+            const checkedInput = getRadioInputsByName(name).find((input) => input.checked);
+
+            if (checkedInput && select.value !== checkedInput.value) {
+                select.value = checkedInput.value;
+            }
+        });
+    }
+
+    function applyRadioProxySelect(select) {
+        const name = select.getAttribute('data-settings-radio-proxy') || '';
+        const targetInput = getRadioInputsByName(name).find((input) => input.value === select.value);
+
+        if (!targetInput || targetInput.disabled) {
+            syncRadioProxySelectUi();
+            return;
+        }
+
+        targetInput.checked = true;
+        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+        syncPillOptionUi();
     }
 
     function setOutputAdvancedPanelState(expanded) {
@@ -11175,6 +11544,9 @@
         if (outputRoleClassStylesOption) {
             const classOutputEnabled = !!(outputMasterInputs.classes && outputMasterInputs.classes.checked);
             outputRoleClassStylesOption.hidden = !(mode === 'classes' || (mode === 'custom' && classOutputEnabled));
+        }
+        if (outputAdvancedPanel) {
+            hydrateSettingsHelpTooltips(outputAdvancedPanel);
         }
         syncPillOptionUi();
     }
@@ -11247,6 +11619,12 @@
     }
 
     function bindOutputSettingsControls() {
+        radioProxySelects.forEach((select) => {
+            select.addEventListener('change', () => {
+                applyRadioProxySelect(select);
+            });
+        });
+
         pillOptionInputs.forEach((input) => {
             input.addEventListener('change', syncPillOptionUi);
         });
@@ -11343,6 +11721,12 @@
 
                 settingsNavigationInFlight = true;
             });
+
+            getSettingsFormClearButtons(form).forEach((button) => {
+                button.addEventListener('click', () => {
+                    resetSettingsFormChanges(form);
+                });
+            });
         });
     }
 
@@ -11366,44 +11750,80 @@
         }
     }
 
+    function syncBricksThemeStyleTargetState(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return '';
+        }
+
+        const modeInputs = Array.from(form.querySelectorAll('[data-bricks-theme-style-target-mode]'));
+        const targetSelect = form.querySelector('[data-bricks-theme-style-target-select]');
+        const targetSelectWrap = form.querySelector('[data-bricks-theme-style-target-select-wrap]');
+        const activeModeInput = modeInputs.find((input) => input instanceof HTMLInputElement && input.checked);
+        const mode = activeModeInput instanceof HTMLInputElement ? String(activeModeInput.value || '') : '';
+        const selectedMode = mode === 'selected';
+
+        if (targetSelect instanceof HTMLSelectElement) {
+            targetSelect.disabled = !selectedMode;
+        }
+
+        if (targetSelectWrap instanceof HTMLElement) {
+            targetSelectWrap.hidden = !selectedMode;
+            targetSelectWrap.setAttribute('aria-hidden', selectedMode ? 'false' : 'true');
+        }
+
+        return mode;
+    }
+
+    function syncSettingsFormDerivedUi(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const monospaceInput = monospaceRoleSettingInputs.find((input) => input instanceof HTMLInputElement && input.checked);
+
+        monospaceRoleEnabled = !!monospaceInput && !!roleMonospace && !!roleMonospaceFallback;
+        syncMonoDependentControls(!!monospaceInput);
+        syncPillOptionUi();
+        syncOutputSettingsUi();
+        syncUnicodeRangeUi();
+        syncAdminAccessControls();
+        syncBricksThemeStyleTargetState(form);
+    }
+
+    function resetSettingsFormChanges(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        form.reset();
+        syncSettingsFormDerivedUi(form);
+        syncSettingsFormDirtyState(form);
+    }
+
     function bindBricksThemeStyleTargetControls() {
         settingsForms.forEach((form) => {
             const modeInputs = Array.from(form.querySelectorAll('[data-bricks-theme-style-target-mode]'));
-            const targetSelect = form.querySelector('[data-bricks-theme-style-target-select]');
-            const targetSelectWrap = form.querySelector('[data-bricks-theme-style-target-select-wrap]');
 
-            if (!modeInputs.length || !(targetSelect instanceof HTMLSelectElement)) {
+            if (!modeInputs.length) {
                 return;
             }
 
-            const syncTargetSelectState = () => {
-                const activeModeInput = modeInputs.find((input) => input instanceof HTMLInputElement && input.checked);
-                const mode = activeModeInput instanceof HTMLInputElement ? String(activeModeInput.value || '') : '';
-                const selectedMode = mode === 'selected';
-
-                targetSelect.disabled = !selectedMode;
-
-                if (targetSelectWrap instanceof HTMLElement) {
-                    targetSelectWrap.hidden = !selectedMode;
-                    targetSelectWrap.setAttribute('aria-hidden', selectedMode ? 'false' : 'true');
-                }
-
-                return mode;
-            };
-
             modeInputs.forEach((input) => {
                 input.addEventListener('change', () => {
-                    const mode = syncTargetSelectState();
+                    const mode = syncBricksThemeStyleTargetState(form);
+                    const targetSelect = form.querySelector('[data-bricks-theme-style-target-select]');
 
                     if (mode === 'selected') {
-                        if (String(targetSelect.value || '').trim() !== '') {
+                        if (targetSelect instanceof HTMLSelectElement && String(targetSelect.value || '').trim() !== '') {
                             if (syncSettingsFormDirtyState(form)) {
                                 requestForcedSettingsSubmit(form);
                             }
                             return;
                         }
 
-                        targetSelect.focus();
+                        if (targetSelect instanceof HTMLSelectElement) {
+                            targetSelect.focus();
+                        }
                         return;
                     }
 
@@ -11413,8 +11833,14 @@
                 });
             });
 
+            const targetSelect = form.querySelector('[data-bricks-theme-style-target-select]');
+            if (!(targetSelect instanceof HTMLSelectElement)) {
+                syncBricksThemeStyleTargetState(form);
+                return;
+            }
+
             targetSelect.addEventListener('change', () => {
-                if (syncTargetSelectState() !== 'selected') {
+                if (syncBricksThemeStyleTargetState(form) !== 'selected') {
                     return;
                 }
 
@@ -11423,7 +11849,7 @@
                 }
             });
 
-            syncTargetSelectState();
+            syncBricksThemeStyleTargetState(form);
         });
     }
 
@@ -11489,6 +11915,50 @@
     }
 
     function bindDeveloperToolsControls() {
+        Array.from(document.querySelectorAll('[data-snapshot-rename-toggle]')).forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const targetId = String(button.getAttribute('aria-controls') || '').trim();
+            const renameForm = targetId ? document.getElementById(targetId) : null;
+            const labelInput = renameForm ? renameForm.querySelector('[data-snapshot-rename-input]') : null;
+
+            if (!(renameForm instanceof HTMLElement)) {
+                return;
+            }
+
+            button.addEventListener('click', () => {
+                const isOpening = renameForm.hidden;
+
+                renameForm.hidden = !isOpening;
+                button.setAttribute('aria-expanded', isOpening ? 'true' : 'false');
+                button.closest('.tasty-fonts-snapshot-row')?.classList.toggle('is-renaming', isOpening);
+
+                if (isOpening && labelInput instanceof HTMLInputElement) {
+                    labelInput.focus();
+                    labelInput.select();
+                }
+            });
+
+            renameForm.querySelectorAll('[data-snapshot-rename-cancel]').forEach((cancelButton) => {
+                if (!(cancelButton instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                cancelButton.addEventListener('click', () => {
+                    if (labelInput instanceof HTMLInputElement) {
+                        labelInput.value = String(labelInput.getAttribute('data-original-value') || '');
+                    }
+
+                    renameForm.hidden = true;
+                    button.setAttribute('aria-expanded', 'false');
+                    button.closest('.tasty-fonts-snapshot-row')?.classList.remove('is-renaming');
+                    button.focus();
+                });
+            });
+        });
+
         siteTransferForms.forEach((form) => {
             const { fileInput, googleApiKeyInput, validateButton } = getSiteTransferFieldParts(form);
 
@@ -11503,6 +11973,8 @@
 
             if (googleApiKeyInput) {
                 googleApiKeyInput.addEventListener('input', () => {
+                    clearSiteTransferGoogleApiKeyValidation(form);
+                    clearSiteTransferStagedBundle(form);
                     syncSiteTransferFormState(form, { clearStatus: false });
                 });
             }
@@ -11629,6 +12101,7 @@
 
         syncDisclosureToggles();
         initToasts();
+        hydrateSettingsHelpTooltips();
         initHelpTooltips();
         initUploadRows();
         initLibraryFiltering();
@@ -11648,8 +12121,11 @@
         applyTrackedUiState(initialTrackedUiState);
         syncTrackedUiUrl('replace');
         syncRoleDisclosureForCurrentPage();
-        syncSettingsSaveShell();
         const appliedPendingUiState = applyPendingUiState();
+        settingsForms.forEach((form) => {
+            refreshSettingsFormBaseline(form);
+        });
+        syncSettingsSaveShell();
 
         if (!appliedPendingUiState && !hasTrackedUiState(initialTrackedUiState)) {
             resetInitialScrollPosition();

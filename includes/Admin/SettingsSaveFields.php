@@ -78,6 +78,8 @@ final class SettingsSaveFields
             ['name' => 'acss_font_role_sync_enabled', 'kind' => 'toggle'],
             ['name' => 'delete_uploaded_files_on_uninstall', 'kind' => 'toggle'],
             ['name' => 'show_activity_log', 'kind' => 'toggle'],
+            ['name' => 'snapshot_retention_limit', 'kind' => 'text'],
+            ['name' => 'site_transfer_export_retention_limit', 'kind' => 'text'],
             ['name' => 'training_wheels_off', 'kind' => 'toggle'],
             ['name' => 'variable_fonts_enabled', 'kind' => 'toggle'],
             ['name' => 'monospace_role_enabled', 'kind' => 'toggle'],

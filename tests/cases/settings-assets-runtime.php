@@ -774,6 +774,92 @@ $tests['site_transfer_service_exports_a_portable_bundle_without_secrets_or_gener
     @unlink((string) ($bundle['path'] ?? ''));
 };
 
+$tests['site_transfer_service_retains_recent_export_bundles_and_respects_protection'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveAppliedRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+
+    for ($index = 0; $index < 6; $index++) {
+        $bundle = $services['site_transfer']->buildExportBundle(true);
+
+        assertFalseValue(is_wp_error($bundle), 'Retained export bundle creation should succeed.');
+        assertSameValue(true, is_readable((string) ($bundle['path'] ?? '')), 'Retained export bundles should remain readable after creation.');
+    }
+
+    $retained = $services['site_transfer']->listExportBundles();
+
+    assertSameValue(5, count($retained), 'Export history should keep the latest five unprotected bundles.');
+
+    $protectedId = (string) ($retained[4]['id'] ?? '');
+    $protectResult = $services['site_transfer']->setExportBundleProtected($protectedId, true);
+
+    assertFalseValue(is_wp_error($protectResult), 'A retained export bundle should be protectable.');
+
+    $extraBundle = $services['site_transfer']->buildExportBundle(true);
+
+    assertFalseValue(is_wp_error($extraBundle), 'Creating another retained export should still succeed after protecting an older export.');
+
+    $afterProtect = $services['site_transfer']->listExportBundles();
+    $afterProtectIds = array_column($afterProtect, 'id');
+    $protectedRows = array_values(array_filter($afterProtect, static fn (array $bundle): bool => !empty($bundle['protected'])));
+    $unprotectedRows = array_values(array_filter($afterProtect, static fn (array $bundle): bool => empty($bundle['protected'])));
+
+    assertSameValue(true, in_array($protectedId, $afterProtectIds, true), 'Protected export bundles should not be pruned by the five-bundle retention limit.');
+    assertSameValue(1, count($protectedRows), 'Only the explicitly protected export should carry the protected state.');
+    assertSameValue(5, count($unprotectedRows), 'The retained export limit should apply to unprotected bundles.');
+    assertSameValue(['Inter'], (array) ($afterProtect[0]['family_names'] ?? []), 'Retained export metadata should include captured family names.');
+    assertSameValue(['Inter'], (array) ($afterProtect[0]['role_families'] ?? []), 'Retained export metadata should include captured live role families.');
+
+    $renameResult = $services['site_transfer']->renameExportBundle($protectedId, 'Before migration');
+    $renamedRows = $services['site_transfer']->listExportBundles();
+    $renamedIndex = array_search($protectedId, array_column($renamedRows, 'id'), true);
+
+    assertFalseValue(is_wp_error($renameResult), 'Protected export bundles should still be renameable.');
+    assertSameValue(
+        'Before migration',
+        (string) (is_int($renamedIndex) ? ($renamedRows[$renamedIndex]['label'] ?? '') : ''),
+        'Renaming should persist the saved export bundle label.'
+    );
+
+    $deleteProtected = $services['site_transfer']->deleteExportBundle($protectedId);
+
+    assertSameValue(true, is_wp_error($deleteProtected), 'Protected export bundles should reject deletion.');
+
+    $unprotectResult = $services['site_transfer']->setExportBundleProtected($protectedId, false);
+    $deleteResult = $services['site_transfer']->deleteExportBundle($protectedId);
+
+    assertFalseValue(is_wp_error($unprotectResult), 'Protected export bundles should be unprotectable.');
+    assertFalseValue(is_wp_error($deleteResult), 'Unprotected export bundles should be deletable.');
+    assertSameValue(false, in_array($protectedId, array_column($services['site_transfer']->listExportBundles(), 'id'), true), 'Deleted export bundles should be removed from history.');
+};
+
 $tests['site_transfer_service_rejects_checksum_mismatches_during_bundle_validation'] = static function (): void {
     resetTestState();
 
@@ -826,7 +912,7 @@ $tests['site_transfer_service_import_replaces_existing_state_and_accepts_a_fresh
     global $remoteRequestResponses;
     global $remoteGetCalls;
     global $remoteRequestCalls;
-    global $uploadedFilePaths;
+    global $uploadedFilePaths, $remoteGetResponses;
 
     $services = makeServiceGraph();
     $services['developer_tools']->ensureStorageScaffolding();
@@ -939,10 +1025,96 @@ $tests['site_transfer_service_import_replaces_existing_state_and_accepts_a_fresh
     assertSameValue(2, count($remoteRequestCalls), 'Importing a site transfer bundle should create one managed family and one managed font face for the restored library.');
 };
 
+$tests['admin_controller_creates_restorable_snapshot_before_direct_site_transfer_import'] = static function (): void {
+    resetTestState();
+
+    global $uploadedFilePaths, $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $sourceFile = (string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($sourceFile, 'source-font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings(['block_editor_font_library_sync_enabled' => '0']);
+
+    $bundle = $services['site_transfer']->buildExportBundle();
+    assertFalseValue(is_wp_error($bundle), 'Building the source bundle for controller import testing should succeed.');
+
+    $existingFile = (string) $services['storage']->pathForRelativePath('upload/existing/existing-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($existingFile, 'existing-font-data');
+    $services['imports']->saveProfile(
+        'Existing Sans',
+        'existing-sans',
+        [
+            'id' => 'existing-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Existing Sans',
+                    'slug' => 'existing-sans',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/existing/existing-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/existing/existing-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $uploadedFilePaths[] = (string) $bundle['path'];
+    $result = $services['controller']->importSiteTransferBundle([
+        'name' => 'tasty-fonts-transfer.zip',
+        'tmp_name' => (string) $bundle['path'],
+        'error' => UPLOAD_ERR_OK,
+        'size' => (int) filesize((string) $bundle['path']),
+    ]);
+
+    assertFalseValue(is_wp_error($result), 'Importing a direct site transfer bundle through the controller should succeed.');
+    assertSameValue(false, file_exists($existingFile), 'The direct controller import should still replace previous managed files.');
+
+    $snapshots = $services['snapshots']->listSnapshots();
+    assertSameValue(1, count($snapshots), 'Importing a direct site transfer bundle through the controller should create one rollback snapshot first.');
+    assertSameValue('before_transfer_import', (string) ($snapshots[0]['reason'] ?? ''), 'The direct import snapshot should record that it protects a transfer import.');
+
+    $restore = $services['snapshots']->restoreSnapshot((string) ($snapshots[0]['id'] ?? ''));
+    assertFalseValue(is_wp_error($restore), 'The direct import snapshot should be restorable.');
+    assertSameValue('existing-font-data', (string) file_get_contents($existingFile), 'Restoring the direct import snapshot should bring back the previous managed font file contents.');
+    assertSameValue('Existing Sans', (string) ($services['imports']->getFamily('existing-sans')['family'] ?? ''), 'Restoring the direct import snapshot should bring back the previous library entry.');
+};
+
 $tests['site_transfer_service_stage_import_bundle_stages_a_validated_bundle_for_follow_up_import'] = static function (): void {
     resetTestState();
 
-    global $uploadedFilePaths;
+    global $uploadedFilePaths, $remoteGetResponses;
 
     $services = makeServiceGraph();
     $services['developer_tools']->ensureStorageScaffolding();
@@ -1020,13 +1192,223 @@ $tests['site_transfer_service_stage_import_bundle_stages_a_validated_bundle_for_
         true
     );
     $services['settings']->saveSettings(['google_api_key' => 'old-secret']);
+    $remoteGetResponses['https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=fresh-destination-key'] = [
+        'response' => ['code' => 200],
+        'body' => wp_json_encode(['items' => []]),
+    ];
 
-    $result = $services['site_transfer']->importStagedBundle((string) ($stage['stage_token'] ?? ''), 'fresh-destination-key');
+    $result = $services['controller']->importStagedSiteTransferBundle((string) ($stage['stage_token'] ?? ''), 'fresh-destination-key');
 
     assertFalseValue(is_wp_error($result), 'Importing a staged site transfer bundle should succeed.');
     assertSameValue(false, file_exists($existingFile), 'Importing a staged site transfer bundle should replace previously managed files that are not in the bundle.');
     assertSameValue('fresh-destination-key', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Importing a staged site transfer bundle should still accept a fresh destination Google API key.');
+    assertSameValue('valid', (string) ($services['settings']->getSettings()['google_api_key_status'] ?? ''), 'Importing a staged site transfer bundle should preserve the validated Google API key status.');
     assertSameValue(false, get_transient('tasty_fonts_transfer_stage_1') !== false, 'The staged bundle should be cleared after the destructive import completes.');
+
+    $snapshots = $services['snapshots']->listSnapshots();
+    assertSameValue(1, count($snapshots), 'Importing a staged site transfer bundle through the controller should create one rollback snapshot first.');
+    assertSameValue('before_transfer_import', (string) ($snapshots[0]['reason'] ?? ''), 'The automatic rollback snapshot should record that it protects a transfer import.');
+
+    $restore = $services['snapshots']->restoreSnapshot((string) ($snapshots[0]['id'] ?? ''));
+    assertFalseValue(is_wp_error($restore), 'The automatic pre-import snapshot should be restorable.');
+    assertSameValue(true, file_exists($existingFile), 'Restoring the automatic pre-import snapshot should bring back the replaced managed font file.');
+    assertSameValue('Existing Sans', (string) ($services['imports']->getFamily('existing-sans')['family'] ?? ''), 'Restoring the automatic pre-import snapshot should bring back the previous library entry.');
+};
+
+$tests['snapshot_service_creates_sanitized_rollback_snapshots_and_restores_state'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $fontPath = (string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($fontPath, 'snapshot-font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings(['google_api_key' => 'secret-google-key', 'auto_apply_roles' => '1']);
+    $services['settings']->saveRoles(['heading' => 'Inter', 'body' => 'Inter'], ['Inter']);
+    $services['settings']->saveAppliedRoles(['heading' => 'Inter', 'body' => 'Inter'], ['Inter']);
+
+    $snapshot = $services['snapshots']->createSnapshot('manual');
+
+    assertFalseValue(is_wp_error($snapshot), 'Creating a rollback snapshot should succeed.');
+    $summary = is_array($snapshot['snapshot'] ?? null) ? $snapshot['snapshot'] : [];
+    $snapshotId = (string) ($summary['id'] ?? '');
+    assertSameValue(true, $snapshotId !== '', 'Rollback snapshots should return a stable snapshot id.');
+    assertSameValue(['Inter'], $summary['family_names'] ?? [], 'Rollback snapshot summaries should expose captured family names for the recovery UI.');
+    assertSameValue(['Inter'], $summary['role_families'] ?? [], 'Rollback snapshot summaries should expose live role families for the recovery UI.');
+
+    $zipPath = null;
+    foreach (glob((string) $GLOBALS['uploadBaseDir'] . '/tasty-fonts-snapshots/*.zip') ?: [] as $candidate) {
+        if (str_contains((string) $candidate, $snapshotId)) {
+            $zipPath = (string) $candidate;
+            break;
+        }
+    }
+
+    assertSameValue(true, is_string($zipPath) && is_readable($zipPath), 'Creating a rollback snapshot should write a readable zip outside managed font storage.');
+
+    $zip = new ZipArchive();
+    assertSameValue(true, $zip->open((string) $zipPath) === true, 'The rollback snapshot should be a readable ZIP archive.');
+    $manifestJson = (string) $zip->getFromName('tasty-fonts-snapshot.json');
+    $fontPayload = (string) $zip->getFromName('fonts/upload/inter/inter-400-normal.woff2');
+    $zip->close();
+    $manifest = json_decode($manifestJson, true);
+
+    assertSameValue(true, is_array($manifest), 'The rollback snapshot should include a JSON manifest.');
+    assertSameValue(false, isset($manifest['settings']['google_api_key']), 'Rollback snapshots should not store Google API keys.');
+    assertSameValue('snapshot-font-data', $fontPayload, 'Rollback snapshots should include managed font files.');
+
+    $services['storage']->deleteAbsolutePath((string) $services['storage']->getRoot());
+    $services['imports']->clearLibrary();
+    $services['settings']->resetStoredSettingsToDefaults();
+
+    $restore = $services['snapshots']->restoreSnapshot($snapshotId);
+
+    assertFalseValue(is_wp_error($restore), 'Restoring a rollback snapshot should succeed.');
+    assertSameValue('snapshot-font-data', (string) file_get_contents($fontPath), 'Rollback restore should restore managed font files.');
+    assertSameValue(true, $services['imports']->getFamily('inter') !== null, 'Rollback restore should restore the font library.');
+    assertSameValue('Inter', (string) ($services['settings']->getRoles([])['heading'] ?? ''), 'Rollback restore should restore saved roles.');
+    assertSameValue('', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Rollback restore should keep excluded Google API keys empty.');
+
+    $rename = $services['snapshots']->renameSnapshot($snapshotId, 'Before homepage launch');
+
+    assertFalseValue(is_wp_error($rename), 'Renaming a rollback snapshot should succeed.');
+    assertSameValue('Before homepage launch', (string) ($rename['snapshot']['label'] ?? ''), 'Renamed rollback snapshots should return their friendly label.');
+    assertSameValue('Before homepage launch', (string) ($services['snapshots']->listSnapshots()[0]['label'] ?? ''), 'Renamed rollback snapshots should persist their friendly label.');
+
+    $delete = $services['snapshots']->deleteSnapshot($snapshotId);
+
+    assertFalseValue(is_wp_error($delete), 'Deleting a rollback snapshot should succeed.');
+    assertSameValue([], $services['snapshots']->listSnapshots(), 'Deleting a rollback snapshot should remove it from the local snapshot list.');
+    assertSameValue(false, is_string($zipPath) && file_exists($zipPath), 'Deleting a rollback snapshot should remove the local ZIP archive.');
+
+    $services['settings']->saveSettings(['snapshot_retention_limit' => 2]);
+    assertFalseValue(is_wp_error($services['snapshots']->createSnapshot('manual')), 'Creating the first retained snapshot should succeed.');
+    assertFalseValue(is_wp_error($services['snapshots']->createSnapshot('manual')), 'Creating the second retained snapshot should succeed.');
+    assertFalseValue(is_wp_error($services['snapshots']->createSnapshot('manual')), 'Creating the third retained snapshot should succeed.');
+    assertSameValue(2, count($services['snapshots']->listSnapshots()), 'Rollback snapshots should be pruned to the configured retention limit.');
+};
+
+$tests['support_bundle_service_exports_sanitized_diagnostics_without_secrets'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $services['settings']->saveSettings(['google_api_key' => 'secret-google-key']);
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->getGeneratedCssPath(), 'body{font-family:Inter;}');
+    $services['log']->add('Generated CSS regenerated.');
+
+    $bundle = $services['support_bundles']->buildBundle([
+        'advanced_tools' => [
+            'google_api_key' => 'secret-google-key',
+            'health_checks' => [],
+        ],
+    ]);
+
+    assertFalseValue(is_wp_error($bundle), 'Building a support bundle should succeed.');
+
+    $zip = new ZipArchive();
+    assertSameValue(true, $zip->open((string) ($bundle['path'] ?? '')) === true, 'The support bundle should be a readable ZIP archive.');
+    $settingsJson = (string) $zip->getFromName('diagnostics/settings.json');
+    $advancedToolsJson = (string) $zip->getFromName('diagnostics/advanced-tools.json');
+    $generatedCss = (string) $zip->getFromName('generated-css/tasty-fonts.css');
+    $zip->close();
+
+    assertNotContainsValue('secret-google-key', $settingsJson . $advancedToolsJson, 'Support bundles should exclude saved and payload API keys.');
+    assertContainsValue('body{font-family:Inter;}', $generatedCss, 'Support bundles should include generated CSS when available.');
+
+    @unlink((string) ($bundle['path'] ?? ''));
+};
+
+$tests['site_transfer_dry_run_reports_import_diff_and_snapshot_notice'] = static function (): void {
+    resetTestState();
+
+    global $uploadedFilePaths;
+
+    $source = makeServiceGraph();
+    $source['developer_tools']->ensureStorageScaffolding();
+    $source['storage']->writeAbsoluteFile((string) $source['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2'), 'source-font-data');
+    $source['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    $bundle = $source['site_transfer']->buildExportBundle();
+    assertFalseValue(is_wp_error($bundle), 'Building a source transfer bundle should succeed.');
+
+    resetTestState();
+    $destination = makeServiceGraph();
+    $destination['developer_tools']->ensureStorageScaffolding();
+    $destination['imports']->saveProfile(
+        'Existing Sans',
+        'existing-sans',
+        [
+            'id' => 'existing',
+            'label' => 'Existing',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+    $uploadedFilePaths[] = (string) ($bundle['path'] ?? '');
+    $stage = $destination['site_transfer']->stageImportBundle([
+        'name' => 'phase-three-transfer.zip',
+        'tmp_name' => (string) ($bundle['path'] ?? ''),
+        'error' => UPLOAD_ERR_OK,
+        'size' => (int) filesize((string) ($bundle['path'] ?? '')),
+    ]);
+
+    assertFalseValue(is_wp_error($stage), 'Dry-running a valid transfer bundle should succeed.');
+    $diff = is_array($stage['diff'] ?? null) ? $stage['diff'] : [];
+    assertSameValue(true, in_array('inter', is_array($diff['families_added'] ?? null) ? $diff['families_added'] : [], true), 'Transfer dry-run diff should list families added by the incoming bundle.');
+    assertSameValue(true, in_array('existing-sans', is_array($diff['families_removed'] ?? null) ? $diff['families_removed'] : [], true), 'Transfer dry-run diff should list current families that the import will remove.');
+    assertSameValue(true, !empty($diff['snapshot_will_be_created']), 'Transfer dry-run diff should disclose that a current-state snapshot will be created before import.');
+
+    @unlink((string) ($bundle['path'] ?? ''));
 };
 
 $tests['site_transfer_service_import_leaves_google_api_key_empty_when_no_fresh_secret_is_provided'] = static function (): void {
