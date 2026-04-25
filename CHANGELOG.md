@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-04-26
+
 ### Added
 
 - Added refreshed admin UI screenshots for the released Tasty Fonts documentation set.
