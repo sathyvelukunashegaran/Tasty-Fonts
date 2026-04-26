@@ -27,6 +27,8 @@ Live Google search requires a valid Google Fonts API key saved in the plugin set
 
 If search is unavailable, open the Google key settings from the add-font workflow and validate the key first.
 
+![Google Fonts API key access panel — key entry, validation, and search readiness status](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/library-add-google-access.png)
+
 ### 2. Search For A Family
 
 Use the Google add-font flow to search for the family you want and review available variants. When Variable Font Support is enabled in `Settings → Behavior`, families that offer a variable version are marked with a **Variable** badge in the search results.

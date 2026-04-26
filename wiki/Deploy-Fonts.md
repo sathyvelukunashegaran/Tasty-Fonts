@@ -14,6 +14,8 @@ Think of this page as a staging area for typography. You can try different font 
 
 This workflow protects you from accidentally serving a broken or mismatched pairing on production while you are still experimenting.
 
+![Deploy Fonts overview — role selectors, preview workspace, and apply controls](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts.png)
+
 ---
 
 ## Steps
@@ -53,6 +55,8 @@ Use this when:
 
 Your draft is safe until you explicitly apply it or overwrite it with a new one.
 
+![Deploy Fonts dirty state — unsaved role changes highlighted before Save Draft or Apply Sitewide](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts-dirty-state.png)
+
 ### 3. Use The Preview Workspace
 
 The preview workspace is meant to answer "Does this pairing work everywhere?" before you publish it.
@@ -70,6 +74,10 @@ The five preview scenes are:
 - **Interface** — labels, buttons, and UI text
 - **Code** — code blocks and `pre` elements (most useful when the monospace role is enabled)
 
+![Deploy Fonts editorial preview — heading and body pairing in a headline-heavy content scene](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts-preview-editorial.png)
+
+![Deploy Fonts code preview — monospace role in a code-block content scene](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts-preview-code.png)
+
 > **Note:** previews always force `font-display: swap` for safety, even when your live output uses a different value. This ensures you see the font rather than a blank period during testing.
 
 ### 4. Apply Sitewide
@@ -86,6 +94,10 @@ The Deploy Fonts page exposes code and snippet panels for:
 - **Role variables**: the CSS custom property declarations emitted by the plugin, such as `--font-heading`, `--font-body`, and `--font-monospace`. Copy these to verify the correct variable names before referencing them in your own CSS.
 - **Role stack snippets**: the full resolved font-family stack for each role, including the configured fallback sequence. Use these when you need the exact stack string for a custom `font-family` declaration outside the plugin's generated output.
 - **Class output**: when utility class generation is enabled in `Settings → Output`, this panel shows the generated class names for role, alias, category, and family selectors. Use these to apply typography roles directly in HTML markup without writing additional CSS.
+
+![Deploy Fonts CSS variable snippets — copy-ready role variable declarations](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts-snippets-variables.png)
+
+![Deploy Fonts font-stack snippets — resolved font-family stacks for each role](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts-snippets-stacks.png)
 
 ---
 

@@ -24,6 +24,8 @@ The overview summarizes generated CSS readiness, diagnostic warnings, activity c
 - generated CSS size and timestamp
 - delivery mode and related runtime metadata
 
+![Advanced Tools overview — health status, runtime details, and copyable debug paths](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/advanced-tools.png)
+
 Use it as the first stop before drilling into a specific tool.
 
 ### Generated CSS
@@ -35,6 +37,8 @@ The `Generated CSS` panel shows the current runtime stylesheet output. Use it to
 - verify self-hosted `@font-face` rules point to your own uploads directory
 - copy snippets for debugging
 - download the generated stylesheet for review or comparison
+
+![Advanced Tools Generated CSS panel — runtime stylesheet output with download and copy controls](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/advanced-generated-css.png)
 
 If sitewide delivery is off, generated runtime CSS may not be available yet.
 
@@ -53,9 +57,13 @@ The `Developer` tab contains guarded maintenance actions that run immediately:
 
 Destructive actions require typed confirmation. Save pending settings before running developer tools.
 
+![Advanced Tools Developer tab — cache clear, CSS regeneration, rollback snapshots, and maintenance actions](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/advanced-developer-tools.png)
+
 ### CLI
 
 The `CLI` tab lists copy-ready WP-CLI commands for diagnostics, generated asset maintenance, transfer bundles, support bundles, and rollback snapshots.
+
+![Advanced Tools CLI tab — copy-ready WP-CLI commands for all maintenance and transfer actions](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/advanced-cli.png)
 
 ### Transfer
 
@@ -67,6 +75,8 @@ The `Transfer` tab contains portable site transfer workflows:
 - review transfer-specific activity
 
 Google API keys, generated CSS, logs, and transient runtime state are excluded from transfer bundles.
+
+![Advanced Tools Transfer tab — export bundle, dry-run, import, and transfer activity](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/advanced-transfer.png)
 
 ### Activity
 
@@ -80,6 +90,8 @@ The `Activity` tab shows recent scans, imports, deletes, settings changes, gener
 Use the account filter to review changes by actor, or search for names, event types, settings, error codes, and detail values. The log keeps the newest 100 entries.
 
 If the Activity tab says the log is hidden, enable `Settings -> Behavior -> Show Activity Log`. The plugin records events regardless of whether the panel is visible, so you can re-enable the setting at any time to view past history.
+
+![Advanced Tools Activity tab — paginated event log with actor filter and search](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/advanced-activity-log.png)
 
 ## WP-CLI
 

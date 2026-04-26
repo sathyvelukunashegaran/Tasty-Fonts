@@ -78,8 +78,6 @@ Published fonts reach every layer of your WordPress site automatically.
 
 ## See It in Action
 
-> 📸 **Drop your screenshots into the `screenshots/` folder using the filenames below.**
-
 <table>
   <tr>
     <td align="center" width="50%">

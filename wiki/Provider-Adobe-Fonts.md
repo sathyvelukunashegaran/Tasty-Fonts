@@ -23,6 +23,8 @@ Use the Adobe add-font workflow to save the project ID from your Adobe Fonts web
 5. Copy the project ID from the project detail page. It looks like an 8-character alphanumeric string (e.g., `abc12def`).
 6. Paste the project ID into the Adobe add-font flow in the plugin.
 
+![Adobe Fonts add-project panel — web project ID entry and detected family list](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/library-add-adobe-project.png)
+
 > **Note:** only fonts from **published** web projects are detected. Draft or paused projects do not expose a usable stylesheet.
 
 ### 2. Sync Detected Families

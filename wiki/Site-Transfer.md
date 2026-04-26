@@ -55,6 +55,8 @@ Before you begin, confirm all of the following:
 4. Click **Export Bundle**.
 5. Your browser downloads a ZIP file named something like `tasty-fonts-transfer-1.14.0-20260426-100000.zip`.
 
+![Advanced Tools Transfer tab — Export Bundle, dry-run, and Import Bundle cards](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/advanced-transfer.png)
+
 > **What's in the ZIP:** the archive contains a manifest file (`tasty-fonts-export.json`) plus your managed font files under a `fonts/` subdirectory. The manifest records your library state, settings, roles, and a checksum for every included file.
 
 Keep this ZIP somewhere safe — it is your portable bundle.
