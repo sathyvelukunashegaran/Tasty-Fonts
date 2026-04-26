@@ -1280,7 +1280,7 @@ $tests['admin_controller_builds_variant_variable_output_panel_content'] = static
     assertNotContainsValue(':root', $panelValues['variables'] ?? '', 'The CSS Variables panel should expose declarations only, without the root selector wrapper.');
 };
 
-$tests['admin_controller_builds_five_preview_panels_including_code'] = static function (): void {
+$tests['admin_controller_builds_six_preview_panels_including_marketing_and_code'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
@@ -1291,9 +1291,9 @@ $tests['admin_controller_builds_five_preview_panels_including_code'] = static fu
     );
 
     assertSameValue(
-        ['editorial', 'card', 'reading', 'interface', 'code'],
+        ['editorial', 'card', 'reading', 'interface', 'marketing', 'code'],
         $keys,
-        'Preview panels should include the dedicated Code tab after the existing four preview modes.'
+        'Preview panels should include Marketing after Interface and before the dedicated Code tab.'
     );
 };
 

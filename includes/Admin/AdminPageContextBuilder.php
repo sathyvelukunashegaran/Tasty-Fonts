@@ -1134,6 +1134,11 @@ final class AdminPageContextBuilder
                 'active' => false,
             ],
             [
+                'key' => 'marketing',
+                'label' => __('Marketing', 'tasty-fonts'),
+                'active' => false,
+            ],
+            [
                 'key' => 'code',
                 'label' => __('Code', 'tasty-fonts'),
                 'active' => false,

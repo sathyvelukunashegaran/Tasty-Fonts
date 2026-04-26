@@ -50,10 +50,9 @@
      * Warm Amber — secondary color in the Three-Color Restraint palette.
      * Paired with Tasty Blue (primary) and Soft Cream (tertiary).
      * NEVER replaces blue for primary actions, focus rings, or selected
-     * states. The single "color" survivor in semantic state work:
-     * --tasty-warning-raw is now an alias for warm amber (the previous
-     * legible warning color #9a6700 is removed, since warning is what
-     * Warm Amber is for).
+     * states. --tasty-warning-raw remains a Warm Amber accent/surface/
+     * border primitive. Readable amber or warning foreground text must
+     * use --tasty-amber-text / --tasty-warning-text instead of amber.
      */
     --tasty-warm-amber: #e89a3c;
     --tasty-warm-amber-rgb: 232, 154, 60;
@@ -86,9 +85,12 @@
      * The plugin uses ONLY Tasty Blue, Warm Amber, and Soft Cream
      * (plus neutrals: white, grays, ink, slate). The legacy
      * --tasty-success / --tasty-warning / --tasty-danger token
-     * NAMES survive as semantic roles so 124 existing consumers
-     * keep working, but they no longer carry green / red / warning-amber
-     * color identity. They now compose from the approved palette:
+     * NAMES survive as semantic roles so existing consumers keep
+     * working, but they no longer carry green / red color identity.
+     * Warning keeps Warm Amber for accent, surface, and border use only.
+     * Readable amber or warning copy must use --tasty-amber-text or
+     * --tasty-warning-text.
+     * They now compose from the approved palette:
      *
      *   --tasty-success  → ink + neutral surface (state shown via icon + filled chrome)
      *   --tasty-warning  → Warm Amber (the only colored survivor — warning is what amber is for)
@@ -201,6 +203,8 @@
     --tasty-text-strong: var(--tasty-ink);
     --tasty-text-muted: var(--tasty-gray-700);
     --tasty-text-on-accent: var(--tasty-gray-0);
+    --tasty-amber-text: var(--tasty-text-strong);
+    --tasty-warning-text: var(--tasty-amber-text);
     --tasty-success: var(--tasty-success-raw);
     --tasty-success-soft: rgba(var(--tasty-success-rgb), 0.055);
     --tasty-warning: var(--tasty-warning-raw);
@@ -304,6 +308,7 @@
     --tasty-layout-38pct: 38%;
     --tasty-layout-38px: 38px;
     --tasty-layout-38rem: 38rem;
+    --tasty-layout-40px: 40px;
     --tasty-layout-40rem: 40rem;
     --tasty-layout-42px: 42px;
     --tasty-layout-42rem: 42rem;
@@ -395,6 +400,11 @@
     --tasty-control-height-compact: 32px;
     --tasty-control-height: var(--tasty-control-height-regular);
     --tasty-control-adornment: var(--tasty-control-height-regular);
+    --tasty-hit-target-min: var(--tasty-layout-40px);
+    --tasty-hit-target-comfort: var(--tasty-layout-44px);
+    --tasty-icon-button-size: var(--tasty-hit-target-min);
+    --tasty-help-button-size: var(--tasty-pill-height-compact);
+    --tasty-clear-button-size: var(--tasty-hit-target-min);
     --tasty-pill-height-compact: 20px;
     --tasty-pill-height-regular: 24px;
     --tasty-pill-height-emphasis: 26px;
@@ -593,7 +603,7 @@
      */
     --tasty-copy-hover-background: var(--tasty-warm-amber-soft);
     --tasty-copy-hover-border: var(--tasty-border-amber-soft);
-    --tasty-copy-hover-color: var(--tasty-warm-amber-deep);
+    --tasty-copy-hover-color: var(--tasty-amber-text);
     --tasty-copy-hover-shadow: var(--tasty-shadow-amber-halo);
 
     /* Layout constants */
@@ -670,8 +680,8 @@
     --tasty-library-specimen-size-compact: clamp(26px, 5vw, 38px);
     --tasty-library-specimen-size-mobile: clamp(22px, 8vw, 32px);
     --tasty-library-action-gap: var(--tasty-space-2);
-    --tasty-library-action-icon-size: var(--tasty-control-height-regular);
-    --tasty-library-action-width: calc(var(--tasty-control-height-regular) * 3.6);
+    --tasty-library-action-icon-size: var(--tasty-icon-button-size);
+    --tasty-library-action-width: calc(var(--tasty-icon-button-size) * 3.6);
     --tasty-library-sidebar-padding: 14px;
     --tasty-library-meta-panel-padding: var(--tasty-space-3);
     --tasty-library-meta-panel-gap: 10px;
@@ -738,7 +748,7 @@
     --tasty-advanced-row-action-padding-inline: var(--tasty-layout-12px);
     --tasty-advanced-row-action-gap: var(--tasty-space-1-5);
     --tasty-advanced-row-action-icon-size: var(--tasty-layout-14px);
-    --tasty-advanced-row-help-size: var(--tasty-layout-24px);
+    --tasty-advanced-row-help-size: var(--tasty-help-button-size);
     --tasty-advanced-row-status-height: var(--tasty-layout-24px);
     --tasty-advanced-row-status-padding-inline: var(--tasty-layout-10px);
     --tasty-settings-board-row-min-height: var(--tasty-layout-58px);
@@ -1137,4 +1147,35 @@
     --tasty-syntax-variable: var(--tasty-brand-blue-active);/* --font-heading  --font-body (as value) */
     --tasty-syntax-keyword: var(--tasty-brand-blue);        /* swap  normal  italic  bold */
     --tasty-syntax-function: var(--tasty-warm-amber-deep);  /* url()  var()  format()  calc() */
+}
+
+@supports (color: oklch(65% 0.12 250deg)) {
+    .tasty-fonts-admin {
+        /* OKLCH primitive overrides. Hex fallbacks above remain canonical for unsupported browsers. */
+        --tasty-oklch-neutral-hue: 250deg;
+        --tasty-oklch-neutral-chroma-soft: 0.006;
+        --tasty-oklch-neutral-chroma-muted: 0.018;
+        --tasty-white: oklch(99.6% var(--tasty-oklch-neutral-chroma-soft) var(--tasty-oklch-neutral-hue));
+        --tasty-gray-0: oklch(99.6% var(--tasty-oklch-neutral-chroma-soft) var(--tasty-oklch-neutral-hue));
+        --tasty-gray-50: oklch(98.2% 0.008 var(--tasty-oklch-neutral-hue));
+        --tasty-gray-100: oklch(96.3% 0.012 var(--tasty-oklch-neutral-hue));
+        --tasty-gray-150: oklch(94.5% 0.014 var(--tasty-oklch-neutral-hue));
+        --tasty-gray-300: oklch(90.1% var(--tasty-oklch-neutral-chroma-muted) var(--tasty-oklch-neutral-hue));
+        --tasty-gray-700: oklch(43.5% 0.036 var(--tasty-oklch-neutral-hue));
+        --tasty-brand-blue: oklch(52.4% 0.139 249deg);
+        --tasty-brand-blue-hover: oklch(47.5% 0.13 249deg);
+        --tasty-brand-blue-active: oklch(39.8% 0.112 249deg);
+        --tasty-brand-cyan: oklch(78.2% 0.142 222deg);
+        --tasty-ink: oklch(25.5% 0.057 var(--tasty-oklch-neutral-hue));
+        --tasty-ink-soft: oklch(31.3% 0.045 var(--tasty-oklch-neutral-hue));
+        --tasty-slate: oklch(43.5% 0.036 var(--tasty-oklch-neutral-hue));
+        --tasty-warm-amber: oklch(74.2% 0.14 69deg);
+        --tasty-warm-amber-deep: oklch(64.3% 0.13 64deg);
+        --tasty-paper: oklch(98.4% 0.012 78deg);
+        --tasty-paper-deep: oklch(95.8% 0.018 78deg);
+        --tasty-ctrl-border: oklch(89.7% 0.018 var(--tasty-oklch-neutral-hue));
+        --tasty-ctrl-border-strong: oklch(75.3% 0.032 var(--tasty-oklch-neutral-hue));
+        --tasty-ctrl-surface: oklch(99.6% var(--tasty-oklch-neutral-chroma-soft) var(--tasty-oklch-neutral-hue));
+        --tasty-ctrl-surface-muted: oklch(98.2% 0.008 var(--tasty-oklch-neutral-hue));
+    }
 }

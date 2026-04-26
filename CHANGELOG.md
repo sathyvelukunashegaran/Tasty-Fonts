@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.15.0-beta.1] - 2026-04-27
+
+### Changed
+
+- Added a Marketing preview scene with CTA, signup, purchase, and social-follow samples so role selections can be reviewed against campaign-style content.
+- Refined admin preview and diagnostics sample copy to use TastyWP branding and consistent sample attribution.
+- Reworked compact admin control sizing so help buttons stay visually small while icon-only controls preserve larger hit targets.
+- Updated admin UI color tokens, OKLCH fallbacks, badges, hover states, and preview treatments to keep amber usage readable within the Tasty palette.
+- Improved help tooltip positioning and import/search result interaction markup for steadier admin UI behavior.
+- Updated CSS lint output and CSS audit coverage for compact controls and scoped OKLCH token overrides.
+
+### Fixed
+
+- Fixed the card preview pricing flag so the "Most Popular" label remains readable on the dark pricing tile.
+- Renamed verified diagnostics states to "Working Fine" / "OKAY" so passing health checks do not imply external verification.
+
 ## [1.14.1] - 2026-04-26
 
 ### Added

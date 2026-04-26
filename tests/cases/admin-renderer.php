@@ -4767,8 +4767,12 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--warning"', $output, 'Overview should tone health rows from their health state.');
     assertContainsValue('class="tasty-fonts-health-board"', $output, 'Overview should present health checks in one consistent board.');
     assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--info"', $output, 'Overview should render advisory checks with the same row pattern as other health checks.');
-    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--ok"', $output, 'Overview should render verified checks with the same row pattern as other health checks.');
-    assertContainsValue('Verified', $output, 'Overview should label passing checks as verified evidence instead of unexplained pills.');
+    assertContainsValue('class="tasty-fonts-health-group tasty-fonts-health-group--ok"', $output, 'Overview should group checks that are working fine without calling them verified.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--ok"', $output, 'Overview should render okay checks with the same row pattern as other health checks.');
+    assertContainsValue('Working Fine', $output, 'Overview should label passing checks as working fine instead of verified.');
+    assertContainsValue('OKAY', $output, 'Overview should label passing check pills as okay.');
+    assertNotContainsValue('Verified', $output, 'Overview should not call passing health checks verified.');
+    assertNotContainsValue('Passing', $output, 'Overview should not describe okay health checks as passing.');
     assertContainsValue('The front-end stylesheet exists and can be served from the selected delivery mode.', $output, 'Passing checks should include a short explanation of what passed.');
     assertContainsValue('Regenerate CSS after changing roles, delivery profiles, or output settings so the runtime file stays aligned with saved settings.', $output, 'Passing checks should include practical guidance, not just a status label.');
     assertContainsValue('href="https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Advanced-Tools"', $output, 'Health checks should expose a knowledge-base link.');
@@ -5452,6 +5456,7 @@ $tests['admin_page_renderer_uses_a_dedicated_code_preview_scene'] = static funct
                 ['key' => 'card', 'label' => 'Card', 'active' => false],
                 ['key' => 'reading', 'label' => 'Reading', 'active' => false],
                 ['key' => 'interface', 'label' => 'Interface', 'active' => false],
+                ['key' => 'marketing', 'label' => 'Marketing', 'active' => false],
                 ['key' => 'code', 'label' => 'Code', 'active' => true],
             ],
             'toasts' => [],
@@ -5464,7 +5469,26 @@ $tests['admin_page_renderer_uses_a_dedicated_code_preview_scene'] = static funct
     }
     $output = (string) ob_get_clean();
     assertContainsValue('tasty-fonts-preview-scene--code', $output, 'The preview renderer should expose a dedicated Code scene.');
+    assertContainsValue('data-tab-target="marketing"', $output, 'The preview tabs should include the new Marketing tab.');
     assertContainsValue('data-tab-target="code"', $output, 'The preview tabs should include the new Code tab.');
+    assertSameValue(1, preg_match('/data-tab-target="interface"[\s\S]*data-tab-target="marketing"[\s\S]*data-tab-target="code"/', $output), 'The Marketing tab should render after Interface and before Code.');
+    assertContainsValue('tasty-fonts-preview-scene--marketing', $output, 'The preview renderer should expose a dedicated Marketing scene.');
+    assertContainsValue('CTA section', $output, 'The Marketing scene should render a CTA snippet sample.');
+    assertContainsValue('Email signup', $output, 'The Marketing scene should render an email signup sample.');
+    assertContainsValue('Buy now', $output, 'The Marketing scene should render a buy-now sample.');
+    assertContainsValue('Follow social', $output, 'The Marketing scene should render a social follow sample.');
+    assertContainsValue('TastyWP Studio', $output, 'The Marketing social sample should use the TastyWP placeholder brand.');
+    assertContainsValue('@TastyWP', $output, 'The Marketing social sample should use the TastyWP social handle.');
+    assertContainsValue('Sathyvelu Kunashegaran', $output, 'Preview samples should use the requested sample author name.');
+    assertNotContainsValue('Casey Sato', $output, 'Preview samples should not use the old Casey sample author.');
+    assertNotContainsValue('Elena Marsh', $output, 'Preview samples should not use the old Elena sample author.');
+    assertNotContainsValue('Jordan Kessler', $output, 'Preview samples should not use the old Jordan sample author.');
+    assertNotContainsValue('H. G. Wells', $output, 'Preview samples should not use the old specimen cite name.');
+    assertNotContainsValue('Northwind', $output, 'Preview samples should not use the old Northwind placeholder brand.');
+    assertNotContainsValue('northwind', $output, 'Preview samples should not use the old Northwind social handle.');
+    assertContainsValue('tasty-fonts-preview-marketing-social-icon', $output, 'The Marketing social sample should include a recognizable platform icon.');
+    assertContainsValue('data-role-preview="heading">12.8k</strong>', $output, 'The Marketing scene should expose numeral rendering through heading role hooks.');
+    assertContainsValue('Signups this week', $output, 'The Interface scene should keep its restored metric sample.');
     assertContainsValue('typography-preview.tsx', $output, 'The Code scene should render an editor-style file tab.');
     assertContainsValue('Published Code Block', $output, 'The Code scene should render a published code block surface.');
     assertContainsValue('tasty-fonts-preview-token-keyword', $output, 'The Code scene should render syntax-highlight token spans.');

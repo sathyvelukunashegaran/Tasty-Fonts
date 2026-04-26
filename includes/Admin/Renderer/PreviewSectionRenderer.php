@@ -76,7 +76,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                             <aside class="tasty-fonts-preview-specimen-pullquote" data-role-preview="heading">
                                 <span class="tasty-fonts-preview-specimen-pullquote-mark" aria-hidden="true">&ldquo;</span>
                                 <blockquote class="tasty-fonts-preview-specimen-quote"><?php esc_html_e('The sky was cloudless and of a deep dark blue.', 'tasty-fonts'); ?></blockquote>
-                                <cite class="tasty-fonts-preview-specimen-pullquote-cite" data-role-preview="body"><?php esc_html_e('H. G. Wells', 'tasty-fonts'); ?></cite>
+                                <cite class="tasty-fonts-preview-specimen-pullquote-cite" data-role-preview="body"><?php esc_html_e('Sathyvelu Kunashegaran', 'tasty-fonts'); ?></cite>
                             </aside>
                         </section>
 
@@ -151,9 +151,9 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                                 <h3 class="tasty-fonts-preview-article-title" data-role-preview="heading"><?php esc_html_e('The Quiet Craft of Choosing Typefaces That Feel Inevitable.', 'tasty-fonts'); ?></h3>
                                 <p class="tasty-fonts-preview-article-excerpt" data-role-preview="body"><?php esc_html_e('Inside the studio, every curve, counter, and line break has to earn its place. The right pairing gives a story rhythm before the reader notices the system underneath.', 'tasty-fonts'); ?></p>
                                 <div class="tasty-fonts-preview-article-byline">
-                                    <span class="tasty-fonts-preview-article-avatar" aria-hidden="true" data-role-preview="heading">EM</span>
+                                    <span class="tasty-fonts-preview-article-avatar" aria-hidden="true" data-role-preview="heading">SK</span>
                                     <span class="tasty-fonts-preview-article-byline-copy">
-                                        <strong data-role-preview="heading"><?php esc_html_e('Elena Marsh', 'tasty-fonts'); ?></strong>
+                                        <strong data-role-preview="heading"><?php esc_html_e('Sathyvelu Kunashegaran', 'tasty-fonts'); ?></strong>
                                         <span data-role-preview="body"><?php esc_html_e('Design Director &middot; Apr 24', 'tasty-fonts'); ?></span>
                                     </span>
                                 </div>
@@ -194,10 +194,10 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                             <blockquote class="tasty-fonts-preview-testimonial-quote" data-role-preview="heading"><?php esc_html_e('The pairing finally feels inevitable. Headings carry confidence, body copy stays calm, and the whole product reads as one voice.', 'tasty-fonts'); ?></blockquote>
                             <div class="tasty-fonts-preview-testimonial-rating" aria-label="<?php esc_attr_e('Five out of five rating', 'tasty-fonts'); ?>" data-role-preview="heading">&#9733; &#9733; &#9733; &#9733; &#9733;</div>
                             <div class="tasty-fonts-preview-testimonial-author">
-                                <span class="tasty-fonts-preview-testimonial-avatar" data-role-preview="heading" aria-hidden="true">JK</span>
+                                <span class="tasty-fonts-preview-testimonial-avatar" data-role-preview="heading" aria-hidden="true">SK</span>
                                 <span class="tasty-fonts-preview-testimonial-author-copy">
-                                    <strong data-role-preview="heading"><?php esc_html_e('Jordan Kessler', 'tasty-fonts'); ?></strong>
-                                    <span data-role-preview="body"><?php esc_html_e('Head of Design, Northwind', 'tasty-fonts'); ?></span>
+                                    <strong data-role-preview="heading"><?php esc_html_e('Sathyvelu Kunashegaran', 'tasty-fonts'); ?></strong>
+                                    <span data-role-preview="body"><?php esc_html_e('Head of Design, TastyWP', 'tasty-fonts'); ?></span>
                                 </span>
                             </div>
                             <div class="tasty-fonts-preview-testimonial-footer" data-role-preview="body" aria-hidden="true">
@@ -225,9 +225,9 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                             <h3 class="tasty-fonts-preview-reading-title" data-role-preview="heading"><?php esc_html_e('A Quiet Manifesto for Typography That Disappears Into the Reading.', 'tasty-fonts'); ?></h3>
                             <p class="tasty-fonts-preview-reading-standfirst" data-role-preview="body"><?php esc_html_e('Great body type does not announce itself. It carries the reader through long passages without ever asking to be admired &mdash; and that is exactly why it is so hard to choose well.', 'tasty-fonts'); ?></p>
                             <div class="tasty-fonts-preview-reading-byline">
-                                <span class="tasty-fonts-preview-reading-avatar" data-role-preview="heading" aria-hidden="true">CS</span>
+                                <span class="tasty-fonts-preview-reading-avatar" data-role-preview="heading" aria-hidden="true">SK</span>
                                 <span class="tasty-fonts-preview-reading-byline-copy">
-                                    <strong data-role-preview="heading"><?php esc_html_e('Casey Sato', 'tasty-fonts'); ?></strong>
+                                    <strong data-role-preview="heading"><?php esc_html_e('Sathyvelu Kunashegaran', 'tasty-fonts'); ?></strong>
                                     <span data-role-preview="body"><?php esc_html_e('Senior Type Editor &middot; 8 min read', 'tasty-fonts'); ?></span>
                                 </span>
                             </div>
@@ -282,6 +282,72 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 <?php
                 return;
 
+            case 'marketing':
+                ?>
+                <div class="tasty-fonts-preview-marketing-board">
+                    <section class="tasty-fonts-preview-marketing-cta" aria-label="<?php esc_attr_e('Marketing CTA sample', 'tasty-fonts'); ?>">
+                        <span class="tasty-fonts-preview-marketing-kicker" data-role-preview="body"><?php esc_html_e('CTA section', 'tasty-fonts'); ?></span>
+                        <h3 class="tasty-fonts-preview-marketing-title" data-role-preview="heading"><?php esc_html_e('Turn scattered font choices into one clear system.', 'tasty-fonts'); ?></h3>
+                        <p class="tasty-fonts-preview-marketing-copy" data-role-preview="body"><?php esc_html_e('Preview the headline, supporting copy, and action labels before a campaign page goes live.', 'tasty-fonts'); ?></p>
+                        <div class="tasty-fonts-preview-marketing-actions" aria-hidden="true">
+                            <span class="button button-primary" data-role-preview="body"><?php esc_html_e('Start free', 'tasty-fonts'); ?></span>
+                            <span class="button" data-role-preview="body"><?php esc_html_e('See examples', 'tasty-fonts'); ?></span>
+                        </div>
+                    </section>
+
+                    <div class="tasty-fonts-preview-marketing-grid">
+                        <section class="tasty-fonts-preview-marketing-snippet tasty-fonts-preview-marketing-snippet--signup" aria-label="<?php esc_attr_e('Email signup sample', 'tasty-fonts'); ?>">
+                            <span class="tasty-fonts-preview-marketing-kicker" data-role-preview="body"><?php esc_html_e('Email signup', 'tasty-fonts'); ?></span>
+                            <h3 class="tasty-fonts-preview-marketing-subtitle" data-role-preview="heading"><?php esc_html_e('Get the type checklist', 'tasty-fonts'); ?></h3>
+                            <p class="tasty-fonts-preview-marketing-copy" data-role-preview="body"><?php esc_html_e('A practical list for checking headings, forms, and small print before launch.', 'tasty-fonts'); ?></p>
+                            <div class="tasty-fonts-preview-marketing-field" aria-hidden="true">
+                                <span data-role-preview="body"><?php esc_html_e('you@example.com', 'tasty-fonts'); ?></span>
+                                <span class="button button-primary" data-role-preview="body"><?php esc_html_e('Join', 'tasty-fonts'); ?></span>
+                            </div>
+                            <span class="tasty-fonts-preview-marketing-note" data-role-preview="body"><?php esc_html_e('Sent to 2,400 designers each Friday.', 'tasty-fonts'); ?></span>
+                        </section>
+
+                        <section class="tasty-fonts-preview-marketing-snippet tasty-fonts-preview-marketing-snippet--buy" aria-label="<?php esc_attr_e('Buy now sample', 'tasty-fonts'); ?>">
+                            <span class="tasty-fonts-preview-marketing-kicker" data-role-preview="body"><?php esc_html_e('Buy now', 'tasty-fonts'); ?></span>
+                            <h3 class="tasty-fonts-preview-marketing-subtitle" data-role-preview="heading"><?php esc_html_e('Launch Kit', 'tasty-fonts'); ?></h3>
+                            <div class="tasty-fonts-preview-marketing-price" data-role-preview="heading" aria-label="<?php esc_attr_e('Forty-nine dollars', 'tasty-fonts'); ?>">
+                                <span class="tasty-fonts-preview-marketing-currency">$</span>
+                                <span class="tasty-fonts-preview-marketing-price-value">49</span>
+                            </div>
+                            <p class="tasty-fonts-preview-marketing-copy" data-role-preview="body"><?php esc_html_e('Includes 12 landing page sections, pricing rows, and button states.', 'tasty-fonts'); ?></p>
+                            <span class="button button-primary" data-role-preview="body" aria-hidden="true"><?php esc_html_e('Buy now', 'tasty-fonts'); ?></span>
+                        </section>
+
+                        <section class="tasty-fonts-preview-marketing-snippet tasty-fonts-preview-marketing-snippet--social" aria-label="<?php esc_attr_e('Social follow sample', 'tasty-fonts'); ?>">
+                            <span class="tasty-fonts-preview-marketing-kicker" data-role-preview="body"><?php esc_html_e('Follow social', 'tasty-fonts'); ?></span>
+                            <div class="tasty-fonts-preview-marketing-profile">
+                                <span class="tasty-fonts-preview-marketing-avatar" data-role-preview="heading" aria-hidden="true">TW</span>
+                                <span class="tasty-fonts-preview-marketing-profile-copy">
+                                    <strong data-role-preview="heading"><?php esc_html_e('TastyWP Studio', 'tasty-fonts'); ?></strong>
+                                    <span data-role-preview="body"><?php esc_html_e('@TastyWP', 'tasty-fonts'); ?></span>
+                                </span>
+                            </div>
+                            <p class="tasty-fonts-preview-marketing-copy" data-role-preview="body"><?php esc_html_e('Follow for weekly type notes, launch teardown posts, and field examples.', 'tasty-fonts'); ?></p>
+                            <div class="tasty-fonts-preview-marketing-social-row">
+                                <span class="tasty-fonts-preview-marketing-social-stat">
+                                    <span class="tasty-fonts-preview-marketing-social-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" focusable="false">
+                                            <rect x="4.5" y="4.5" width="15" height="15" rx="4.2"></rect>
+                                            <circle cx="12" cy="12" r="3.4"></circle>
+                                            <circle cx="16.4" cy="7.6" r="1"></circle>
+                                        </svg>
+                                    </span>
+                                    <strong data-role-preview="heading">12.8k</strong>
+                                    <span class="tasty-fonts-preview-marketing-social-label" data-role-preview="body"><?php esc_html_e('followers', 'tasty-fonts'); ?></span>
+                                </span>
+                                <span class="button" data-role-preview="body" aria-hidden="true"><?php esc_html_e('Follow', 'tasty-fonts'); ?></span>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+                <?php
+                return;
+
             case 'code':
                 $this->renderCodePreviewScene($previewText, $roles, $monospaceRoleEnabled, $familyLabels);
                 return;
@@ -294,7 +360,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                         <div class="tasty-fonts-preview-ui-topbar-brand">
                             <span class="tasty-fonts-preview-ui-topbar-mark" data-role-preview="heading" aria-hidden="true">N</span>
                             <span class="tasty-fonts-preview-ui-topbar-copy">
-                                <span class="tasty-fonts-preview-ui-topbar-label" data-role-preview="body"><?php esc_html_e('Northwind &rsaquo; Marketing', 'tasty-fonts'); ?></span>
+                                <span class="tasty-fonts-preview-ui-topbar-label" data-role-preview="body"><?php esc_html_e('TastyWP &rsaquo; Marketing', 'tasty-fonts'); ?></span>
                                 <strong class="tasty-fonts-preview-ui-topbar-title" data-role-preview="heading"><?php esc_html_e('Spring Launch Workspace', 'tasty-fonts'); ?></strong>
                             </span>
                         </div>
@@ -359,28 +425,28 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                         </header>
                         <div class="tasty-fonts-preview-ui-feed-list">
                             <article class="tasty-fonts-preview-ui-feed-row">
-                                <span class="tasty-fonts-preview-ui-feed-avatar" data-role-preview="heading" aria-hidden="true">EM</span>
+                                <span class="tasty-fonts-preview-ui-feed-avatar" data-role-preview="heading" aria-hidden="true">SK</span>
                                 <span class="tasty-fonts-preview-ui-feed-copy">
                                     <strong data-role-preview="heading"><?php esc_html_e('Headline lockup', 'tasty-fonts'); ?></strong>
-                                    <span data-role-preview="body"><?php esc_html_e('Elena approved the final hero pairing.', 'tasty-fonts'); ?></span>
+                                    <span data-role-preview="body"><?php esc_html_e('Sathyvelu Kunashegaran approved the final hero pairing.', 'tasty-fonts'); ?></span>
                                 </span>
                                 <span class="tasty-fonts-preview-ui-feed-pill tasty-fonts-preview-ui-feed-pill--ok" data-role-preview="body"><?php esc_html_e('Approved', 'tasty-fonts'); ?></span>
                                 <span class="tasty-fonts-preview-ui-feed-time" data-role-preview="body"><?php esc_html_e('2m', 'tasty-fonts'); ?></span>
                             </article>
                             <article class="tasty-fonts-preview-ui-feed-row">
-                                <span class="tasty-fonts-preview-ui-feed-avatar" data-role-preview="heading" aria-hidden="true">JK</span>
+                                <span class="tasty-fonts-preview-ui-feed-avatar" data-role-preview="heading" aria-hidden="true">SK</span>
                                 <span class="tasty-fonts-preview-ui-feed-copy">
                                     <strong data-role-preview="heading"><?php esc_html_e('Landing page copy', 'tasty-fonts'); ?></strong>
-                                    <span data-role-preview="body"><?php esc_html_e('Jordan shared revisions for the second pass.', 'tasty-fonts'); ?></span>
+                                    <span data-role-preview="body"><?php esc_html_e('Sathyvelu Kunashegaran shared revisions for the second pass.', 'tasty-fonts'); ?></span>
                                 </span>
                                 <span class="tasty-fonts-preview-ui-feed-pill tasty-fonts-preview-ui-feed-pill--review" data-role-preview="body"><?php esc_html_e('In Review', 'tasty-fonts'); ?></span>
                                 <span class="tasty-fonts-preview-ui-feed-time" data-role-preview="body"><?php esc_html_e('14m', 'tasty-fonts'); ?></span>
                             </article>
                             <article class="tasty-fonts-preview-ui-feed-row">
-                                <span class="tasty-fonts-preview-ui-feed-avatar" data-role-preview="heading" aria-hidden="true">CS</span>
+                                <span class="tasty-fonts-preview-ui-feed-avatar" data-role-preview="heading" aria-hidden="true">SK</span>
                                 <span class="tasty-fonts-preview-ui-feed-copy">
                                     <strong data-role-preview="heading"><?php esc_html_e('Pricing module', 'tasty-fonts'); ?></strong>
-                                    <span data-role-preview="body"><?php esc_html_e('Casey staged the variant for tomorrow&rsquo;s review.', 'tasty-fonts'); ?></span>
+                                    <span data-role-preview="body"><?php esc_html_e('Sathyvelu Kunashegaran staged the variant for tomorrow&rsquo;s review.', 'tasty-fonts'); ?></span>
                                 </span>
                                 <span class="tasty-fonts-preview-ui-feed-pill tasty-fonts-preview-ui-feed-pill--draft" data-role-preview="body"><?php esc_html_e('Draft', 'tasty-fonts'); ?></span>
                                 <span class="tasty-fonts-preview-ui-feed-time" data-role-preview="body"><?php esc_html_e('48m', 'tasty-fonts'); ?></span>

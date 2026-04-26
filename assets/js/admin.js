@@ -337,6 +337,8 @@
     let importInFlight = false;
     let uploadInFlight = false;
     let activeHelpButton = null;
+    let helpTooltipPositionFrame = 0;
+    let pendingHelpTooltipButton = null;
     let nextUploadGroupIndex = uploadGroupsWrap ? uploadGroupsWrap.querySelectorAll('[data-upload-group]').length : 0;
     let nextUploadRowIndex = uploadGroupsWrap ? uploadGroupsWrap.querySelectorAll('[data-upload-row]').length : 0;
     let nextGeneratedFieldIndex = 0;
@@ -3629,7 +3631,7 @@
 
         if (activeHelpButton === roleDeploymentPill && tooltipLayer && !tooltipLayer.hidden) {
             tooltipLayer.textContent = tooltip;
-            positionHelpTooltip(roleDeploymentPill);
+            scheduleHelpTooltipPosition(roleDeploymentPill);
         }
     }
 
@@ -3919,6 +3921,25 @@
         return pill;
     }
 
+    function createSearchResultBadge(label, options = {}) {
+        const fullLabel = String(label || '').trim();
+
+        if (!fullLabel) {
+            return null;
+        }
+
+        const toneClass = String(options.toneClass || '').trim();
+        const badge = document.createElement('span');
+
+        badge.className = [
+            'tasty-fonts-badge',
+            toneClass,
+        ].filter(Boolean).join(' ');
+        badge.textContent = fullLabel;
+
+        return badge;
+    }
+
     function axisSummaryLabel(tag, definition) {
         const min = String(definition && definition.min ? definition.min : '').trim();
         const max = String(definition && definition.max ? definition.max : '').trim();
@@ -4032,12 +4053,12 @@
             return;
         }
 
-        const badges = document.createElement('div');
+        const badges = document.createElement('span');
 
         badges.className = 'tasty-fonts-badges tasty-fonts-badges--import tasty-fonts-search-card-badges';
 
         if (inLibrary) {
-            const badge = createIconPill(getString('searchResultInLibrary', 'In Library'), {
+            const badge = createSearchResultBadge(getString('searchResultInLibrary', 'In Library'), {
                 kind: 'status',
                 toneClass: 'is-success',
             });
@@ -4057,7 +4078,7 @@
             const badgeClass = mode === 'variable'
                 ? (format.source_only ? 'is-warning' : 'is-role')
                 : '';
-            const badge = createIconPill(format.label, {
+            const badge = createSearchResultBadge(format.label, {
                 kind: 'type',
                 toneClass: badgeClass,
             });
@@ -4100,9 +4121,10 @@
             element._tastyFontsFlashTimer = 0;
         }
 
-        element.classList.remove(className);
-        void element.offsetWidth;
-        element.classList.add(className);
+        if (!element.classList.contains(className)) {
+            element.classList.add(className);
+        }
+
         element._tastyFontsFlashTimer = window.setTimeout(() => {
             element.classList.remove(className);
             element._tastyFontsFlashTimer = 0;
@@ -5412,6 +5434,32 @@
         });
     }
 
+    function scheduleHelpTooltipPosition(button = activeHelpButton) {
+        const tooltipLayer = getHelpTooltipLayer();
+
+        if (!button || !tooltipLayer || tooltipLayer.hidden) {
+            pendingHelpTooltipButton = null;
+            return;
+        }
+
+        pendingHelpTooltipButton = button;
+
+        if (helpTooltipPositionFrame) {
+            return;
+        }
+
+        helpTooltipPositionFrame = window.requestAnimationFrame(() => {
+            const nextButton = pendingHelpTooltipButton;
+
+            helpTooltipPositionFrame = 0;
+            pendingHelpTooltipButton = null;
+
+            if (nextButton) {
+                positionHelpTooltip(nextButton);
+            }
+        });
+    }
+
     function positionHelpTooltip(button) {
         const tooltipLayer = getHelpTooltipLayer();
 
@@ -5422,10 +5470,11 @@
         const margin = 12;
         const gap = 10;
         const triggerRect = button.getBoundingClientRect();
+        const nextMaxWidth = `${Math.max(220, Math.min(320, window.innerWidth - (margin * 2)))}px`;
 
-        tooltipLayer.style.left = '0px';
-        tooltipLayer.style.top = '0px';
-        tooltipLayer.style.maxWidth = `${Math.max(220, Math.min(320, window.innerWidth - (margin * 2)))}px`;
+        if (tooltipLayer.style.maxWidth !== nextMaxWidth) {
+            tooltipLayer.style.maxWidth = nextMaxWidth;
+        }
 
         const tooltipRect = tooltipLayer.getBoundingClientRect();
         const left = Math.max(
@@ -5446,8 +5495,7 @@
             top = Math.max(margin, Math.min(top, window.innerHeight - tooltipRect.height - margin));
         }
 
-        tooltipLayer.style.left = `${left}px`;
-        tooltipLayer.style.top = `${top}px`;
+        tooltipLayer.style.transform = `translate3d(${left}px, ${top}px, 0)`;
         tooltipLayer.classList.toggle('is-above', isAbove);
     }
 
@@ -5497,9 +5545,16 @@
             restoreHelpTooltipDescription(activeHelpButton);
         }
 
+        if (helpTooltipPositionFrame) {
+            window.cancelAnimationFrame(helpTooltipPositionFrame);
+            helpTooltipPositionFrame = 0;
+        }
+
+        pendingHelpTooltipButton = null;
         tooltipLayer.hidden = true;
         tooltipLayer.textContent = '';
         tooltipLayer.classList.remove('is-above');
+        tooltipLayer.style.removeProperty('transform');
         activeHelpButton = null;
     }
 
@@ -5819,7 +5874,7 @@
         applyHelpTooltipDescription(activeHelpButton);
         tooltipLayer.textContent = copy;
         tooltipLayer.hidden = false;
-        positionHelpTooltip(button);
+        scheduleHelpTooltipPosition(button);
     }
 
     function initHelpTooltips() {
@@ -5931,11 +5986,11 @@
         });
 
         window.addEventListener('resize', () => {
-            positionHelpTooltip(activeHelpButton);
+            scheduleHelpTooltipPosition(activeHelpButton);
         });
 
         window.addEventListener('scroll', () => {
-            positionHelpTooltip(activeHelpButton);
+            scheduleHelpTooltipPosition(activeHelpButton);
         }, true);
     }
 
@@ -6027,7 +6082,7 @@
             target.classList.add('is-progress');
             track.className = 'tasty-fonts-import-progress-track';
             bar.className = 'tasty-fonts-import-progress-bar';
-            bar.style.width = `${clamped}%`;
+            bar.style.setProperty('--tasty-import-progress-scale', String(clamped / 100));
             track.appendChild(bar);
             target.appendChild(track);
             return;
@@ -6163,7 +6218,7 @@
                 }
 
                 tooltipLayer.textContent = nextCopy;
-                positionHelpTooltip(target);
+                scheduleHelpTooltipPosition(target);
             }
         }
     }
@@ -6639,7 +6694,7 @@
 
             if (activeHelpButton === button && tooltipLayer && !tooltipLayer.hidden) {
                 tooltipLayer.textContent = nextHelp;
-                positionHelpTooltip(button);
+                scheduleHelpTooltipPosition(button);
             }
         });
 
@@ -6660,7 +6715,7 @@
 
                 if (activeHelpButton === button && tooltipLayer && !tooltipLayer.hidden) {
                     tooltipLayer.textContent = blockedMessage;
-                    positionHelpTooltip(button);
+                    scheduleHelpTooltipPosition(button);
                 }
                 return;
             }
@@ -6671,7 +6726,7 @@
 
             if (activeHelpButton === button && tooltipLayer && !tooltipLayer.hidden) {
                 tooltipLayer.textContent = button.dataset.deleteReadyTitle || '';
-                positionHelpTooltip(button);
+                scheduleHelpTooltipPosition(button);
             }
         });
 
@@ -7933,11 +7988,11 @@
         updateGooglePreviewStylesheet(searchResults);
 
         searchResults.forEach((item) => {
-            const card = document.createElement('article');
-            const head = document.createElement('div');
-            const title = document.createElement('h3');
-            const preview = document.createElement('div');
-            const meta = document.createElement('div');
+            const card = document.createElement('button');
+            const head = document.createElement('span');
+            const title = document.createElement('span');
+            const preview = document.createElement('span');
+            const meta = document.createElement('span');
             const category = document.createElement('span');
             const variants = document.createElement('span');
             const axes = document.createElement('span');
@@ -7947,10 +8002,9 @@
             const showVariableMeta = variableFontsEnabled && familySupportsFormat(item, 'variable', 'google');
 
             card.className = 'tasty-fonts-search-card';
+            card.type = 'button';
             card.dataset.family = item.family;
             card.dataset.searchProvider = 'google';
-            card.setAttribute('role', 'button');
-            card.setAttribute('tabindex', '0');
             card.setAttribute('aria-label', formatMessage(getString('searchResultSelectLabel', 'Select %s'), [item.family]));
             card.setAttribute('aria-pressed', !!selectedSearchFamily && selectedSearchFamily.family === item.family ? 'true' : 'false');
             card.classList.toggle('is-active', !!selectedSearchFamily && selectedSearchFamily.family === item.family);
@@ -8129,11 +8183,11 @@
         updateBunnySearchPreviewStylesheet(bunnySearchResults);
 
         bunnySearchResults.forEach((item) => {
-            const card = document.createElement('article');
-            const head = document.createElement('div');
-            const title = document.createElement('h3');
-            const preview = document.createElement('div');
-            const meta = document.createElement('div');
+            const card = document.createElement('button');
+            const head = document.createElement('span');
+            const title = document.createElement('span');
+            const preview = document.createElement('span');
+            const meta = document.createElement('span');
             const category = document.createElement('span');
             const variants = document.createElement('span');
             const axes = document.createElement('span');
@@ -8144,10 +8198,9 @@
             const showVariableMeta = variableFontsEnabled && familySupportsFormat(item, 'variable', 'bunny');
 
             card.className = 'tasty-fonts-search-card';
+            card.type = 'button';
             card.dataset.family = item.family || '';
             card.dataset.searchProvider = 'bunny';
-            card.setAttribute('role', 'button');
-            card.setAttribute('tabindex', '0');
             card.setAttribute('aria-label', formatMessage(getString('searchResultSelectLabel', 'Select %s'), [item.family || '']));
             card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             card.classList.toggle('is-active', isActive);
@@ -9714,6 +9767,7 @@
             const progressBar = status.querySelector('.tasty-fonts-import-progress-bar');
 
             if (progressBar) {
+                progressBar.style.setProperty('--tasty-import-progress-scale', '1');
                 progressBar.classList.add('is-indeterminate');
             }
         }
@@ -10184,7 +10238,14 @@
                 const showLabel = String(toggle.getAttribute('data-activity-detail-show-label') || '');
                 const hideLabel = String(toggle.getAttribute('data-activity-detail-hide-label') || '');
 
+                if (detail._tastyFontsActivityDetailTimer) {
+                    window.clearTimeout(detail._tastyFontsActivityDetailTimer);
+                    detail._tastyFontsActivityDetailTimer = 0;
+                }
+
                 if (isExpanded) {
+                    const collapseDelay = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260;
+
                     toggle.setAttribute('aria-expanded', 'false');
                     detail.classList.remove('is-expanded');
 
@@ -10192,11 +10253,13 @@
                         toggle.setAttribute('aria-label', showLabel);
                     }
 
-                    window.setTimeout(() => {
+                    detail._tastyFontsActivityDetailTimer = window.setTimeout(() => {
                         if (toggle.getAttribute('aria-expanded') !== 'true') {
                             detail.hidden = true;
                         }
-                    }, 260);
+
+                        detail._tastyFontsActivityDetailTimer = 0;
+                    }, collapseDelay);
 
                     return;
                 }
@@ -10209,7 +10272,9 @@
                 }
 
                 window.requestAnimationFrame(() => {
-                    detail.classList.add('is-expanded');
+                    if (toggle.getAttribute('aria-expanded') === 'true') {
+                        detail.classList.add('is-expanded');
+                    }
                 });
             });
         });
@@ -10703,7 +10768,7 @@
     }
 
     function handleSearchCardKeydown(event) {
-        const searchCard = event.target.closest('.tasty-fonts-search-card[role="button"]');
+        const searchCard = event.target.closest('.tasty-fonts-search-card[role="button"]:not(button)');
 
         if (!searchCard) {
             return false;

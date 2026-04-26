@@ -605,12 +605,12 @@
                                                     ),
                                                 ],
                                                 [
-                                                    'slug' => 'verified',
-                                                    'title' => __('Verified', 'tasty-fonts'),
+                                                    'slug' => 'ok',
+                                                    'title' => __('Working Fine', 'tasty-fonts'),
                                                     'checks' => $passingHealthChecks,
                                                     'summary' => sprintf(
                                                         /* translators: %d: number of passing health checks */
-                                                        _n('%d Passing', '%d Passing', count($passingHealthChecks), 'tasty-fonts'),
+                                                        _n('%d Okay', '%d Okay', count($passingHealthChecks), 'tasty-fonts'),
                                                         count($passingHealthChecks)
                                                     ),
                                                 ],
@@ -649,7 +649,7 @@
                                                                 'critical' => __('Critical', 'tasty-fonts'),
                                                                 'warning' => __('Warning', 'tasty-fonts'),
                                                                 'info' => __('Advisory', 'tasty-fonts'),
-                                                                default => __('Verified', 'tasty-fonts'),
+                                                                default => __('OKAY', 'tasty-fonts'),
                                                             };
 
                                                             if ($healthTitle === '') {

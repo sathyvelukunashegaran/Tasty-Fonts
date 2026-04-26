@@ -5841,7 +5841,7 @@ final class AdminController
         return match ($key) {
             'tf_page' => in_array($value, [self::PAGE_ROLES, self::PAGE_LIBRARY, self::PAGE_SETTINGS, self::PAGE_DIAGNOSTICS], true) ? $value : '',
             'tf_studio' => in_array($value, array_merge(['preview', 'snippets'], self::DIAGNOSTICS_STUDIO_TABS, self::SETTINGS_STUDIO_TABS), true) ? $value : '',
-            'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface', 'code'], true) ? $value : '',
+            'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface', 'marketing', 'code'], true) ? $value : '',
             'tf_output' => in_array($value, ['usage', 'variables', 'stacks', 'names'], true) ? $value : '',
             'tf_source' => in_array($value, ['google', 'bunny', 'adobe', 'upload'], true) ? $value : '',
             default => '',

@@ -13,9 +13,15 @@ const cssFiles = [
   'assets/css/tokens.css'
 ];
 
-const result = spawnSync(stylelintBin, [...cssFiles, ...process.argv.slice(2)], {
+const passthroughArgs = process.argv.slice(2);
+const hasFormatter = passthroughArgs.some((arg) => arg === '--formatter' || arg.startsWith('--formatter='));
+const stylelintArgs = hasFormatter
+  ? [...cssFiles, ...passthroughArgs]
+  : [...cssFiles, '--formatter', 'verbose', ...passthroughArgs];
+
+const result = spawnSync(stylelintBin, stylelintArgs, {
   cwd: root,
-  stdio: 'inherit'
+  stdio: ['ignore', 'inherit', 'inherit']
 });
 
 if (result.error) {

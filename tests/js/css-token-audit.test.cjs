@@ -170,6 +170,37 @@ test('admin CSS keeps numeric declaration values on design tokens', () => {
   assert.deepEqual(violations, []);
 });
 
+test('admin compact icon controls use 40px targets and help controls stay visually compact', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+  const tokensCss = fs.readFileSync(path.join(cssDir, 'tokens.css'), 'utf8');
+  const targetContracts = [
+    { selector: '.tasty-fonts-toast-dismiss', token: '--tasty-icon-button-size' },
+    { selector: '.tasty-fonts-toast.is-actionable .tasty-fonts-toast-dismiss', token: '--tasty-icon-button-size' },
+    { selector: '.tasty-fonts-select-clear', token: '--tasty-clear-button-size' },
+    { selector: '.tasty-fonts-log-toggle.button', token: '--tasty-icon-button-size' },
+    { selector: '#tasty-fonts-settings-page .tasty-fonts-settings-row-help', token: '--tasty-help-button-size' },
+    { selector: '#tasty-fonts-settings-page .tasty-fonts-settings-copy-with-help > .tasty-fonts-settings-row-help', token: '--tasty-help-button-size' },
+    { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-health-help-trigger', token: '--tasty-help-button-size' },
+    { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button', token: '--tasty-icon-button-size' },
+    { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-copy-button.button', token: '--tasty-icon-button-size' },
+    { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-download-button.button', token: '--tasty-icon-button-size' }
+  ];
+
+  assert.match(tokensCss, /--tasty-hit-target-min:\s*var\(--tasty-layout-40px\);/);
+  assert.match(tokensCss, /--tasty-hit-target-comfort:\s*var\(--tasty-layout-44px\);/);
+  assert.match(tokensCss, /--tasty-icon-button-size:\s*var\(--tasty-hit-target-min\);/);
+  assert.match(tokensCss, /--tasty-help-button-size:\s*var\(--tasty-pill-height-compact\);/);
+  assert.match(tokensCss, /--tasty-clear-button-size:\s*var\(--tasty-hit-target-min\);/);
+
+  for (const { selector, token } of targetContracts) {
+    assert.match(
+      cssBlockForSelector(adminCss, selector),
+      new RegExp(`var\\(${escapeRegExp(token)}\\)`),
+      `${selector} should consume ${token} for its effective hit target.`
+    );
+  }
+});
+
 test('admin CSS keeps settings row help and controls vertically centered', () => {
   const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
   const centeredControlSelectors = [

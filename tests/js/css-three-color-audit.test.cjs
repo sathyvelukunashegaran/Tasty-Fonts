@@ -241,6 +241,75 @@ test('CSS does not use forbidden CSS color name keywords (red / green / orange /
   assert.deepEqual(violations, [], violations.join('\n'));
 });
 
+test('OKLCH primitive overrides stay scoped to tokens.css and .tasty-fonts-admin', () => {
+  const sources = readCssSources();
+  const tokens = sources.find(({ file }) => file === 'tokens.css');
+  const violations = [];
+
+  assert.ok(tokens, 'tokens.css should be available for OKLCH governance.');
+
+  for (const { file, source } of sources) {
+    if (file !== 'tokens.css' && /oklch\(/i.test(stripExemptions(source))) {
+      violations.push(`${file}: raw oklch() is only allowed in tokens.css`);
+    }
+  }
+
+  assert.match(
+    tokens.source,
+    /@supports\s*\(\s*color:\s*oklch\([^)]*\)\s*\)\s*\{\s*\.tasty-fonts-admin\s*\{/,
+    'OKLCH overrides should live under an @supports block scoped to .tasty-fonts-admin.'
+  );
+
+  let inOklchSupports = false;
+  let supportDepth = 0;
+  let inAdminScope = false;
+  let adminDepth = 0;
+
+  tokens.source.split(/\r?\n/).forEach((line, index) => {
+    const lineNumber = index + 1;
+    const startsOklchSupports = /@supports\s*\(\s*color:\s*oklch\(/i.test(line);
+    const startsAdminScope = inOklchSupports && /\.tasty-fonts-admin\s*\{/i.test(line);
+
+    if (startsOklchSupports) {
+      inOklchSupports = true;
+      supportDepth = 0;
+    }
+
+    if (startsAdminScope) {
+      inAdminScope = true;
+      adminDepth = 0;
+    }
+
+    if (/oklch\(/i.test(line) && !startsOklchSupports) {
+      if (!inOklchSupports || !inAdminScope) {
+        violations.push(`tokens.css:${lineNumber}: oklch() declaration is not scoped to .tasty-fonts-admin @supports`);
+      }
+
+      if (!/^\s*--tasty-[a-z0-9_-]+\s*:\s*oklch\(/i.test(line)) {
+        violations.push(`tokens.css:${lineNumber}: oklch() may only override primitive --tasty-* tokens`);
+      }
+    }
+
+    const braceDelta = (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+
+    if (inAdminScope) {
+      adminDepth += braceDelta;
+      if (adminDepth <= 0 && !startsAdminScope) {
+        inAdminScope = false;
+      }
+    }
+
+    if (inOklchSupports) {
+      supportDepth += braceDelta;
+      if (supportDepth <= 0 && !startsOklchSupports) {
+        inOklchSupports = false;
+      }
+    }
+  });
+
+  assert.deepEqual(violations, [], violations.join('\n'));
+});
+
 test('the previous warning-amber #9a6700 is fully removed from active CSS values', () => {
   const violations = [];
 
