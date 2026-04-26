@@ -12,6 +12,8 @@ Manage families, delivery profiles, publish state, fallback stacks, and per-fami
 
 The Font Library is your central inventory. Every font family added to the plugin — regardless of whether it came from a local upload, Google, Bunny, or Adobe — lives here. You do not assign roles from this page (that happens in Deploy Fonts), but you do control how each family is delivered and whether it participates in runtime output.
 
+![Font Library — all managed families with delivery profiles, publish state, and source filters](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/font-library.png)
+
 ---
 
 ## Steps
@@ -27,6 +29,8 @@ Use the library filters to narrow by:
 - search text
 
 This is the fastest way to isolate imported families, local uploads, CDN profiles, or families that are currently in use.
+
+![Font Library filtered to In Use families — active role assignments highlighted](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/library-filtered-in-use.png)
 
 ### 2. Understand Publish State
 
@@ -59,6 +63,8 @@ Common examples:
 **Working with multiple delivery profiles:**
 
 Keeping multiple profiles on one family lets you switch delivery modes without losing your previous configuration. For example, you can import a family as both self-hosted and CDN, keep both profiles saved, and toggle between them to compare performance or troubleshoot delivery issues — without re-importing anything. Only the active profile affects runtime output.
+
+![Font Library family details — expanded card showing variants, delivery profiles, and per-family settings](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/library-family-details.png)
 
 ### 4. Save Fallback Stacks
 

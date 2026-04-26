@@ -17,6 +17,8 @@ Bunny Fonts mirrors the Google Fonts catalog and is a drop-in GDPR-friendly alte
 
 Use the Bunny add-font workflow to search the Bunny catalog and inspect the family details the plugin exposes. When Variable Font Support is enabled in `Settings → Behavior`, variable families are marked with a **Variable** badge in search results.
 
+![Bunny Fonts add-font flow — catalog search with delivery mode selector](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/library-add-bunny.png)
+
 > **Note on Bunny variable fonts and self-hosted delivery:** Bunny's catalog includes variable fonts, but Bunny's download API currently provides static files for self-hosted imports even when the family has a variable version. For variable font delivery from Bunny, use CDN mode — Bunny's CDN stylesheet serves the variable font files directly. When self-hosted is selected for a variable family, the plugin stores the axis metadata from the catalog for reference, but the downloaded files will be static weight variants.
 
 ### 2. Choose A Delivery Mode

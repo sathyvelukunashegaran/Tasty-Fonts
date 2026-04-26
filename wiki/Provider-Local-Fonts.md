@@ -21,6 +21,8 @@ Supported local formats:
 - `TTF`
 - `OTF`
 
+![Local Fonts upload builder — file picker with variable axis editor column](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/library-upload-builder.png)
+
 Variable fonts in any of the above formats are accepted. The plugin detects whether a font file contains variable axis data and, when Variable Font Support is enabled in `Settings → Behavior`, stores the axis metadata alongside the file.
 
 **Using the variable axis editor (when Variable Font Support is enabled):**

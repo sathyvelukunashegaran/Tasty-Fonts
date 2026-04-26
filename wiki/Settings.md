@@ -36,6 +36,8 @@ The Settings page has three tabs:
 - `Integrations`: how the plugin cooperates with editor and builder ecosystems
 - `Behavior`: plugin-level feature defaults, variable font support, admin access, and uninstall behavior
 
+![Settings — three-tab layout with Output, Integrations, and Behavior controls](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/settings.png)
+
 > **Developer maintenance and Site Transfer** moved to **[Advanced Tools](Advanced-Tools)** in 1.14.0. Use `Advanced Tools → Developer` for cache clearing, resets, and rollback snapshots; use `Advanced Tools → Transfer` for export and import bundles.
 
 ## Steps
@@ -61,6 +63,8 @@ Advanced output controls also cover:
 - class sub-controls by role, alias, category, and family
 - variable generation
 - variable sub-controls such as role aliases, category aliases, and weight tokens
+
+![Settings Output tab — preset selector, CSS delivery, font-display, and advanced output controls](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/settings-output-details.png)
 
 #### Output Preset
 
@@ -142,6 +146,8 @@ Key controls include:
 - `Bricks Builder`
 - `Oxygen Builder`
 
+![Settings Integrations tab — Block Editor, Automatic.css, Bricks, and Oxygen controls](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/settings-integrations.png)
+
 #### Block Editor Font Library Sync
 
 When enabled, the plugin mirrors managed families into the core WordPress Block Editor Font Library so they appear in the site editor's typography controls. The sync depends on background loopback requests from the server back to itself.
@@ -181,6 +187,8 @@ Key controls include:
 - `Show Onboarding Hints`
 - `Keep Uploaded Fonts on Uninstall`
 
+![Settings Behavior tab — variable fonts, monospace role, admin access, and uninstall controls](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/settings-behavior.png)
+
 > **Update Channel** moved to `Advanced Tools → Developer` in 1.14.0. See [Advanced Tools](Advanced-Tools) for the update channel and rollback reinstall controls.
 
 #### Enable Variable Fonts
@@ -210,6 +218,8 @@ By default, only WordPress administrators can open the Tasty Fonts admin pages a
 - Under **Additional Roles**, check any non-administrator role whose members should have full Tasty Fonts access (for example, `Editor`).
 - Under **Specific Users**, search and add individual users by name. These grants are site-local and are never exported in transfer bundles.
 - Save changes. The access change takes effect immediately — no page reload required.
+
+![Settings Admin Access — expanded role and user selectors for delegated access](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/settings-admin-access-expanded.png)
 
 **Important notes:**
 
