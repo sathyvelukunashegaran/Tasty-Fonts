@@ -69,7 +69,7 @@ The plugin prioritises WOFF2 files in preload candidates and `@font-face` orderi
 
 ## Variable Fonts: Fewer Requests, More Flexibility
 
-**Location:** `Settings → Output → Variable Font Support`
+**Location:** `Settings → Behavior → Enable Variable Fonts`
 
 A single variable WOFF2 file can encode a continuous range of weights (e.g., 100–900) in one file, replacing what would otherwise be up to eight separate static weight files.
 

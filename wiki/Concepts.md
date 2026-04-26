@@ -123,7 +123,7 @@ A **variable font** is a single font file that contains a continuous range of de
 
 Variable font support is **opt-in**. It is disabled by default so static-only installs stay simple and unaffected.
 
-When you enable it in `Settings → Output → Variable Font Support`:
+When you enable it in `Settings → Behavior → Enable Variable Fonts`:
 
 - **Library**: families that have variable delivery profiles display a `Variable` badge and can be filtered by type.
 - **Upload flow**: an axis editor appears per uploaded variable file so you can review detected axes and set axis defaults before saving.
@@ -141,8 +141,8 @@ When variable font support is disabled, the plugin treats every font as static. 
 ### Decision guide
 
 - **You have separate weight files (e.g., Inter-Regular.woff2, Inter-Bold.woff2)** → use static mode (default). No change needed.
-- **You have a variable font file (e.g., Inter-VariableFont_wght.woff2)** → enable Variable Font Support in `Settings → Output`.
-- **You imported from Google Fonts and want the variable version** → enable Variable Font Support, then re-import the family. Google Fonts provides variable versions where available.
+- **You have a variable font file (e.g., Inter-VariableFont_wght.woff2)** → enable Variable Fonts in `Settings → Behavior`.
+- **You imported from Google Fonts and want the variable version** → enable Variable Fonts in `Settings → Behavior`, then re-import the family. Google Fonts provides variable versions where available.
 
 ---
 

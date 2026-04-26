@@ -236,7 +236,7 @@ Yes. The Bricks integration exposes published families in Bricks builder selecto
 <details>
 <summary><strong>Can I use variable fonts in WordPress with this plugin?</strong></summary>
 
-Yes. Enable variable font support from `Settings → Output → Variable Font Support`. Once active, axis-aware controls unlock per role and the plugin tracks weight behavior for variable families correctly.
+Yes. Enable variable font support from `Settings → Behavior → Enable Variable Fonts`. Once active, axis-aware controls unlock per role and the plugin tracks weight behavior for variable families correctly.
 
 </details>
 
@@ -263,14 +263,16 @@ Yes, since 1.13.0. Go to `Settings → Behavior → Admin Access`, toggle **Enab
 
 ---
 
-## What Tasty WP Is Actively Building
+## What's New in 1.14.0
 
-`1.13.0` is the current stable release. Here is what comes next:
+`1.14.0` is the current stable release. It ships significant quality-of-life improvements for power users and agencies:
 
-- 🛠 **WP-CLI commands** for maintenance, cache management, CSS regeneration, rescans, and diagnostics — for agencies and power users who live in the terminal
-- ⚡ **Bulk management for large libraries** — faster browsing, bulk actions, and broader search flows for high-volume workflows
-- 🔁 **Scheduled Adobe Fonts project refresh** — automatically sync web project changes without manual re-imports
-- 🔍 **Richer diagnostics** — deeper inspection tools for generated CSS, delivery planning, and integration state
+- 🖥 **Reworked Advanced Tools** — power-user command center with dedicated tabs for Overview, Generated CSS, Developer, Transfer, Activity, and CLI
+- 🔄 **Rollback snapshots** — automatic safety checkpoints before every destructive operation (settings reset, import, restore), plus manual create/rename/restore/delete
+- 📦 **Support bundles** — one-click sanitized diagnostics export for debugging and handoff (no API keys exposed)
+- 🛠 **Full WP-CLI parity** — commands for diagnostics, CSS regeneration, cache clears, rescans, transfer bundles, support bundles, and snapshots
+- 📋 **Paginated activity log** — search, filter by actor, and choose 5–100 entries per page in Advanced Tools → Activity
+- ⚙️ **Settings streamlined to 3 tabs** — Output, Integrations, and Behavior; Developer maintenance and Transfer workflows now live in Advanced Tools
 
 Have a workflow you want prioritized? Open a feature request on **[GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues)** — real-world agency, client, and editorial use cases shape the roadmap directly.
 

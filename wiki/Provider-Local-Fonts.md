@@ -21,7 +21,7 @@ Supported local formats:
 - `TTF`
 - `OTF`
 
-Variable fonts in any of the above formats are accepted. The plugin detects whether a font file contains variable axis data and, when Variable Font Support is enabled in `Settings → Output`, stores the axis metadata alongside the file.
+Variable fonts in any of the above formats are accepted. The plugin detects whether a font file contains variable axis data and, when Variable Font Support is enabled in `Settings → Behavior`, stores the axis metadata alongside the file.
 
 **Using the variable axis editor (when Variable Font Support is enabled):**
 
@@ -70,7 +70,7 @@ Self-hosted local files are stored at:
 
 **File rejected on upload** — confirm the format is `WOFF2`, `WOFF`, `TTF`, or `OTF`. EOT and SVG are not supported.
 
-**Variable column does not appear in upload builder** — Variable Font Support must be enabled in `Settings → Output` for the axis editor column to show. If it is off, variable font files are still accepted but treated as static.
+**Variable column does not appear in upload builder** — Variable Font Support must be enabled in `Settings → Behavior` for the axis editor column to show. If it is off, variable font files are still accepted but treated as static.
 
 **Duplicate variable font detection** — the plugin handles duplicate detection correctly for variable fonts. Self-hosted variable files can coexist in the same family alongside static face files without conflict.
 

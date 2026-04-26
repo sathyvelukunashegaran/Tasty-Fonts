@@ -197,7 +197,7 @@ A `font-display` value that shows a fallback font until the custom font loads, t
 The identifier used to namespace translatable strings in WordPress plugins. Tasty Custom Fonts uses the text domain `tasty-fonts`.
 
 **Transfer Bundle**
-Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.13.0 or later.
+Synonym for Site Transfer Bundle. A portable ZIP file containing a Tasty Fonts export that can be imported on any site running 1.14.0 or later.
 
 **Transfer Tab**
 The Transfer tab in Advanced Tools. Contains the Export and Import cards for the Site Transfer workflow.
@@ -216,10 +216,10 @@ A WordPress plugin header field the plugin uses to advertise its GitHub reposito
 ## V
 
 **Variable font**
-A font file format that encodes a continuous range of design variations (such as weight, width, or slant) as named axes within a single file. A single variable WOFF2 file can replace multiple separate static weight files. Variable font support in the plugin is opt-in; enable it in `Settings → Output → Variable Font Support`.
+A font file format that encodes a continuous range of design variations (such as weight, width, or slant) as named axes within a single file. A single variable WOFF2 file can replace multiple separate static weight files. Variable font support in the plugin is opt-in; enable it in `Settings → Behavior → Enable Variable Fonts`.
 
 **Variable Font Support**
-The opt-in Output setting that activates variable font features across uploads, imports, library display, Deploy Fonts role controls, and generated CSS. Off by default to keep static-only installs simple and unaffected.
+The opt-in Behavior setting that activates variable font features across uploads, imports, library display, Deploy Fonts role controls, and generated CSS. Off by default to keep static-only installs simple and unaffected. Enable it in `Settings → Behavior → Enable Variable Fonts`.
 
 **Variant**
 A single font file associated with a specific weight, style, or subset of a family. For example, `Inter 400 normal`, `Inter 700 italic`. The plugin stores variants within delivery profiles.

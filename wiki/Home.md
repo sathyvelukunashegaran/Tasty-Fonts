@@ -4,9 +4,21 @@ This is the versioned documentation hub for the current plugin codebase.
 
 ## Current Release Track
 
-`1.13.0` is the current stable release. If you want to test upcoming prerelease builds, set `Settings → Behavior → Update Channel` to `Beta` or `Nightly`.
+`1.14.0` is the current stable release. If you want to test upcoming prerelease builds, set `Advanced Tools → Developer → Update Channel` to `Beta` or `Nightly`.
 
-These docs describe the current plugin behavior in full, covering the shipping features, release channels, variable font controls, Site Transfer, and the full integration surface.
+These docs describe the current plugin behavior in full, covering the shipping features, release channels, variable font controls, Site Transfer, rollback snapshots, WP-CLI, and the full integration surface.
+
+---
+
+## What's New In 1.14.0
+
+- **[Reworked Advanced Tools](Advanced-Tools)** — six-tab power-user command center: Overview, Generated CSS, Developer, Transfer, Activity, and CLI. Developer maintenance and Transfer workflows moved here from Settings.
+- **[Rollback Snapshots](Advanced-Tools#rollback-snapshots)** — automatic safety checkpoints are created before every destructive operation (settings reset, import, snapshot restore). You can also create, rename, restore, and delete snapshots manually from the Developer tab.
+- **[Support Bundles](Advanced-Tools#support-bundles)** — one-click sanitized export of diagnostics, generated CSS, activity, settings, and library state for debugging and agency handoffs. Google API keys are never included.
+- **[Full WP-CLI Parity](Advanced-Tools#wp-cli)** — commands for diagnostics, CSS regeneration, cache clears, library rescans, site-transfer export/import, support bundles, rollback snapshots, and Google API key management.
+- **[Paginated Activity Log](Advanced-Tools#activity)** — search by text or event type, filter by actor, and choose page sizes of 5, 10, 25, or 100 entries in Advanced Tools → Activity.
+- **[Settings streamlined to 3 tabs](Settings)** — Output, Integrations, and Behavior. Update Channel moved to `Advanced Tools → Developer`.
+- **[Improved health checks](Advanced-Tools#overview)** — plain-language guidance, knowledge-base links, and hover help across all health check rows.
 
 ---
 
@@ -107,6 +119,6 @@ These docs describe the current plugin behavior in full, covering the shipping f
 ## Notes
 
 - The docs in `main` always describe the current plugin behavior.
-- The docs cover the `1.13.0` release, including Site Transfer, Google Fonts API key encryption, variable-font axis-default cleanup, and all existing Google, Bunny, Adobe, and integration workflows.
+- The docs cover the `1.14.0` release, including the reworked Advanced Tools, rollback snapshots, support bundles, WP-CLI parity, Site Transfer, Google Fonts API key encryption, variable-font axis-default cleanup, and all existing Google, Bunny, Adobe, and integration workflows.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/blob/main/README.md) stays shorter and links here for full guidance.
