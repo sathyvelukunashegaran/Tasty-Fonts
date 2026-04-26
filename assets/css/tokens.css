@@ -1060,7 +1060,7 @@
     --tasty-motion-celebrate: 0.52s;
     --tasty-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
     --tasty-easing-decel: cubic-bezier(0, 0, 0.2, 1);
-    --tasty-easing-overshoot: cubic-bezier(0.2, 1.4, 0.4, 1);
+    --tasty-easing-overshoot: var(--tasty-easing-emphasized);
 
     /*
      * Composite transition tokens — apply directly to `transition:`.

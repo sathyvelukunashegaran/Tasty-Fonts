@@ -40,6 +40,10 @@ jobs:
         shell: bash
         run: npm run lint:css
 
+      - name: Run Impeccable design anti-pattern scan
+        shell: bash
+        run: npm run lint:design
+
       - name: Run PHPStan
         shell: bash
         run: composer phpstan

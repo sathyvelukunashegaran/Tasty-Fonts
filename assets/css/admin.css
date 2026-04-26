@@ -719,7 +719,7 @@
 }
 
 .tasty-fonts-toast {
-    animation: tasty-fonts-toast-enter var(--tasty-duration-medium) var(--tasty-easing-spring) both;
+    animation: tasty-fonts-toast-enter var(--tasty-duration-medium) var(--tasty-easing-emphasized) both;
     will-change: transform, opacity;
 }
 
@@ -1260,7 +1260,7 @@ h3.tasty-fonts-section-title {
 
 @media (prefers-reduced-motion: no-preference) {
     .tasty-fonts-pill--copy.is-copied {
-        animation: tasty-fonts-copy-pop var(--tasty-duration-medium) var(--tasty-easing-spring) both;
+        animation: tasty-fonts-copy-pop var(--tasty-duration-medium) var(--tasty-easing-emphasized) both;
     }
 }
 

@@ -37,6 +37,7 @@ playwright-report/
 output/
 output/playwright/
 .playwright-cli/
+docs/
 
 # Logs and temporary/cache files
 *.log
@@ -52,7 +53,6 @@ cache/
 jscpd-report.json
 report/
 .agents/
-AGENTS.md
 CLAUDE.md
 .agents/tasks/todo-*.md
 

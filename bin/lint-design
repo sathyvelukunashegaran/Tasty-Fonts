@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+'use strict';
+
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const defaultTargets = [
+  'assets/css',
+  'assets/js',
+  'includes/Admin'
+];
+
+const passthroughArgs = process.argv.slice(2);
+const impeccableArgs = passthroughArgs.length > 0
+  ? ['-y', 'impeccable@latest', 'detect', ...passthroughArgs]
+  : ['-y', 'impeccable@latest', 'detect', '--fast', ...defaultTargets];
+
+const result = spawnSync(executable, impeccableArgs, {
+  cwd: root,
+  stdio: ['ignore', 'inherit', 'inherit']
+});
+
+if (result.error) {
+  console.error(result.error.message);
+  process.exit(1);
+}
+
+if (result.signal) {
+  console.error(`impeccable terminated by signal ${result.signal}`);
+  process.exit(1);
+}
+
+process.exit(result.status ?? 1);
