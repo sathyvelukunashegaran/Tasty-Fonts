@@ -82,6 +82,7 @@ These docs describe the current plugin behavior in full, covering the shipping f
 ## Font Sources
 
 - [Local Fonts](Provider-Local-Fonts) — upload files or rescan the uploads directory
+- [Custom CSS URL Imports](Provider-Custom-CSS) — import WOFF2/WOFF faces from a public HTTPS `@font-face` stylesheet
 - [Google Fonts](Provider-Google-Fonts) — self-hosted or CDN delivery with API key search
 - [Bunny Fonts](Provider-Bunny-Fonts) — GDPR-friendly alternative, no API key needed
 - [Adobe Fonts](Provider-Adobe-Fonts) — use an existing Adobe CC web project
@@ -119,6 +120,6 @@ These docs describe the current plugin behavior in full, covering the shipping f
 ## Notes
 
 - The docs in `main` always describe the current plugin behavior.
-- The docs cover the `1.14.0` release, including the reworked Advanced Tools, rollback snapshots, support bundles, WP-CLI parity, Site Transfer, Google Fonts API key encryption, variable-font axis-default cleanup, and all existing Google, Bunny, Adobe, and integration workflows.
+- The docs cover the `1.14.0` release, including the reworked Advanced Tools, rollback snapshots, support bundles, WP-CLI parity, Site Transfer, Google Fonts API key encryption, variable-font axis-default cleanup, custom CSS URL imports, and all existing Google, Bunny, Adobe, and integration workflows.
 - User-facing screenshots can be added later under the repo `screenshots/` directory.
 - The top-level [`README.md`](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/blob/main/README.md) stays shorter and links here for full guidance.

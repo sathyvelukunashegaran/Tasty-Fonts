@@ -5542,6 +5542,59 @@ $tests['runtime_asset_planner_get_preconnect_origins_returns_empty_for_self_host
     assertSameValue([], $origins, 'getPreconnectOrigins() should return an empty array for self-hosted deliveries (no external connection needed).');
 };
 
+$tests['runtime_asset_planner_generates_custom_remote_css_without_original_stylesheet_enqueue'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $sourceCssUrl = 'https://assets.example.com/foundry.css';
+    $fontUrl = 'https://cdn.example.com/fonts/remote-sans.woff2';
+    $services['settings']->saveSettings([
+        'font_display' => 'optional',
+        'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_PRESERVE,
+        'remote_connection_hints' => '1',
+    ]);
+    $services['imports']->saveProfile(
+        'Remote Sans',
+        'remote-sans',
+        [
+            'id' => 'custom-remote-remote-sans-abc123',
+            'provider' => 'custom',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Remote Sans',
+                'slug' => 'remote-sans',
+                'source' => 'custom',
+                'weight' => '400',
+                'style' => 'normal',
+                'unicode_range' => 'U+0000-00FF',
+                'files' => ['woff2' => $fontUrl],
+                'paths' => [],
+            ]],
+            'meta' => [
+                'delivery_mode' => 'remote',
+                'source_css_url' => $sourceCssUrl,
+                'source_host' => 'assets.example.com',
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $localCatalog = $services['planner']->getLocalRuntimeCatalog();
+    $css = $services['assets']->getCss();
+    $origins = $services['planner']->getPreconnectOrigins();
+
+    assertSameValue([], $services['planner']->getExternalStylesheets(), 'Custom remote deliveries should not enqueue the original third-party stylesheet.');
+    assertContainsValue($fontUrl, str_replace('\\/', '/', wp_json_encode($localCatalog) ?: ''), 'Custom remote deliveries should feed absolute remote font URLs into the local runtime catalog.');
+    assertContainsValue('@font-face', $css, 'Custom remote deliveries should be emitted as controlled Tasty Fonts-generated @font-face CSS.');
+    assertContainsValue($fontUrl, $css, 'Generated CSS should reference the reviewed remote font URL.');
+    assertContainsValue('font-display:optional', $css, 'Generated CSS should use the existing font-display setting for custom remote faces.');
+    assertContainsValue('unicode-range:U+0000-00FF;', $css, 'Generated CSS should preserve reviewed unicode-range values for custom remote faces.');
+    assertNotContainsValue($sourceCssUrl, $css, 'Generated CSS should not include or import the original source stylesheet URL.');
+    assertSameValue(['https://cdn.example.com'], $origins, 'Remote connection hints should preconnect to remote font hosts, not source CSS hosts.');
+};
+
 // ---------------------------------------------------------------------------
 // RuntimeService::enqueueAdminScreenFonts
 // ---------------------------------------------------------------------------

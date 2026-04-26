@@ -658,6 +658,7 @@ final class FontUtils
      *     user-agent?: string,
      *     reject_unsafe_urls?: bool,
      *     blocking?: bool,
+     *     limit_response_size?: int,
      *     headers?: array<string, string>|string
      * }
      */
@@ -695,6 +696,10 @@ final class FontUtils
 
         if (isset($value['blocking']) && is_bool($value['blocking'])) {
             $normalized['blocking'] = $value['blocking'];
+        }
+
+        if (isset($value['limit_response_size']) && is_int($value['limit_response_size']) && $value['limit_response_size'] > 0) {
+            $normalized['limit_response_size'] = $value['limit_response_size'];
         }
 
         if (isset($value['headers'])) {

@@ -39,7 +39,7 @@ final class CatalogService
 {
     public const TRANSIENT_CATALOG = 'tasty_fonts_catalog_v2';
     private const LOCAL_FORMATS = ['woff2', 'woff', 'ttf', 'otf'];
-    private const IMPORTED_SOURCES = ['google', 'bunny'];
+    private const IMPORTED_SOURCES = ['google', 'bunny', 'custom'];
     private const DEFAULT_COUNTS = [
         'families' => 0,
         'files' => 0,
@@ -295,7 +295,7 @@ final class CatalogService
         $type = strtolower(trim($this->stringValue($profile, 'type', 'self_hosted')));
         $faces = [];
 
-        foreach ($this->deliveryFaceList($profile) as $face) {
+        foreach ($this->deliveryFaceList($profile, $provider) as $face) {
             $faces[] = $this->hydrateFace(
                 $this->stringValue($family, 'family'),
                 $this->stringValue($family, 'slug'),
@@ -857,6 +857,11 @@ final class CatalogService
                 'class' => '',
                 'copy' => __('Adobe web fonts stay hosted by Adobe and load from the project stylesheet defined in Adobe Fonts.', 'tasty-fonts'),
             ],
+            'custom:cdn' => [
+                'label' => __('External Request', 'tasty-fonts'),
+                'class' => '',
+                'copy' => __('Visitors request this custom CSS delivery from the reviewed remote font URLs while Tasty Fonts generates the @font-face rules.', 'tasty-fonts'),
+            ],
             default => [
                 'label' => __('Self-hosted', 'tasty-fonts'),
                 'class' => 'is-success',
@@ -1139,12 +1144,15 @@ final class CatalogService
      * @param DeliveryProfile $profile
      * @return array<string, CatalogFace>
      */
-    private function deliveryFaceMap(array $profile): array
+    private function deliveryFaceMap(array $profile, string $provider = ''): array
     {
         $normalized = [];
+        $provider = strtolower(trim($provider !== '' ? $provider : $this->stringValue($profile, 'provider')));
 
         foreach ($this->normalizeCatalogFaceList($profile['faces'] ?? []) as $face) {
-            $key = HostedImportSupport::faceKeyFromFace($face);
+            $key = $provider === 'custom'
+                ? $this->customFaceKeyFromFace($face)
+                : HostedImportSupport::faceKeyFromFace($face);
             $normalized[$key] = $face;
         }
 
@@ -1155,9 +1163,28 @@ final class CatalogService
      * @param DeliveryProfile $profile
      * @return list<CatalogFace>
      */
-    private function deliveryFaceList(array $profile): array
+    private function deliveryFaceList(array $profile, string $provider = ''): array
     {
-        return array_values($this->deliveryFaceMap($profile));
+        return array_values($this->deliveryFaceMap($profile, $provider));
+    }
+
+    /**
+     * @param CatalogFace $face
+     */
+    private function customFaceKeyFromFace(array $face): string
+    {
+        $files = $this->stringMap($face['files'] ?? []);
+        $format = $files !== [] ? (string) array_key_first($files) : '';
+        $path = $format !== '' ? ($files[$format] ?? '') : '';
+        $provider = $this->arrayValue($face, 'provider');
+        $originalUrl = self::scalarStringValue($provider['original_url'] ?? '');
+
+        return implode('|', [
+            HostedImportSupport::faceKeyFromFace($face),
+            strtolower(trim($format)),
+            trim($this->stringValue($face, 'unicode_range')),
+            $originalUrl !== '' ? $originalUrl : trim($path),
+        ]);
     }
 
     /**
@@ -1475,6 +1502,8 @@ final class CatalogService
             'bunny:self_hosted' => 40,
             'bunny:cdn' => 50,
             'adobe:adobe_hosted' => 60,
+            'custom:self_hosted' => 70,
+            'custom:cdn' => 80,
             default => 99,
         };
     }

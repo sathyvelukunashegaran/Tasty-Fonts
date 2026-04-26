@@ -268,6 +268,11 @@
     const uploadAddFamily = document.getElementById('tasty-fonts-upload-add-family');
     const uploadSubmit = document.getElementById('tasty-fonts-upload-submit');
     const uploadStatus = document.getElementById('tasty-fonts-upload-status');
+    const urlDryRunForm = document.getElementById('tasty-fonts-url-dry-run-form');
+    const urlDryRunInput = document.getElementById('tasty-fonts-url-dry-run-input');
+    const urlDryRunSubmit = document.getElementById('tasty-fonts-url-dry-run-submit');
+    const urlDryRunStatus = document.getElementById('tasty-fonts-url-dry-run-status');
+    const urlDryRunReview = document.getElementById('tasty-fonts-url-dry-run-review');
     const addFontsPanelToggle = document.getElementById('tasty-fonts-add-font-panel-toggle');
     const toastItems = Array.from(document.querySelectorAll('[data-toast]'));
     let helpButtons = [];
@@ -336,6 +341,9 @@
     let bunnyFamilyLookupToken = 0;
     let importInFlight = false;
     let uploadInFlight = false;
+    let urlDryRunInFlight = false;
+    let urlFinalImportInFlight = false;
+    let latestCustomCssDryRunPlan = null;
     let activeHelpButton = null;
     let helpTooltipPositionFrame = 0;
     let pendingHelpTooltipButton = null;
@@ -443,6 +451,19 @@
         siteTransferImportIdle: __('Import Bundle', 'tasty-fonts'),
         siteTransferImportBusy: __('Importing Bundle…', 'tasty-fonts'),
         siteTransferImportRequiresDryRun: __('Run the dry run before importing this bundle.', 'tasty-fonts'),
+        urlDryRunButtonIdle: __('Run Dry Run', 'tasty-fonts'),
+        urlDryRunButtonBusy: __('Running Dry Run…', 'tasty-fonts'),
+        urlDryRunMissing: __('Enter a CSS stylesheet URL.', 'tasty-fonts'),
+        urlDryRunSubmitting: __('Reading the stylesheet…', 'tasty-fonts'),
+        urlDryRunSuccess: __('Dry run complete. Review the detected faces below.', 'tasty-fonts'),
+        urlDryRunError: __('The stylesheet dry run failed.', 'tasty-fonts'),
+        urlImportButtonIdle: __('Import Selected Faces', 'tasty-fonts'),
+        urlImportButtonBusy: __('Importing…', 'tasty-fonts'),
+        urlImportMissingSnapshot: __('Run a dry run before importing selected faces.', 'tasty-fonts'),
+        urlImportNoSelection: __('Select at least one validated font face to import.', 'tasty-fonts'),
+        urlImportSubmitting: __('Importing selected custom CSS faces…', 'tasty-fonts'),
+        urlImportSuccess: __('Import complete. Refreshing the library…', 'tasty-fonts'),
+        urlImportError: __('The custom CSS import failed.', 'tasty-fonts'),
         uploadButtonIdle: __('Upload to Library', 'tasty-fonts'),
         uploadButtonBusy: __('Uploading…', 'tasty-fonts'),
         uploadRowQueued: __('Queued', 'tasty-fonts'),
@@ -662,6 +683,39 @@
         : (type) => (String(type || '').trim().toLowerCase() === 'error'
             ? { role: 'alert', live: 'assertive' }
             : { role: 'status', live: 'polite' });
+    const buildCustomCssDryRunRequest = typeof adminContracts.buildCustomCssDryRunRequest === 'function'
+        ? adminContracts.buildCustomCssDryRunRequest
+        : (url) => ({ url: String(url || '').trim() });
+    const buildCustomCssFinalImportRequest = typeof adminContracts.buildCustomCssFinalImportRequest === 'function'
+        ? adminContracts.buildCustomCssFinalImportRequest
+        : (snapshotToken, selectedFaceIds = [], options = {}) => ({
+            snapshot_token: String(snapshotToken || '').trim(),
+            selected_face_ids: Array.isArray(selectedFaceIds) ? selectedFaceIds : [],
+            delivery_mode: String(options.deliveryMode || 'self_hosted').trim() || 'self_hosted',
+            family_fallbacks: options.familyFallbacks || {},
+            duplicate_handling: String(options.duplicateHandling || 'skip').trim() || 'skip',
+            activate: !!options.activate,
+            publish: !!options.publish,
+        });
+    const buildCustomCssImportErrorMessage = typeof adminContracts.buildCustomCssImportErrorMessage === 'function'
+        ? adminContracts.buildCustomCssImportErrorMessage
+        : (payload, fallback) => getApiMessage(payload, fallback);
+    const normalizeCustomCssDryRunPlan = typeof adminContracts.normalizeCustomCssDryRunPlan === 'function'
+        ? adminContracts.normalizeCustomCssDryRunPlan
+        : (payload) => (payload && typeof payload === 'object' ? payload : {});
+    const renderCustomCssDryRunReviewHtml = typeof adminContracts.renderCustomCssDryRunReviewHtml === 'function'
+        ? adminContracts.renderCustomCssDryRunReviewHtml
+        : () => '';
+    const escapeCustomCssStatusHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    const renderCustomCssDryRunErrorHtml = typeof adminContracts.renderCustomCssDryRunErrorHtml === 'function'
+        ? adminContracts.renderCustomCssDryRunErrorHtml
+        : (message) => `<div class="tasty-fonts-empty tasty-fonts-empty--panel" role="alert">${escapeCustomCssStatusHtml(message)}</div>`;
+
     const describeFontType = typeof adminContracts.describeFontType === 'function'
         ? adminContracts.describeFontType
         : (entry, provider = 'library') => {
@@ -1229,7 +1283,12 @@
         const payload = await readApiPayload(response);
 
         if (!response.ok) {
-            throw new Error(getApiMessage(payload, fallbackMessage || defaultRequestFailedMessage()));
+            const requestError = new Error(getApiMessage(payload, fallbackMessage || defaultRequestFailedMessage()));
+
+            requestError.payload = payload && typeof payload === 'object' ? payload : {};
+            requestError.status = response.status;
+
+            throw requestError;
         }
 
         return payload && typeof payload === 'object' ? payload : {};
@@ -4968,6 +5027,14 @@
 
     function focusAddFontPanel() {
         const activeKey = activeTabKeyForGroup('add-font') || 'google';
+
+        if (activeKey === 'url') {
+            if (urlDryRunInput) {
+                urlDryRunInput.focus();
+            }
+
+            return;
+        }
 
         if (activeKey === 'upload') {
             const firstFamilyInput = uploadGroupsWrap ? uploadGroupsWrap.querySelector('[data-upload-group-field="family"]') : null;
@@ -9773,6 +9840,290 @@
         }
     }
 
+    function setUrlDryRunBusyState(isBusy, originalLabel) {
+        if (urlDryRunSubmit) {
+            urlDryRunSubmit.disabled = isBusy;
+            urlDryRunSubmit.textContent = isBusy
+                ? getString('urlDryRunButtonBusy', 'Running Dry Run…')
+                : (originalLabel || getString('urlDryRunButtonIdle', 'Run Dry Run'));
+        }
+
+        if (urlDryRunInput) {
+            urlDryRunInput.disabled = isBusy;
+        }
+    }
+
+    function isCustomCssControlDisabled(element) {
+        if (!element) {
+            return false;
+        }
+
+        return !!(
+            element.disabled
+            || element.getAttribute('aria-disabled') === 'true'
+            || element.closest('[aria-disabled="true"], [data-custom-css-disabled="1"], [data-feature-disabled="custom-css-url"]')
+        );
+    }
+
+    function customCssFinalFormStatus(form) {
+        return form ? form.querySelector('[data-custom-css-import-status]') : null;
+    }
+
+    function customCssFinalFormSubmit(form) {
+        return form ? form.querySelector('[data-custom-css-import-submit]') : null;
+    }
+
+    function selectedCustomCssFaceIds(form) {
+        if (!form) {
+            return [];
+        }
+
+        return Array.from(form.querySelectorAll('.tasty-fonts-url-face-row input[type="checkbox"]'))
+            .filter((input) => input.checked && !input.disabled)
+            .map((input) => String(input.value || '').trim())
+            .filter(Boolean);
+    }
+
+    function selectedCustomCssFamilyFallbacks(form) {
+        if (!form) {
+            return {};
+        }
+
+        const fallbacks = {};
+
+        Array.from(form.querySelectorAll('[data-custom-css-family-fallback]')).forEach((input) => {
+            const slug = String(input.getAttribute('data-family-slug') || '').trim();
+
+            if (slug) {
+                fallbacks[slug] = String(input.value || '').trim();
+            }
+        });
+
+        return fallbacks;
+    }
+
+    function selectedCustomCssRadioValue(form, name, fallback) {
+        if (!form) {
+            return fallback;
+        }
+
+        const selected = form.querySelector(`input[name="${name}"]:checked`);
+
+        return selected ? String(selected.value || '').trim() : fallback;
+    }
+
+    function setUrlFinalImportBusyState(form, isBusy, originalLabel) {
+        const submit = customCssFinalFormSubmit(form);
+
+        setButtonBusyState(
+            submit,
+            isBusy,
+            originalLabel || getString('urlImportButtonIdle', 'Import Selected Faces'),
+            getString('urlImportButtonBusy', 'Importing…')
+        );
+
+        if (!form) {
+            return;
+        }
+
+        Array.from(form.querySelectorAll('input, button')).forEach((field) => {
+            if (field === submit) {
+                return;
+            }
+
+            field.disabled = isBusy || !!field.dataset.customCssOriginalDisabled;
+        });
+    }
+
+    function rememberCustomCssOriginalDisabledState(form) {
+        if (!form || form.dataset.customCssDisabledStateTracked === '1') {
+            return;
+        }
+
+        Array.from(form.querySelectorAll('input, button')).forEach((field) => {
+            if (field.disabled) {
+                field.dataset.customCssOriginalDisabled = '1';
+            }
+        });
+        form.dataset.customCssDisabledStateTracked = '1';
+    }
+
+    function buildCustomCssImportSummary(result = {}) {
+        const counts = result && result.counts && typeof result.counts === 'object' ? result.counts : {};
+        const imported = Number.parseInt(counts.faces_imported, 10) || 0;
+        const skipped = Number.parseInt(counts.faces_skipped, 10) || 0;
+        const failed = Number.parseInt(counts.faces_failed, 10) || 0;
+        const replaced = Number.parseInt(counts.faces_replaced, 10) || 0;
+        const parts = [];
+
+        if (imported > 0) {
+            parts.push(formatPluralMessage('%d face imported', '%d faces imported', imported, [imported]));
+        }
+
+        if (replaced > 0) {
+            parts.push(formatPluralMessage('%d duplicate replaced', '%d duplicates replaced', replaced, [replaced]));
+        }
+
+        if (skipped > 0) {
+            parts.push(formatPluralMessage('%d duplicate skipped', '%d duplicates skipped', skipped, [skipped]));
+        }
+
+        if (failed > 0) {
+            parts.push(formatPluralMessage('%d face failed', '%d faces failed', failed, [failed]));
+        }
+
+        return parts.join(' · ');
+    }
+
+    function renderCustomCssFinalImportResult(form, result = {}) {
+        const status = customCssFinalFormStatus(form);
+        const message = getApiMessage(result, getString('urlImportSuccess', 'Import complete. Refreshing the library…'));
+        const summary = buildCustomCssImportSummary(result);
+        const finalMessage = summary ? `${message} ${summary}.` : message;
+        const type = String(result.status || '').trim() === 'partial' || String(result.status || '').trim() === 'skipped'
+            ? 'warning'
+            : 'success';
+
+        setStatus(status, finalMessage, type, 100);
+        showToast(finalMessage, type === 'success' ? 'success' : 'error');
+    }
+
+    async function importCustomCssFinal(form) {
+        if (urlFinalImportInFlight) {
+            return;
+        }
+
+        const status = customCssFinalFormStatus(form);
+        const submit = customCssFinalFormSubmit(form);
+        const snapshotToken = latestCustomCssDryRunPlan && latestCustomCssDryRunPlan.snapshotToken
+            ? latestCustomCssDryRunPlan.snapshotToken
+            : '';
+
+        if (isCustomCssControlDisabled(form) || isCustomCssControlDisabled(submit)) {
+            return;
+        }
+
+        if (!snapshotToken) {
+            setStatus(status, getString('urlImportMissingSnapshot', 'Run a dry run before importing selected faces.'), 'error');
+            return;
+        }
+
+        const selectedFaceIds = selectedCustomCssFaceIds(form);
+
+        if (selectedFaceIds.length === 0) {
+            setStatus(status, getString('urlImportNoSelection', 'Select at least one validated font face to import.'), 'error');
+            return;
+        }
+
+        const originalLabel = submit ? submit.textContent : '';
+        let disableAfterFailure = false;
+
+        urlFinalImportInFlight = true;
+        rememberCustomCssOriginalDisabledState(form);
+        setUrlFinalImportBusyState(form, true, originalLabel);
+
+        try {
+            setStatus(status, getString('urlImportSubmitting', 'Importing selected custom CSS faces…'), 'progress', 35);
+
+            const result = await requestJson(getRoutePath('customCssImport', 'custom-css/import'), {
+                method: 'POST',
+                body: buildCustomCssFinalImportRequest(snapshotToken, selectedFaceIds, {
+                    deliveryMode: selectedCustomCssRadioValue(form, 'custom_css_delivery_mode', 'self_hosted'),
+                    familyFallbacks: selectedCustomCssFamilyFallbacks(form),
+                    duplicateHandling: selectedCustomCssRadioValue(form, 'custom_css_duplicate_handling', 'skip'),
+                }),
+                fallbackMessage: getString('urlImportError', 'The custom CSS import failed.')
+            });
+
+            renderCustomCssFinalImportResult(form, result);
+            latestCustomCssDryRunPlan = null;
+            reloadPageSoon(900);
+        } catch (error) {
+            const fallbackMessage = getString('urlImportError', 'The custom CSS import failed.');
+            const payload = error && typeof error === 'object' && error.payload && typeof error.payload === 'object'
+                ? error.payload
+                : {};
+            const message = buildCustomCssImportErrorMessage(payload, getErrorMessage(error, fallbackMessage));
+
+            latestCustomCssDryRunPlan = null;
+            disableAfterFailure = true;
+            setStatus(status, message, 'error');
+            showToast(message, 'error');
+        } finally {
+            urlFinalImportInFlight = false;
+            setUrlFinalImportBusyState(form, false, originalLabel);
+
+            if (disableAfterFailure && submit) {
+                submit.disabled = true;
+            }
+        }
+    }
+
+    async function runCustomCssDryRun() {
+        if (isCustomCssControlDisabled(urlDryRunForm) || isCustomCssControlDisabled(urlDryRunInput) || isCustomCssControlDisabled(urlDryRunSubmit)) {
+            return;
+        }
+
+        const url = urlDryRunInput ? urlDryRunInput.value.trim() : '';
+
+        if (!url) {
+            latestCustomCssDryRunPlan = null;
+            setStatus(urlDryRunStatus, getString('urlDryRunMissing', 'Enter a CSS stylesheet URL.'), 'error');
+            if (urlDryRunReview) {
+                urlDryRunReview.hidden = true;
+                urlDryRunReview.innerHTML = '';
+            }
+            return;
+        }
+
+        if (urlDryRunInFlight) {
+            return;
+        }
+
+        const originalLabel = urlDryRunSubmit ? urlDryRunSubmit.textContent : '';
+
+        urlDryRunInFlight = true;
+        latestCustomCssDryRunPlan = null;
+        setUrlDryRunBusyState(true, originalLabel);
+
+        try {
+            setStatus(urlDryRunStatus, getString('urlDryRunSubmitting', 'Reading the stylesheet…'), 'progress', 25);
+
+            const result = await requestJson(getRoutePath('customCssDryRun', 'custom-css/dry-run'), {
+                method: 'POST',
+                body: buildCustomCssDryRunRequest(url),
+                fallbackMessage: getString('urlDryRunError', 'The stylesheet dry run failed.')
+            });
+            const normalizedPlan = normalizeCustomCssDryRunPlan(result);
+            const reviewHtml = renderCustomCssDryRunReviewHtml(result);
+            const message = getApiMessage(result, getString('urlDryRunSuccess', 'Dry run complete. Review the detected faces below.'));
+
+            latestCustomCssDryRunPlan = normalizedPlan.snapshotToken ? normalizedPlan : null;
+
+            if (urlDryRunReview) {
+                urlDryRunReview.innerHTML = reviewHtml;
+                urlDryRunReview.hidden = false;
+            }
+
+            setStatus(urlDryRunStatus, message, 'success', 100);
+        } catch (error) {
+            const message = getErrorMessage(error, getString('urlDryRunError', 'The stylesheet dry run failed.'));
+
+            latestCustomCssDryRunPlan = null;
+
+            if (urlDryRunReview) {
+                urlDryRunReview.innerHTML = renderCustomCssDryRunErrorHtml(message);
+                urlDryRunReview.hidden = false;
+            }
+
+            setStatus(urlDryRunStatus, message, 'error');
+            showToast(message, 'error');
+        } finally {
+            urlDryRunInFlight = false;
+            setUrlDryRunBusyState(false, originalLabel);
+        }
+    }
+
     async function importGoogleFont() {
         const family = manualFamily ? manualFamily.value.trim() : '';
         const deliveryMode = currentGoogleDeliveryMode();
@@ -11527,6 +11878,30 @@
         });
     }
 
+    function bindCustomCssUrlControls() {
+        if (urlDryRunForm) {
+            urlDryRunForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                void runCustomCssDryRun();
+            });
+        }
+
+        if (urlDryRunReview) {
+            urlDryRunReview.addEventListener('submit', (event) => {
+                const form = event.target && event.target.closest
+                    ? event.target.closest('[data-custom-css-final-form]')
+                    : null;
+
+                if (!form) {
+                    return;
+                }
+
+                event.preventDefault();
+                void importCustomCssFinal(form);
+            });
+        }
+    }
+
     function bindUploadControls() {
         if (uploadAddFamily) {
             uploadAddFamily.addEventListener('click', () => {
@@ -12454,6 +12829,7 @@
         bindRolePreviewControls();
         bindGoogleImportControls();
         bindBunnyImportControls();
+        bindCustomCssUrlControls();
         bindUploadControls();
         bindOutputSettingsControls();
         bindBricksThemeStyleTargetControls();

@@ -25,8 +25,10 @@ Under GDPR, transferring personal data (IP addresses are personal data under GDP
 | Delivery method | Third-party data exposure | GDPR risk level | Notes |
 |---|---|---|---|
 | **Self-hosted (Local upload)** | None | Lowest | All requests stay on your server |
+| **Self-hosted (Custom CSS URL import)** | None at runtime | Lowest | Files are downloaded once to your server; visitors never contact the source host for that self-hosted profile |
 | **Self-hosted (Google Fonts download)** | None at runtime | Lowest | Files are downloaded once to your server; visitors never contact Google |
 | **Self-hosted (Bunny Fonts download)** | None at runtime | Lowest | Files are downloaded once; visitors never contact Bunny.net |
+| **Custom CSS remote serving** | Original remote font host | Depends on host | Visitor IPs reach the saved remote font URLs; review licensing, privacy, availability, and CORS warnings |
 | **Bunny CDN** | Bunny.net (EU infrastructure) | Lower | Visitor IPs reach Bunny servers; Bunny is GDPR-friendly but still third-party |
 | **Google CDN** | Google (US infrastructure) | Higher | Visitor IPs are sent to Google servers on every page load |
 | **Adobe Fonts (hosted)** | Adobe (US infrastructure) | Higher | Visitor IPs are sent to Adobe CDN on every page load |
@@ -35,16 +37,17 @@ Under GDPR, transferring personal data (IP addresses are personal data under GDP
 
 ## Self-Hosted Delivery (The Privacy-First Option)
 
-When you self-host fonts — regardless of whether the source was a local upload, a Google Fonts import, or a Bunny Fonts import — **no visitor data reaches any third-party server at font-load time**.
+When you self-host fonts — regardless of whether the source was a local upload, custom CSS URL import, Google Fonts import, or Bunny Fonts import — **no visitor data reaches any third-party server at font-load time**.
 
 The plugin downloads font files to `wp-content/uploads/fonts/` on your server. At runtime, the plugin emits `@font-face` rules pointing to those local paths. The visitor's browser fetches the font directly from your domain.
 
 ### How to achieve fully self-hosted delivery
 
 1. **For fonts you own:** upload them via the Local Fonts flow. See [Local Fonts](Provider-Local-Fonts).
-2. **For Google Fonts:** import with `Self-hosted` mode (not `CDN`). The plugin downloads the WOFF2 files to your server. See [Google Fonts](Provider-Google-Fonts).
-3. **For Bunny Fonts:** import with `Self-hosted` mode. The plugin downloads files from Bunny.net once and serves them locally afterwards. See [Bunny Fonts](Provider-Bunny-Fonts).
-4. **Disable Remote Connection Hints** in `Settings → Output` if all your active deliveries are self-hosted. This stops the plugin emitting `<link rel="preconnect">` tags to CDN origins.
+2. **For custom CSS URL imports:** choose `Self-hosted` after the dry run. The plugin downloads selected WOFF2/WOFF files into `wp-content/uploads/fonts/custom/`. See [Custom CSS URL Imports](Provider-Custom-CSS).
+3. **For Google Fonts:** import with `Self-hosted` mode (not `CDN`). The plugin downloads the WOFF2 files to your server. See [Google Fonts](Provider-Google-Fonts).
+4. **For Bunny Fonts:** import with `Self-hosted` mode. The plugin downloads files from Bunny.net once and serves them locally afterwards. See [Bunny Fonts](Provider-Bunny-Fonts).
+5. **Disable Remote Connection Hints** in `Settings → Output` if all your active deliveries are self-hosted. This stops the plugin emitting `<link rel="preconnect">` tags to CDN origins.
 
 > **Beginner tip:** after switching from CDN to self-hosted delivery, go to `Advanced Tools → Generated CSS` and verify the `@font-face` rules point to your domain (`/wp-content/uploads/fonts/...`), not to `fonts.googleapis.com` or `fonts.bunny.net`.
 
@@ -116,6 +119,7 @@ This means that even if a font is ultimately served from your server, if the plu
 
 1. **Use self-hosted delivery** for all active families:
    - Local uploads → always self-hosted
+   - Custom CSS URL imports → choose `Self-hosted` after the dry run
    - Google Fonts → choose `Self-hosted` (not `CDN`) on import
    - Bunny Fonts → choose `Self-hosted` (not `CDN`) on import
    - Adobe Fonts → not possible; Adobe requires remote delivery
@@ -162,6 +166,7 @@ Regardless of which delivery methods you use, document your font setup in your s
 ## Related Docs
 
 - [Concepts](Concepts) — delivery profiles and the CSS pipeline
+- [Provider: Custom CSS URL Imports](Provider-Custom-CSS)
 - [Provider: Google Fonts](Provider-Google-Fonts)
 - [Provider: Bunny Fonts](Provider-Bunny-Fonts)
 - [Provider: Adobe Fonts](Provider-Adobe-Fonts)

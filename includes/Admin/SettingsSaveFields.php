@@ -82,6 +82,7 @@ final class SettingsSaveFields
             ['name' => 'site_transfer_export_retention_limit', 'kind' => 'text'],
             ['name' => 'training_wheels_off', 'kind' => 'toggle'],
             ['name' => 'variable_fonts_enabled', 'kind' => 'toggle'],
+            ['name' => 'custom_css_url_imports_enabled', 'kind' => 'toggle'],
             ['name' => 'monospace_role_enabled', 'kind' => 'toggle'],
             ['name' => 'admin_access_custom_enabled', 'kind' => 'toggle'],
             ['name' => 'admin_access_role_slugs', 'kind' => 'string_array'],

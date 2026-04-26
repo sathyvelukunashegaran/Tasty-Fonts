@@ -11,7 +11,7 @@ Take control of your WordPress typography with one plugin for local fonts, Googl
 
 == Description ==
 
-Tasty Custom Fonts gives you one place to upload, import, preview, and publish the fonts that shape your site. Manage local fonts, Google Fonts, Bunny Fonts, and Adobe Fonts from a single dashboard, then push the right typography across the frontend, Gutenberg, and Etch without piecing together a fragmented workflow.
+Tasty Custom Fonts gives you one place to upload, import, preview, and publish the fonts that shape your site. Manage local fonts, custom CSS URL imports, Google Fonts, Bunny Fonts, and Adobe Fonts from a single dashboard, then push the right typography across the frontend, Gutenberg, and Etch without piecing together a fragmented workflow.
 
 = Why site builders and agencies like it =
 
@@ -24,6 +24,7 @@ Tasty Custom Fonts gives you one place to upload, import, preview, and publish t
 = Key features =
 
 * Upload WOFF2, WOFF, TTF, and OTF files directly from the WordPress dashboard.
+* Import WOFF2/WOFF fonts from one public HTTPS CSS stylesheet URL containing @font-face rules.
 * Import Google Fonts as self-hosted files or serve them from Google CDN.
 * Import Bunny Fonts as self-hosted files or serve them from Bunny CDN.
 * Connect an Adobe Fonts web project and use Adobe-hosted families alongside local and imported fonts.
@@ -51,7 +52,7 @@ The latest stable release is 1.14.0. Beta and nightly builds are published from 
 
 = What is planned after 1.14.0 stable? =
 
-The post-1.14.0 line continues with power-user and agency improvements: bulk library management, richer diagnostics, scheduled Adobe project refreshes, and more polished distribution surfaces.
+The post-1.14.0 line continues with power-user and agency improvements: Phase 1 custom CSS URL imports for one public HTTPS @font-face stylesheet at a time, bulk library management, richer diagnostics, scheduled Adobe project refreshes, and more polished distribution surfaces.
 
 If you want to help shape that roadmap, open a feature request or feedback issue on GitHub:
 
@@ -62,7 +63,7 @@ https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues
 1. Upload the `tasty-fonts` folder to `/wp-content/plugins/`, or install a packaged ZIP from GitHub releases.
 2. Activate `Tasty Custom Fonts` from the Plugins screen on the site where you want to manage typography.
 3. Open `Tasty Fonts` in the WordPress admin menu.
-4. Add local, Google, Bunny, or Adobe families to your library and publish your live roles when ready.
+4. Add local, custom CSS URL, Google, Bunny, or Adobe families to your library and publish your live roles when ready.
 
 == Frequently Asked Questions ==
 
@@ -76,7 +77,7 @@ Only for live Google Fonts search inside the dashboard. Local uploads, Bunny Fon
 
 = Can I self-host imported fonts? =
 
-Yes. Google Fonts and Bunny Fonts can both be imported into local storage so your runtime CSS can serve your own copies instead of relying on third-party CDN delivery.
+Yes. Google Fonts, Bunny Fonts, and supported custom CSS URL imports can be imported into local storage so your runtime CSS can serve your own copies instead of relying on third-party CDN delivery.
 
 = Does it support multisite? =
 
@@ -84,7 +85,7 @@ It supports activating the plugin on individual sites within a multisite network
 
 = Where are self-hosted font files stored? =
 
-Generated assets and imported files live under `wp-content/uploads/fonts/`, with provider-specific subdirectories for Google and Bunny imports.
+Generated assets and imported files live under `wp-content/uploads/fonts/`, with provider-specific subdirectories for custom CSS URL, Google, Bunny, and local upload imports.
 
 = Where should I send feedback or feature ideas? =
 

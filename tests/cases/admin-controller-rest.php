@@ -14,6 +14,65 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
 
+if (!function_exists('tastyFontsCustomCssSnapshotTransientKey')) {
+    function tastyFontsCustomCssSnapshotTransientKey(): string
+    {
+        global $transientStore;
+
+        foreach (array_keys($transientStore) as $key) {
+            if (is_string($key) && str_contains($key, 'tasty_fonts_custom_css_snapshot_')) {
+                return $key;
+            }
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('tastyFontsEnableCustomCssUrlImports')) {
+    function tastyFontsEnableCustomCssUrlImports(array $services): void
+    {
+        $services['settings']->saveSettings(['custom_css_url_imports_enabled' => '1']);
+    }
+}
+
+if (!function_exists('tastyFontsRunCustomCssDryRunRestFixture')) {
+    function tastyFontsRunCustomCssDryRunRestFixture(array $services): array
+    {
+        tastyFontsEnableCustomCssUrlImports($services);
+
+        global $remoteGetResponses;
+
+        $cssUrl = 'https://assets.example.com/snapshot.css';
+        $fontUrl = 'https://cdn.example.com/snapshot-sans.woff2';
+        $remoteGetResponses[$cssUrl] = [
+            'response' => ['code' => 200],
+            'headers' => ['content-type' => 'text/css'],
+            'body' => <<<'CSS'
+@font-face {
+    font-family: "Snapshot Sans";
+    font-style: normal;
+    font-weight: 400;
+    src: url("https://cdn.example.com/snapshot-sans.woff2") format("woff2");
+    unicode-range: U+000-5FF;
+}
+CSS,
+        ];
+        tastyFontsMockCustomCssFont($fontUrl);
+
+        $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/dry-run');
+        $request->set_body_params(['url' => $cssUrl]);
+        $response = $services['rest']->dryRunCustomCssUrl($request);
+        $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+        if (!$response instanceof WP_REST_Response || !is_array($data)) {
+            throw new RuntimeException('Expected dry-run fixture to return a REST response.');
+        }
+
+        return $data;
+    }
+}
+
 $tests['admin_controller_merges_adobe_families_into_selectable_role_names'] = static function (): void {
     resetTestState();
 
@@ -78,6 +137,16 @@ $tests['rest_controller_route_reference_builds_full_api_paths_and_ignores_unknow
         '/tasty-fonts/v1/transfer/validate',
         RestController::routeReference('validateSiteTransfer'),
         'Site transfer validation should expose a dedicated REST route reference.'
+    );
+    assertSameValue(
+        '/tasty-fonts/v1/custom-css/dry-run',
+        RestController::routeReference('customCssDryRun'),
+        'Custom CSS URL dry runs should expose a dedicated REST route reference.'
+    );
+    assertSameValue(
+        '/tasty-fonts/v1/custom-css/import',
+        RestController::routeReference('customCssImport'),
+        'Custom CSS final imports should expose a dedicated REST route reference.'
     );
 };
 
@@ -1687,6 +1756,16 @@ $tests['admin_controller_localizes_rest_transport_config'] = static function ():
         'Admin scripts should receive the local upload REST route path.'
     );
     assertSameValue(
+        'custom-css/dry-run',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['routes']['customCssDryRun'] ?? ''),
+        'Admin scripts should receive the custom CSS dry-run REST route path.'
+    );
+    assertSameValue(
+        'custom-css/import',
+        (string) ($localizedScripts['tasty-fonts-admin']['data']['routes']['customCssImport'] ?? ''),
+        'Admin scripts should receive the custom CSS final import REST route path.'
+    );
+    assertSameValue(
         'draft',
         (string) ($localizedScripts['tasty-fonts-admin']['data']['previewBootstrap']['baselineSource'] ?? ''),
         'Admin scripts should receive the preview baseline source for the workspace bootstrap.'
@@ -1925,6 +2004,8 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/bunny/family' => 'GET',
         'tasty-fonts/v1/google/import' => 'POST',
         'tasty-fonts/v1/bunny/import' => 'POST',
+        'tasty-fonts/v1/custom-css/dry-run' => 'POST',
+        'tasty-fonts/v1/custom-css/import' => 'POST',
         'tasty-fonts/v1/transfer/validate' => 'POST',
         'tasty-fonts/v1/local/upload' => 'POST',
         'tasty-fonts/v1/families/fallback' => 'PATCH',
@@ -1986,6 +2067,21 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         !empty($registeredRestRoutes['tasty-fonts/v1/families/publish-state']['args']['args']['publish_state']['required']),
         'Publish-state routes should require the publish_state parameter.'
     );
+    assertSameValue(
+        true,
+        !empty($registeredRestRoutes['tasty-fonts/v1/custom-css/dry-run']['args']['args']['url']['required']),
+        'Custom CSS dry-run routes should require the stylesheet URL parameter.'
+    );
+    assertSameValue(
+        true,
+        !empty($registeredRestRoutes['tasty-fonts/v1/custom-css/import']['args']['args']['snapshot_token']['required']),
+        'Custom CSS final import routes should require the snapshot token parameter.'
+    );
+    assertSameValue(
+        true,
+        !empty($registeredRestRoutes['tasty-fonts/v1/custom-css/import']['args']['args']['selected_face_ids']['required']),
+        'Custom CSS final import routes should require selected face IDs.'
+    );
 };
 
 $tests['bundled_js_translation_placeholder_exists'] = static function (): void {
@@ -2018,6 +2114,398 @@ $tests['rest_controller_returns_native_payloads_for_write_routes'] = static func
     assertSameValue(true, $response instanceof WP_REST_Response, 'REST write routes should return a native REST response object.');
     assertSameValue('Inter', (string) ($response->get_data()['family'] ?? ''), 'REST write routes should return the saved family in the response body.');
     assertSameValue('serif', (string) ($response->get_data()['fallback'] ?? ''), 'REST write routes should return the saved fallback in the response body.');
+};
+
+$tests['rest_controller_custom_css_feature_gate_rejects_dry_run_and_final_import_when_disabled'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $dryRunRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/dry-run');
+    $dryRunRequest->set_body_params(['url' => 'https://assets.example.com/custom.css']);
+
+    $dryRunResponse = $services['rest']->dryRunCustomCssUrl($dryRunRequest);
+
+    assertSameValue(true, $dryRunResponse instanceof WP_Error, 'Custom CSS dry runs should be gated off by default.');
+    assertSameValue('tasty_fonts_custom_css_url_imports_disabled', $dryRunResponse->get_error_code(), 'Disabled dry runs should use a stable gate error code.');
+    assertSameValue(403, (int) (($dryRunResponse->get_error_data()['status'] ?? 0)), 'Disabled dry runs should return a forbidden REST status.');
+    assertContainsValue('Advanced Tools', $dryRunResponse->get_error_message(), 'Disabled dry-run errors should tell users where to enable the gate.');
+
+    $importRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $importRequest->set_body_params([
+        'snapshot_token' => 'snapshot-token',
+        'selected_face_ids' => ['face-id'],
+    ]);
+
+    $importResponse = $services['rest']->importCustomCssUrl($importRequest);
+
+    assertSameValue(true, $importResponse instanceof WP_Error, 'Custom CSS final imports should be gated off by default.');
+    assertSameValue('tasty_fonts_custom_css_url_imports_disabled', $importResponse->get_error_code(), 'Disabled final imports should use the same stable gate error code.');
+    assertSameValue(403, (int) (($importResponse->get_error_data()['status'] ?? 0)), 'Disabled final imports should return a forbidden REST status.');
+};
+
+$tests['rest_controller_custom_css_dry_run_returns_review_plan'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    tastyFontsEnableCustomCssUrlImports($services);
+    $cssUrl = 'https://assets.example.com/custom.css';
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+    font-family: "Review Sans";
+    font-style: normal;
+    font-weight: 400;
+    src: url("https://cdn.example.com/review-sans.woff2") format("woff2");
+}
+CSS,
+    ];
+    tastyFontsMockCustomCssFont('https://cdn.example.com/review-sans.woff2');
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/dry-run');
+    $request->set_body_params(['url' => $cssUrl]);
+
+    $response = $services['rest']->dryRunCustomCssUrl($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Custom CSS dry runs should return a native REST response object.');
+    assertSameValue('dry_run', (string) ($data['status'] ?? ''), 'The REST response should expose the dry-run status.');
+    assertSameValue('Review Sans', (string) ($data['plan']['families'][0]['family'] ?? ''), 'The REST response should include detected review families.');
+    assertSameValue('woff2', (string) ($data['plan']['families'][0]['faces'][0]['format'] ?? ''), 'The REST response should include detected face formats.');
+    assertSameValue('valid', (string) ($data['plan']['families'][0]['faces'][0]['status'] ?? ''), 'The REST response should include validated font URL status.');
+    assertContainsValue('WOFF2 signature matched.', implode(' ', $data['plan']['families'][0]['faces'][0]['validation']['notes'] ?? []), 'The REST response should include validation notes for review details.');
+};
+
+$tests['rest_controller_custom_css_dry_run_stores_short_lived_server_snapshot'] = static function (): void {
+    resetTestState();
+
+    global $transientStore;
+
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $snapshotKey = tastyFontsCustomCssSnapshotTransientKey();
+    $snapshot = is_string($snapshotKey) && $snapshotKey !== '' ? ($transientStore[$snapshotKey] ?? null) : null;
+
+    assertSameValue(true, $token !== '', 'REST dry runs should return a snapshot token to the browser.');
+    assertSameValue(900, (int) ($data['snapshot_ttl_seconds'] ?? 0), 'Snapshot tokens should advertise an approximately fifteen-minute TTL.');
+    assertSameValue(true, is_array($snapshot), 'REST dry runs should store a server-side snapshot transient.');
+    assertSameValue(900, (int) (($snapshot['expires_at'] ?? 0) - ($snapshot['created_at'] ?? 0)), 'Stored snapshots should expire after about fifteen minutes.');
+    assertSameValue('Snapshot Sans', (string) ($snapshot['plan']['families'][0]['family'] ?? ''), 'Snapshots should store the normalized server-side review plan.');
+    assertSameValue(false, array_key_exists('raw_css', (array) $snapshot), 'Snapshots should not store raw CSS under a raw_css key.');
+    assertNotContainsValue('@font-face', wp_json_encode($snapshot) ?: '', 'Snapshots should not store the fetched raw stylesheet body.');
+};
+
+$tests['rest_controller_custom_css_final_import_accepts_valid_snapshot_once'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    tastyFontsMockCustomCssFinalFont('https://cdn.example.com/snapshot-sans.woff2', 'woff2', tastyFontsTestFontBytes('woff2'));
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $request->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+        'delivery_mode' => 'self_hosted',
+        'family_fallbacks' => ['snapshot-sans' => 'serif'],
+        'duplicate_handling' => 'skip',
+    ]);
+
+    $response = $services['rest']->importCustomCssUrl($request);
+    $result = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'A valid final import contract should return a native REST response.');
+    assertSameValue('imported', (string) ($result['status'] ?? ''), 'Slice 6 final import should persist selected self-hosted faces.');
+    assertSameValue('self_hosted', (string) ($result['delivery_mode'] ?? ''), 'Final import should report self-hosted delivery mode.');
+    assertSameValue(1, (int) ($result['counts']['faces_imported'] ?? 0), 'Final import should save the selected snapshot face.');
+    assertSameValue('serif', $services['settings']->getFamilyFallback('Snapshot Sans'), 'Final import should persist explicit family fallback choices.');
+    assertSameValue('custom', (string) ($services['imports']->getFamily('snapshot-sans')['delivery_profiles'][$result['families'][0]['delivery_id']]['provider'] ?? ''), 'Final import should save a custom provider profile from server snapshot metadata.');
+
+    $reusedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $reusedRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+    ]);
+    $reusedResponse = $services['rest']->importCustomCssUrl($reusedRequest);
+
+    assertSameValue(true, $reusedResponse instanceof WP_Error, 'Snapshot tokens should be single-use after a valid final import contract.');
+    assertSameValue('tasty_fonts_custom_css_snapshot_unavailable', $reusedResponse->get_error_code(), 'Reused snapshot tokens should be rejected as unavailable.');
+    assertSameValue(410, (int) (($reusedResponse->get_error_data()['status'] ?? 0)), 'Reused snapshot tokens should map to an expired/gone REST status.');
+};
+
+$tests['rest_controller_custom_css_remote_final_import_accepts_valid_snapshot_once'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    $remoteRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $remoteRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+        'delivery_mode' => 'remote',
+        'family_fallbacks' => ['snapshot-sans' => 'serif'],
+    ]);
+
+    $remoteResponse = $services['rest']->importCustomCssUrl($remoteRequest);
+    $result = $remoteResponse instanceof WP_REST_Response ? $remoteResponse->get_data() : [];
+    $family = $services['imports']->getFamily('snapshot-sans');
+    $profile = is_array($family) ? (array) ($family['delivery_profiles'][$result['families'][0]['delivery_id'] ?? ''] ?? []) : [];
+    $face = (array) ($profile['faces'][0] ?? []);
+
+    assertSameValue(true, $remoteResponse instanceof WP_REST_Response, 'Remote final imports should return a native REST response for valid snapshot contracts.');
+    assertSameValue('imported', (string) ($result['status'] ?? ''), 'Remote final import should persist selected snapshot faces.');
+    assertSameValue('remote', (string) ($result['delivery_mode'] ?? ''), 'Remote final import should report remote delivery mode to the client.');
+    assertSameValue(1, (int) ($result['counts']['remote_urls_saved'] ?? 0), 'Remote final import should count saved absolute remote font URLs.');
+    assertSameValue(0, (int) ($result['counts']['files_written'] ?? -1), 'Remote final import should not write local font files.');
+    assertSameValue('custom', (string) ($profile['provider'] ?? ''), 'Remote final import should save custom provider profiles.');
+    assertSameValue('cdn', (string) ($profile['type'] ?? ''), 'Remote final import should normalize the stored delivery type to cdn.');
+    assertSameValue('https://assets.example.com/snapshot.css', (string) ($profile['meta']['source_css_url'] ?? ''), 'Remote final import should retain the reviewed source CSS URL in profile metadata.');
+    assertSameValue('assets.example.com', (string) ($profile['meta']['source_host'] ?? ''), 'Remote final import should retain the reviewed source CSS host in profile metadata.');
+    assertSameValue('https://cdn.example.com/snapshot-sans.woff2', (string) ($face['files']['woff2'] ?? ''), 'Remote final import should save the absolute remote font URL as the generated CSS source.');
+    assertSameValue([], (array) ($face['paths'] ?? []), 'Remote final import should not store local path metadata for remote faces.');
+    assertSameValue('serif', $services['settings']->getFamilyFallback('Snapshot Sans'), 'Remote final import should persist explicit family fallback choices like self-hosted import.');
+
+    $reusedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $reusedRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+        'delivery_mode' => 'remote',
+    ]);
+    $reusedResponse = $services['rest']->importCustomCssUrl($reusedRequest);
+
+    assertSameValue(true, $reusedResponse instanceof WP_Error, 'Snapshot tokens should be single-use after a valid remote final import contract.');
+    assertSameValue('tasty_fonts_custom_css_snapshot_unavailable', $reusedResponse->get_error_code(), 'Reused remote snapshot tokens should be rejected as unavailable.');
+};
+
+$tests['rest_controller_custom_css_final_import_rejects_missing_expired_and_mismatched_tokens'] = static function (): void {
+    resetTestState();
+
+    global $currentBlogId;
+    global $currentUserId;
+    global $transientStore;
+
+    $services = makeServiceGraph();
+    tastyFontsEnableCustomCssUrlImports($services);
+    $missingRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $missingRequest->set_body_params(['selected_face_ids' => ['face-missing']]);
+    $missingResponse = $services['rest']->importCustomCssUrl($missingRequest);
+
+    assertSameValue(true, $missingResponse instanceof WP_Error, 'Final import should reject a missing snapshot token.');
+    assertSameValue('tasty_fonts_custom_css_snapshot_token_missing', $missingResponse->get_error_code(), 'Missing tokens should use a stable error code.');
+
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    update_option('tasty_fonts_custom_css_snapshot_lock_' . hash('sha256', $token), [
+        'created_at' => time(),
+        'expires_at' => time() + 60,
+    ], false);
+    $lockedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $lockedRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+    ]);
+    $lockedResponse = $services['rest']->importCustomCssUrl($lockedRequest);
+
+    assertSameValue(true, $lockedResponse instanceof WP_Error, 'Final import should reject snapshot tokens already being consumed.');
+    assertSameValue('tasty_fonts_custom_css_snapshot_in_use', $lockedResponse->get_error_code(), 'Locked tokens should use a stable in-use error code.');
+    assertSameValue(409, (int) (($lockedResponse->get_error_data()['status'] ?? 0)), 'Locked tokens should map to a conflict REST status.');
+    delete_option('tasty_fonts_custom_css_snapshot_lock_' . hash('sha256', $token));
+
+    resetTestState();
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    $snapshotKey = tastyFontsCustomCssSnapshotTransientKey();
+    $snapshot = (array) ($transientStore[$snapshotKey] ?? []);
+    $snapshot['expires_at'] = time() - 1;
+    $transientStore[$snapshotKey] = $snapshot;
+
+    $expiredRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $expiredRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+    ]);
+    $expiredResponse = $services['rest']->importCustomCssUrl($expiredRequest);
+
+    assertSameValue(true, $expiredResponse instanceof WP_Error, 'Final import should reject expired snapshot tokens.');
+    assertSameValue('tasty_fonts_custom_css_snapshot_unavailable', $expiredResponse->get_error_code(), 'Expired tokens should be unavailable.');
+
+    resetTestState();
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    $currentUserId = 2;
+
+    $userMismatchRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $userMismatchRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+    ]);
+    $userMismatchResponse = $services['rest']->importCustomCssUrl($userMismatchRequest);
+
+    assertSameValue(true, $userMismatchResponse instanceof WP_Error, 'Final import should reject tokens created by another user.');
+    assertSameValue('tasty_fonts_custom_css_snapshot_scope_mismatch', $userMismatchResponse->get_error_code(), 'User mismatches should use the scope mismatch error.');
+
+    resetTestState();
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    $currentBlogId = 2;
+
+    $siteMismatchRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $siteMismatchRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+    ]);
+    $siteMismatchResponse = $services['rest']->importCustomCssUrl($siteMismatchRequest);
+
+    assertSameValue(true, $siteMismatchResponse instanceof WP_Error, 'Final import should reject tokens outside the current site scope.');
+    assertSameValue('tasty_fonts_custom_css_snapshot_unavailable', $siteMismatchResponse->get_error_code(), 'Site-scoped transient keys should not resolve on another site.');
+};
+
+$tests['rest_controller_custom_css_final_import_rejects_tampered_selected_ids_and_untrusted_payloads'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $tamperedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $tamperedRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => ['face-does-not-exist'],
+    ]);
+
+    $tamperedResponse = $services['rest']->importCustomCssUrl($tamperedRequest);
+
+    assertSameValue(true, $tamperedResponse instanceof WP_Error, 'Final import should reject selected IDs that are not present in the snapshot.');
+    assertSameValue('tasty_fonts_custom_css_selected_faces_mismatch', $tamperedResponse->get_error_code(), 'Unknown selected IDs should use the mismatch error code.');
+
+    resetTestState();
+    global $transientStore;
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $snapshotKey = tastyFontsCustomCssSnapshotTransientKey();
+    $invalidFace = (array) ($data['plan']['families'][0]['faces'][0] ?? []);
+    $invalidFace['id'] = 'snapshot-invalid-face';
+    $invalidFace['status'] = 'invalid';
+    $transientStore[$snapshotKey]['plan']['families'][0]['faces'][] = $invalidFace;
+    $invalidSelectionRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $invalidSelectionRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => ['snapshot-invalid-face'],
+    ]);
+
+    $invalidSelectionResponse = $services['rest']->importCustomCssUrl($invalidSelectionRequest);
+
+    assertSameValue(true, $invalidSelectionResponse instanceof WP_Error, 'Final import should reject non-selectable face IDs even when they exist in the snapshot.');
+    assertSameValue('tasty_fonts_custom_css_selected_faces_mismatch', $invalidSelectionResponse->get_error_code(), 'Non-selectable snapshot faces should use the mismatch error code.');
+
+    resetTestState();
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    $untrustedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $untrustedRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+        'faces' => [[
+            'id' => $faceId,
+            'url' => 'https://attacker.example.invalid/evil.woff2',
+            'family' => 'Injected Family',
+        ]],
+    ]);
+
+    $untrustedResponse = $services['rest']->importCustomCssUrl($untrustedRequest);
+
+    assertSameValue(true, $untrustedResponse instanceof WP_Error, 'Final import should reject browser-submitted face metadata.');
+    assertSameValue('tasty_fonts_custom_css_untrusted_payload', $untrustedResponse->get_error_code(), 'Untrusted face metadata should use a stable rejection code.');
+
+    resetTestState();
+    $services = makeServiceGraph();
+    $data = tastyFontsRunCustomCssDryRunRestFixture($services);
+    $token = (string) ($data['snapshot_token'] ?? '');
+    $faceId = (string) ($data['plan']['families'][0]['faces'][0]['id'] ?? '');
+    $unexpectedPayloadRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
+    $unexpectedPayloadRequest->set_body_params([
+        'snapshot_token' => $token,
+        'selected_face_ids' => [$faceId],
+        'source_url' => 'https://attacker.example.invalid/fonts.css',
+    ]);
+
+    $unexpectedPayloadResponse = $services['rest']->importCustomCssUrl($unexpectedPayloadRequest);
+
+    assertSameValue(true, $unexpectedPayloadResponse instanceof WP_Error, 'Final import should reject unallowlisted top-level payload keys.');
+    assertSameValue('tasty_fonts_custom_css_untrusted_payload', $unexpectedPayloadResponse->get_error_code(), 'Unexpected payload keys should use the untrusted payload error code.');
+};
+
+$tests['rest_controller_custom_css_dry_run_returns_basic_failure_shape'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    tastyFontsEnableCustomCssUrlImports($services);
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/dry-run');
+    $request->set_body_params(['url' => 'http://example.test/fonts.css']);
+
+    $response = $services['rest']->dryRunCustomCssUrl($request);
+
+    assertSameValue(true, $response instanceof WP_Error, 'Invalid custom CSS dry runs should return a REST error.');
+    assertSameValue('tasty_fonts_custom_css_url_invalid', $response->get_error_code(), 'The REST error should expose a stable custom CSS error code.');
+    assertSameValue(400, (int) (($response->get_error_data()['status'] ?? 0)), 'The REST error should expose the default HTTP failure status.');
+};
+
+$tests['rest_controller_custom_css_dry_run_surfaces_safety_and_limit_errors'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    add_filter('tasty_fonts_rest_action_cooldown_window', static fn (): float => 0.0);
+
+    $services = makeServiceGraph();
+    tastyFontsEnableCustomCssUrlImports($services);
+
+    $blockedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/dry-run');
+    $blockedRequest->set_body_params(['url' => 'https://localhost/fonts.css']);
+    $blockedResponse = $services['rest']->dryRunCustomCssUrl($blockedRequest);
+
+    assertSameValue(true, $blockedResponse instanceof WP_Error, 'Blocked custom CSS URLs should return REST errors.');
+    assertSameValue('tasty_fonts_custom_css_url_blocked', $blockedResponse->get_error_code(), 'Blocked custom CSS URLs should preserve the safety error code.');
+    assertContainsValue('public HTTPS URL', $blockedResponse->get_error_message(), 'Blocked custom CSS URL errors should remain user-facing.');
+
+    $largeUrl = 'https://assets.example.com/rest-large.css';
+    $remoteGetResponses[$largeUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => str_repeat('a', 262145),
+    ];
+    $largeRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/dry-run');
+    $largeRequest->set_body_params(['url' => $largeUrl]);
+    $largeResponse = $services['rest']->dryRunCustomCssUrl($largeRequest);
+
+    assertSameValue(true, $largeResponse instanceof WP_Error, 'Oversized custom CSS responses should return REST errors.');
+    assertSameValue('tasty_fonts_custom_css_too_large', $largeResponse->get_error_code(), 'Oversized custom CSS responses should preserve the limit error code.');
+    assertSameValue(413, (int) (($largeResponse->get_error_data()['status'] ?? 0)), 'Oversized custom CSS responses should surface HTTP 413.');
+
+    $timeoutUrl = 'https://assets.example.com/rest-timeout.css';
+    $remoteGetResponses[$timeoutUrl] = new WP_Error('http_request_failed', 'Request timed out');
+    $timeoutRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/dry-run');
+    $timeoutRequest->set_body_params(['url' => $timeoutUrl]);
+    $timeoutResponse = $services['rest']->dryRunCustomCssUrl($timeoutRequest);
+
+    assertSameValue(true, $timeoutResponse instanceof WP_Error, 'Timeouts should return REST errors.');
+    assertSameValue('tasty_fonts_custom_css_fetch_timeout', $timeoutResponse->get_error_code(), 'Timeouts should preserve the dedicated error code.');
+    assertSameValue(504, (int) (($timeoutResponse->get_error_data()['status'] ?? 0)), 'Timeouts should surface HTTP 504.');
 };
 
 $tests['rest_controller_returns_advanced_tools_health_and_manifest_payloads'] = static function (): void {
@@ -2867,6 +3355,32 @@ $tests['rest_controller_roles_draft_returns_current_applied_roles_for_client_res
     assertSameValue('Inter', (string) ($data['applied_roles']['body'] ?? ''), 'The roles/draft route should include the current live body role for client-side resync.');
 };
 
+$tests['settings_repository_defaults_custom_css_url_imports_off'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $settings = $services['settings']->getSettings();
+
+    assertSameValue(false, !empty($settings['custom_css_url_imports_enabled']), 'Custom CSS URL imports should default off for new and existing installs.');
+};
+
+$tests['rest_controller_settings_accepts_custom_css_url_import_feature_gate'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'custom_css_url_imports_enabled' => '1',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The settings route should return a native REST response when saving the custom CSS URL import gate.');
+    assertSameValue(true, !empty($data['settings']['custom_css_url_imports_enabled']), 'The settings route should persist the custom CSS URL import gate.');
+    assertSameValue(true, !empty($data['reload_required']), 'Changing the custom CSS URL import gate should request a reload so the server-rendered From URL panel updates.');
+};
+
 $tests['rest_controller_settings_accepts_variable_font_feature_flag'] = static function (): void {
     resetTestState();
 
@@ -2917,6 +3431,33 @@ $tests['rest_controller_wraps_missing_family_errors_with_http_status'] = static 
     assertSameValue(true, is_wp_error($response), 'REST read routes should return WP_Error objects when the underlying lookup fails.');
     assertSameValue('tasty_fonts_bunny_family_not_found', $response->get_error_code(), 'REST error responses should preserve the original plugin error code.');
     assertSameValue(404, (int) (($response->get_error_data()['status'] ?? 0)), 'REST error responses should expose the HTTP status expected by the client.');
+};
+
+$tests['rest_controller_preserves_structured_error_data_when_wrapping_errors'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $error = new WP_Error(
+        'tasty_fonts_custom_css_import_failed',
+        'No custom font faces could be imported.',
+        [
+            'failed_faces' => [[
+                'family' => 'Roboto',
+                'weight' => '400',
+                'style' => 'normal',
+                'message' => 'The font URL returned HTTP 404.',
+            ]],
+        ]
+    );
+
+    $response = invokePrivateMethod($services['rest'], 'restResult', [$error, 400]);
+    $data = $response instanceof WP_Error ? (array) $response->get_error_data() : [];
+
+    assertSameValue(true, $response instanceof WP_Error, 'Wrapped REST errors should still return WP_Error instances.');
+    assertSameValue('tasty_fonts_custom_css_import_failed', $response->get_error_code(), 'Wrapped REST errors should preserve the original plugin error code.');
+    assertSameValue(422, (int) ($data['status'] ?? 0), 'Wrapped REST errors should include the mapped HTTP status code.');
+    assertSameValue('Roboto', (string) ($data['failed_faces'][0]['family'] ?? ''), 'Wrapped REST errors should preserve failed face payload details.');
+    assertSameValue('The font URL returned HTTP 404.', (string) ($data['failed_faces'][0]['message'] ?? ''), 'Wrapped REST errors should preserve failed face failure messages.');
 };
 
 $tests['rest_controller_upload_route_returns_native_payloads'] = static function (): void {

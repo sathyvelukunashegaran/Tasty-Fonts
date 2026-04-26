@@ -348,6 +348,12 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $profileProvider = $this->stringValue($profile, 'provider');
         $profileIsActive = $profileId === $activeDeliveryId;
         $profileVariantCount = $this->countProfileVariants($profile);
+        $isCustomCssProfile = $this->isCustomCssProfile($profile);
+        $customCssSourceUrl = $isCustomCssProfile ? $this->customCssSourceUrl($profile) : '';
+        $customCssDeliveryModeLabel = $isCustomCssProfile ? $this->customCssDeliveryModeLabel($profile) : '';
+        $customCssDeliveryModeDescription = $isCustomCssProfile ? $this->customCssDeliveryModeDescription($profile) : '';
+        $customCssLastVerifiedAt = $isCustomCssProfile ? $this->customCssLastVerifiedAt($profile) : '';
+        $customCssLastVerifiedLabel = $customCssLastVerifiedAt !== '' ? $this->formatCustomCssTimestamp($customCssLastVerifiedAt) : '';
         $profileDeleteBlocked = $profileIsActive && $publishState === 'role_active'
             ? __('Switch the live delivery or remove this family from the active roles before deleting this delivery profile.', 'tasty-fonts')
             : '';
@@ -402,6 +408,28 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                     <dt><?php esc_html_e('Request Path', 'tasty-fonts'); ?></dt>
                     <dd><?php echo esc_html($this->buildProfileRequestSummary($profile)); ?></dd>
                 </div>
+                <?php if ($isCustomCssProfile): ?>
+                    <div class="tasty-fonts-detail-meta-item tasty-fonts-detail-meta-item--source-url">
+                        <dt><?php esc_html_e('Source CSS URL', 'tasty-fonts'); ?></dt>
+                        <dd>
+                            <code class="tasty-fonts-code"><?php echo esc_html($customCssSourceUrl); ?></code>
+                            <span class="tasty-fonts-detail-meta-note"><?php esc_html_e('Read-only source history from the original import.', 'tasty-fonts'); ?></span>
+                        </dd>
+                    </div>
+                    <div class="tasty-fonts-detail-meta-item">
+                        <dt><?php esc_html_e('Delivery Mode', 'tasty-fonts'); ?></dt>
+                        <dd>
+                            <span><?php echo esc_html($customCssDeliveryModeLabel); ?></span>
+                            <span class="tasty-fonts-detail-meta-note"><?php echo esc_html($customCssDeliveryModeDescription); ?></span>
+                        </dd>
+                    </div>
+                    <?php if ($customCssLastVerifiedAt !== '' && $customCssLastVerifiedLabel !== ''): ?>
+                        <div class="tasty-fonts-detail-meta-item">
+                            <dt><?php esc_html_e('Last Verified', 'tasty-fonts'); ?></dt>
+                            <dd><time datetime="<?php echo esc_attr($customCssLastVerifiedAt); ?>"><?php echo esc_html($customCssLastVerifiedLabel); ?></time></dd>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
                 <div class="tasty-fonts-detail-meta-item">
                     <dt><?php esc_html_e('Variants', 'tasty-fonts'); ?></dt>
                     <dd><?php echo esc_html(sprintf(_n('%d variant', '%d variants', $profileVariantCount, 'tasty-fonts'), $profileVariantCount)); ?></dd>

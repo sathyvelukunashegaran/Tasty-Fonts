@@ -4,7 +4,7 @@
 
 ## Font Sources
 
-[Local Fonts](Provider-Local-Fonts) · [Google Fonts](Provider-Google-Fonts) · [Bunny Fonts](Provider-Bunny-Fonts) · [Adobe Fonts](Provider-Adobe-Fonts)
+[Local Fonts](Provider-Local-Fonts) · [Custom CSS URL](Provider-Custom-CSS) · [Google Fonts](Provider-Google-Fonts) · [Bunny Fonts](Provider-Bunny-Fonts) · [Adobe Fonts](Provider-Adobe-Fonts)
 
 ## Guides
 

@@ -10,7 +10,7 @@ Manage families, delivery profiles, publish state, fallback stacks, and per-fami
 
 ## Overview
 
-The Font Library is your central inventory. Every font family added to the plugin — regardless of whether it came from a local upload, Google, Bunny, or Adobe — lives here. You do not assign roles from this page (that happens in Deploy Fonts), but you do control how each family is delivered and whether it participates in runtime output.
+The Font Library is your central inventory. Every font family added to the plugin — regardless of whether it came from a local upload, custom CSS URL import, Google, Bunny, or Adobe — lives here. You do not assign roles from this page (that happens in Deploy Fonts), but you do control how each family is delivered and whether it participates in runtime output.
 
 ![Font Library — all managed families with delivery profiles, publish state, and source filters](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/font-library.png)
 
@@ -22,7 +22,7 @@ The Font Library is your central inventory. Every font family added to the plugi
 
 Use the library filters to narrow by:
 
-- source (Local, Google, Bunny, Adobe)
+- source (Local, Custom CSS, Google, Bunny, Adobe)
 - runtime state (In Use, Published, In Library Only)
 - family type (Static, Variable) — available when Variable Font Support is enabled
 - category (serif, sans-serif, monospace, display, handwriting)
@@ -58,6 +58,7 @@ Common examples:
 
 - local self-hosted delivery for production
 - Google CDN or Bunny CDN delivery for testing or fallback comparison
+- custom CSS self-hosted or remote-serving profiles from a reviewed source stylesheet
 - multiple historical profiles kept for later reuse
 
 **Working with multiple delivery profiles:**
@@ -106,6 +107,7 @@ The plugin blocks destructive actions when doing so would break a live applied r
 
 ## Notes
 
+- Custom CSS URL imports appear as custom delivery profiles. Expanded custom profile details show the original source CSS URL as read-only history, the delivery mode, and the last verified timestamp when available.
 - Google and Bunny self-hosted imports become local files under provider-specific upload directories.
 - Adobe stays hosted remotely, but Adobe families still participate in selectors, previews, and live role assignments.
 - The library is also where you confirm whether a family should stay `Published` or remain `In Library Only`.
@@ -117,6 +119,7 @@ The plugin blocks destructive actions when doing so would break a live applied r
 - [Getting Started](Getting-Started)
 - [Deploy Fonts](Deploy-Fonts)
 - [Local Fonts](Provider-Local-Fonts)
+- [Custom CSS URL Imports](Provider-Custom-CSS)
 - [Google Fonts](Provider-Google-Fonts)
 - [Bunny Fonts](Provider-Bunny-Fonts)
 - [Adobe Fonts](Provider-Adobe-Fonts)

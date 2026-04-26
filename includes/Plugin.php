@@ -15,6 +15,9 @@ use TastyFonts\Bunny\BunnyCssParser;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Cli\Command as CliCommand;
+use TastyFonts\CustomCss\CustomCssFinalImportService;
+use TastyFonts\CustomCss\CustomCssImportSnapshotService;
+use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
@@ -72,6 +75,9 @@ final class Plugin
     private readonly OxygenIntegrationService $oxygenIntegration;
     private readonly RuntimeService $runtime;
     private readonly BlockEditorFontLibraryService $blockEditorFontLibrary;
+    private readonly CustomCssUrlImportService $customCssImport;
+    private readonly CustomCssImportSnapshotService $customCssSnapshots;
+    private readonly CustomCssFinalImportService $customCssFinalImport;
     private readonly DeveloperToolsService $developerTools;
     private readonly SiteTransferService $siteTransfer;
     private readonly SnapshotService $snapshots;
@@ -172,6 +178,16 @@ final class Plugin
             $this->settings,
             $this->log
         );
+        $this->customCssImport = new CustomCssUrlImportService($this->imports);
+        $this->customCssSnapshots = new CustomCssImportSnapshotService();
+        $this->customCssFinalImport = new CustomCssFinalImportService(
+            $this->storage,
+            $this->imports,
+            $this->settings,
+            $this->catalog,
+            $this->assets,
+            $this->log
+        );
         $this->developerTools = new DeveloperToolsService(
             $this->storage,
             $this->settings,
@@ -229,7 +245,10 @@ final class Plugin
             $this->supportBundles,
             $this->updater,
             $this->adminAccess,
-            $this->planner
+            $this->planner,
+            $this->customCssImport,
+            $this->customCssSnapshots,
+            $this->customCssFinalImport
         );
         $this->rest = new RestController($this->admin, $this->adminAccess);
     }

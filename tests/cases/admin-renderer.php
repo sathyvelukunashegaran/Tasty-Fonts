@@ -585,6 +585,10 @@ $tests['admin_page_renderer_renders_single_page_library_tab_for_empty_and_popula
 
     assertContainsValue('No Fonts Yet', $emptyOutput, 'The unified Library tab should preserve the empty-library state.');
     assertContainsValue('<h2 class="screen-reader-text" id="tasty-fonts-library-panel-title">Font Library</h2>', $emptyOutput, 'The library panel should keep an accessible stable section heading regardless of tab activation order.');
+	assertContainsValue('id="tasty-fonts-add-font-tab-url"', $emptyOutput, 'The Add Fonts panel should still expose a From URL entry point.');
+	assertContainsValue('Developer Off', $emptyOutput, 'The From URL panel should show the developer gate state when custom CSS URL imports are off.');
+	assertContainsValue('Custom CSS URL Imports is enabled in the Developer tab of Advanced Tools', $emptyOutput, 'The From URL panel should explain where to enable the developer gate.');
+	assertNotContainsValue('id="tasty-fonts-url-dry-run-form"', $emptyOutput, 'The From URL panel should not render the dry-run form while the developer gate is off.');
 
     ob_start();
     try {
@@ -724,7 +728,7 @@ $tests['admin_page_renderer_only_shows_upload_variable_controls_when_variable_fo
 
     ob_start();
     try {
-        $renderer->renderPage($baseContext + ['variable_fonts_enabled' => true]);
+        $renderer->renderPage($baseContext + ['variable_fonts_enabled' => true, 'custom_css_url_imports_enabled' => true]);
     } catch (\Throwable $e) {
         ob_end_clean();
         throw $e;
@@ -733,6 +737,8 @@ $tests['admin_page_renderer_only_shows_upload_variable_controls_when_variable_fo
 
     assertNotContainsValue('tasty-fonts-upload-face-shell--static-only', $enabledOutput, 'The upload builder should keep the full upload grid when variable font support is on.');
     assertContainsValue('data-upload-field="is-variable"', $enabledOutput, 'The upload builder should render variable upload toggles when variable font support is on.');
+    assertContainsValue('id="tasty-fonts-url-dry-run-form"', $enabledOutput, 'The From URL panel should render the dry-run form when the custom CSS URL import gate is on.');
+    assertContainsValue('The dry run reads CSS and shows supported WOFF or WOFF2 faces.', $enabledOutput, 'The enabled From URL panel should explain the dry-run review scope.');
 };
 
 $tests['admin_page_renderer_renders_extended_variable_submenu_controls'] = static function (): void {
@@ -2426,6 +2432,109 @@ $tests['family_card_renderer_counts_delivery_variants_from_faces_before_stale_pr
     assertNotContainsValue('7 variants', $output, 'Delivery profile cards should not surface stale stored variant counts when a single variable face is present.');
 };
 
+$tests['family_card_renderer_shows_custom_css_source_history_for_custom_profiles_only'] = static function (): void {
+	resetTestState();
+
+	$renderer = new FamilyCardRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderDeliveryProfileCard(
+			'Fixture Sans',
+			'fixture-sans',
+			'custom-self-hosted',
+			'published',
+			[
+				'id' => 'custom-self-hosted',
+				'label' => 'Self-hosted custom CSS (assets.example.com, 2026-04-27)',
+				'provider' => 'custom',
+				'type' => 'self_hosted',
+				'variants' => ['400'],
+				'meta' => [
+					'source_type' => 'custom_css_url',
+					'source_css_url' => 'https://assets.example.com/fonts.css',
+					'source_host' => 'assets.example.com',
+					'delivery_mode' => 'self_hosted',
+				],
+				'faces' => [
+					[
+						'weight' => '400',
+						'style' => 'normal',
+						'source' => 'custom',
+						'files' => ['woff2' => 'custom/fixture-sans/fixture-sans.woff2'],
+						'paths' => ['woff2' => 'custom/fixture-sans/fixture-sans.woff2'],
+					],
+				],
+			]
+		);
+		$renderer->renderDeliveryProfileCard(
+			'Fixture Sans',
+			'fixture-sans',
+			'custom-remote',
+			'published',
+			[
+				'id' => 'custom-remote',
+				'label' => 'Remote custom CSS (assets.example.com, 2026-04-27)',
+				'provider' => 'custom',
+				'type' => 'cdn',
+				'variants' => ['700'],
+				'meta' => [
+					'source_type' => 'custom_css_url',
+					'source_css_url' => 'https://assets.example.com/remote.css',
+					'source_host' => 'assets.example.com',
+					'delivery_mode' => 'remote',
+				],
+				'faces' => [
+					[
+						'weight' => '700',
+						'style' => 'normal',
+						'source' => 'custom',
+						'files' => ['woff2' => 'https://cdn.example.com/fixture-sans-700.woff2'],
+						'paths' => [],
+						'provider' => [
+							'type' => 'custom_css',
+							'remote_url' => 'https://cdn.example.com/fixture-sans-700.woff2',
+							'last_verified_at' => '2026-04-27T12:34:00+00:00',
+						],
+					],
+				],
+			]
+		);
+		$renderer->renderDeliveryProfileCard(
+			'Inter',
+			'inter',
+			'google-cdn',
+			'published',
+			[
+				'id' => 'google-cdn',
+				'label' => 'Google CDN',
+				'provider' => 'google',
+				'type' => 'cdn',
+				'variants' => ['regular'],
+				'meta' => [
+					'source_css_url' => 'https://fonts.googleapis.com/css2?family=Inter',
+				],
+			]
+		);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('Source CSS URL', $output, 'Custom CSS delivery details should label the read-only source URL history.');
+	assertContainsValue('https://assets.example.com/fonts.css', $output, 'Custom self-hosted profiles should render the original source CSS URL.');
+	assertContainsValue('https://assets.example.com/remote.css', $output, 'Custom remote-serving profiles should render the original source CSS URL.');
+	assertContainsValue('Self-hosted custom CSS files', $output, 'Custom self-hosted profiles should clarify that files were copied locally.');
+	assertContainsValue('Remote custom CSS font URLs', $output, 'Custom remote-serving profiles should clarify that generated CSS points at remote URLs.');
+	assertContainsValue('Read-only source history from the original import.', $output, 'Custom CSS source URLs should be presented as read-only history.');
+	assertContainsValue('Font files were copied to WordPress uploads. The original CSS URL is retained as read-only history.', $output, 'Self-hosted source history copy should be read-only and practical.');
+	assertContainsValue('Visitors request the reviewed remote font URLs while Tasty Fonts generates the CSS.', $output, 'Remote-serving source history copy should clarify visitor requests.');
+	assertContainsValue('Last Verified', $output, 'Custom remote profiles with verification metadata should show the last verified label.');
+	assertContainsValue('datetime="2026-04-27T12:34:00+00:00"', $output, 'Last verified timestamps should keep the stored machine-readable value.');
+	assertNotContainsValue('https://fonts.googleapis.com/css2?family=Inter', $output, 'Known provider profiles should not render custom CSS source URL metadata.');
+};
+
 $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static function (): void {
     resetTestState();
 
@@ -2553,6 +2662,10 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Show Onboarding Hints', $output, 'The Behavior tab should expose the onboarding-hints toggle with positive wording.');
     assertNotContainsValue('Hide Onboarding Hints', $output, 'The Behavior tab should not frame onboarding hints as a hide setting.');
     assertSameValue(1, preg_match('/name="training_wheels_off" value="1"[\s\S]*name="training_wheels_off" value="0"/', $output), 'The positive onboarding hints toggle should still submit the stored inverse setting correctly.');
+	assertContainsValue('Advanced Import Gates', $output, 'The Advanced Tools Developer tab should group expert import feature gates.');
+	assertContainsValue('Custom CSS URL Imports', $output, 'The Advanced Tools Developer tab should expose the custom CSS URL import feature gate.');
+	assertContainsValue('name="custom_css_url_imports_enabled" value="0"', $output, 'The custom CSS URL import gate should submit an explicit off value.');
+	assertContainsValue('Save Gate', $output, 'The custom CSS URL import gate should provide a local save action.');
     assertContainsValue('Release Rail', $output, 'The Advanced Tools Developer tab should group release-channel controls for testing workflows.');
     assertContainsValue('Testing Channel', $output, 'The Advanced Tools Developer tab should frame release-channel controls as a testing setting.');
     assertContainsValue('Update Channel', $output, 'The Advanced Tools Developer tab should expose the update channel selector.');

@@ -68,6 +68,7 @@ Inside `Advanced Tools`, six tabs provide power-user controls:
 Pick the source that matches your workflow:
 
 - **Upload local files** — use this if you have font files on your computer (`WOFF2`, `WOFF`, `TTF`, or `OTF`). Variable fonts in those same formats are also accepted.
+- **Import from a custom CSS URL** — use this if you have one public HTTPS stylesheet containing `@font-face` rules. Phase 1 supports WOFF2 and WOFF sources, with a dry run before anything is saved.
 - **Rescan `wp-content/uploads/fonts/`** — use this if files were placed on the server directly (via FTP/SSH)
 - **Import Google Fonts** — requires a Google Fonts API key; imports self-hosted files or keeps delivery on Google's CDN
 - **Import Bunny Fonts** — no API key needed; GDPR-friendly; same workflow as Google
@@ -75,6 +76,7 @@ Pick the source that matches your workflow:
 
 > **Not sure which to pick?** Start with Bunny Fonts if you want a free catalog without API credentials, or upload your own files if you already have them. See [Concepts → Choosing a Provider](Concepts#choosing-a-provider) for a comparison table.
 
+Custom CSS self-hosted files are stored under `wp-content/uploads/fonts/custom/<family-slug>/`.
 Google self-hosted files are stored under `wp-content/uploads/fonts/google/<family-slug>/`.
 Bunny self-hosted files are stored under `wp-content/uploads/fonts/bunny/<family-slug>/`.
 
@@ -146,4 +148,5 @@ Once your first sitewide pairing is working, go back to `Settings` and review th
 - [Font Library](Font-Library) — managing families, profiles, and publish state
 - [Settings](Settings) — full output and integration controls
 - [Local Fonts](Provider-Local-Fonts) — uploading your own font files
+- [Custom CSS URL Imports](Provider-Custom-CSS) — importing from public `@font-face` stylesheets
 - [FAQ](FAQ) — answers to common beginner and developer questions

@@ -51,7 +51,7 @@ final class ImportRepository
     public const OPTION_LIBRARY = 'tasty_fonts_library';
     private const SUPPORTED_PUBLISH_STATES = ['library_only', 'published', 'role_active'];
     private const SUPPORTED_DELIVERY_TYPES = ['self_hosted', 'cdn', 'adobe_hosted'];
-    private const SUPPORTED_PROVIDERS = ['local', 'google', 'bunny', 'adobe'];
+    private const SUPPORTED_PROVIDERS = ['local', 'google', 'bunny', 'adobe', 'custom'];
     private const SUPPORTED_FORMATS = ['static', 'variable'];
 
     /**
@@ -758,6 +758,8 @@ final class ImportRepository
             'bunny:self_hosted' => 'Self-hosted (Bunny import)',
             'bunny:cdn' => 'Bunny CDN',
             'adobe:adobe_hosted' => 'Adobe-hosted',
+            'custom:self_hosted' => 'Self-hosted custom CSS',
+            'custom:cdn' => 'Remote custom CSS',
             default => ucfirst($provider),
         };
     }

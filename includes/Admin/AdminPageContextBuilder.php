@@ -245,6 +245,7 @@ final class AdminPageContextBuilder
             'training_wheels_off' => !empty($settings['training_wheels_off']),
             'monospace_role_enabled' => !empty($settings['monospace_role_enabled']),
             'variable_fonts_enabled' => !empty($settings['variable_fonts_enabled']),
+            'custom_css_url_imports_enabled' => !empty($settings['custom_css_url_imports_enabled']),
             'delete_uploaded_files_on_uninstall' => !empty($settings['delete_uploaded_files_on_uninstall']),
             'advanced_tools' => $advancedTools,
             'diagnostic_items' => $diagnosticItems,

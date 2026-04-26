@@ -2,6 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+    buildCustomCssDryRunRequest,
+    buildCustomCssFinalImportRequest,
+    buildCustomCssImportErrorMessage,
     canDisableOutputLayer,
     describeFontType,
     deriveExactOutputQuickMode,
@@ -11,6 +14,7 @@ const {
     hasVariableFontMetadata,
     isTrustedHostedStylesheetUrl,
     logEntryMatchesFilters,
+    normalizeCustomCssDryRunPlan,
     normalizeSettingsFieldName,
     normalizeOutputQuickModePreference,
     parsePhpIniSizeToBytes,
@@ -18,6 +22,8 @@ const {
     resolveLogPagination,
     resolveStatusAnnouncement,
     resolveAssignedRoleState,
+    renderCustomCssDryRunErrorHtml,
+    renderCustomCssDryRunReviewHtml,
     roleStatesMatch,
     serializeSettingsFormEntries,
     settingsStatesMatch,
@@ -57,6 +63,377 @@ test('admin contracts reject non-https, foreign-origin, and malformed stylesheet
     assert.equal(isTrustedHostedStylesheetUrl('http://fonts.googleapis.com/css2?family=Inter&display=swap'), false);
     assert.equal(isTrustedHostedStylesheetUrl('https://example.com/css2?family=Inter&display=swap'), false);
     assert.equal(isTrustedHostedStylesheetUrl('not a url'), false);
+});
+
+test('admin contracts build custom CSS dry-run requests and normalize review plans', () => {
+    const payload = {
+        status: 'dry_run',
+        message: 'Found 1 supported font face.',
+        snapshot_token: 'snapshot-token-123',
+        snapshot_expires_at: 1770000900,
+        snapshot_ttl_seconds: 900,
+        plan: {
+            source: { type: 'custom_css_url', url: 'https://assets.example.com/fonts.css', host: 'assets.example.com' },
+            counts: { families: 1, faces: 1, valid_faces: 1 },
+            families: [{
+                family: 'Foundry Sans',
+                slug: 'foundry-sans',
+                faces: [{
+                    id: 'face-abc',
+                    weight: '400',
+                    style: 'normal',
+                    format: 'woff2',
+                    url: 'https://cdn.example.com/foundry.woff2',
+                    host: 'cdn.example.com',
+                    unicode_range: 'U+000-5FF',
+                    status: 'valid',
+                    selected: true,
+                }],
+            }],
+        },
+    };
+
+    assert.deepEqual(buildCustomCssDryRunRequest('  https://assets.example.com/fonts.css  '), {
+        url: 'https://assets.example.com/fonts.css',
+    });
+    assert.deepEqual(normalizeCustomCssDryRunPlan(payload), {
+        status: 'dry_run',
+        message: 'Found 1 supported font face.',
+        source: { type: 'custom_css_url', url: 'https://assets.example.com/fonts.css', host: 'assets.example.com' },
+        families: [{
+            family: 'Foundry Sans',
+            slug: 'foundry-sans',
+            fallback: 'sans-serif',
+            faces: [{
+                id: 'face-abc',
+                weight: '400',
+                style: 'normal',
+                format: 'woff2',
+                url: 'https://cdn.example.com/foundry.woff2',
+                host: 'cdn.example.com',
+                unicodeRange: 'U+000-5FF',
+                status: 'valid',
+                selected: true,
+                warnings: [],
+                duplicateMatches: [],
+                duplicateSummary: { hasMatches: false, hasReplaceableCustomMatches: false, defaultAction: 'import', selfHostedMatches: 0, remoteMatches: 0 },
+                validation: {
+                    method: '',
+                    contentType: '',
+                    contentLength: 0,
+                    notes: [],
+                },
+            }],
+        }],
+        counts: { families: 1, faces: 1, validFaces: 1, warningFaces: 0, invalidFaces: 0, unsupportedFaces: 0, duplicateFaces: 0, replaceableDuplicateFaces: 0 },
+        warnings: [],
+        snapshotToken: 'snapshot-token-123',
+        snapshotExpiresAt: 1770000900,
+        snapshotTtlSeconds: 900,
+    });
+});
+
+test('admin contracts build final custom CSS import requests without face metadata', () => {
+    assert.deepEqual(
+        buildCustomCssFinalImportRequest(' token-123 ', ['face-a', 'face-b', 'face-a', ''], {
+            deliveryMode: 'remote',
+            familyFallbacks: {
+                'Foundry Sans': ' serif ',
+            },
+            duplicateHandling: 'replace_custom',
+            activate: true,
+            publish: false,
+            faces: [{ url: 'https://evil.example/font.woff2' }],
+        }),
+        {
+            snapshot_token: 'token-123',
+            selected_face_ids: ['face-a', 'face-b'],
+            delivery_mode: 'remote',
+            family_fallbacks: {
+                'foundry-sans': 'serif',
+            },
+            duplicate_handling: 'replace_custom',
+            activate: true,
+            publish: false,
+        }
+    );
+});
+
+test('admin contracts include failed face details in custom CSS import errors when present', () => {
+    const message = buildCustomCssImportErrorMessage({
+        message: 'No custom font faces could be imported.',
+        data: {
+            status: 422,
+            failed_faces: [{
+                family: 'Roboto',
+                weight: '400',
+                style: 'normal',
+                message: 'The font URL returned HTTP 404.',
+            }, {
+                family: 'Roboto',
+                weight: '700',
+                style: 'italic',
+                message: 'The downloaded file did not pass WOFF2 signature validation.',
+            }],
+        },
+    }, 'The custom CSS import failed.');
+
+    assert.match(message, /No custom font faces could be imported\./);
+    assert.match(message, /Failed faces:/);
+    assert.match(message, /Roboto \(400 normal\): The font URL returned HTTP 404\./);
+    assert.match(message, /Roboto \(700 italic\): The downloaded file did not pass WOFF2 signature validation\./);
+});
+
+test('admin contracts fall back to default custom CSS import error message when failed faces are missing', () => {
+    assert.equal(
+        buildCustomCssImportErrorMessage({}, 'The custom CSS import failed.'),
+        'The custom CSS import failed.'
+    );
+});
+
+test('admin contracts render custom CSS dry-run errors as accessible inline UI', () => {
+    const html = renderCustomCssDryRunErrorHtml('Blocked <internal> URL');
+
+    assert.match(html, /role="alert"/);
+    assert.match(html, /Blocked &lt;internal&gt; URL/);
+    assert.doesNotMatch(html, /<internal>/);
+});
+
+test('admin contracts render custom CSS dry-run empty state with a restrained next step', () => {
+    const html = renderCustomCssDryRunReviewHtml({
+        plan: {
+            source: { host: 'assets.example.com' },
+            families: [],
+        },
+    });
+
+    assert.match(html, /No importable WOFF or WOFF2 faces were found\./);
+    assert.match(html, /Check that the stylesheet includes @font-face rules with WOFF2 or WOFF sources\./);
+});
+
+test('admin contracts render custom CSS dry-run unsupported faces as disabled rows', () => {
+    const html = renderCustomCssDryRunReviewHtml({
+        plan: {
+            source: { host: 'assets.example.com' },
+            families: [{
+                family: 'Legacy Display',
+                faces: [{
+                    id: 'face-ttf',
+                    weight: '400',
+                    style: 'normal',
+                    format: 'ttf',
+                    url: 'https://assets.example.com/legacy.ttf',
+                    host: 'assets.example.com',
+                    status: 'unsupported',
+                }],
+            }],
+        },
+    });
+
+    assert.match(html, /400 normal \(TTF\)/);
+    assert.match(html, /Unsupported format/);
+    assert.match(html, /type="checkbox" value="face-ttf" disabled/);
+    assert.doesNotMatch(html, /type="checkbox" value="face-ttf" checked disabled/);
+});
+
+test('admin contracts pluralize custom CSS dry-run review summaries', () => {
+    const singularHtml = renderCustomCssDryRunReviewHtml({
+        plan: {
+            families: [{
+                family: 'Single Sans',
+                faces: [{
+                    id: 'face-1',
+                    weight: '400',
+                    style: 'normal',
+                    format: 'woff2',
+                    url: 'https://cdn.example.com/single.woff2',
+                    host: 'cdn.example.com',
+                }],
+            }],
+        },
+    });
+    const pluralHtml = renderCustomCssDryRunReviewHtml({
+        plan: {
+            counts: { families: 1, faces: 7 },
+            families: [{
+                family: 'Inter',
+                faces: Array.from({ length: 7 }, (_, index) => ({
+                    id: `face-${index}`,
+                    weight: '400',
+                    style: 'normal',
+                    format: 'woff2',
+                    url: `https://cdn.example.com/inter-${index}.woff2`,
+                    host: 'cdn.example.com',
+                })),
+            }],
+        },
+    });
+
+    assert.match(singularHtml, />1 family, 1 face</);
+    assert.match(pluralHtml, />1 family, 7 faces</);
+    assert.doesNotMatch(pluralHtml, />1 family, 7 face</);
+});
+
+test('admin contracts render custom CSS dry-run review HTML safely', () => {
+    const html = renderCustomCssDryRunReviewHtml({
+        snapshot_token: 'snapshot-token-123',
+        plan: {
+            source: { host: 'assets.example.com' },
+            families: [{
+                family: 'Foundry <Sans>',
+                slug: 'foundry-sans',
+                fallback: 'system-ui, sans-serif',
+                faces: [{
+                    id: 'face-1',
+                    weight: '400',
+                    style: 'normal',
+                    format: 'woff2',
+                    url: 'https://cdn.example.com/foundry.woff2',
+                    host: 'cdn.example.com',
+                }],
+            }],
+        },
+    });
+
+    assert.match(html, /data-custom-css-final-form/);
+    assert.match(html, /Delivery mode/);
+    assert.match(html, /name="custom_css_delivery_mode" value="self_hosted" checked/);
+    assert.match(html, /name="custom_css_delivery_mode" value="remote"/);
+    assert.match(html, /data-custom-css-family-fallback data-family-slug="foundry-sans" value="system-ui, sans-serif" aria-label="Fallback stack for Foundry &lt;Sans&gt;"/);
+    assert.match(html, /data-custom-css-import-submit/);
+    assert.match(html, /Import Selected Faces/);
+    assert.match(html, /data-custom-css-import-status aria-live="polite"/);
+    assert.match(html, /Foundry &lt;Sans&gt;/);
+    assert.match(html, /400 normal \(WOFF2\)/);
+    assert.match(html, /cdn\.example\.com/);
+    assert.match(html, /type="checkbox" value="face-1" checked aria-label="Foundry &lt;Sans&gt;, 400 normal, WOFF2, from cdn\.example\.com, Validated"/);
+    assert.doesNotMatch(html, /type="checkbox" value="face-1" checked disabled/);
+});
+
+test('admin contracts render custom CSS validation states and details', () => {
+    const html = renderCustomCssDryRunReviewHtml({
+        plan: {
+            source: { host: 'assets.example.com' },
+            warnings: ['Remote serving uses third-party font URLs. Confirm licensing, visitor privacy, and source availability before choosing remote serving.'],
+            families: [{
+                family: 'Review Sans',
+                faces: [{
+                    id: 'face-warning',
+                    weight: '400',
+                    style: 'normal',
+                    format: 'woff2',
+                    url: 'https://cdn.example.com/review.woff2?token=temporary',
+                    host: 'cdn.example.com',
+                    status: 'warning',
+                    selected: true,
+                    warnings: ['Self-hosted imports are not blocked by browser CORS.'],
+                    validation: {
+                        method: 'capped GET fallback',
+                        content_type: 'font/woff2',
+                        content_length: 2048,
+                        notes: ['WOFF2 signature matched.'],
+                    },
+                }, {
+                    id: 'face-invalid',
+                    weight: '700',
+                    style: 'normal',
+                    format: 'woff2',
+                    url: 'https://cdn.example.com/bad.woff2',
+                    host: 'cdn.example.com',
+                    status: 'invalid',
+                    selected: false,
+                    validation: {
+                        method: 'HEAD',
+                        content_type: 'text/html',
+                        notes: ['The font URL returned HTTP 404.'],
+                    },
+                }],
+            }],
+        },
+    });
+
+    assert.match(html, /data-state="warning"/);
+    assert.match(html, /Warning/);
+    assert.match(html, /type="checkbox" value="face-warning" checked aria-label="Review Sans, 400 normal, WOFF2, from cdn\.example\.com, Warning"/);
+    assert.match(html, /type="checkbox" value="face-invalid" disabled/);
+    assert.match(html, /Resolved URL/);
+    assert.match(html, /https:\/\/cdn\.example\.com\/review\.woff2\?token=temporary/);
+    assert.match(html, /Check: capped GET fallback/);
+    assert.match(html, /Size: 2 KB/);
+    assert.match(html, /Self-hosted imports are not blocked by browser CORS/);
+    assert.match(html, /licensing, visitor privacy, and source availability/);
+});
+
+test('admin contracts surface duplicate matches and advanced custom replacement controls', () => {
+    const payload = {
+        plan: {
+            counts: { families: 1, faces: 1, duplicate_faces: 1, replaceable_duplicate_faces: 1 },
+            source: { host: 'assets.example.com' },
+            families: [{
+                family: 'Review Sans',
+                faces: [{
+                    id: 'face-duplicate',
+                    weight: '400',
+                    style: 'normal',
+                    format: 'woff2',
+                    url: 'https://cdn.example.com/review.woff2',
+                    host: 'cdn.example.com',
+                    status: 'valid',
+                    duplicate_summary: {
+                        has_matches: true,
+                        has_replaceable_custom_matches: true,
+                        default_action: 'skip',
+                        self_hosted_matches: 1,
+                        remote_matches: 1,
+                    },
+                    duplicate_matches: [{
+                        family: 'Review Sans',
+                        family_slug: 'review-sans',
+                        delivery_id: 'custom-self-hosted-old',
+                        delivery_label: 'Custom CSS import',
+                        provider: 'custom',
+                        delivery_type: 'self_hosted',
+                        format: 'woff2',
+                        replaceable: true,
+                        protected: false,
+                    }, {
+                        family: 'Review Sans',
+                        family_slug: 'review-sans',
+                        delivery_id: 'google-css2',
+                        delivery_label: 'Google Fonts',
+                        provider: 'google',
+                        delivery_type: 'remote',
+                        format: 'woff2',
+                        replaceable: false,
+                        protected: true,
+                    }],
+                }],
+            }],
+        },
+    };
+    const plan = normalizeCustomCssDryRunPlan(payload);
+    const html = renderCustomCssDryRunReviewHtml(payload);
+
+    assert.equal(plan.counts.duplicateFaces, 1);
+    assert.equal(plan.counts.replaceableDuplicateFaces, 1);
+    assert.deepEqual(plan.families[0].faces[0].duplicateSummary, {
+        hasMatches: true,
+        hasReplaceableCustomMatches: true,
+        defaultAction: 'skip',
+        selfHostedMatches: 1,
+        remoteMatches: 1,
+    });
+    assert.equal(plan.families[0].faces[0].duplicateMatches[0].replaceable, true);
+    assert.equal(plan.families[0].faces[0].duplicateMatches[1].protected, true);
+    assert.match(html, /Duplicate handling/);
+    assert.match(html, /name="custom_css_duplicate_handling" value="skip" checked/);
+    assert.match(html, /name="custom_css_duplicate_handling" value="replace_custom"/);
+    assert.match(html, /<span class="tasty-fonts-url-face-status" data-state="duplicate">Duplicate<\/span>/);
+    assert.doesNotMatch(html, /Duplicate: skips by default/);
+    assert.match(html, /Duplicate matches/);
+    assert.match(html, /replaceable custom CSS/);
+    assert.match(html, /protected provider\/local profile/);
+    assert.match(html, /Google, Bunny, Adobe, and local upload profiles are protected/);
 });
 
 test('admin contracts resolve keyboard tab navigation targets for tablists', () => {
@@ -157,6 +534,8 @@ test('admin contracts serialize settings entries with array fields and empty sen
             ['show_activity_log', '1'],
             ['delete_uploaded_files_on_uninstall', '1'],
             ['delete_uploaded_files_on_uninstall', '0'],
+            ['custom_css_url_imports_enabled', '0'],
+            ['custom_css_url_imports_enabled', '1'],
             ['font_display', 'swap'],
         ], {
             ignoredKeys: ['_wpnonce'],
@@ -167,6 +546,7 @@ test('admin contracts serialize settings entries with array fields and empty sen
             training_wheels_off: '0',
             show_activity_log: '1',
             delete_uploaded_files_on_uninstall: '0',
+            custom_css_url_imports_enabled: '1',
             font_display: 'swap',
         }
     );

@@ -15,7 +15,7 @@ Understand the three core ideas that underpin everything Tasty Custom Fonts does
 
 Tasty Custom Fonts is a typography management layer for WordPress. It lets you:
 
-1. **Collect font families** from multiple sources (your own files, Google Fonts, Bunny Fonts, or Adobe Fonts) into a single managed library.
+1. **Collect font families** from multiple sources (your own files, custom CSS URL imports, Google Fonts, Bunny Fonts, or Adobe Fonts) into a single managed library.
 2. **Assign families to roles** — named slots like Heading, Body, and Monospace — that your theme or page builder can reference using CSS custom properties.
 3. **Preview pairings** before publishing them live.
 4. **Generate and serve CSS** that wires everything together on the frontend, in the block editor, and inside Etch.
@@ -28,7 +28,7 @@ You do not need to edit theme files, write `@font-face` rules by hand, or manage
 
 A **delivery profile** describes how a font family should be served at runtime. It carries:
 
-- the provider (local, Google, Bunny, or Adobe)
+- the provider (local, custom, Google, Bunny, or Adobe)
 - the delivery type (self-hosted or CDN/remote)
 - the font variants and faces that belong to this delivery arrangement
 - optional provider-specific metadata
@@ -108,7 +108,8 @@ If file delivery is disabled or unavailable, the plugin falls back to injecting 
 ### What this means in practice
 
 - The generated stylesheet contains all `@font-face` rules for self-hosted families and all role variable declarations.
-- CDN and Adobe deliveries are loaded as separate `<link>` tags rather than being embedded in the generated stylesheet.
+- CDN and Adobe provider deliveries are loaded as separate `<link>` tags rather than being embedded in the generated stylesheet.
+- Custom CSS remote-serving profiles are different: Tasty Fonts emits its own reviewed `@font-face` rules that point to validated remote font URLs, and it does not enqueue the original third-party stylesheet.
 - If you open `Advanced Tools → Generated CSS`, you are looking at the exact output of this pipeline.
 
 ---
@@ -149,6 +150,7 @@ When variable font support is disabled, the plugin treats every font as static. 
 | Provider | Files downloaded? | API key needed? | Variable font support? | Best for |
 |---|---|---|---|---|
 | Local files | Yes (you upload them) | No | Yes | Fonts you already own or licensed separately |
+| Custom CSS URL | Optional (self-hosted) | No | Preserves reviewed metadata; direct URL variable-axis editing is deferred | Client/agency/CDN stylesheets that expose `@font-face` WOFF2/WOFF rules |
 | Google Fonts | Optional (self-hosted) | Yes, for live search | Yes | Large open catalog, self-hosting for privacy |
 | Bunny Fonts | Optional (self-hosted) | No | Source metadata only (CDN serves variable, self-hosted serves static files) | GDPR-friendly alternative to Google CDN |
 | Adobe Fonts | No (Adobe-hosted) | No (project ID only) | Depends on project | Existing Adobe CC subscriptions with web projects |
@@ -158,6 +160,7 @@ Providers are not exclusive. You can mix sources — for example, use a self-hos
 ### Decision guide
 
 - **You already have font files** → use Local.
+- **You have a public CSS stylesheet with `@font-face` rules** → use Custom CSS URL Imports.
 - **You want access to a large free catalog** → use Google or Bunny.
 - **Your site handles EU user data and you want to avoid Google CDN** → use Bunny.
 - **You have an Adobe CC subscription and want premium typefaces** → use Adobe.

@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.15.0-beta.2] - 2026-04-27
+
+### Added
+
+- Added a gated Custom CSS URL import workflow for expert users, including server-side dry runs, font-face review, duplicate handling, and final import support for one public HTTPS stylesheet at a time.
+- Added Custom CSS provider services for URL inspection, snapshot persistence, self-hosted downloads, remote delivery profiles, and source metadata.
+- Added live admin UI support for From URL imports, including disabled developer-gate messaging, delivery-mode selection, selectable face rows, warning details, and inline errors.
+- Added documentation and wiki guidance for Custom CSS imports, provider limitations, privacy/licensing considerations, troubleshooting, and end-to-end testing.
+
+### Changed
+
+- Added an Advanced Tools developer gate for Custom CSS URL Imports so the expert From URL workflow stays disabled by default until deliberately enabled.
+- Expanded library, catalog, runtime, storage, and settings flows so custom CSS delivery profiles participate in generated CSS, deployment planning, diagnostics, and managed storage consistently with other providers.
+- Updated README/readme feature copy to include custom CSS URL imports alongside local, Google, Bunny, and Adobe workflows.
+
+### Fixed
+
+- Improved hosted-font URL resolution so relative @font-face sources from CDN stylesheets, including Fontsource CSS, resolve correctly during dry runs and imports.
+- Added regression coverage for dry-run validation, warning states, duplicate behavior, self-hosted and remote final imports, gated admin rendering, JS contracts, generated CSS, and runtime planning.
+
 ## [1.15.0-beta.1] - 2026-04-27
 
 ### Changed

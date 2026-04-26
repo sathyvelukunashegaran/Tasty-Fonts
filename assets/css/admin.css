@@ -6529,6 +6529,139 @@ h3.tasty-fonts-section-title {
     align-items: center;
 }
 
+.tasty-fonts-url-dry-run-form {
+    display: grid;
+    gap: var(--tasty-space-3);
+}
+
+.tasty-fonts-url-dry-run-review {
+    display: grid;
+    gap: var(--tasty-space-3);
+    margin-top: var(--tasty-space-4);
+    padding-top: var(--tasty-space-4);
+    border-top: var(--tasty-layout-1px) solid rgba(var(--tasty-gray-600-rgb), var(--tasty-alpha-14));
+}
+
+.tasty-fonts-url-dry-run-review[hidden] {
+    display: none;
+}
+
+.tasty-fonts-url-review-summary {
+    display: grid;
+    gap: var(--tasty-space-1);
+}
+
+.tasty-fonts-url-review-warnings {
+    display: grid;
+    gap: var(--tasty-space-1);
+    margin: var(--tasty-space-2) var(--tasty-layout-0) var(--tasty-layout-0);
+    padding: var(--tasty-space-2) var(--tasty-space-3);
+    border: var(--tasty-layout-1px) solid rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-32));
+    border-radius: var(--tasty-radius-control);
+    background: rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-10));
+    color: var(--tasty-ink);
+    list-style-position: inside;
+}
+
+.tasty-fonts-url-review-family {
+    display: grid;
+    gap: var(--tasty-space-2);
+}
+
+.tasty-fonts-url-review-family h5 {
+    margin: var(--tasty-layout-0);
+    font-size: var(--tasty-type-card-title-size);
+    line-height: var(--tasty-line-height-tight);
+}
+
+.tasty-fonts-url-review-family ul {
+    display: grid;
+    gap: var(--tasty-space-1-5);
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-layout-0);
+    list-style: none;
+}
+
+.tasty-fonts-url-face-row {
+    display: grid;
+    grid-template-columns: minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) auto auto auto;
+    gap: var(--tasty-space-2);
+    align-items: center;
+    min-height: var(--tasty-control-height-regular);
+    padding: var(--tasty-space-2) var(--tasty-space-3);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    border-radius: var(--tasty-radius-control);
+    background: var(--tasty-control-surface-muted);
+}
+
+.tasty-fonts-url-face-row[data-state="warning"] {
+    border-color: rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-32));
+    background: rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-08));
+}
+
+.tasty-fonts-url-face-row[data-state="invalid"],
+.tasty-fonts-url-face-row[data-state="unsupported"] {
+    opacity: var(--tasty-alpha-82);
+}
+
+.tasty-fonts-url-face-row label {
+    display: inline-flex;
+    gap: var(--tasty-space-2);
+    align-items: center;
+    min-width: var(--tasty-layout-0);
+}
+
+.tasty-fonts-url-face-row > * {
+    min-width: var(--tasty-layout-0);
+}
+
+.tasty-fonts-url-face-row .tasty-fonts-muted {
+    overflow-wrap: anywhere;
+}
+
+.tasty-fonts-url-face-status {
+    justify-self: start;
+    padding: var(--tasty-space-1) var(--tasty-space-2);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle);
+    border-radius: var(--tasty-radius-pill);
+    background: var(--tasty-surface-card);
+    color: var(--tasty-slate);
+    font-size: var(--tasty-font-size-xs);
+    font-weight: var(--tasty-font-weight-semibold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+.tasty-fonts-url-face-status[data-state="warning"] {
+    border-color: rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-32));
+    background: rgba(var(--tasty-warm-amber-rgb), var(--tasty-alpha-12));
+    color: var(--tasty-ink);
+}
+
+.tasty-fonts-url-face-status[data-state="invalid"],
+.tasty-fonts-url-face-status[data-state="unsupported"] {
+    color: var(--tasty-ink);
+}
+
+.tasty-fonts-url-face-details {
+    grid-column: var(--tasty-layout-1) / var(--tasty-layout-neg-1);
+    color: var(--tasty-slate);
+}
+
+.tasty-fonts-url-face-details summary {
+    cursor: pointer;
+    font-weight: var(--tasty-font-weight-semibold);
+}
+
+.tasty-fonts-url-face-details dl,
+.tasty-fonts-url-face-details ul {
+    margin: var(--tasty-space-2) var(--tasty-layout-0) var(--tasty-layout-0);
+}
+
+.tasty-fonts-url-face-details code {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
 .tasty-fonts-import-status {
     display: none;
     gap: var(--tasty-space-2-5);
@@ -7622,6 +7755,19 @@ h3.tasty-fonts-section-title {
     font-weight: var(--tasty-font-weight-semibold);
     line-height: var(--tasty-line-height-body);
     overflow-wrap: anywhere;
+}
+
+.tasty-fonts-detail-meta-note {
+    display: block;
+    margin-top: var(--tasty-space-1);
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-meta-size);
+    font-weight: var(--tasty-font-weight-regular);
+    line-height: var(--tasty-line-height-body);
+}
+
+.tasty-fonts-detail-meta-item--source-url {
+    grid-column: var(--tasty-layout-1) / var(--tasty-layout-neg-1);
 }
 
 .tasty-fonts-detail-chip-row {

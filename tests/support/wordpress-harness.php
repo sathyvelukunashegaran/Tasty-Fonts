@@ -105,6 +105,9 @@ use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyCssParser;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
+use TastyFonts\CustomCss\CustomCssFinalImportService;
+use TastyFonts\CustomCss\CustomCssImportSnapshotService;
+use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
@@ -840,6 +843,23 @@ if (!function_exists('update_option')) {
     }
 }
 
+if (!function_exists('add_option')) {
+    function add_option(string $option, mixed $value = '', string $deprecated = '', bool $autoload = false): bool
+    {
+        global $optionAutoload;
+        global $optionStore;
+
+        if (array_key_exists($option, $optionStore)) {
+            return false;
+        }
+
+        $optionStore[$option] = $value;
+        $optionAutoload[$option] = $autoload;
+
+        return true;
+    }
+}
+
 if (!function_exists('delete_option')) {
     function delete_option(string $option): bool
     {
@@ -1103,6 +1123,7 @@ if (!function_exists('WP_Filesystem')) {
 
         if (!$wp_filesystem instanceof TestWpFilesystem) {
             $wp_filesystem = new TestWpFilesystem();
+            $wp_filesystem->recursiveMkdir = true;
         }
 
         return $wpFilesystemShouldInit;
@@ -1684,6 +1705,12 @@ final class TestWpFilesystem
     public array $mkdirCalls = [];
     public array $writeCalls = [];
 
+    /**
+     * Mirrors WP_Filesystem_Direct::mkdir() semantics by defaulting to recursive=false,
+     * while allowing tests to opt into recursive behavior for legacy fixtures.
+     */
+    public bool $recursiveMkdir = false;
+
     public function exists(string $path): bool
     {
         return file_exists($path);
@@ -1698,7 +1725,7 @@ final class TestWpFilesystem
     {
         $this->mkdirCalls[] = $path;
 
-        return is_dir($path) || mkdir($path, $chmod, true);
+        return is_dir($path) || mkdir($path, $chmod, $this->recursiveMkdir);
     }
 
     public function put_contents(string $path, string $contents, int $chmod): bool
@@ -1918,6 +1945,7 @@ function resetTestState(): void
     $wpdb = new TestWpdb();
     $wpdbQueries = [];
     $wp_filesystem = new TestWpFilesystem();
+    $wp_filesystem->recursiveMkdir = true;
     $_GET = [];
     $_POST = [];
     $_FILES = [];
@@ -1966,6 +1994,9 @@ function makeServiceGraph(): array
     $bricksIntegration = new BricksIntegrationService();
     $oxygenIntegration = new OxygenIntegrationService();
     $blockEditorFontLibrary = new BlockEditorFontLibraryService($storage, $imports, $settings, $log);
+    $customCssImport = new CustomCssUrlImportService($imports);
+    $customCssSnapshots = new CustomCssImportSnapshotService();
+    $customCssFinalImport = new CustomCssFinalImportService($storage, $imports, $settings, $catalog, $assets, $log);
     $developerTools = new DeveloperToolsService(
         $storage,
         $settings,
@@ -2019,7 +2050,10 @@ function makeServiceGraph(): array
         $supportBundles,
         $updater,
         $adminAccess,
-        $planner
+        $planner,
+        $customCssImport,
+        $customCssSnapshots,
+        $customCssFinalImport
     );
     $rest = new RestController($controller, $adminAccess);
     $runtime = new RuntimeService($planner, $assets, $cssBuilder, $adobe, $settings, $acssIntegration, $bricksIntegration, $oxygenIntegration);
@@ -2043,6 +2077,9 @@ function makeServiceGraph(): array
         'bricks_integration' => $bricksIntegration,
         'oxygen_integration' => $oxygenIntegration,
         'block_editor_font_library' => $blockEditorFontLibrary,
+        'custom_css_import' => $customCssImport,
+        'custom_css_snapshots' => $customCssSnapshots,
+        'custom_css_final_import' => $customCssFinalImport,
         'developer_tools' => $developerTools,
         'site_transfer' => $siteTransfer,
         'snapshots' => $snapshots,

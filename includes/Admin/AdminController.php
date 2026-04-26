@@ -11,6 +11,9 @@ use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Api\RestController;
+use TastyFonts\CustomCss\CustomCssFinalImportService;
+use TastyFonts\CustomCss\CustomCssImportSnapshotService;
+use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
@@ -117,7 +120,10 @@ final class AdminController
         private readonly SupportBundleService $supportBundles,
         private readonly ?GitHubUpdater $updater = null,
         ?AdminAccessService $adminAccess = null,
-        private readonly ?RuntimeAssetPlanner $runtimePlanner = null
+        private readonly ?RuntimeAssetPlanner $runtimePlanner = null,
+        private readonly ?CustomCssUrlImportService $customCssImport = null,
+        private readonly ?CustomCssImportSnapshotService $customCssSnapshots = null,
+        private readonly ?CustomCssFinalImportService $customCssFinalImport = null
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
         $this->adminAccess = $adminAccess ?? new AdminAccessService($this->settings);
@@ -235,6 +241,7 @@ final class AdminController
                 'trainingWheelsOff' => !empty($settings['training_wheels_off']),
                 'monospaceRoleEnabled' => !empty($settings['monospace_role_enabled']),
                 'variableFontsEnabled' => $variableFontsEnabled,
+                'customCssUrlImportsEnabled' => !empty($settings['custom_css_url_imports_enabled']),
                 'roleFamilyCatalog' => $this->buildRoleFamilyCatalog($catalog),
                 'previewBootstrap' => [
                     'roles' => $roles,
@@ -544,6 +551,86 @@ final class AdminController
                 $variants,
                 $deliveryMode
             )
+        );
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function dryRunCustomCssUrl(string $stylesheetUrl): array|WP_Error
+    {
+        if (!$this->customCssUrlImportsEnabled()) {
+            return $this->customCssUrlImportsDisabledError();
+        }
+
+        $service = $this->customCssImport ?? new CustomCssUrlImportService(new \TastyFonts\Repository\ImportRepository());
+        $snapshotService = $this->customCssSnapshots ?? new CustomCssImportSnapshotService();
+
+        return $this->runRateLimitedAction(
+            'custom_css_dry_run',
+            function () use ($service, $snapshotService, $stylesheetUrl): array|WP_Error {
+                $result = $service->dryRun($stylesheetUrl);
+
+                if (is_wp_error($result)) {
+                    return $result;
+                }
+
+                $snapshot = $snapshotService->createSnapshot($result);
+
+                if (is_wp_error($snapshot)) {
+                    return $snapshot;
+                }
+
+                return array_merge($result, [
+                    'snapshot_token' => $snapshot['token'],
+                    'snapshot_expires_at' => $snapshot['expires_at'],
+                    'snapshot_ttl_seconds' => $snapshot['ttl_seconds'],
+                ]);
+            }
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return Payload|WP_Error
+     */
+    public function importCustomCssUrl(array $input): array|WP_Error
+    {
+        if (!$this->customCssUrlImportsEnabled()) {
+            return $this->customCssUrlImportsDisabledError();
+        }
+
+        $snapshotService = $this->customCssSnapshots ?? new CustomCssImportSnapshotService();
+        $validated = $snapshotService->validateFinalImportContract($input);
+
+        if (is_wp_error($validated)) {
+            return $validated;
+        }
+
+        $finalImport = $this->customCssFinalImport ?? new CustomCssFinalImportService(
+            $this->storage,
+            new \TastyFonts\Repository\ImportRepository(),
+            $this->settings,
+            $this->catalog,
+            $this->assets,
+            $this->log
+        );
+
+        return $finalImport->importSelfHosted($validated);
+    }
+
+    private function customCssUrlImportsEnabled(): bool
+    {
+        $settings = $this->settings->getSettings();
+
+        return !empty($settings['custom_css_url_imports_enabled']);
+    }
+
+    private function customCssUrlImportsDisabledError(): WP_Error
+    {
+        return new WP_Error(
+            'tasty_fonts_custom_css_url_imports_disabled',
+            __('Custom CSS URL imports are disabled. Enable Custom CSS URL Imports in Advanced Tools > Developer before running this workflow.', 'tasty-fonts')
         );
     }
 
@@ -1972,6 +2059,18 @@ final class AdminController
     {
         return match ($error->get_error_code()) {
             'tasty_fonts_rest_action_rate_limited' => 429,
+            'tasty_fonts_custom_css_url_imports_disabled' => 403,
+            'tasty_fonts_custom_css_too_large',
+            'tasty_fonts_custom_css_too_many_faces',
+            'tasty_fonts_custom_css_too_many_font_urls' => 413,
+            'tasty_fonts_custom_css_fetch_timeout' => 504,
+            'tasty_fonts_custom_css_snapshot_unavailable' => 410,
+            'tasty_fonts_custom_css_snapshot_scope_mismatch' => 403,
+            'tasty_fonts_custom_css_snapshot_in_use',
+            'tasty_fonts_custom_css_selected_faces_mismatch' => 409,
+            'tasty_fonts_custom_css_delivery_deferred',
+            'tasty_fonts_custom_css_replacement_deferred' => 501,
+            'tasty_fonts_custom_css_import_failed' => 422,
             'tasty_fonts_google_family_not_found',
             'tasty_fonts_bunny_family_not_found',
             'tasty_fonts_family_not_found',
@@ -3131,6 +3230,7 @@ final class AdminController
             || !empty($before['show_activity_log']) !== !empty($after['show_activity_log'])
             || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled'])
             || !empty($before['variable_fonts_enabled']) !== !empty($after['variable_fonts_enabled'])
+            || !empty($before['custom_css_url_imports_enabled']) !== !empty($after['custom_css_url_imports_enabled'])
             || $this->adminAccessSettingsDiffer($before, $after)
             || ($before['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE) !== ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE)
             || !empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])
@@ -5843,7 +5943,7 @@ final class AdminController
             'tf_studio' => in_array($value, array_merge(['preview', 'snippets'], self::DIAGNOSTICS_STUDIO_TABS, self::SETTINGS_STUDIO_TABS), true) ? $value : '',
             'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface', 'marketing', 'code'], true) ? $value : '',
             'tf_output' => in_array($value, ['usage', 'variables', 'stacks', 'names'], true) ? $value : '',
-            'tf_source' => in_array($value, ['google', 'bunny', 'adobe', 'upload'], true) ? $value : '',
+            'tf_source' => in_array($value, ['google', 'bunny', 'adobe', 'upload', 'url'], true) ? $value : '',
             default => '',
         };
     }

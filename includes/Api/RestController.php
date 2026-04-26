@@ -32,6 +32,8 @@ final class RestController
         'bunnyFamily' => 'bunny/family',
         'importGoogle' => 'google/import',
         'importBunny' => 'bunny/import',
+        'customCssDryRun' => 'custom-css/dry-run',
+        'customCssImport' => 'custom-css/import',
         'validateSiteTransfer' => 'transfer/validate',
         'uploadLocal' => 'local/upload',
         'saveFamilyFallback' => 'families/fallback',
@@ -88,6 +90,18 @@ final class RestController
         ]);
         $this->registerRoute(self::ROUTES['importGoogle'], 'POST', [$this, 'importGoogleFamily'], $this->hostedImportArgs());
         $this->registerRoute(self::ROUTES['importBunny'], 'POST', [$this, 'importBunnyFamily'], $this->hostedImportArgs());
+        $this->registerRoute(self::ROUTES['customCssDryRun'], 'POST', [$this, 'dryRunCustomCssUrl'], [
+            'url' => $this->buildTextArg(true),
+        ]);
+        $this->registerRoute(self::ROUTES['customCssImport'], 'POST', [$this, 'importCustomCssUrl'], [
+            'snapshot_token' => $this->buildTextArg(true),
+            'selected_face_ids' => $this->buildStringArrayArg(true),
+            'delivery_mode' => $this->buildTextArg(false, ['self_hosted', 'remote', 'cdn']),
+            'family_fallbacks' => $this->buildNestedArrayArg(),
+            'duplicate_handling' => $this->buildTextArg(false, ['skip', 'replace_custom']),
+            'activate' => $this->buildToggleArg(),
+            'publish' => $this->buildToggleArg(),
+        ]);
         $this->registerRoute(self::ROUTES['validateSiteTransfer'], 'POST', [$this, 'validateSiteTransferBundle']);
         $this->registerRoute(self::ROUTES['uploadLocal'], 'POST', [$this, 'uploadLocalFonts'], [
             'rows' => $this->buildNestedArrayArg(true),
@@ -189,6 +203,20 @@ final class RestController
                 $this->getVariantTokens($request),
                 $this->getTextParam($request, 'delivery_mode', 'self_hosted')
             )
+        );
+    }
+
+    public function dryRunCustomCssUrl(WP_REST_Request $request): mixed
+    {
+        return $this->restResult(
+            $this->admin->dryRunCustomCssUrl($this->getTextParam($request, 'url'))
+        );
+    }
+
+    public function importCustomCssUrl(WP_REST_Request $request): mixed
+    {
+        return $this->restResult(
+            $this->admin->importCustomCssUrl($request->get_params())
         );
     }
 
@@ -378,10 +406,24 @@ final class RestController
             return rest_ensure_response($result);
         }
 
+        $status = $this->admin->statusForError($result, $defaultErrorStatus);
+        $errorData = $result->get_error_data();
+
+        if (is_array($errorData)) {
+            $errorData['status'] = $status;
+        } elseif ($errorData === null) {
+            $errorData = ['status' => $status];
+        } else {
+            $errorData = [
+                'status' => $status,
+                'value' => $errorData,
+            ];
+        }
+
         return new WP_Error(
             $result->get_error_code(),
             $result->get_error_message(),
-            ['status' => $this->admin->statusForError($result, $defaultErrorStatus)]
+            $errorData
         );
     }
 

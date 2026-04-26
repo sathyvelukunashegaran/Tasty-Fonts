@@ -145,6 +145,14 @@ require_once __DIR__ . '/cases/my-feature.php';
 - `invokePrivateMethod()` helps target private methods in focused unit tests.
 - `resetPluginSingleton()` is available when you need to test the `Plugin` boot lifecycle cleanly.
 
+**Custom CSS URL import coverage:**
+
+- Use `tests/cases/imports-library.php` for dry-run planning, URL safety, snapshots, self-hosted/remote final imports, duplicate handling, and generated-profile persistence.
+- Use `tests/cases/admin-controller-rest.php` for REST contract shape, permission/error behavior, and tamper-resistant final-import payloads.
+- Use `tests/cases/admin-renderer.php` for library-card source history rendering.
+- Use `tests/cases/css-storage-catalog.php` and `tests/cases/settings-assets-runtime.php` when a change can affect generated CSS, preconnects, or runtime planning.
+- Use `tests/js/admin-contracts.test.cjs` for From URL review rendering, selection state, duplicate handling controls, and final-import request shape.
+
 ### JavaScript Tests
 
 JavaScript tests live in `tests/js/*.test.cjs`. They use Node's built-in `node:test` module and `node:assert`.

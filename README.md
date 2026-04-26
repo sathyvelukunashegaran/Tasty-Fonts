@@ -1,6 +1,6 @@
 # One Plugin to Manage Every Font on Your WordPress Site
 
-**Tasty Custom Fonts** is the free WordPress font manager from **[Tasty WP](https://github.com/sathyvelukunashegaran)** that unifies local fonts, Google Fonts, Bunny Fonts, and Adobe Fonts in a single dashboard — with a draft-first publishing workflow, GDPR-friendly self-hosting, and deep integrations for Gutenberg and your favourite page builders.
+**Tasty Custom Fonts** is the free WordPress font manager from **[Tasty WP](https://github.com/sathyvelukunashegaran)** that unifies local fonts, custom CSS URL imports, Google Fonts, Bunny Fonts, and Adobe Fonts in a single dashboard — with a draft-first publishing workflow, GDPR-friendly self-hosting, and deep integrations for Gutenberg and your favourite page builders.
 
 Stop juggling four workflows. Stop breaking Gutenberg presets. Stop rebuilding typography from scratch on every project.
 
@@ -40,6 +40,7 @@ Tasty Custom Fonts fixes that — one plugin, every font source, zero build tool
 Pull in fonts from wherever your project needs them — all managed from the same dashboard.
 
 - Upload `WOFF2`, `WOFF`, `TTF`, and `OTF` files directly from the WordPress admin
+- Import fonts from one public HTTPS CSS stylesheet URL containing `@font-face` rules (WOFF2/WOFF in Phase 1)
 - Import Google Fonts as self-hosted files or serve from Google CDN
 - Import Bunny Fonts as self-hosted files or serve from Bunny CDN
 - Connect an Adobe Fonts web project and use Adobe-hosted families alongside local and imported fonts
@@ -108,20 +109,24 @@ Published fonts reach every layer of your WordPress site automatically.
 | Source | Delivery options | Self-hostable | GDPR-friendly |
 | --- | --- | --- | --- |
 | Local files | Self-hosted | ✅ Yes | ✅ Yes |
+| Custom CSS URL | Self-hosted or remote URL | ✅ Yes | ✅ Yes (when self-hosted) |
 | Google Fonts | Self-hosted or Google CDN | ✅ Yes | ✅ Yes (when self-hosted) |
 | Bunny Fonts | Self-hosted or Bunny CDN | ✅ Yes | ✅ Yes (when self-hosted) |
 | Adobe Fonts | Adobe-hosted | — | ❌ No (Adobe-hosted) |
 
 Each family stores one or more delivery profiles. The active profile controls what the plugin serves at runtime — switch it any time without rebuilding your typography system.
 
-Self-hosted Google Fonts are stored under your uploads directory (typically `wp-content/uploads/fonts/google/<family-slug>/`).  
-Self-hosted Bunny Fonts are stored under your uploads directory (typically `wp-content/uploads/fonts/bunny/<family-slug>/`).
+Self-hosted provider files are stored under your uploads directory:
+
+- Custom CSS URL imports: `wp-content/uploads/fonts/custom/<family-slug>/`
+- Google Fonts: `wp-content/uploads/fonts/google/<family-slug>/`
+- Bunny Fonts: `wp-content/uploads/fonts/bunny/<family-slug>/`
 
 ---
 
 ## How It Works — 5 Steps
 
-1. **Add fonts to your library** — local files, Google Fonts, Bunny Fonts, or Adobe Fonts, all from the same screen.
+1. **Add fonts to your library** — local files, custom CSS URLs, Google Fonts, Bunny Fonts, or Adobe Fonts, all from the same screen.
 2. **Choose a delivery profile** for each family — self-hosted for full GDPR control, CDN for convenience.
 3. **Assign draft roles** for heading, body, and optional monospace output — nothing goes live yet.
 4. **Preview the full typography system** and compare it against what is currently live on the site.
@@ -206,7 +211,7 @@ No. Tasty Custom Fonts works on any standard WordPress site without any companio
 <details>
 <summary><strong>Is this plugin GDPR compliant? Can I self-host Google Fonts?</strong></summary>
 
-Yes. Google Fonts and Bunny Fonts can both be imported into your own server storage. The plugin downloads the font files to `wp-content/uploads/fonts/` and generates `@font-face` rules that point to your own domain — no calls to Google or Bunny servers happen at runtime when you use self-hosted mode.
+Yes. Google Fonts, Bunny Fonts, and supported custom CSS URL imports can be imported into your own server storage. The plugin downloads the font files to `wp-content/uploads/fonts/` and generates `@font-face` rules that point to your own domain — no calls to those source hosts happen at runtime when you use self-hosted mode.
 
 </details>
 
@@ -220,7 +225,7 @@ Search for a Google Fonts family inside the Font Library, choose **Self-hosted**
 <details>
 <summary><strong>Does a Google Fonts API key cost money?</strong></summary>
 
-No. A Google Fonts API key is free. It is only needed if you want live Google Fonts search inside the dashboard. Local uploads, self-hosted imports, Bunny Fonts, and Adobe Fonts workflows do not require a key at all.
+No. A Google Fonts API key is free. It is only needed if you want live Google Fonts search inside the dashboard. Local uploads, custom CSS URL imports, self-hosted imports, Bunny Fonts, and Adobe Fonts workflows do not require a key at all.
 
 </details>
 
@@ -248,7 +253,7 @@ The plugin supports per-site activation inside a multisite network. Network-wide
 <details>
 <summary><strong>Where are font files stored?</strong></summary>
 
-All generated assets and imported files live under `wp-content/uploads/fonts/`, with provider-specific subdirectories for Google (`/google/`) and Bunny (`/bunny/`) imports. The runtime CSS file is written to `wp-content/uploads/fonts/.generated/tasty-fonts.css`.
+All generated assets and imported files live under `wp-content/uploads/fonts/`, with provider-specific subdirectories for custom CSS URL (`/custom/`), Google (`/google/`), Bunny (`/bunny/`), and local upload (`/upload/`) imports. The runtime CSS file is written to `wp-content/uploads/fonts/.generated/tasty-fonts.css`.
 
 </details>
 
@@ -272,6 +277,8 @@ Yes, since 1.13.0. Go to `Settings → Behavior → Admin Access`, toggle **Enab
 - 📋 **Paginated activity log** — search, filter by actor, and choose 5–100 entries per page in Advanced Tools → Activity
 - ⚙️ **Settings streamlined to 3 tabs** — Output, Integrations, and Behavior; Developer maintenance and Transfer workflows now live in Advanced Tools
 
+The current development line also includes **Phase 1 Custom CSS URL Imports**: a From URL flow for one public HTTPS `@font-face` stylesheet at a time, with WOFF2/WOFF dry-run validation, self-hosted or remote-serving final import, and read-only source history. Direct font-file URLs, multiple CSS URLs, source replacement, and Verify Now remain future phases.
+
 Have a workflow you want prioritized? Open a feature request on **[GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues)** — real-world agency, client, and editorial use cases shape the roadmap directly.
 
 ---
@@ -286,6 +293,7 @@ Full documentation on the **[GitHub Wiki](https://github.com/sathyvelukunashegar
 | [Getting Started](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Getting-Started) | Installation, first run, and initial setup |
 | [Deploy Fonts](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Deploy-Fonts) | Draft roles, preview, and publishing workflow |
 | [Font Library](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Font-Library) | Managing families, delivery profiles, and font-display |
+| [Custom CSS URL Imports](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Provider-Custom-CSS) | Phase 1 From URL workflow, limits, delivery choices, and troubleshooting |
 | [Settings](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Settings) | Output controls, integrations, and runtime behavior |
 | [Advanced Tools](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Advanced-Tools) | Generated CSS, diagnostics, and activity log |
 | [Developer Docs](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Architecture) | Architecture, filters, and extension points |

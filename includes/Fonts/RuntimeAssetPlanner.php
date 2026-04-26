@@ -205,6 +205,14 @@ final class RuntimeAssetPlanner
                 continue;
             }
 
+            if ($provider === 'custom' && $type === 'cdn') {
+                foreach ($this->remoteFontOrigins($activeDelivery) as $origin) {
+                    $origins[$origin] = $origin;
+                }
+
+                continue;
+            }
+
             $origin = match ($provider . ':' . $type) {
                 'google:cdn' => 'https://fonts.googleapis.com',
                 'bunny:cdn' => 'https://fonts.bunny.net',
@@ -279,8 +287,9 @@ final class RuntimeAssetPlanner
             $format = FontUtils::resolveProfileFormat($delivery);
             $deliveryId = $this->deliveryStringValue($delivery, 'id');
             $familyName = $this->familyStringValue($family, 'family');
+            $generatedFontFaceDelivery = $type === 'self_hosted' || ($provider === 'custom' && $type === 'cdn');
 
-            if ($deliveryId === '' || $provider === 'adobe' || $type !== 'self_hosted') {
+            if ($deliveryId === '' || $provider === 'adobe' || !$generatedFontFaceDelivery) {
                 continue;
             }
 
@@ -371,6 +380,32 @@ final class RuntimeAssetPlanner
             'provider' => $provider,
             'type' => $type,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $delivery
+     * @return list<string>
+     */
+    private function remoteFontOrigins(array $delivery): array
+    {
+        $origins = [];
+
+        foreach ($this->deliveryFaces($delivery) as $face) {
+            foreach ($this->faceFiles($face) as $url) {
+                $scheme = strtolower(FontUtils::scalarStringValue(wp_parse_url($url, PHP_URL_SCHEME) ?: ''));
+                $host = strtolower(FontUtils::scalarStringValue(wp_parse_url($url, PHP_URL_HOST) ?: ''));
+
+                if ($scheme === '' || $host === '') {
+                    continue;
+                }
+
+                $port = FontUtils::scalarStringValue(wp_parse_url($url, PHP_URL_PORT) ?: '');
+                $origin = $scheme . '://' . $host . ($port !== '' ? ':' . $port : '');
+                $origins[$origin] = $origin;
+            }
+        }
+
+        return array_values($origins);
     }
 
     /**

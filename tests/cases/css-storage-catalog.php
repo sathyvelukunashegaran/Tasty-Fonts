@@ -1419,6 +1419,47 @@ $tests['css_builder_uses_per_family_font_display_overrides'] = static function (
     assertContainsValue("font-family:\"Lora\";\n  font-weight:700;\n  font-style:normal;\n  src:url(\"https://example.com/fonts/lora.woff2\") format(\"woff2\");\n  font-display:optional;", $css, 'Families without an override should continue using the global font-display default.');
 };
 
+$tests['css_builder_emits_controlled_font_face_css_for_custom_remote_urls'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Remote Sans' => [
+            'family' => 'Remote Sans',
+            'slug' => 'remote-sans',
+            'sources' => ['custom'],
+            'active_delivery' => [
+                'provider' => 'custom',
+                'type' => 'cdn',
+            ],
+            'faces' => [[
+                'family' => 'Remote Sans',
+                'slug' => 'remote-sans',
+                'source' => 'custom',
+                'weight' => '400',
+                'style' => 'normal',
+                'unicode_range' => 'U+0000-00FF',
+                'files' => [
+                    'woff2' => 'https://cdn.example.com/fonts/remote-sans.woff2?v=1&subset=latin',
+                ],
+            ]],
+        ],
+    ];
+
+    $css = $builder->buildFontFaceOnly(
+        $catalog,
+        [
+            'font_display' => 'optional',
+            'family_font_displays' => ['Remote Sans' => 'fallback'],
+            'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_PRESERVE,
+            'minify_css_output' => false,
+        ]
+    );
+
+    assertContainsValue('@font-face', $css, 'Custom remote deliveries should still emit Tasty Fonts-generated @font-face rules.');
+    assertContainsValue('url("https://cdn.example.com/fonts/remote-sans.woff2?v=1&subset=latin") format("woff2")', $css, 'Custom remote @font-face rules should preserve absolute remote font URLs.');
+    assertContainsValue('font-display:fallback;', $css, 'Custom remote @font-face rules should use existing per-family font-display settings.');
+    assertContainsValue('unicode-range:U+0000-00FF;', $css, 'Custom remote @font-face rules should preserve reviewed unicode-range values.');
+};
+
 $tests['storage_returns_absolute_generated_css_url'] = static function (): void {
     resetTestState();
 
@@ -1604,7 +1645,7 @@ $tests['storage_writes_absolute_files_via_wp_filesystem'] = static function (): 
 
     assertSameValue(true, $written, 'Storage should write absolute files through the shared filesystem bridge.');
     assertSameValue('font-data', (string) file_get_contents($targetPath), 'Storage writes should persist the provided file contents.');
-    assertSameValue(true, in_array(dirname($targetPath), $wp_filesystem->mkdirCalls, true), 'Storage writes should create missing parent directories before writing.');
+    assertSameValue(true, is_dir(dirname($targetPath)), 'Storage writes should ensure missing parent directories exist before writing.');
     assertSameValue(1, count($wpFilesystemInitCalls), 'Storage writes should initialize the shared filesystem bridge once per write.');
 };
 

@@ -165,6 +165,7 @@ final class AdminPageViewBuilder
         $showActivityLog = !empty($context['show_activity_log']);
         $trainingWheelsOff = $this->trainingWheelsOff;
         $variableFontsEnabled = !empty($context['variable_fonts_enabled']);
+        $customCssUrlImportsEnabled = !empty($context['custom_css_url_imports_enabled']);
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
         $advancedTools = $this->mapValue($context, 'advanced_tools');
         $diagnosticItems = $this->listOfMapsValue($context, 'diagnostic_items');

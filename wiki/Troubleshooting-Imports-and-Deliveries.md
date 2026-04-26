@@ -48,6 +48,7 @@ Go to `Deploy Fonts`, confirm the family is assigned to the correct role (Headin
 | Google | Valid API key is saved in the plugin; the key has the Web Fonts API enabled |
 | Bunny | Download URLs are reachable from the server (no firewall blocking Bunny.net) |
 | Adobe | Web project ID is correct and the project is published (not in draft or paused) |
+| Custom CSS URL | Source is one public HTTPS CSS stylesheet; detected font URLs resolve to public HTTPS WOFF2/WOFF files; the dry-run snapshot has not expired |
 | Local | File format is supported (WOFF2, WOFF, TTF, OTF) and file is writable after upload |
 
 ### 5. Check The Activity Log
@@ -69,12 +70,15 @@ For self-hosted deliveries, the generated `@font-face` rules use your saved glob
 
 For live Google and Bunny CDN deliveries, the runtime planner promotes `optional` to `swap`. If a CDN family still does not render as expected, inspect whether the family has a per-family `font-display` override such as `fallback` or `block`.
 
+Custom CSS URL imports ignore any `font-display` value found in the source stylesheet. The generated Tasty Fonts CSS uses the saved global or per-family font-display setting instead.
+
 ---
 
 ## Notes
 
 - Families can stay in the library for later use without becoming live immediately.
 - Remote CDN deliveries and self-hosted deliveries both work within the same delivery profile model, but they produce different runtime asset behavior.
+- Custom CSS remote-serving profiles emit Tasty Fonts-generated `@font-face` rules for validated remote font URLs. The original third-party stylesheet is not enqueued.
 - Google and Bunny CDN deliveries intentionally avoid live `display=optional` requests because that can leave first-visit renders stuck on fallback fonts.
 - If the library state looks correct but runtime still looks stale, continue with the generated CSS checks.
 
@@ -82,6 +86,7 @@ For live Google and Bunny CDN deliveries, the runtime planner promotes `optional
 
 - [Font Library](Font-Library)
 - [Generated CSS](Troubleshooting-Generated-CSS)
+- [Custom CSS URL Imports](Provider-Custom-CSS)
 - [Site Transfer](Site-Transfer)
 - [Google Fonts](Provider-Google-Fonts)
 - [Bunny Fonts](Provider-Bunny-Fonts)

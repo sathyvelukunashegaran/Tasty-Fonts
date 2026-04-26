@@ -136,6 +136,7 @@ final class SettingsRepository
         'training_wheels_off' => false,
         'monospace_role_enabled' => false,
         'variable_fonts_enabled' => false,
+        'custom_css_url_imports_enabled' => false,
         'admin_access_custom_enabled' => false,
         'admin_access_role_slugs' => [],
         'admin_access_user_ids' => [],
@@ -232,6 +233,7 @@ final class SettingsRepository
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
         $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);
+        $settings['custom_css_url_imports_enabled'] = !empty($settings['custom_css_url_imports_enabled']);
         $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
         $settings['admin_access_user_ids'] = $this->normalizeAdminAccessUserIds($settings['admin_access_user_ids'] ?? []);
         $settings['admin_access_custom_enabled'] = $this->normalizeAdminAccessCustomEnabled(
@@ -358,6 +360,11 @@ final class SettingsRepository
 
         if (array_key_exists('variable_fonts_enabled', $input)) {
             $settings['variable_fonts_enabled'] = !empty($input['variable_fonts_enabled']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('custom_css_url_imports_enabled', $input)) {
+            $settings['custom_css_url_imports_enabled'] = !empty($input['custom_css_url_imports_enabled']);
             $settingsChanged = true;
         }
 

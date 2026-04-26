@@ -422,6 +422,7 @@ trait FamilyCardRendererSupport
             'google' => __('Google', 'tasty-fonts'),
             'bunny' => __('Bunny', 'tasty-fonts'),
             'adobe' => __('Adobe', 'tasty-fonts'),
+            'custom' => __('Custom CSS', 'tasty-fonts'),
             default => ucfirst(trim($source)),
         };
     }
@@ -457,8 +458,123 @@ trait FamilyCardRendererSupport
             'google:cdn' => __('External request via Google Fonts', 'tasty-fonts'),
             'bunny:cdn' => __('External request via Bunny Fonts', 'tasty-fonts'),
             'adobe:adobe_hosted' => __('Adobe-hosted project stylesheet', 'tasty-fonts'),
+            'custom:cdn' => __('Remote custom CSS font URLs', 'tasty-fonts'),
+            'custom:self_hosted' => __('Self-hosted custom CSS files', 'tasty-fonts'),
             default => __('Self-hosted files', 'tasty-fonts'),
         };
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function isCustomCssProfile(array $profile): bool
+    {
+        $provider = strtolower(trim($this->mapStringValue($profile, 'provider')));
+        $meta = FontUtils::normalizeStringKeyedMap($profile['meta'] ?? null);
+        $sourceType = strtolower(trim(FontUtils::scalarStringValue($meta['source_type'] ?? '')));
+        $sourceUrl = trim(FontUtils::scalarStringValue($meta['source_css_url'] ?? ''));
+
+        return $provider === 'custom' && $sourceUrl !== '' && in_array($sourceType, ['', 'custom_css_url'], true);
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function customCssSourceUrl(array $profile): string
+    {
+        $meta = FontUtils::normalizeStringKeyedMap($profile['meta'] ?? null);
+
+        return trim(FontUtils::scalarStringValue($meta['source_css_url'] ?? ''));
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function customCssDeliveryModeLabel(array $profile): string
+    {
+        $type = strtolower(trim($this->mapStringValue($profile, 'type')));
+        $meta = FontUtils::normalizeStringKeyedMap($profile['meta'] ?? null);
+        $mode = strtolower(trim(FontUtils::scalarStringValue($meta['delivery_mode'] ?? '')));
+
+        if ($type === 'cdn' || $mode === 'remote') {
+            return __('Remote-serving', 'tasty-fonts');
+        }
+
+        return __('Self-hosted', 'tasty-fonts');
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function customCssDeliveryModeDescription(array $profile): string
+    {
+        $type = strtolower(trim($this->mapStringValue($profile, 'type')));
+        $meta = FontUtils::normalizeStringKeyedMap($profile['meta'] ?? null);
+        $mode = strtolower(trim(FontUtils::scalarStringValue($meta['delivery_mode'] ?? '')));
+
+        if ($type === 'cdn' || $mode === 'remote') {
+            return __('Visitors request the reviewed remote font URLs while Tasty Fonts generates the CSS.', 'tasty-fonts');
+        }
+
+        return __('Font files were copied to WordPress uploads. The original CSS URL is retained as read-only history.', 'tasty-fonts');
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function customCssLastVerifiedAt(array $profile): string
+    {
+        $latest = 0;
+        $meta = FontUtils::normalizeStringKeyedMap($profile['meta'] ?? null);
+        $metaVerifiedAt = trim(FontUtils::scalarStringValue($meta['last_verified_at'] ?? ''));
+
+        if ($metaVerifiedAt !== '') {
+            $parsed = strtotime($metaVerifiedAt);
+
+            if ($parsed !== false) {
+                $latest = max($latest, $parsed);
+            }
+        }
+
+        foreach (FontUtils::normalizeFaceList($profile['faces'] ?? []) as $face) {
+            $provider = FontUtils::normalizeStringKeyedMap($face['provider'] ?? null);
+            $verifiedAt = trim(FontUtils::scalarStringValue($provider['last_verified_at'] ?? ''));
+
+            if ($verifiedAt === '') {
+                continue;
+            }
+
+            $parsed = strtotime($verifiedAt);
+
+            if ($parsed !== false) {
+                $latest = max($latest, $parsed);
+            }
+        }
+
+        return $latest > 0 ? gmdate('c', $latest) : '';
+    }
+
+    protected function formatCustomCssTimestamp(string $timestamp): string
+    {
+        $timestamp = trim($timestamp);
+
+        if ($timestamp === '') {
+            return '';
+        }
+
+        $unix = strtotime($timestamp);
+
+        if ($unix === false) {
+            return '';
+        }
+
+        $dateFormat = trim(FontUtils::scalarStringValue(get_option('date_format', 'M j, Y')));
+        $timeFormat = trim(FontUtils::scalarStringValue(get_option('time_format', 'g:i a')));
+        $format = trim($dateFormat . ' ' . $timeFormat);
+        $format = $format !== '' ? $format : 'M j, Y g:i a';
+        $formatted = wp_date($format, $unix);
+
+        return is_string($formatted) ? $formatted : '';
     }
 
     /**

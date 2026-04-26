@@ -1,4 +1,15 @@
-                    <?php $showUploadVariableControls = !empty($variableFontsEnabled); ?>
+                    <?php
+                    $showUploadVariableControls = !empty($variableFontsEnabled);
+                    $customCssUrlImportsEnabled = !empty($customCssUrlImportsEnabled);
+                    $customCssDeveloperGateUrl = add_query_arg(
+                        [
+                            'page' => 'tasty-custom-fonts',
+                            'tf_page' => 'diagnostics',
+                            'tf_studio' => 'maintenance',
+                        ],
+                        admin_url('admin.php')
+                    );
+                    ?>
                     <section class="tasty-fonts-card tasty-fonts-library-card" id="tasty-fonts-library" aria-labelledby="tasty-fonts-library-panel-title">
                         <div class="tasty-fonts-card-head tasty-fonts-card-head--library">
                             <h2 class="screen-reader-text" id="tasty-fonts-library-panel-title"><?php esc_html_e('Font Library', 'tasty-fonts'); ?></h2>
@@ -75,6 +86,7 @@
                                 <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button" id="tasty-fonts-add-font-tab-bunny" data-tab-group="add-font" data-tab-target="bunny" aria-selected="false" tabindex="-1" aria-controls="tasty-fonts-add-font-panel-bunny" role="tab"><?php esc_html_e('Bunny Fonts', 'tasty-fonts'); ?></button>
                                 <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button" id="tasty-fonts-add-font-tab-adobe" data-tab-group="add-font" data-tab-target="adobe" aria-selected="false" tabindex="-1" aria-controls="tasty-fonts-add-font-panel-adobe" role="tab"><?php esc_html_e('Adobe Fonts', 'tasty-fonts'); ?></button>
                                 <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button" id="tasty-fonts-add-font-tab-upload" data-tab-group="add-font" data-tab-target="upload" aria-selected="false" tabindex="-1" aria-controls="tasty-fonts-add-font-panel-upload" role="tab"><?php esc_html_e('Upload Files', 'tasty-fonts'); ?></button>
+                                <button type="button" class="button tasty-fonts-add-font-tab tasty-fonts-tab-button" id="tasty-fonts-add-font-tab-url" data-tab-group="add-font" data-tab-target="url" aria-selected="false" tabindex="-1" aria-controls="tasty-fonts-add-font-panel-url" role="tab"><?php esc_html_e('From URL', 'tasty-fonts'); ?></button>
                             </div>
 
                             <div class="tasty-fonts-add-font-panels">
@@ -355,6 +367,61 @@
                                                     <?php foreach ($adobeDetectedFamilies as $family): ?>
                                                         <?php $familyCardRenderer->renderAdobeFamilyCard($family); ?>
                                                     <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </section>
+                                    </div>
+                                </section>
+
+                                <section class="tasty-fonts-add-font-panel" id="tasty-fonts-add-font-panel-url" data-tab-group="add-font" data-tab-panel="url" role="tabpanel" aria-labelledby="tasty-fonts-add-font-tab-url" hidden>
+                                    <div class="tasty-fonts-source-shell tasty-fonts-source-shell--url">
+                                        <section class="tasty-fonts-source-card tasty-fonts-source-card--status">
+                                            <div class="tasty-fonts-source-status-row">
+                                                <?php
+                                                $this->renderSourceSetupCopy(
+                                                    __('From URL', 'tasty-fonts'),
+                                                    __('Inspect a public HTTPS CSS stylesheet that contains @font-face rules.', 'tasty-fonts')
+                                                );
+                                                ?>
+                                                <div class="tasty-fonts-source-status-actions">
+                                                    <span class="tasty-fonts-badge"><?php echo esc_html($customCssUrlImportsEnabled ? __('Dry Run Only', 'tasty-fonts') : __('Developer Off', 'tasty-fonts')); ?></span>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--url">
+                                            <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                                                <span class="tasty-fonts-panel-kicker"><?php echo esc_html($customCssUrlImportsEnabled ? __('Review First', 'tasty-fonts') : __('Developer Gate', 'tasty-fonts')); ?></span>
+                                                <h4><?php esc_html_e('Inspect a CSS Stylesheet', 'tasty-fonts'); ?></h4>
+                                            </div>
+
+                                            <?php if ($customCssUrlImportsEnabled): ?>
+                                                <form id="tasty-fonts-url-dry-run-form" class="tasty-fonts-url-dry-run-form" novalidate>
+                                                    <label class="tasty-fonts-stack-field" for="tasty-fonts-url-dry-run-input">
+                                                        <?php $this->renderFieldLabel(__('CSS Stylesheet URL', 'tasty-fonts')); ?>
+                                                        <input
+                                                            type="url"
+                                                            id="tasty-fonts-url-dry-run-input"
+                                                            class="regular-text tasty-fonts-text-control"
+                                                            placeholder="<?php esc_attr_e('https://example.com/fonts.css', 'tasty-fonts'); ?>"
+                                                            autocomplete="url"
+                                                            spellcheck="false"
+                                                            aria-describedby="tasty-fonts-url-dry-run-help tasty-fonts-url-dry-run-status"
+                                                            required
+                                                        >
+                                                    </label>
+                                                    <p id="tasty-fonts-url-dry-run-help" class="tasty-fonts-muted"><?php esc_html_e('The dry run reads CSS and shows supported WOFF or WOFF2 faces. It does not save library data or write font files.', 'tasty-fonts'); ?></p>
+                                                    <div class="tasty-fonts-upload-actions">
+                                                        <button type="submit" class="button button-primary" id="tasty-fonts-url-dry-run-submit"><?php esc_html_e('Run Dry Run', 'tasty-fonts'); ?></button>
+                                                    </div>
+                                                    <div id="tasty-fonts-url-dry-run-status" class="tasty-fonts-import-status" aria-live="polite" aria-atomic="true"></div>
+                                                </form>
+
+                                                <div id="tasty-fonts-url-dry-run-review" class="tasty-fonts-url-dry-run-review" aria-live="polite" aria-atomic="false" hidden></div>
+                                            <?php else: ?>
+                                                <div class="tasty-fonts-empty tasty-fonts-empty--panel" role="note">
+                                                    <p><?php esc_html_e('From URL is an expert import workflow. It is disabled until Custom CSS URL Imports is enabled in the Developer tab of Advanced Tools.', 'tasty-fonts'); ?></p>
+                                                    <p><a class="button" href="<?php echo esc_url($customCssDeveloperGateUrl); ?>"><?php esc_html_e('Open Developer Tools', 'tasty-fonts'); ?></a></p>
                                                 </div>
                                             <?php endif; ?>
                                         </section>

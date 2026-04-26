@@ -66,6 +66,9 @@ final class Storage
         $adobeDir = wp_normalize_path(trailingslashit($rootDir) . 'adobe');
         $adobeUrl = $rootUrl . '/adobe';
         $adobeUrlFull = $rootUrlFull . '/adobe';
+        $customDir = wp_normalize_path(trailingslashit($rootDir) . 'custom');
+        $customUrl = $rootUrl . '/custom';
+        $customUrlFull = $rootUrlFull . '/custom';
         $generatedDir = wp_normalize_path(trailingslashit($rootDir) . '.generated');
         $generatedUrl = $rootUrl . '/.generated';
         $generatedUrlFull = $rootUrlFull . '/.generated';
@@ -90,6 +93,9 @@ final class Storage
             'adobe_dir' => $adobeDir,
             'adobe_url' => $adobeUrl,
             'adobe_url_full' => $adobeUrlFull,
+            'custom_dir' => $customDir,
+            'custom_url' => $customUrl,
+            'custom_url_full' => $customUrlFull,
             'generated_dir' => $generatedDir,
             'generated_url' => $generatedUrl,
             'generated_url_full' => $generatedUrlFull,
@@ -126,6 +132,11 @@ final class Storage
     public function getAdobeRoot(): ?string
     {
         return $this->getProviderRoot('adobe');
+    }
+
+    public function getCustomRoot(): ?string
+    {
+        return $this->getProviderRoot('custom');
     }
 
     public function getProviderRoot(string $provider): ?string
@@ -271,7 +282,15 @@ final class Storage
 
     public function writeAbsoluteFile(string $path, string $contents): bool
     {
-        if ($path === '' || !$this->initializeFilesystem(dirname($path))) {
+        $path = wp_normalize_path($path);
+
+        if ($path === '') {
+            return false;
+        }
+
+        $directory = wp_normalize_path(dirname($path));
+
+        if (!$this->ensureDirectory($directory) || !$this->initializeFilesystem($directory)) {
             return false;
         }
 
@@ -288,7 +307,6 @@ final class Storage
 
         $filesystem = $wp_filesystem;
 
-        $directory = dirname($path);
         $directoryPermissions = $this->directoryPermissions();
         $filePermissions = $this->filePermissions();
 

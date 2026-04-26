@@ -28,7 +28,8 @@ includes/
   Plugin.php             — service container and hook wiring
   Repository/            — options, transients, library state, activity logging
   Support/               — storage helpers, environment detection, font utilities
-  Fonts/                 — catalog, CSS building, runtime planning, library mutations, asset handling
+  Fonts/                 — catalog, CSS building, runtime planning, local uploads, library mutations, and generated asset handling
+  CustomCss/             — custom CSS URL dry-run planning, snapshots, final import, and revalidation
   Google/                — Google Fonts import and catalog logic
   Bunny/                 — Bunny Fonts import and catalog logic
   Adobe/                 — Adobe Fonts import and catalog logic
@@ -50,6 +51,7 @@ bin/                     — release helper scripts
 - `Repository/`: options, transients, library state, and activity logging
 - `Support/`: storage, environment detection, and font utility helpers
 - `Fonts/`: catalog, CSS building, runtime planning, local uploads, library mutations, and generated asset handling
+- `CustomCss/`: public HTTPS CSS stylesheet dry runs, server-side review snapshots, self-hosted/remote final imports, and safe custom replacement cleanup
 - provider namespaces: Google, Bunny, and Adobe import/catalog logic
 - `Integrations/`: dedicated service classes for ACSS, Bricks, and Oxygen page-builder integrations
 - `Admin/`: controller, page context building, view building, and section rendering
@@ -74,8 +76,8 @@ No external dependency injection container is used. The wiring is explicit and c
 
 Each family can store one or more delivery profiles. A profile carries:
 
-- provider (string constant: `local`, `google`, `bunny`, `adobe`)
-- delivery type (string constant: `self-hosted`, `cdn`, `adobe-hosted`)
+- provider (string constant: `local`, `custom`, `google`, `bunny`, `adobe`)
+- delivery type (string constant: `self-hosted`, `cdn`, `adobe-hosted`; custom CSS URL imports store self-hosted or remote-serving custom profiles)
 - variants (array of variant records)
 - faces (array of generated `@font-face` parameters)
 - optional metadata (e.g., Google API response details)
@@ -152,6 +154,7 @@ The admin UI operates entirely through a plugin REST API adapter (`Api/RestContr
 | Applied (live) roles | Stored under `applied_roles` within `tasty_fonts_settings`; used by `CssBuilder` at runtime |
 | Activity log | `get_option('tasty_fonts_log')` — see `Repository/LogRepository.php` |
 | Rollback snapshots | `get_option('tasty_fonts_snapshots')` — see `Maintenance/SnapshotService::OPTION_SNAPSHOTS` |
+| Custom CSS dry-run snapshots | Short-lived site/user-scoped transients created by `CustomCssImportSnapshotService`; tokens expire after roughly 15 minutes and are single-use |
 | Generated CSS cache | Transients: `tasty_fonts_css_v2` (stylesheet) and `tasty_fonts_css_hash_v2` (content hash) — see `AssetService::TRANSIENT_CSS` / `TRANSIENT_HASH` |
 | Integration detection | Stored in settings; reset via `Advanced Tools → Developer` |
 
@@ -192,6 +195,7 @@ If you need behavior that is not covered by the existing hooks:
 ## Notes
 
 - The canonical generated stylesheet path is `uploads/fonts/.generated/tasty-fonts.css`.
+- Custom CSS URL imports can be self-hosted under `uploads/fonts/custom/` or remote-serving through Tasty Fonts-generated `@font-face` rules; the original source stylesheet is not enqueued.
 - Google and Bunny can be self-hosted or CDN-based; Adobe remains hosted remotely.
 - Block Editor Font Library sync is separate from the plugin's own runtime output path.
 - Variable font support is opt-in. When enabled, `CatalogService`, `CssBuilder`, and `RuntimeAssetPlanner` carry axis metadata and emit `font-variation-settings` where variable faces are active. Disabling it reverts all paths to static-only behavior.

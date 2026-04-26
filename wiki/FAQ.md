@@ -95,6 +95,12 @@ Having multiple profiles on one family means you can switch between them without
 3. If you placed the file on the server manually (via FTP or SSH), use the `Rescan` action from the Font Library to discover it.
 4. Check the activity log in `Advanced Tools` for any upload error messages.
 
+### Can I import fonts from a CSS URL?
+
+Yes. Use **Font Library → Add Fonts → From URL** when you have one public HTTPS CSS stylesheet containing `@font-face` rules. Phase 1 supports WOFF2 and WOFF sources, requires a dry run before final import, and lets you choose self-hosted or remote-serving delivery.
+
+It does not import direct font-file URLs, TTF/OTF URLs, private/authenticated URLs, or multiple CSS URLs in one batch yet. See [Custom CSS URL Imports](Provider-Custom-CSS) for limits and troubleshooting.
+
 ---
 
 ## Site Transfer
