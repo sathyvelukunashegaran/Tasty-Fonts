@@ -156,7 +156,7 @@ add_filter( 'tasty_fonts_generated_css', function ( string $css, array $catalog,
 | What | Option / Transient |
 |---|---|
 | Settings | `tasty_fonts_settings` |
-| Google Fonts API key | `tasty_fonts_google_api_key_data` (encrypted, isolated, never exported in transfer bundles) |
+| Google Fonts API key | `tasty_fonts_google_api_key_data` (encrypted when libsodium and WordPress salts are available; otherwise falls back to plaintext `google_api_key`; isolated and never exported in transfer bundles) |
 | Font library | `tasty_fonts_library` |
 | Draft roles | `tasty_fonts_roles` |
 | Applied (live) roles | `applied_roles` key inside `tasty_fonts_settings` |
