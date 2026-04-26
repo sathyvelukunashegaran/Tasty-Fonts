@@ -32,13 +32,17 @@ includes/
   Google/                — Google Fonts import and catalog logic
   Bunny/                 — Bunny Fonts import and catalog logic
   Adobe/                 — Adobe Fonts import and catalog logic
+  Integrations/          — page-builder integrations (ACSS, Bricks, Oxygen)
+  Maintenance/           — developer tooling, health checks, site transfer, snapshots, support bundles
+  Cli/                   — WP-CLI command adapter
   Admin/                 — page controller, context builders, view builders, section renderers
   Api/                   — REST adapter over admin actions
   Updates/               — GitHub release updater integration
+  Uninstall/             — clean-up handler invoked on plugin uninstall
 assets/                  — JS and CSS for admin UI
 languages/               — POT template and translation files
 tests/                   — PHP test cases and JS contract tests
-bin/                     — release helper script
+bin/                     — release helper scripts
 ```
 
 ### Major Service Layers
@@ -47,10 +51,12 @@ bin/                     — release helper script
 - `Support/`: storage, environment detection, and font utility helpers
 - `Fonts/`: catalog, CSS building, runtime planning, local uploads, library mutations, and generated asset handling
 - provider namespaces: Google, Bunny, and Adobe import/catalog logic
+- `Integrations/`: dedicated service classes for ACSS, Bricks, and Oxygen page-builder integrations
 - `Admin/`: controller, page context building, view building, and section rendering
 - `Api/`: REST adapter over admin actions
 - `Updates/`: GitHub release updater integration
-- `Maintenance/`: developer tooling, cache management, and site transfer — `DeveloperToolsService` handles cache clears, resets, and storage scaffolding; `SiteTransferService` (added in 1.12.0) coordinates portable export bundles (builds a ZIP containing a manifest and font files), validates and imports bundles (replaces library, settings, and role data), and handles the optional fresh Google API key flow during import. `SiteTransferService` requires the underlying `ZipArchive` PHP extension for bundle export/import operations.
+- `Cli/`: WP-CLI command adapter (`wp tasty-fonts`); routes through `AdminController` so CLI and admin UI share identical behavior
+- `Maintenance/`: developer tooling, cache management, and site transfer — `DeveloperToolsService` handles cache clears, resets, and storage scaffolding; `HealthCheckService` produces severity-rated health checks consumed by the Diagnostics tab and `wp tasty-fonts doctor`; `SiteTransferService` (added in 1.12.0) coordinates portable export bundles and validates/imports them; `SnapshotService` manages automated rollback snapshots (stored in `tasty_fonts_snapshots`, up to 10); `SupportBundleService` assembles diagnostic ZIPs for support. `SiteTransferService`, `SnapshotService`, and `SupportBundleService` all require the PHP `ZipArchive` extension. `SiteTransferService` and `SnapshotService` share `SCHEMA_VERSION = 1` for bundle compatibility.
 
 ### Service Container
 
@@ -145,6 +151,7 @@ The admin UI operates entirely through a plugin REST API adapter (`Api/RestContr
 | Draft roles | `get_option('tasty_fonts_roles')` — see `SettingsRepository::OPTION_ROLES` |
 | Applied (live) roles | Stored under `applied_roles` within `tasty_fonts_settings`; used by `CssBuilder` at runtime |
 | Activity log | `get_option('tasty_fonts_log')` — see `Repository/LogRepository.php` |
+| Rollback snapshots | `get_option('tasty_fonts_snapshots')` — see `Maintenance/SnapshotService::OPTION_SNAPSHOTS` |
 | Generated CSS cache | Transients: `tasty_fonts_css_v2` (stylesheet) and `tasty_fonts_css_hash_v2` (content hash) — see `AssetService::TRANSIENT_CSS` / `TRANSIENT_HASH` |
 | Integration detection | Stored in settings; reset via `Advanced Tools → Developer` |
 
