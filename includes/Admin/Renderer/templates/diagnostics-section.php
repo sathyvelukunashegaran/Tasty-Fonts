@@ -28,7 +28,6 @@
                     $activityActorOptions = isset($activityActorOptions) && is_array($activityActorOptions) ? $activityActorOptions : [];
                     $showSettingsDescriptions = empty($trainingWheelsOff);
                     $showActivityLog = !empty($showActivityLog);
-                    $customCssUrlImportsEnabled = !empty($customCssUrlImportsEnabled);
 					$updateChannel = isset($updateChannel) ? (string) $updateChannel : 'stable';
 					$updateChannelOptions = isset($updateChannelOptions) && is_array($updateChannelOptions) ? $updateChannelOptions : [];
 					$updateChannelStatus = isset($updateChannelStatus) && is_array($updateChannelStatus) ? $updateChannelStatus : [];
@@ -881,57 +880,6 @@
                                         <span><?php esc_html_e('Pending settings changes temporarily disable developer actions.', 'tasty-fonts'); ?></span>
                                     </div>
                                     <div class="tasty-fonts-health-board tasty-fonts-developer-board">
-                                        <section class="tasty-fonts-health-group tasty-fonts-health-group--developer tasty-fonts-developer-tool-group tasty-fonts-developer-tool-group--import-gates" aria-labelledby="tasty-fonts-advanced-developer-group-import-gates">
-                                            <div class="tasty-fonts-health-group-head">
-                                                <h4 id="tasty-fonts-advanced-developer-group-import-gates"><?php esc_html_e('Advanced Import Gates', 'tasty-fonts'); ?></h4>
-                                                <span class="tasty-fonts-health-group-count"><?php esc_html_e('Expert Controls', 'tasty-fonts'); ?></span>
-                                            </div>
-                                            <div class="tasty-fonts-health-list">
-                                                <article class="tasty-fonts-health-row tasty-fonts-developer-row tasty-fonts-developer-row--custom-css-imports">
-                                                    <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
-                                                    <div class="tasty-fonts-health-row-copy">
-                                                        <div class="tasty-fonts-health-row-title">
-                                                            <strong><?php esc_html_e('Custom CSS URL Imports', 'tasty-fonts'); ?></strong>
-                                                            <?php if ($showSettingsDescriptions): ?>
-                                                                <span><?php esc_html_e('Off by default. Enables the From URL workflow to fetch remote CSS, validate font URLs, and create custom delivery profiles.', 'tasty-fonts'); ?></span>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    </div>
-                                                    <div class="tasty-fonts-health-row-actions">
-                                                        <button
-                                                            type="button"
-                                                            class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-health-help-trigger"
-                                                            aria-label="<?php esc_attr_e('Explain Custom CSS URL Imports', 'tasty-fonts'); ?>"
-                                                            <?php $renderSiteTransferHelpAttributes(__('Expert feature. Only enable it when you trust the stylesheet source and understand that final imports can fetch remote font files, save them locally, or create remote custom delivery profiles.', 'tasty-fonts')); ?>
-                                                        >?</button>
-                                                        <form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form tasty-fonts-custom-css-gate-form">
-                                                            <?php wp_nonce_field('tasty_fonts_save_settings'); ?>
-                                                            <input type="hidden" name="tasty_fonts_save_settings" value="1">
-                                                            <input type="hidden" name="custom_css_url_imports_enabled" value="0">
-                                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--developer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    class="tasty-fonts-toggle-input"
-                                                                    name="custom_css_url_imports_enabled"
-                                                                    value="1"
-                                                                    <?php checked($customCssUrlImportsEnabled); ?>
-                                                                >
-                                                                <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
-                                                                <span class="tasty-fonts-toggle-copy">
-                                                                    <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable URL imports', 'tasty-fonts'); ?></span>
-                                                                    <?php if ($showSettingsDescriptions): ?>
-                                                                        <span class="tasty-fonts-toggle-description"><?php esc_html_e('Requires a page reload before the From URL panel becomes available.', 'tasty-fonts'); ?></span>
-                                                                    <?php endif; ?>
-                                                                </span>
-                                                            </label>
-                                                            <div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
-                                                                <button type="submit" class="button tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--save tasty-fonts-developer-action-button"><?php esc_html_e('Save Gate', 'tasty-fonts'); ?></button>
-                                                            </div>
-                                                        </form>
-                                                    </div>
-                                                </article>
-                                            </div>
-                                        </section>
 										<section class="tasty-fonts-health-group tasty-fonts-health-group--developer tasty-fonts-developer-tool-group tasty-fonts-developer-tool-group--release-rail" aria-labelledby="tasty-fonts-advanced-developer-group-release-rail">
 											<div class="tasty-fonts-health-group-head">
 												<h4 id="tasty-fonts-advanced-developer-group-release-rail"><?php esc_html_e('Release Rail', 'tasty-fonts'); ?></h4>
@@ -955,7 +903,7 @@
 															aria-label="<?php esc_attr_e('Explain Update Channel', 'tasty-fonts'); ?>"
 															<?php $renderSiteTransferHelpAttributes(__('Stable is recommended for production sites. Use Beta or Nightly only when you are testing release candidates or development builds.', 'tasty-fonts')); ?>
 														>?</button>
-														<form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form tasty-fonts-release-rail-form">
+														<form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form tasty-fonts-release-rail-form" data-auto-submit-on-change>
 															<?php wp_nonce_field('tasty_fonts_save_settings'); ?>
 															<input type="hidden" name="tasty_fonts_save_settings" value="1">
 															<div class="tasty-fonts-settings-flat-row-form tasty-fonts-settings-flat-row-form--channel-control">
@@ -969,9 +917,6 @@
 																		<?php endforeach; ?>
 																	</select>
 																</span>
-															</div>
-															<div class="tasty-fonts-developer-action-row tasty-fonts-settings-flat-row-actions">
-																<button type="submit" class="button tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--save tasty-fonts-developer-action-button"><?php esc_html_e('Save Channel', 'tasty-fonts'); ?></button>
 															</div>
 														</form>
 														<?php if (!empty($updateChannelStatus['can_reinstall'])): ?>

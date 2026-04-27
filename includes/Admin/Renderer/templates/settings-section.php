@@ -11,7 +11,7 @@
                         ],
                         'plugin-behavior' => [
                             'title' => __('Behavior', 'tasty-fonts'),
-							'description' => __('Configure onboarding hints, activity visibility, font capabilities, and admin access.', 'tasty-fonts'),
+							'description' => __('Configure onboarding hints, import workflows, activity visibility, font capabilities, and admin access.', 'tasty-fonts'),
                         ],
                     ];
                     ?>
@@ -1270,6 +1270,69 @@
                                                 <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Variable Fonts', 'tasty-fonts'); ?></span>
                                                 <?php if ($showSettingsDescriptions): ?>
                                                     <span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows variable font uploads and axis controls.', 'tasty-fonts'); ?></span>
+                                                <?php endif; ?>
+                                            </span>
+                                        </label>
+                                        </div>
+                                    </section>
+									<section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Font import workflows', 'tasty-fonts'); ?>">
+                                        <div class="tasty-fonts-health-group-head">
+											<h4><?php esc_html_e('Font Import Workflows', 'tasty-fonts'); ?></h4>
+											<span class="tasty-fonts-health-group-count"><?php esc_html_e('Provider Sources', 'tasty-fonts'); ?></span>
+                                        </div>
+                                        <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
+										<input type="hidden" name="google_font_imports_enabled" value="0">
+										<label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+											<input type="checkbox" class="tasty-fonts-toggle-input" name="google_font_imports_enabled" value="1" <?php checked(!empty($googleFontImportsEnabled)); ?>>
+											<span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+											<span class="tasty-fonts-toggle-copy">
+												<span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Google Fonts Imports', 'tasty-fonts'); ?></span>
+												<?php if ($showSettingsDescriptions): ?>
+													<span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows searching and importing Google Fonts families from Add Fonts.', 'tasty-fonts'); ?></span>
+												<?php endif; ?>
+											</span>
+										</label>
+										<input type="hidden" name="bunny_font_imports_enabled" value="0">
+										<label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+											<input type="checkbox" class="tasty-fonts-toggle-input" name="bunny_font_imports_enabled" value="1" <?php checked(!empty($bunnyFontImportsEnabled)); ?>>
+											<span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+											<span class="tasty-fonts-toggle-copy">
+												<span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Bunny Fonts Imports', 'tasty-fonts'); ?></span>
+												<?php if ($showSettingsDescriptions): ?>
+													<span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows searching and importing Bunny Fonts families from Add Fonts.', 'tasty-fonts'); ?></span>
+												<?php endif; ?>
+											</span>
+										</label>
+										<input type="hidden" name="adobe_font_imports_enabled" value="0">
+										<label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+											<input type="checkbox" class="tasty-fonts-toggle-input" name="adobe_font_imports_enabled" value="1" <?php checked(!empty($adobeFontImportsEnabled)); ?>>
+											<span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+											<span class="tasty-fonts-toggle-copy">
+												<span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Adobe Fonts Imports', 'tasty-fonts'); ?></span>
+												<?php if ($showSettingsDescriptions): ?>
+													<span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows connecting or resyncing an Adobe Fonts project from Add Fonts.', 'tasty-fonts'); ?></span>
+												<?php endif; ?>
+											</span>
+										</label>
+										<input type="hidden" name="local_font_uploads_enabled" value="0">
+										<label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+											<input type="checkbox" class="tasty-fonts-toggle-input" name="local_font_uploads_enabled" value="1" <?php checked(!empty($localFontUploadsEnabled)); ?>>
+											<span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+											<span class="tasty-fonts-toggle-copy">
+												<span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Custom Uploads', 'tasty-fonts'); ?></span>
+												<?php if ($showSettingsDescriptions): ?>
+													<span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows uploading local WOFF and WOFF2 font files from Add Fonts.', 'tasty-fonts'); ?></span>
+												<?php endif; ?>
+											</span>
+										</label>
+                                        <input type="hidden" name="custom_css_url_imports_enabled" value="0">
+                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="custom_css_url_imports_enabled" value="1" <?php checked(!empty($customCssUrlImportsEnabled)); ?>>
+                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                            <span class="tasty-fonts-toggle-copy">
+                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable URL Imports', 'tasty-fonts'); ?></span>
+                                                <?php if ($showSettingsDescriptions): ?>
+													<span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows inspecting custom CSS stylesheets from Add Fonts. Save and reload before using it.', 'tasty-fonts'); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                         </label>

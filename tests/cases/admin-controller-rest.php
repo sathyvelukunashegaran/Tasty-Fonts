@@ -2116,6 +2116,55 @@ $tests['rest_controller_returns_native_payloads_for_write_routes'] = static func
     assertSameValue('serif', (string) ($response->get_data()['fallback'] ?? ''), 'REST write routes should return the saved fallback in the response body.');
 };
 
+$tests['rest_controller_font_import_workflow_gates_reject_disabled_provider_and_upload_routes'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'google_font_imports_enabled' => '0',
+        'bunny_font_imports_enabled' => '0',
+        'local_font_uploads_enabled' => '0',
+    ]);
+
+    $googleSearchRequest = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/google/search');
+    $googleSearchRequest->set_param('query', 'Inter');
+    $googleSearchResponse = $services['rest']->searchGoogle($googleSearchRequest);
+
+    assertSameValue(true, $googleSearchResponse instanceof WP_Error, 'Disabled Google imports should block REST search.');
+    assertSameValue('tasty_fonts_font_import_workflow_disabled', $googleSearchResponse->get_error_code(), 'Disabled Google imports should use the shared workflow gate error.');
+    assertSameValue(403, (int) (($googleSearchResponse->get_error_data()['status'] ?? 0)), 'Disabled Google imports should return a forbidden REST status.');
+
+    $bunnySearchRequest = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/bunny/search');
+    $bunnySearchRequest->set_param('query', 'Inter');
+    $bunnySearchResponse = $services['rest']->searchBunny($bunnySearchRequest);
+
+    assertSameValue(true, $bunnySearchResponse instanceof WP_Error, 'Disabled Bunny imports should block REST search.');
+    assertSameValue('tasty_fonts_font_import_workflow_disabled', $bunnySearchResponse->get_error_code(), 'Disabled Bunny imports should use the shared workflow gate error.');
+    assertSameValue(403, (int) (($bunnySearchResponse->get_error_data()['status'] ?? 0)), 'Disabled Bunny imports should return a forbidden REST status.');
+
+    $bunnyDirectResponse = $services['controller']->searchBunnyResults('Inter');
+    assertSameValue(true, $bunnyDirectResponse instanceof WP_Error, 'Disabled Bunny imports should block direct search helpers too.');
+
+    $uploadRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/local/upload');
+    $uploadRequest->set_param('rows', []);
+    $uploadResponse = $services['rest']->uploadLocalFonts($uploadRequest);
+
+    assertSameValue(true, $uploadResponse instanceof WP_Error, 'Disabled custom uploads should block the REST upload route before validation.');
+    assertSameValue('tasty_fonts_font_import_workflow_disabled', $uploadResponse->get_error_code(), 'Disabled custom uploads should use the shared workflow gate error.');
+    assertSameValue(403, (int) (($uploadResponse->get_error_data()['status'] ?? 0)), 'Disabled custom uploads should return a forbidden REST status.');
+
+    $settingsRequest = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $settingsRequest->set_body_params([
+        'google_font_imports_enabled' => '0',
+        'google_api_key' => 'crafted-key',
+    ]);
+    $settingsResponse = $services['rest']->saveSettings($settingsRequest);
+
+    assertSameValue(true, $settingsResponse instanceof WP_Error, 'Disabled Google imports should block crafted Google API key saves.');
+    assertSameValue('tasty_fonts_font_import_workflow_disabled', $settingsResponse->get_error_code(), 'Blocked Google API key saves should use the shared workflow gate error.');
+    assertSameValue(403, (int) (($settingsResponse->get_error_data()['status'] ?? 0)), 'Blocked Google API key saves should return a forbidden REST status.');
+};
+
 $tests['rest_controller_custom_css_feature_gate_rejects_dry_run_and_final_import_when_disabled'] = static function (): void {
     resetTestState();
 
@@ -2128,7 +2177,7 @@ $tests['rest_controller_custom_css_feature_gate_rejects_dry_run_and_final_import
     assertSameValue(true, $dryRunResponse instanceof WP_Error, 'Custom CSS dry runs should be gated off by default.');
     assertSameValue('tasty_fonts_custom_css_url_imports_disabled', $dryRunResponse->get_error_code(), 'Disabled dry runs should use a stable gate error code.');
     assertSameValue(403, (int) (($dryRunResponse->get_error_data()['status'] ?? 0)), 'Disabled dry runs should return a forbidden REST status.');
-    assertContainsValue('Advanced Tools', $dryRunResponse->get_error_message(), 'Disabled dry-run errors should tell users where to enable the gate.');
+    assertContainsValue('Settings > Behavior > Font Import Workflows', $dryRunResponse->get_error_message(), 'Disabled dry-run errors should tell users where to enable the workflow.');
 
     $importRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
     $importRequest->set_body_params([
@@ -3355,30 +3404,42 @@ $tests['rest_controller_roles_draft_returns_current_applied_roles_for_client_res
     assertSameValue('Inter', (string) ($data['applied_roles']['body'] ?? ''), 'The roles/draft route should include the current live body role for client-side resync.');
 };
 
-$tests['settings_repository_defaults_custom_css_url_imports_off'] = static function (): void {
+$tests['settings_repository_defaults_font_import_workflows_for_existing_behavior'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
     $settings = $services['settings']->getSettings();
 
-    assertSameValue(false, !empty($settings['custom_css_url_imports_enabled']), 'Custom CSS URL imports should default off for new and existing installs.');
+    assertSameValue(true, !empty($settings['google_font_imports_enabled']), 'Google Fonts imports should default on for the standard provider workflow.');
+    assertSameValue(true, !empty($settings['bunny_font_imports_enabled']), 'Bunny Fonts imports should default on for the standard provider workflow.');
+    assertSameValue(true, !empty($settings['local_font_uploads_enabled']), 'Custom uploads should default on for local font workflows.');
+    assertSameValue(false, !empty($settings['adobe_font_imports_enabled']), 'Adobe Fonts imports should default off until explicitly enabled.');
+    assertSameValue(false, !empty($settings['custom_css_url_imports_enabled']), 'URL imports should default off until explicitly enabled.');
 };
 
-$tests['rest_controller_settings_accepts_custom_css_url_import_feature_gate'] = static function (): void {
+$tests['rest_controller_settings_accepts_font_import_workflow_gates'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
     $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
     $request->set_body_params([
+        'google_font_imports_enabled' => '0',
+        'bunny_font_imports_enabled' => '0',
+        'local_font_uploads_enabled' => '0',
+        'adobe_font_imports_enabled' => '1',
         'custom_css_url_imports_enabled' => '1',
     ]);
 
     $response = $services['rest']->saveSettings($request);
     $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
 
-    assertSameValue(true, $response instanceof WP_REST_Response, 'The settings route should return a native REST response when saving the custom CSS URL import gate.');
-    assertSameValue(true, !empty($data['settings']['custom_css_url_imports_enabled']), 'The settings route should persist the custom CSS URL import gate.');
-    assertSameValue(true, !empty($data['reload_required']), 'Changing the custom CSS URL import gate should request a reload so the server-rendered From URL panel updates.');
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The settings route should return a native REST response when saving font import workflow gates.');
+    assertSameValue(false, !empty($data['settings']['google_font_imports_enabled']), 'The settings route should persist the Google Fonts import workflow gate.');
+    assertSameValue(false, !empty($data['settings']['bunny_font_imports_enabled']), 'The settings route should persist the Bunny Fonts import workflow gate.');
+    assertSameValue(false, !empty($data['settings']['local_font_uploads_enabled']), 'The settings route should persist the custom upload workflow gate.');
+    assertSameValue(true, !empty($data['settings']['adobe_font_imports_enabled']), 'The settings route should allow Adobe Fonts imports to be turned on.');
+    assertSameValue(true, !empty($data['settings']['custom_css_url_imports_enabled']), 'The settings route should allow URL imports to be turned on.');
+    assertSameValue(true, !empty($data['reload_required']), 'Changing font import workflow gates should request a reload so server-rendered Add Fonts panels update.');
 };
 
 $tests['rest_controller_settings_accepts_variable_font_feature_flag'] = static function (): void {

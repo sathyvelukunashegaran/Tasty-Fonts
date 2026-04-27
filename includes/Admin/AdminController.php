@@ -392,6 +392,10 @@ final class AdminController
      */
     public function searchGoogle(string $query): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('google')) {
+            return $this->fontImportWorkflowDisabledError('google');
+        }
+
         return $this->resolveRateLimitedSearch(
             'google',
             $query,
@@ -404,10 +408,14 @@ final class AdminController
      */
     public function searchBunny(string $query): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('bunny')) {
+            return $this->fontImportWorkflowDisabledError('bunny');
+        }
+
         return $this->resolveRateLimitedSearch(
             'bunny',
             $query,
-            fn (string $resolvedQuery): array => $this->searchBunnyResults($resolvedQuery)
+            fn (string $resolvedQuery): array|WP_Error => $this->searchBunnyResults($resolvedQuery)
         );
     }
 
@@ -416,6 +424,10 @@ final class AdminController
      */
     public function searchGoogleResults(string $query): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('google')) {
+            return $this->fontImportWorkflowDisabledError('google');
+        }
+
         if (!$this->googleClient->canSearch()) {
             return new WP_Error(
                 'tasty_fonts_google_search_unavailable',
@@ -427,10 +439,14 @@ final class AdminController
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function searchBunnyResults(string $query): array
+    public function searchBunnyResults(string $query): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('bunny')) {
+            return $this->fontImportWorkflowDisabledError('bunny');
+        }
+
         return ['items' => $this->bunnyClient->searchFamilies(sanitize_text_field($query), 12)];
     }
 
@@ -439,6 +455,10 @@ final class AdminController
      */
     public function fetchGoogleFamily(string $familyName): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('google')) {
+            return $this->fontImportWorkflowDisabledError('google');
+        }
+
         $familyName = sanitize_text_field($familyName);
 
         if ($familyName === '') {
@@ -477,6 +497,10 @@ final class AdminController
      */
     public function fetchBunnyFamily(string $familyName): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('bunny')) {
+            return $this->fontImportWorkflowDisabledError('bunny');
+        }
+
         $familyName = sanitize_text_field($familyName);
 
         if ($familyName === '') {
@@ -514,6 +538,10 @@ final class AdminController
         string $formatMode = 'static'
     ): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('google')) {
+            return $this->fontImportWorkflowDisabledError('google');
+        }
+
         $familyName = sanitize_text_field($familyName);
         $variants = $this->sanitizeVariantTokens($variantTokens);
         $deliveryMode = $this->normalizeDeliveryMode($deliveryMode);
@@ -540,6 +568,10 @@ final class AdminController
         string $deliveryMode = 'self_hosted'
     ): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('bunny')) {
+            return $this->fontImportWorkflowDisabledError('bunny');
+        }
+
         $familyName = sanitize_text_field($familyName);
         $variants = $this->sanitizeVariantTokens($variantTokens);
         $deliveryMode = $this->normalizeDeliveryMode($deliveryMode);
@@ -559,8 +591,8 @@ final class AdminController
      */
     public function dryRunCustomCssUrl(string $stylesheetUrl): array|WP_Error
     {
-        if (!$this->customCssUrlImportsEnabled()) {
-            return $this->customCssUrlImportsDisabledError();
+        if (!$this->fontImportWorkflowEnabled('custom_css_url')) {
+            return $this->fontImportWorkflowDisabledError('custom_css_url');
         }
 
         $service = $this->customCssImport ?? new CustomCssUrlImportService(new \TastyFonts\Repository\ImportRepository());
@@ -596,8 +628,8 @@ final class AdminController
      */
     public function importCustomCssUrl(array $input): array|WP_Error
     {
-        if (!$this->customCssUrlImportsEnabled()) {
-            return $this->customCssUrlImportsDisabledError();
+        if (!$this->fontImportWorkflowEnabled('custom_css_url')) {
+            return $this->fontImportWorkflowDisabledError('custom_css_url');
         }
 
         $snapshotService = $this->customCssSnapshots ?? new CustomCssImportSnapshotService();
@@ -619,20 +651,43 @@ final class AdminController
         return $finalImport->importSelfHosted($validated);
     }
 
-    private function customCssUrlImportsEnabled(): bool
+    private function fontImportWorkflowEnabled(string $workflow): bool
     {
         $settings = $this->settings->getSettings();
+        $field = match ($workflow) {
+            'google' => 'google_font_imports_enabled',
+            'bunny' => 'bunny_font_imports_enabled',
+            'adobe' => 'adobe_font_imports_enabled',
+            'local_upload' => 'local_font_uploads_enabled',
+            'custom_css_url' => 'custom_css_url_imports_enabled',
+            default => '',
+        };
 
-        return !empty($settings['custom_css_url_imports_enabled']);
+        return $field !== '' && !empty($settings[$field]);
     }
 
-    private function customCssUrlImportsDisabledError(): WP_Error
+    private function fontImportWorkflowDisabledError(string $workflow): WP_Error
     {
+        $label = match ($workflow) {
+            'google' => __('Google Fonts imports', 'tasty-fonts'),
+            'bunny' => __('Bunny Fonts imports', 'tasty-fonts'),
+            'adobe' => __('Adobe Fonts imports', 'tasty-fonts'),
+            'local_upload' => __('custom uploads', 'tasty-fonts'),
+            'custom_css_url' => __('URL imports', 'tasty-fonts'),
+            default => __('This font import workflow', 'tasty-fonts'),
+        };
+
         return new WP_Error(
-            'tasty_fonts_custom_css_url_imports_disabled',
-            __('Custom CSS URL imports are disabled. Enable Custom CSS URL Imports in Advanced Tools > Developer before running this workflow.', 'tasty-fonts')
+            $workflow === 'custom_css_url' ? 'tasty_fonts_custom_css_url_imports_disabled' : 'tasty_fonts_font_import_workflow_disabled',
+            sprintf(
+                /* translators: %s: font import workflow label. */
+                __('%s are disabled. Turn them on in Settings > Behavior > Font Import Workflows before running this workflow.', 'tasty-fonts'),
+                $label
+            ),
+            ['status' => 403]
         );
     }
+
 
     /**
      * @param array<int|string, array<string, mixed>> $postedRows
@@ -668,6 +723,10 @@ final class AdminController
      */
     public function uploadLocalFontRows(array $rows): array|WP_Error
     {
+        if (!$this->fontImportWorkflowEnabled('local_upload')) {
+            return $this->fontImportWorkflowDisabledError('local_upload');
+        }
+
         if ($rows === []) {
             return new WP_Error(
                 'tasty_fonts_upload_requires_rows',
@@ -795,6 +854,13 @@ final class AdminController
         $clearGoogleKey = !empty($submittedValues['tasty_fonts_clear_google_api_key']);
         $settingsInput = $this->buildSettingsSaveInput($submittedValues);
         $settingsInput = $this->preserveUnavailableIntegrationSettings($settingsInput);
+        $googleWorkflowEnabledForSave = array_key_exists('google_font_imports_enabled', $settingsInput)
+            ? !empty($settingsInput['google_font_imports_enabled'])
+            : !empty($previousSettings['google_font_imports_enabled']);
+
+        if (($submittedGoogleKey !== '' || $clearGoogleKey) && !$googleWorkflowEnabledForSave) {
+            return $this->fontImportWorkflowDisabledError('google');
+        }
 
         if (array_key_exists('acss_font_role_sync_enabled', $settingsInput)) {
             $settingsInput['acss_font_role_sync_opted_out'] = in_array(
@@ -2059,6 +2125,7 @@ final class AdminController
     {
         return match ($error->get_error_code()) {
             'tasty_fonts_rest_action_rate_limited' => 429,
+            'tasty_fonts_font_import_workflow_disabled',
             'tasty_fonts_custom_css_url_imports_disabled' => 403,
             'tasty_fonts_custom_css_too_large',
             'tasty_fonts_custom_css_too_many_faces',
@@ -3169,6 +3236,10 @@ final class AdminController
                 : __('variable font support disabled', 'tasty-fonts');
         }
 
+        if ($this->fontImportWorkflowSettingsDiffer($before, $after)) {
+            $changes[] = __('font import workflows updated', 'tasty-fonts');
+        }
+
         if (($before['acss_font_role_sync_enabled'] ?? null) !== ($after['acss_font_role_sync_enabled'] ?? null)) {
             $changes[] = ($after['acss_font_role_sync_enabled'] ?? null) === true
                 ? __('Automatic.css font sync enabled', 'tasty-fonts')
@@ -3230,7 +3301,7 @@ final class AdminController
             || !empty($before['show_activity_log']) !== !empty($after['show_activity_log'])
             || !empty($before['monospace_role_enabled']) !== !empty($after['monospace_role_enabled'])
             || !empty($before['variable_fonts_enabled']) !== !empty($after['variable_fonts_enabled'])
-            || !empty($before['custom_css_url_imports_enabled']) !== !empty($after['custom_css_url_imports_enabled'])
+            || $this->fontImportWorkflowSettingsDiffer($before, $after)
             || $this->adminAccessSettingsDiffer($before, $after)
             || ($before['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE) !== ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE)
             || !empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])
@@ -3242,6 +3313,29 @@ final class AdminController
             || ($before['oxygen_integration_enabled'] ?? null) !== ($after['oxygen_integration_enabled'] ?? null)
             || ($before['acss_font_role_sync_enabled'] ?? null) !== ($after['acss_font_role_sync_enabled'] ?? null)
             || !empty($before['acss_font_role_sync_applied']) !== !empty($after['acss_font_role_sync_applied']);
+    }
+
+    /**
+     * @param NormalizedSettings $before
+     * @param NormalizedSettings $after
+     */
+    private function fontImportWorkflowSettingsDiffer(array $before, array $after): bool
+    {
+        foreach (
+            [
+                'google_font_imports_enabled',
+                'bunny_font_imports_enabled',
+                'adobe_font_imports_enabled',
+                'local_font_uploads_enabled',
+                'custom_css_url_imports_enabled',
+            ] as $field
+        ) {
+            if (!empty($before[$field]) !== !empty($after[$field])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -3904,6 +3998,11 @@ final class AdminController
         }
 
         check_admin_referer('tasty_fonts_save_adobe_project');
+
+        if (!$isRemove && !$this->fontImportWorkflowEnabled('adobe')) {
+            $error = $this->fontImportWorkflowDisabledError('adobe');
+            $this->redirectWithError($error->get_error_message());
+        }
 
         if ($isRemove) {
             $existingProjectId = $this->settings->getAdobeProjectId();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Plugin;
+use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 
 $tests['plugin_activation_creates_provider_index_files_and_generated_css'] = static function (): void {
@@ -33,6 +34,13 @@ $tests['plugin_activation_creates_provider_index_files_and_generated_css'] = sta
     assertContainsValue('Silence is golden', (string) file_get_contents($root . '/index.php'), 'Plugin activation should write the silence-is-golden index stub.');
     assertContainsValue('Options -Indexes', (string) file_get_contents($root . '/.htaccess'), 'Plugin activation should disable directory listing in the font storage root.');
     assertContainsValue('FilesMatch', (string) file_get_contents($root . '/.htaccess'), 'Plugin activation should block PHP requests inside the font storage root.');
+
+    $settings = (new SettingsRepository())->getSettings();
+    assertSameValue(true, !empty($settings['google_font_imports_enabled']), 'Plugin activation should leave Google Fonts imports enabled by default.');
+    assertSameValue(true, !empty($settings['bunny_font_imports_enabled']), 'Plugin activation should leave Bunny Fonts imports enabled by default.');
+    assertSameValue(true, !empty($settings['local_font_uploads_enabled']), 'Plugin activation should leave custom uploads enabled by default.');
+    assertSameValue(false, !empty($settings['adobe_font_imports_enabled']), 'Plugin activation should leave Adobe imports disabled by default.');
+    assertSameValue(false, !empty($settings['custom_css_url_imports_enabled']), 'Plugin activation should leave URL imports disabled by default.');
 
     resetPluginSingleton();
 };

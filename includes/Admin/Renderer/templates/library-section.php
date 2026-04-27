@@ -1,14 +1,33 @@
                     <?php
                     $showUploadVariableControls = !empty($variableFontsEnabled);
+                    $googleFontImportsEnabled = !isset($googleFontImportsEnabled) || !empty($googleFontImportsEnabled);
+                    $bunnyFontImportsEnabled = !isset($bunnyFontImportsEnabled) || !empty($bunnyFontImportsEnabled);
+                    $adobeFontImportsEnabled = isset($adobeFontImportsEnabled) && !empty($adobeFontImportsEnabled);
+                    $localFontUploadsEnabled = !isset($localFontUploadsEnabled) || !empty($localFontUploadsEnabled);
                     $customCssUrlImportsEnabled = !empty($customCssUrlImportsEnabled);
-                    $customCssDeveloperGateUrl = add_query_arg(
+                    $fontImportWorkflowsSettingsUrl = add_query_arg(
                         [
                             'page' => 'tasty-custom-fonts',
-                            'tf_page' => 'diagnostics',
-                            'tf_studio' => 'maintenance',
+                            'tf_page' => 'settings',
+                            'tf_studio' => 'plugin-behavior',
                         ],
                         admin_url('admin.php')
                     );
+                    $renderWorkflowDisabledNotice = static function (string $workflowLabel) use ($fontImportWorkflowsSettingsUrl): void {
+                        ?>
+                        <div class="tasty-fonts-empty tasty-fonts-empty--panel" role="note">
+                            <p>
+                                <?php
+                                printf(
+                                    esc_html__('%s is disabled until its font import workflow is turned on in Settings > Behavior.', 'tasty-fonts'),
+                                    esc_html($workflowLabel)
+                                );
+                                ?>
+                            </p>
+                            <p><a class="button" href="<?php echo esc_url($fontImportWorkflowsSettingsUrl); ?>"><?php esc_html_e('Open Behavior Settings', 'tasty-fonts'); ?></a></p>
+                        </div>
+                        <?php
+                    };
                     ?>
                     <section class="tasty-fonts-card tasty-fonts-library-card" id="tasty-fonts-library" aria-labelledby="tasty-fonts-library-panel-title">
                         <div class="tasty-fonts-card-head tasty-fonts-card-head--library">
@@ -102,25 +121,28 @@
                                                     <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($googleAccessCopy); ?></p>
                                                 </div>
                                                 <div class="tasty-fonts-source-status-actions">
-                                                    <span class="tasty-fonts-badge <?php echo esc_attr($googleStatusClass); ?>">
-                                                        <?php echo esc_html($googleStatusLabel); ?>
+                                                    <span class="tasty-fonts-badge <?php echo esc_attr($googleFontImportsEnabled ? $googleStatusClass : ''); ?>">
+                                                        <?php echo esc_html($googleFontImportsEnabled ? $googleStatusLabel : __('Workflow Off', 'tasty-fonts')); ?>
                                                     </span>
-                                                    <button
-                                                        type="button"
-                                                        class="button tasty-fonts-disclosure-button"
-                                                        data-disclosure-toggle="tasty-fonts-google-access-panel"
-                                                        data-expanded-label="<?php echo esc_attr($googleAccessButtonLabel); ?>"
-                                                        data-collapsed-label="<?php echo esc_attr($googleAccessButtonLabel); ?>"
-                                                        aria-expanded="<?php echo esc_attr($googleAccessExpanded ? 'true' : 'false'); ?>"
-                                                        aria-controls="tasty-fonts-google-access-panel"
-                                                    >
-                                                        <?php echo esc_html($googleAccessButtonLabel); ?>
-                                                    </button>
+                                                    <?php if ($googleFontImportsEnabled): ?>
+                                                        <button
+                                                            type="button"
+                                                            class="button tasty-fonts-disclosure-button"
+                                                            data-disclosure-toggle="tasty-fonts-google-access-panel"
+                                                            data-expanded-label="<?php echo esc_attr($googleAccessButtonLabel); ?>"
+                                                            data-collapsed-label="<?php echo esc_attr($googleAccessButtonLabel); ?>"
+                                                            aria-expanded="<?php echo esc_attr($googleAccessExpanded ? 'true' : 'false'); ?>"
+                                                            aria-controls="tasty-fonts-google-access-panel"
+                                                        >
+                                                            <?php echo esc_html($googleAccessButtonLabel); ?>
+                                                        </button>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
 
-                                            <div id="tasty-fonts-google-access-panel" class="tasty-fonts-google-access-panel" <?php echo $googleAccessExpanded ? '' : 'hidden'; ?>>
-                                                <form method="post" class="tasty-fonts-google-access-form">
+                                            <?php if ($googleFontImportsEnabled): ?>
+                                                <div id="tasty-fonts-google-access-panel" class="tasty-fonts-google-access-panel" <?php echo $googleAccessExpanded ? '' : 'hidden'; ?>>
+                                                    <form method="post" class="tasty-fonts-google-access-form">
                                                     <?php wp_nonce_field('tasty_fonts_save_settings'); ?>
                                                     <input type="hidden" name="tasty_fonts_save_settings" value="1">
                                                     <input
@@ -161,12 +183,14 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </form>
-                                            </div>
+                                                    </form>
+                                                </div>
+                                            <?php endif; ?>
                                         </section>
 
-                                        <?php
-                                        $this->renderHostedImportWorkflow(
+                                        <?php if ($googleFontImportsEnabled): ?>
+                                            <?php
+                                            $this->renderHostedImportWorkflow(
                                             [
                                                 'provider_key' => 'google',
                                                 'workflow_class' => 'tasty-fonts-google-workflow',
@@ -206,8 +230,17 @@
                                                 'size_estimate_id' => 'tasty-fonts-import-size-estimate',
                                                 'submit_id' => 'tasty-fonts-import-submit',
                                             ]
-                                        );
-                                        ?>
+                                            );
+                                            ?>
+                                        <?php else: ?>
+                                            <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--google">
+                                                <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Font Import Workflow', 'tasty-fonts'); ?></span>
+                                                    <h4><?php esc_html_e('Search and Import Google Fonts', 'tasty-fonts'); ?></h4>
+                                                </div>
+                                                <?php $renderWorkflowDisabledNotice(__('Google Fonts', 'tasty-fonts')); ?>
+                                            </section>
+                                        <?php endif; ?>
                                     </div>
                                 </section>
 
@@ -222,7 +255,7 @@
                                                 );
                                                 ?>
                                                 <div class="tasty-fonts-source-status-actions">
-                                                    <span class="tasty-fonts-badge is-success"><?php esc_html_e('No Key Needed', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-badge <?php echo esc_attr($bunnyFontImportsEnabled ? 'is-success' : ''); ?>"><?php echo esc_html($bunnyFontImportsEnabled ? __('No Key Needed', 'tasty-fonts') : __('Workflow Off', 'tasty-fonts')); ?></span>
                                                 </div>
                                             </div>
 
@@ -238,10 +271,11 @@
                                             </div>
                                         </section>
 
-                                        <?php
-                                        $this->renderHostedImportWorkflow(
-                                            [
-                                                'provider_key' => 'bunny',
+                                        <?php if ($bunnyFontImportsEnabled): ?>
+                                            <?php
+                                            $this->renderHostedImportWorkflow(
+                                                [
+                                                    'provider_key' => 'bunny',
                                                 'workflow_class' => 'tasty-fonts-google-workflow',
                                                 'search_label' => __('Search Bunny Fonts', 'tasty-fonts'),
                                                 'search_input_id' => 'tasty-fonts-bunny-search',
@@ -276,8 +310,17 @@
                                                 'size_estimate_id' => 'tasty-fonts-bunny-import-size-estimate',
                                                 'submit_id' => 'tasty-fonts-bunny-import-submit',
                                             ]
-                                        );
-                                        ?>
+                                            );
+                                            ?>
+                                        <?php else: ?>
+                                            <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--bunny">
+                                                <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                                                    <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Font Import Workflow', 'tasty-fonts'); ?></span>
+                                                    <h4><?php esc_html_e('Search and Import Bunny Fonts', 'tasty-fonts'); ?></h4>
+                                                </div>
+                                                <?php $renderWorkflowDisabledNotice(__('Bunny Fonts', 'tasty-fonts')); ?>
+                                            </section>
+                                        <?php endif; ?>
                                     </div>
                                 </section>
 
@@ -293,25 +336,28 @@
                                                     <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($adobeAccessCopy); ?></p>
                                                 </div>
                                                 <div class="tasty-fonts-source-status-actions">
-                                                    <span class="tasty-fonts-badge <?php echo esc_attr($adobeStatusClass); ?>">
-                                                        <?php echo esc_html($adobeStatusLabel); ?>
+                                                    <span class="tasty-fonts-badge <?php echo esc_attr($adobeFontImportsEnabled ? $adobeStatusClass : ''); ?>">
+                                                        <?php echo esc_html($adobeFontImportsEnabled ? $adobeStatusLabel : __('Workflow Off', 'tasty-fonts')); ?>
                                                     </span>
-                                                    <button
-                                                        type="button"
-                                                        class="button tasty-fonts-disclosure-button"
-                                                        data-disclosure-toggle="tasty-fonts-adobe-project-panel"
-                                                        data-expanded-label="<?php echo esc_attr($adobeAccessButtonLabel); ?>"
-                                                        data-collapsed-label="<?php echo esc_attr($adobeAccessButtonLabel); ?>"
-                                                        aria-expanded="<?php echo esc_attr($adobeAccessExpanded ? 'true' : 'false'); ?>"
-                                                        aria-controls="tasty-fonts-adobe-project-panel"
-                                                    >
-                                                        <?php echo esc_html($adobeAccessButtonLabel); ?>
-                                                    </button>
+                                                    <?php if ($adobeFontImportsEnabled): ?>
+                                                        <button
+                                                            type="button"
+                                                            class="button tasty-fonts-disclosure-button"
+                                                            data-disclosure-toggle="tasty-fonts-adobe-project-panel"
+                                                            data-expanded-label="<?php echo esc_attr($adobeAccessButtonLabel); ?>"
+                                                            data-collapsed-label="<?php echo esc_attr($adobeAccessButtonLabel); ?>"
+                                                            aria-expanded="<?php echo esc_attr($adobeAccessExpanded ? 'true' : 'false'); ?>"
+                                                            aria-controls="tasty-fonts-adobe-project-panel"
+                                                        >
+                                                            <?php echo esc_html($adobeAccessButtonLabel); ?>
+                                                        </button>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
 
-                                            <div id="tasty-fonts-adobe-project-panel" class="tasty-fonts-google-access-panel" <?php echo $adobeAccessExpanded ? '' : 'hidden'; ?>>
-                                                <form method="post" class="tasty-fonts-google-access-form">
+                                            <?php if ($adobeFontImportsEnabled): ?>
+                                                <div id="tasty-fonts-adobe-project-panel" class="tasty-fonts-google-access-panel" <?php echo $adobeAccessExpanded ? '' : 'hidden'; ?>>
+                                                    <form method="post" class="tasty-fonts-google-access-form">
                                                     <?php wp_nonce_field('tasty_fonts_save_adobe_project'); ?>
                                                     <input type="hidden" name="tasty_fonts_save_adobe_project" value="1">
                                                     <div class="tasty-fonts-google-access-grid">
@@ -350,8 +396,9 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </form>
-                                            </div>
+                                                    </form>
+                                                </div>
+                                            <?php endif; ?>
                                         </section>
 
                                         <section class="tasty-fonts-source-card tasty-fonts-source-card--secondary tasty-fonts-import-panel tasty-fonts-import-panel--detected">
@@ -360,7 +407,9 @@
                                                 <h4><?php esc_html_e('Detected Families', 'tasty-fonts'); ?></h4>
                                             </div>
 
-                                            <?php if ($adobeDetectedFamilies === []): ?>
+                                            <?php if (!$adobeFontImportsEnabled): ?>
+                                                <?php $renderWorkflowDisabledNotice(__('Adobe Fonts', 'tasty-fonts')); ?>
+                                            <?php elseif ($adobeDetectedFamilies === []): ?>
                                                 <div class="tasty-fonts-empty tasty-fonts-empty--panel"><?php esc_html_e('No Adobe families detected yet.', 'tasty-fonts'); ?></div>
                                             <?php else: ?>
                                                 <div class="tasty-fonts-adobe-family-list">
@@ -384,14 +433,14 @@
                                                 );
                                                 ?>
                                                 <div class="tasty-fonts-source-status-actions">
-                                                    <span class="tasty-fonts-badge"><?php echo esc_html($customCssUrlImportsEnabled ? __('Dry Run Only', 'tasty-fonts') : __('Developer Off', 'tasty-fonts')); ?></span>
+                                                    <span class="tasty-fonts-badge"><?php echo esc_html($customCssUrlImportsEnabled ? __('Dry Run Only', 'tasty-fonts') : __('Workflow Off', 'tasty-fonts')); ?></span>
                                                 </div>
                                             </div>
                                         </section>
 
                                         <section class="tasty-fonts-source-card tasty-fonts-source-card--task tasty-fonts-import-panel tasty-fonts-import-panel--url">
                                             <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
-                                                <span class="tasty-fonts-panel-kicker"><?php echo esc_html($customCssUrlImportsEnabled ? __('Review First', 'tasty-fonts') : __('Developer Gate', 'tasty-fonts')); ?></span>
+                                                <span class="tasty-fonts-panel-kicker"><?php echo esc_html($customCssUrlImportsEnabled ? __('Review First', 'tasty-fonts') : __('Font Import Workflow', 'tasty-fonts')); ?></span>
                                                 <h4><?php esc_html_e('Inspect a CSS Stylesheet', 'tasty-fonts'); ?></h4>
                                             </div>
 
@@ -420,8 +469,8 @@
                                                 <div id="tasty-fonts-url-dry-run-review" class="tasty-fonts-url-dry-run-review" aria-live="polite" aria-atomic="false" hidden></div>
                                             <?php else: ?>
                                                 <div class="tasty-fonts-empty tasty-fonts-empty--panel" role="note">
-                                                    <p><?php esc_html_e('From URL is an expert import workflow. It is disabled until Custom CSS URL Imports is enabled in the Developer tab of Advanced Tools.', 'tasty-fonts'); ?></p>
-                                                    <p><a class="button" href="<?php echo esc_url($customCssDeveloperGateUrl); ?>"><?php esc_html_e('Open Developer Tools', 'tasty-fonts'); ?></a></p>
+                                                    <p><?php esc_html_e('From URL is an expert import workflow. It is disabled until Enable URL Imports is turned on in Settings > Behavior.', 'tasty-fonts'); ?></p>
+                                                    <p><a class="button" href="<?php echo esc_url($fontImportWorkflowsSettingsUrl); ?>"><?php esc_html_e('Open Behavior Settings', 'tasty-fonts'); ?></a></p>
                                                 </div>
                                             <?php endif; ?>
                                         </section>
@@ -439,9 +488,11 @@
                                                 );
                                                 ?>
                                                 <div class="tasty-fonts-access-note tasty-fonts-access-note--external tasty-fonts-access-note--upload">
-                                                    <span class="tasty-fonts-access-note-label"><?php esc_html_e('Auto-detect', 'tasty-fonts'); ?></span>
-                                                    <p class="tasty-fonts-muted"><?php esc_html_e('Clear filenames can prefill family, weight, and style.', 'tasty-fonts'); ?></p>
-                                                    <p class="tasty-fonts-muted"><?php echo $showUploadVariableControls ? esc_html__('Variable uploads can include axis ranges and defaults.', 'tasty-fonts') : esc_html__('Enable variable fonts in Settings to configure axes.', 'tasty-fonts'); ?></p>
+                                                    <span class="tasty-fonts-access-note-label"><?php echo esc_html($localFontUploadsEnabled ? __('Auto-detect', 'tasty-fonts') : __('Workflow Off', 'tasty-fonts')); ?></span>
+                                                    <p class="tasty-fonts-muted"><?php echo esc_html($localFontUploadsEnabled ? __('Clear filenames can prefill family, weight, and style.', 'tasty-fonts') : __('Custom upload imports are disabled in Settings > Behavior.', 'tasty-fonts')); ?></p>
+                                                    <?php if ($localFontUploadsEnabled): ?>
+                                                        <p class="tasty-fonts-muted"><?php echo $showUploadVariableControls ? esc_html__('Variable uploads can include axis ranges and defaults.', 'tasty-fonts') : esc_html__('Enable variable fonts in Settings to configure axes.', 'tasty-fonts'); ?></p>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </section>
@@ -452,8 +503,9 @@
                                                 <h4><?php esc_html_e('Assemble Local Files', 'tasty-fonts'); ?></h4>
                                             </div>
 
-                                            <form id="tasty-fonts-upload-form" class="tasty-fonts-upload-form tasty-fonts-upload-form--builder" novalidate>
-                                                <div id="tasty-fonts-upload-groups" class="tasty-fonts-upload-groups">
+                                            <?php if ($localFontUploadsEnabled): ?>
+                                                <form id="tasty-fonts-upload-form" class="tasty-fonts-upload-form tasty-fonts-upload-form--builder" novalidate>
+                                                    <div id="tasty-fonts-upload-groups" class="tasty-fonts-upload-groups">
                                                     <?php $this->renderUploadBuilderGroup($showUploadVariableControls); ?>
                                                 </div>
 
@@ -473,7 +525,10 @@
                                                 </div>
 
                                                 <div id="tasty-fonts-upload-status" class="tasty-fonts-import-status" aria-live="polite" aria-atomic="true"></div>
-                                            </form>
+                                                </form>
+                                            <?php else: ?>
+                                                <?php $renderWorkflowDisabledNotice(__('Custom Uploads', 'tasty-fonts')); ?>
+                                            <?php endif; ?>
                                         </section>
                                     </div>
                                 </section>

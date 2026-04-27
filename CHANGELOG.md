@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Moved font import workflow controls into Settings > Behavior, keeping Google Fonts, Bunny Fonts, and custom uploads enabled by default while Adobe Fonts and URL imports remain opt-in.
+- Simplified Advanced Tools developer controls so the release rail appears first and saves channel changes immediately without a separate save button.
+
+### Fixed
+
+- Added end-to-end workflow gating so disabled font import workflows are reflected in Add Fonts UI panels and rejected consistently by REST/admin actions.
+
 ## [1.15.0-beta.2] - 2026-04-27
 
 ### Added

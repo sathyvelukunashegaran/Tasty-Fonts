@@ -12405,6 +12405,57 @@
         }
     }
 
+    function requestAutoSubmitForm(form) {
+        if (!(form instanceof HTMLFormElement) || form.hasAttribute('data-auto-submit-pending')) {
+            return;
+        }
+
+        form.setAttribute('data-auto-submit-pending', '');
+        form.classList.add('is-submitting');
+        form.setAttribute('aria-busy', 'true');
+        settingsNavigationInFlight = true;
+
+        if (typeof form.requestSubmit === 'function') {
+            const submitter = document.createElement('button');
+            submitter.type = 'submit';
+            submitter.hidden = true;
+            submitter.tabIndex = -1;
+            submitter.setAttribute('aria-hidden', 'true');
+            form.appendChild(submitter);
+
+            try {
+                form.requestSubmit(submitter);
+            } finally {
+                submitter.remove();
+            }
+            return;
+        }
+
+        form.submit();
+    }
+
+    function bindAutoSubmitForms() {
+        Array.from(document.querySelectorAll('form[data-auto-submit-on-change]')).forEach((form) => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            form.addEventListener('change', (event) => {
+                const target = event.target;
+
+                if (!(target instanceof HTMLInputElement)
+                    && !(target instanceof HTMLSelectElement)
+                    && !(target instanceof HTMLTextAreaElement)) {
+                    return;
+                }
+
+                window.setTimeout(() => {
+                    requestAutoSubmitForm(form);
+                }, 0);
+            });
+        });
+    }
+
     function syncBricksThemeStyleTargetState(form) {
         if (!(form instanceof HTMLFormElement)) {
             return '';
@@ -12836,6 +12887,7 @@
         bindSettingsForms();
         bindAdminAccessControls();
         bindDeveloperToolsControls();
+        bindAutoSubmitForms();
 
         syncDisclosureToggles();
         initToasts();

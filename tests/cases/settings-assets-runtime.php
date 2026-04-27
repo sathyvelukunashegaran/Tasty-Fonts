@@ -353,6 +353,11 @@ $tests['developer_tools_reset_plugin_settings_preserves_library_and_files'] = st
         'font_display' => 'swap',
         'training_wheels_off' => '1',
         'monospace_role_enabled' => '1',
+        'google_font_imports_enabled' => '0',
+        'bunny_font_imports_enabled' => '0',
+        'local_font_uploads_enabled' => '0',
+        'adobe_font_imports_enabled' => '1',
+        'custom_css_url_imports_enabled' => '1',
     ]);
     $services['settings']->saveRoles(
         [
@@ -385,6 +390,11 @@ $tests['developer_tools_reset_plugin_settings_preserves_library_and_files'] = st
     assertSameValue(true, $services['imports']->getFamily('inter') !== null, 'Reset plugin settings should preserve the saved font library.');
     assertSameValue('swap', (string) ($result['font_display'] ?? ''), 'Reset plugin settings should restore the default font-display.');
     assertSameValue(false, !empty($result['training_wheels_off']), 'Reset plugin settings should restore behavior toggles to their defaults.');
+    assertSameValue(true, !empty($result['google_font_imports_enabled']), 'Reset plugin settings should restore Google Fonts imports to the default-on workflow.');
+    assertSameValue(true, !empty($result['bunny_font_imports_enabled']), 'Reset plugin settings should restore Bunny Fonts imports to the default-on workflow.');
+    assertSameValue(true, !empty($result['local_font_uploads_enabled']), 'Reset plugin settings should restore custom uploads to the default-on workflow.');
+    assertSameValue(false, !empty($result['adobe_font_imports_enabled']), 'Reset plugin settings should restore Adobe imports to the default-off workflow.');
+    assertSameValue(false, !empty($result['custom_css_url_imports_enabled']), 'Reset plugin settings should restore URL imports to the default-off workflow.');
     assertSameValue('', (string) ($result['google_api_key'] ?? ''), 'Reset plugin settings should clear the saved Google API key.');
     assertSameValue(false, array_key_exists(AdminController::LOCAL_ENV_NOTICE_OPTION, $optionStore), 'Reset plugin settings should clear suppressed notice preferences.');
     assertSameValue(1, did_action('tasty_fonts_before_reset_settings'), 'Reset plugin settings should emit a before hook.');

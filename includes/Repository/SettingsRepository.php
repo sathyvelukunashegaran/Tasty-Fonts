@@ -136,6 +136,10 @@ final class SettingsRepository
         'training_wheels_off' => false,
         'monospace_role_enabled' => false,
         'variable_fonts_enabled' => false,
+        'google_font_imports_enabled' => true,
+        'bunny_font_imports_enabled' => true,
+        'adobe_font_imports_enabled' => false,
+        'local_font_uploads_enabled' => true,
         'custom_css_url_imports_enabled' => false,
         'admin_access_custom_enabled' => false,
         'admin_access_role_slugs' => [],
@@ -233,6 +237,10 @@ final class SettingsRepository
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
         $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);
+        $settings['google_font_imports_enabled'] = !empty($settings['google_font_imports_enabled']);
+        $settings['bunny_font_imports_enabled'] = !empty($settings['bunny_font_imports_enabled']);
+        $settings['adobe_font_imports_enabled'] = !empty($settings['adobe_font_imports_enabled']);
+        $settings['local_font_uploads_enabled'] = !empty($settings['local_font_uploads_enabled']);
         $settings['custom_css_url_imports_enabled'] = !empty($settings['custom_css_url_imports_enabled']);
         $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
         $settings['admin_access_user_ids'] = $this->normalizeAdminAccessUserIds($settings['admin_access_user_ids'] ?? []);
@@ -363,8 +371,20 @@ final class SettingsRepository
             $settingsChanged = true;
         }
 
-        if (array_key_exists('custom_css_url_imports_enabled', $input)) {
-            $settings['custom_css_url_imports_enabled'] = !empty($input['custom_css_url_imports_enabled']);
+        foreach (
+            [
+                'google_font_imports_enabled',
+                'bunny_font_imports_enabled',
+                'adobe_font_imports_enabled',
+                'local_font_uploads_enabled',
+                'custom_css_url_imports_enabled',
+            ] as $field
+        ) {
+            if (!array_key_exists($field, $input)) {
+                continue;
+            }
+
+            $settings[$field] = !empty($input[$field]);
             $settingsChanged = true;
         }
 
@@ -1121,6 +1141,11 @@ final class SettingsRepository
         $settings['training_wheels_off'] = !empty($settings['training_wheels_off']);
         $settings['monospace_role_enabled'] = !empty($settings['monospace_role_enabled']);
         $settings['variable_fonts_enabled'] = !empty($settings['variable_fonts_enabled']);
+        $settings['google_font_imports_enabled'] = !empty($settings['google_font_imports_enabled']);
+        $settings['bunny_font_imports_enabled'] = !empty($settings['bunny_font_imports_enabled']);
+        $settings['adobe_font_imports_enabled'] = !empty($settings['adobe_font_imports_enabled']);
+        $settings['local_font_uploads_enabled'] = !empty($settings['local_font_uploads_enabled']);
+        $settings['custom_css_url_imports_enabled'] = !empty($settings['custom_css_url_imports_enabled']);
         $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
         $settings['admin_access_custom_enabled'] = $this->normalizeAdminAccessCustomEnabled(
             $settings['admin_access_custom_enabled'] ?? null,

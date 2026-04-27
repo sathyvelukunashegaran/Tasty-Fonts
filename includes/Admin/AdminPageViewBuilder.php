@@ -165,6 +165,10 @@ final class AdminPageViewBuilder
         $showActivityLog = !empty($context['show_activity_log']);
         $trainingWheelsOff = $this->trainingWheelsOff;
         $variableFontsEnabled = !empty($context['variable_fonts_enabled']);
+        $googleFontImportsEnabled = !array_key_exists('google_font_imports_enabled', $context) || !empty($context['google_font_imports_enabled']);
+        $bunnyFontImportsEnabled = !array_key_exists('bunny_font_imports_enabled', $context) || !empty($context['bunny_font_imports_enabled']);
+        $adobeFontImportsEnabled = array_key_exists('adobe_font_imports_enabled', $context) && !empty($context['adobe_font_imports_enabled']);
+        $localFontUploadsEnabled = !array_key_exists('local_font_uploads_enabled', $context) || !empty($context['local_font_uploads_enabled']);
         $customCssUrlImportsEnabled = !empty($context['custom_css_url_imports_enabled']);
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
         $advancedTools = $this->mapValue($context, 'advanced_tools');
