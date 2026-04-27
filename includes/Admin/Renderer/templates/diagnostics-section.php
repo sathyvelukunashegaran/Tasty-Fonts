@@ -18,6 +18,10 @@
                     $snapshotRestoreActionField = (string) ($siteTransfer['snapshot_restore_action_field'] ?? 'tasty_fonts_restore_rollback_snapshot');
                     $snapshotRenameActionField = (string) ($siteTransfer['snapshot_rename_action_field'] ?? 'tasty_fonts_rename_rollback_snapshot');
                     $snapshotDeleteActionField = (string) ($siteTransfer['snapshot_delete_action_field'] ?? 'tasty_fonts_delete_rollback_snapshot');
+                    $snapshotDeleteAllActionField = (string) ($siteTransfer['snapshot_delete_all_action_field'] ?? 'tasty_fonts_delete_all_rollback_snapshots');
+                    $exportDeleteAllActionField = (string) ($siteTransfer['export_delete_all_action_field'] ?? 'tasty_fonts_delete_all_site_transfer_export_bundles');
+                    $exportDeleteAllBlocked = !empty($siteTransfer['export_delete_all_blocked']);
+                    $exportDeleteAllBlockedMessage = trim((string) ($siteTransfer['export_delete_all_blocked_message'] ?? __('One or more export bundles are locked. Unprotect all export bundles before deleting all exports.', 'tasty-fonts')));
                     $snapshotRetentionLimit = max(1, (int) ($siteTransfer['snapshot_retention_limit'] ?? 5));
                     $snapshotRetentionMin = max(1, (int) ($siteTransfer['snapshot_retention_min'] ?? 1));
                     $snapshotRetentionMax = max($snapshotRetentionMin, (int) ($siteTransfer['snapshot_retention_max'] ?? 10));
@@ -310,6 +314,30 @@
                                     'card_class' => 'tasty-fonts-developer-tool-card--danger',
                                     'confirm_message' => __('Wipe the managed font library, remove managed files, and rebuild empty storage?', 'tasty-fonts'),
                                 ],
+                                [
+                                    'slug' => 'delete_all_snapshots',
+                                    'title' => __('Delete all snapshots', 'tasty-fonts'),
+                                    'description' => __('Deletes every retained rollback snapshot for this site. Settings, roles, and font files stay untouched.', 'tasty-fonts'),
+                                    'nonce' => $snapshotDeleteAllActionField,
+                                    'action_name' => $snapshotDeleteAllActionField,
+                                    'button_label' => __('Delete All Snapshots', 'tasty-fonts'),
+                                    'button_class' => 'button button-secondary tasty-fonts-button-danger tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--delete tasty-fonts-developer-action-button',
+                                    'card_class' => 'tasty-fonts-developer-tool-card--danger',
+                                    'confirm_message' => __('Delete all rollback snapshots permanently?', 'tasty-fonts'),
+                                ],
+                                [
+                                    'slug' => 'delete_all_exports',
+                                    'title' => __('Delete all exports', 'tasty-fonts'),
+                                    'description' => __('Deletes every retained site transfer export bundle. Locked exports must be unlocked first.', 'tasty-fonts'),
+                                    'nonce' => $exportDeleteAllActionField,
+                                    'action_name' => $exportDeleteAllActionField,
+                                    'button_label' => __('Delete All Exports', 'tasty-fonts'),
+                                    'button_class' => 'button button-secondary tasty-fonts-button-danger tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--delete tasty-fonts-developer-action-button',
+                                    'card_class' => 'tasty-fonts-developer-tool-card--danger',
+                                    'confirm_message' => __('Delete all site transfer export bundles permanently?', 'tasty-fonts'),
+                                    'blocked' => $exportDeleteAllBlocked,
+                                    'blocked_message' => $exportDeleteAllBlockedMessage,
+                                ],
                             ],
 	                        ],
 	                    ];
@@ -474,10 +502,10 @@
                         'support_bundle' => __('Download this when you need to inspect or share plugin diagnostics without exposing API keys. It is separate from a transfer bundle and is not meant for importing.', 'tasty-fonts'),
                         'activity_log' => __('This log is limited to transfer and recovery events, so it does not duplicate the full Advanced Tools activity tab.', 'tasty-fonts'),
                     ];
-                    $renderSiteTransferHelpAttributes = static function (string $copy) use ($trainingWheelsOff): void {
+                    $renderSiteTransferHelpAttributes = static function (string $copy, bool $force = false) use ($trainingWheelsOff): void {
                         $copy = trim($copy);
 
-                        if (!empty($trainingWheelsOff) || $copy === '') {
+                        if ((!$force && !empty($trainingWheelsOff)) || $copy === '') {
                             return;
                         }
 
@@ -709,9 +737,9 @@
                                         <?php endif; ?>
                                     </div>
                                     <div class="tasty-fonts-health-board tasty-fonts-overview-reference-board">
-                                        <section class="tasty-fonts-health-group tasty-fonts-health-group--runtime" aria-label="<?php esc_attr_e('Active output', 'tasty-fonts'); ?>">
+                                        <section class="tasty-fonts-health-group tasty-fonts-health-group--runtime" aria-label="<?php esc_attr_e('Fonts in frontend CSS', 'tasty-fonts'); ?>">
                                             <div class="tasty-fonts-health-group-head">
-                                                <h4><?php esc_html_e('Active Output', 'tasty-fonts'); ?></h4>
+                                                <h4><?php esc_html_e('Fonts in Frontend CSS', 'tasty-fonts'); ?></h4>
                                                 <span class="tasty-fonts-health-group-count">
                                                     <?php
                                                     echo esc_html(
@@ -772,7 +800,7 @@
                                                         <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
                                                         <div class="tasty-fonts-health-row-copy">
                                                             <div class="tasty-fonts-health-row-title">
-                                                                <strong><?php esc_html_e('No families on the front end yet.', 'tasty-fonts'); ?></strong>
+                                                                <strong><?php esc_html_e('No families in frontend CSS yet.', 'tasty-fonts'); ?></strong>
                                                                 <span><?php esc_html_e('Publish your roles to deploy them.', 'tasty-fonts'); ?></span>
                                                             </div>
                                                         </div>
@@ -880,6 +908,70 @@
                                         <span><?php esc_html_e('Pending settings changes temporarily disable developer actions.', 'tasty-fonts'); ?></span>
                                     </div>
                                     <div class="tasty-fonts-health-board tasty-fonts-developer-board">
+										<section class="tasty-fonts-health-group tasty-fonts-health-group--developer tasty-fonts-developer-tool-group tasty-fonts-developer-tool-group--admin-experience" aria-labelledby="tasty-fonts-advanced-developer-group-admin-experience">
+											<div class="tasty-fonts-health-group-head">
+												<h4 id="tasty-fonts-advanced-developer-group-admin-experience"><?php esc_html_e('Admin Experience', 'tasty-fonts'); ?></h4>
+												<span class="tasty-fonts-health-group-count"><?php esc_html_e('Guidance & Logs', 'tasty-fonts'); ?></span>
+											</div>
+											<div class="tasty-fonts-health-list">
+												<article class="tasty-fonts-health-row tasty-fonts-developer-row tasty-fonts-developer-row--admin-setting">
+													<span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+													<div class="tasty-fonts-health-row-copy">
+														<div class="tasty-fonts-health-row-title">
+															<strong><?php esc_html_e('Show Onboarding Hints', 'tasty-fonts'); ?></strong>
+															<?php if ($showSettingsDescriptions): ?>
+																<span><?php esc_html_e('Shows helper tips and info buttons across the admin UI.', 'tasty-fonts'); ?></span>
+															<?php endif; ?>
+														</div>
+													</div>
+													<div class="tasty-fonts-health-row-actions">
+														<button
+															type="button"
+															class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-health-help-trigger"
+															aria-label="<?php esc_attr_e('Explain Show Onboarding Hints', 'tasty-fonts'); ?>"
+															<?php $renderSiteTransferHelpAttributes(__('Shows the short row descriptions and passive help tooltips across the admin UI. Keep it on while learning the plugin; turn it off for a denser workspace.', 'tasty-fonts')); ?>
+														>?</button>
+														<form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form tasty-fonts-developer-setting-form" data-auto-submit-on-change>
+															<?php wp_nonce_field('tasty_fonts_save_settings'); ?>
+															<input type="hidden" name="tasty_fonts_save_settings" value="1">
+															<input type="hidden" name="training_wheels_off" value="1">
+															<label class="tasty-fonts-toggle-field tasty-fonts-developer-setting-toggle">
+																<input type="checkbox" class="tasty-fonts-toggle-input" name="training_wheels_off" value="0" aria-label="<?php esc_attr_e('Show Onboarding Hints', 'tasty-fonts'); ?>" <?php checked(!$trainingWheelsOff); ?>>
+																<span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+															</label>
+														</form>
+													</div>
+												</article>
+												<article class="tasty-fonts-health-row tasty-fonts-developer-row tasty-fonts-developer-row--admin-setting">
+													<span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+													<div class="tasty-fonts-health-row-copy">
+														<div class="tasty-fonts-health-row-title">
+															<strong><?php esc_html_e('Show Activity Log', 'tasty-fonts'); ?></strong>
+															<?php if ($showSettingsDescriptions): ?>
+																<span><?php esc_html_e('Adds the full activity log to Advanced Tools. Events are still recorded when hidden.', 'tasty-fonts'); ?></span>
+															<?php endif; ?>
+														</div>
+													</div>
+													<div class="tasty-fonts-health-row-actions">
+														<button
+															type="button"
+															class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-health-help-trigger"
+															aria-label="<?php esc_attr_e('Explain Show Activity Log', 'tasty-fonts'); ?>"
+															<?php $renderSiteTransferHelpAttributes(__('Shows the full activity log in Advanced Tools. Tasty Fonts still records relevant events while this is hidden.', 'tasty-fonts')); ?>
+														>?</button>
+														<form method="post" class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form tasty-fonts-developer-setting-form" data-auto-submit-on-change>
+															<?php wp_nonce_field('tasty_fonts_save_settings'); ?>
+															<input type="hidden" name="tasty_fonts_save_settings" value="1">
+															<input type="hidden" name="show_activity_log" value="0">
+															<label class="tasty-fonts-toggle-field tasty-fonts-developer-setting-toggle">
+																<input type="checkbox" class="tasty-fonts-toggle-input" name="show_activity_log" value="1" aria-label="<?php esc_attr_e('Show Activity Log', 'tasty-fonts'); ?>" <?php checked($showActivityLog); ?>>
+																<span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+															</label>
+														</form>
+													</div>
+												</article>
+											</div>
+										</section>
 										<section class="tasty-fonts-health-group tasty-fonts-health-group--developer tasty-fonts-developer-tool-group tasty-fonts-developer-tool-group--release-rail" aria-labelledby="tasty-fonts-advanced-developer-group-release-rail">
 											<div class="tasty-fonts-health-group-head">
 												<h4 id="tasty-fonts-advanced-developer-group-release-rail"><?php esc_html_e('Release Rail', 'tasty-fonts'); ?></h4>
@@ -974,9 +1066,12 @@
                                                         $developerToolLastRun = trim((string) ($developerToolStatus['last_run'] ?? ''));
                                                         $developerToolConfirmPhrase = trim((string) ($developerToolAction['confirm_phrase'] ?? ''));
                                                         $developerToolDescription = trim((string) ($developerToolAction['description'] ?? ''));
+                                                        $developerToolBlocked = !empty($developerToolAction['blocked']);
+                                                        $developerToolBlockedMessage = trim((string) ($developerToolAction['blocked_message'] ?? ''));
                                                         $developerToolSummaryDisplay = $formatDeveloperToolMeta($developerToolSummary);
                                                         $developerToolLastRunDisplay = $formatDeveloperToolMeta($developerToolLastRun);
                                                         $developerToolIsIntegrationScan = $developerToolSlug === 'reset_integration_detection_state';
+                                                        $developerToolButtonClass = trim((string) ($developerToolAction['button_class'] ?? 'button'));
                                                         $developerToolHelpCopy = $developerToolDescription !== ''
                                                             ? $developerToolDescription
                                                             : (string) $developerToolAction['title'];
@@ -987,6 +1082,11 @@
 
                                                         if ($developerToolLastRun !== '') {
                                                             $developerToolHelpCopy .= ' ' . $developerToolLastRun;
+                                                        }
+
+                                                        if ($developerToolBlocked && $developerToolBlockedMessage !== '') {
+                                                            $developerToolHelpCopy .= ' ' . $developerToolBlockedMessage;
+                                                            $developerToolButtonClass .= ' is-disabled';
                                                         }
 
                                                         if ($developerToolIsIntegrationScan) {
@@ -1097,12 +1197,24 @@
                                                                     method="post"
                                                                     class="tasty-fonts-output-settings-form tasty-fonts-developer-tool-form tasty-fonts-developer-row-form"
                                                                     data-developer-tool-form
+                                                                    <?php if ($developerToolBlocked && $developerToolBlockedMessage !== ''): ?>data-developer-blocked-message="<?php echo esc_attr($developerToolBlockedMessage); ?>"<?php endif; ?>
                                                                     <?php if (!empty($developerToolAction['confirm_message'])): ?>data-developer-confirm-message="<?php echo esc_attr((string) $developerToolAction['confirm_message']); ?>"<?php endif; ?>
                                                                     <?php if ($developerToolConfirmPhrase !== ''): ?>data-developer-confirm-input="<?php echo esc_attr($developerToolConfirmPhrase); ?>"<?php endif; ?>
                                                                 >
                                                                     <?php wp_nonce_field((string) $developerToolAction['nonce']); ?>
                                                                     <div class="tasty-fonts-developer-action-row">
-                                                                        <button type="submit" class="<?php echo esc_attr((string) $developerToolAction['button_class']); ?>" name="<?php echo esc_attr((string) $developerToolAction['action_name']); ?>" value="1" data-developer-submit><?php echo esc_html((string) $developerToolAction['button_label']); ?></button>
+                                                                        <button
+                                                                            type="submit"
+                                                                            class="<?php echo esc_attr($developerToolButtonClass); ?>"
+                                                                            name="<?php echo esc_attr((string) $developerToolAction['action_name']); ?>"
+                                                                            value="1"
+                                                                            data-developer-submit
+                                                                            <?php if ($developerToolBlocked && $developerToolBlockedMessage !== ''): ?>
+                                                                                data-delete-blocked="<?php echo esc_attr($developerToolBlockedMessage); ?>"
+                                                                                aria-disabled="true"
+                                                                                <?php $renderSiteTransferHelpAttributes($developerToolBlockedMessage, true); ?>
+                                                                            <?php endif; ?>
+                                                                        ><?php echo esc_html((string) $developerToolAction['button_label']); ?></button>
                                                                     </div>
                                                                     <?php if ($developerToolConfirmPhrase !== ''): ?>
                                                                         <div class="tasty-fonts-developer-confirm-lock" data-developer-confirm-lock hidden>
@@ -1674,7 +1786,8 @@
                                                                         $snapshotFamilyNames = is_array($snapshot['family_names'] ?? null) ? array_values(array_filter(array_map('strval', $snapshot['family_names']))) : [];
                                                                         $snapshotRoleFamilies = is_array($snapshot['role_families'] ?? null) ? array_values(array_filter(array_map('strval', $snapshot['role_families']))) : [];
                                                                         $snapshotFamilyCount = max(0, (int) ($snapshot['families'] ?? 0));
-                                                                        $snapshotFileCount = max(0, (int) ($snapshot['files'] ?? 0));
+                                                                        $snapshotFontFileCount = max(0, (int) ($snapshot['font_files'] ?? 0));
+                                                                        $snapshotStorageFileCount = max(0, (int) ($snapshot['storage_files'] ?? $snapshot['files'] ?? 0));
                                                                         $snapshotSize = max(0, (int) ($snapshot['size'] ?? 0));
                                                                         $snapshotVersion = trim((string) ($snapshot['plugin_version'] ?? ''));
                                                                         $snapshotDisplayName = $snapshotLabel !== '' ? $snapshotLabel : $snapshotReasonLabel($snapshotReason);
@@ -1688,15 +1801,20 @@
                                                                             $snapshotReasonLabel($snapshotReason),
                                                                             $snapshotCreatedAt !== '' ? $snapshotCreatedAt : __('No timestamp', 'tasty-fonts'),
                                                                             sprintf(
-                                                                                /* translators: %d: font family count */
-                                                                                _n('%d family', '%d families', $snapshotFamilyCount, 'tasty-fonts'),
-                                                                                $snapshotFamilyCount
+                                                                                /* translators: %d: captured font file count */
+                                                                                _n('%d font file', '%d font files', $snapshotFontFileCount, 'tasty-fonts'),
+                                                                                $snapshotFontFileCount
                                                                             ),
                                                                             sprintf(
-                                                                                /* translators: %d: managed font file count */
-                                                                                _n('%d file', '%d files', $snapshotFileCount, 'tasty-fonts'),
-                                                                                $snapshotFileCount
+                                                                                /* translators: %d: captured storage file count */
+                                                                                _n('%d storage file', '%d storage files', $snapshotStorageFileCount, 'tasty-fonts'),
+                                                                                $snapshotStorageFileCount
                                                                             ),
+																			sprintf(
+																				/* translators: %d: font family count */
+																				_n('%d font family', '%d font families', $snapshotFamilyCount, 'tasty-fonts'),
+																				$snapshotFamilyCount
+																			),
                                                                         ];
                                                                         if ($snapshotSize > 0) {
                                                                             $snapshotMeta[] = size_format($snapshotSize);
@@ -1883,21 +2001,33 @@
                                             </section>
                                         </div>
 
-                                        <article class="tasty-fonts-health-board tasty-fonts-site-transfer-log-card" data-log-filter-root>
+                                        <article class="tasty-fonts-health-board tasty-fonts-advanced-activity-board" data-log-filter-root>
                                             <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Transfer activity', 'tasty-fonts'); ?>">
                                                 <div class="tasty-fonts-health-group-head">
                                                     <h4><?php esc_html_e('Activity Log', 'tasty-fonts'); ?></h4>
-                                                    <?php if ($siteTransferLogs === []): ?>
-                                                        <div class="tasty-fonts-activity-head-actions tasty-fonts-site-transfer-activity-head-actions">
+                                                    <div class="tasty-fonts-activity-head-actions tasty-fonts-site-transfer-activity-head-actions">
+                                                        <?php if (!$showActivityLog): ?>
+                                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Hidden', 'tasty-fonts'); ?></span>
+                                                        <?php elseif ($siteTransferLogs === []): ?>
                                                             <span class="tasty-fonts-health-group-count"><?php esc_html_e('No Events Yet', 'tasty-fonts'); ?></span>
-                                                        </div>
-                                                    <?php else: ?>
-                                                        <div class="tasty-fonts-activity-head-actions tasty-fonts-site-transfer-activity-head-actions">
+                                                        <?php else: ?>
                                                             <span class="tasty-fonts-health-group-count" data-log-count><?php echo esc_html(sprintf(_n('%d entry', '%d entries', count($siteTransferLogs), 'tasty-fonts'), count($siteTransferLogs))); ?></span>
-                                                        </div>
-                                                    <?php endif; ?>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </div>
-                                                <?php if ($siteTransferLogs === []): ?>
+                                                <?php if (!$showActivityLog): ?>
+                                                    <div class="tasty-fonts-health-list">
+                                                        <article class="tasty-fonts-health-row tasty-fonts-health-row--reference">
+                                                            <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
+                                                            <div class="tasty-fonts-health-row-copy">
+                                                                <div class="tasty-fonts-health-row-title">
+                                                                    <strong><?php esc_html_e('Activity Log Hidden', 'tasty-fonts'); ?></strong>
+                                                                    <span><?php esc_html_e('Enable Show Activity Log in Settings -> Behavior to review the full event timeline here.', 'tasty-fonts'); ?></span>
+                                                                </div>
+                                                            </div>
+                                                        </article>
+                                                    </div>
+                                                <?php elseif ($siteTransferLogs === []): ?>
                                                     <div class="tasty-fonts-health-list">
                                                         <article class="tasty-fonts-health-row tasty-fonts-health-row--reference">
                                                             <span class="tasty-fonts-health-row-marker" aria-hidden="true"></span>
@@ -1922,35 +2052,35 @@
                                                         </article>
                                                     </div>
                                                 <?php else: ?>
-                                                    <div class="tasty-fonts-activity-filterbar">
-                                                        <div class="tasty-fonts-activity-toolbar" role="group" aria-label="<?php esc_attr_e('Transfer activity filters', 'tasty-fonts'); ?>">
-                                                            <label class="screen-reader-text" for="tasty-fonts-advanced-transfer-log-actor-filter"><?php esc_html_e('Filter transfer activity by account', 'tasty-fonts'); ?></label>
-                                                            <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable tasty-fonts-activity-select">
-                                                                <select id="tasty-fonts-advanced-transfer-log-actor-filter" data-log-actor-filter>
-                                                                    <option value=""><?php esc_html_e('All Accounts', 'tasty-fonts'); ?></option>
-                                                                    <?php foreach ($siteTransferActorOptions as $actor): ?>
-                                                                        <option value="<?php echo esc_attr((string) $actor); ?>"><?php echo esc_html((string) $actor); ?></option>
-                                                                    <?php endforeach; ?>
-                                                                </select>
-                                                                <?php $this->renderClearSelectButton(__('Clear account filter', 'tasty-fonts'), 'tasty-fonts-advanced-transfer-log-actor-filter'); ?>
-                                                            </span>
-                                                            <label class="screen-reader-text" for="tasty-fonts-advanced-transfer-log-search"><?php esc_html_e('Search transfer activity', 'tasty-fonts'); ?></label>
-                                                            <span class="tasty-fonts-search-field--compact tasty-fonts-search-field--activity">
-                                                                <input
-                                                                    type="search"
-                                                                    id="tasty-fonts-advanced-transfer-log-search"
-                                                                    placeholder="<?php esc_attr_e('Search transfer activity', 'tasty-fonts'); ?>"
-                                                                    autocomplete="off"
-                                                                    data-log-search
-                                                                >
-                                                            </span>
+                                                        <div class="tasty-fonts-activity-filterbar">
+                                                            <div class="tasty-fonts-activity-toolbar" role="group" aria-label="<?php esc_attr_e('Transfer activity filters', 'tasty-fonts'); ?>">
+                                                                <label class="screen-reader-text" for="tasty-fonts-advanced-transfer-log-actor-filter"><?php esc_html_e('Filter transfer activity by account', 'tasty-fonts'); ?></label>
+                                                                <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable tasty-fonts-activity-select">
+                                                                    <select id="tasty-fonts-advanced-transfer-log-actor-filter" data-log-actor-filter>
+                                                                        <option value=""><?php esc_html_e('All Accounts', 'tasty-fonts'); ?></option>
+                                                                        <?php foreach ($siteTransferActorOptions as $actor): ?>
+                                                                            <option value="<?php echo esc_attr((string) $actor); ?>"><?php echo esc_html((string) $actor); ?></option>
+                                                                        <?php endforeach; ?>
+                                                                    </select>
+                                                                    <?php $this->renderClearSelectButton(__('Clear account filter', 'tasty-fonts'), 'tasty-fonts-advanced-transfer-log-actor-filter'); ?>
+                                                                </span>
+                                                                <label class="screen-reader-text" for="tasty-fonts-advanced-transfer-log-search"><?php esc_html_e('Search transfer activity', 'tasty-fonts'); ?></label>
+                                                                <span class="tasty-fonts-search-field--compact tasty-fonts-search-field--activity">
+                                                                    <input
+                                                                        type="search"
+                                                                        id="tasty-fonts-advanced-transfer-log-search"
+                                                                        placeholder="<?php esc_attr_e('Search transfer activity', 'tasty-fonts'); ?>"
+                                                                        autocomplete="off"
+                                                                        data-log-search
+                                                                    >
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="tasty-fonts-activity-shell">
-                                                        <div id="tasty-fonts-advanced-transfer-log-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty--panel tasty-fonts-activity-empty" data-log-empty-filtered hidden><?php esc_html_e('No transfer activity matches the current filters.', 'tasty-fonts'); ?></div>
-                                                        <?php $this->renderLogList($siteTransferLogs, 'tasty-fonts-log-list', 5, 'transfer'); ?>
-                                                    </div>
-                                                <?php endif; ?>
+                                                        <div class="tasty-fonts-activity-shell">
+                                                            <div id="tasty-fonts-advanced-transfer-log-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty--panel tasty-fonts-activity-empty" data-log-empty-filtered hidden><?php esc_html_e('No transfer activity matches the current filters.', 'tasty-fonts'); ?></div>
+                                                            <?php $this->renderLogList($siteTransferLogs, 'tasty-fonts-log-list', 5, 'transfer'); ?>
+                                                        </div>
+                                                    <?php endif; ?>
                                             </section>
                                         </article>
                                     </section>

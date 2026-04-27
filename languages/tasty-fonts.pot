@@ -597,6 +597,10 @@ msgstr ""
 msgid "Self-hosted (Google import)"
 msgstr ""
 
+#: includes/Admin/Renderer/templates/library-section.php:60
+msgid "URL Import"
+msgstr ""
+
 #: includes/Admin/AdminController.php:2499
 #: includes/Admin/Renderer/FamilyCardRendererSupport.php:429
 #: includes/Admin/Renderer/templates/library-section.php:35

@@ -11,7 +11,7 @@
                         ],
                         'plugin-behavior' => [
                             'title' => __('Behavior', 'tasty-fonts'),
-							'description' => __('Configure onboarding hints, import workflows, activity visibility, font capabilities, and admin access.', 'tasty-fonts'),
+							'description' => __('Configure import workflows, font capabilities, cleanup, and admin access.', 'tasty-fonts'),
                         ],
                     ];
                     ?>
@@ -1333,36 +1333,6 @@
                                                 <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable URL Imports', 'tasty-fonts'); ?></span>
                                                 <?php if ($showSettingsDescriptions): ?>
 													<span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows inspecting custom CSS stylesheets from Add Fonts. Save and reload before using it.', 'tasty-fonts'); ?></span>
-                                                <?php endif; ?>
-                                            </span>
-                                        </label>
-                                        </div>
-                                    </section>
-                                    <section class="tasty-fonts-health-group" aria-label="<?php esc_attr_e('Admin experience', 'tasty-fonts'); ?>">
-                                        <div class="tasty-fonts-health-group-head">
-                                            <h4><?php esc_html_e('Admin Experience', 'tasty-fonts'); ?></h4>
-                                            <span class="tasty-fonts-health-group-count"><?php esc_html_e('Guidance & Logs', 'tasty-fonts'); ?></span>
-                                        </div>
-                                        <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
-                                        <input type="hidden" name="training_wheels_off" value="1">
-                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
-                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="training_wheels_off" value="0" <?php checked(!$trainingWheelsOff); ?>>
-                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
-                                            <span class="tasty-fonts-toggle-copy">
-                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Show Onboarding Hints', 'tasty-fonts'); ?></span>
-                                                <?php if ($showSettingsDescriptions): ?>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Shows helper tips and info buttons across the admin UI.', 'tasty-fonts'); ?></span>
-                                                <?php endif; ?>
-                                            </span>
-                                        </label>
-                                        <input type="hidden" name="show_activity_log" value="0">
-                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
-                                            <input type="checkbox" class="tasty-fonts-toggle-input" name="show_activity_log" value="1" <?php checked($showActivityLog); ?>>
-                                            <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
-                                            <span class="tasty-fonts-toggle-copy">
-                                                <span class="tasty-fonts-toggle-title"><?php esc_html_e('Show Activity Log', 'tasty-fonts'); ?></span>
-                                                <?php if ($showSettingsDescriptions): ?>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds the full activity log to Advanced Tools. Events are still recorded when hidden.', 'tasty-fonts'); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                         </label>

@@ -1650,6 +1650,10 @@
         const confirmLock = form.querySelector('[data-developer-confirm-lock]');
         const confirmPhrase = String(form.getAttribute('data-developer-confirm-input') || '').trim();
         const lockActive = confirmLock instanceof HTMLElement && !confirmLock.hidden;
+        const blockedMessage = submitButton instanceof HTMLElement
+            ? String(submitButton.getAttribute('data-delete-blocked') || form.getAttribute('data-developer-blocked-message') || '').trim()
+            : String(form.getAttribute('data-developer-blocked-message') || '').trim();
+        const isBlocked = blockedMessage !== '';
         const confirmReady = !lockActive
             || (!(confirmField instanceof HTMLInputElement)
                 ? false
@@ -1657,6 +1661,12 @@
 
         if (submitButton instanceof HTMLButtonElement || submitButton instanceof HTMLInputElement) {
             submitButton.disabled = hasUnsavedChanges || !confirmReady;
+            submitButton.classList.toggle('is-disabled', isBlocked);
+            if (isBlocked) {
+                submitButton.setAttribute('aria-disabled', 'true');
+            } else if (!submitButton.disabled) {
+                submitButton.removeAttribute('aria-disabled');
+            }
         }
     }
 
@@ -4958,18 +4968,10 @@
 
         initHelpTooltips();
 
-        target.querySelectorAll('[data-family-fallback-form]').forEach((form) => {
-            syncFamilyFallbackSaveState(form);
-        });
-        target.querySelectorAll('[data-family-font-display-form]').forEach((form) => {
-            syncFamilyFontDisplaySaveState(form);
-        });
-        target.querySelectorAll('[data-family-delivery-form]').forEach((form) => {
-            syncFamilyDeliverySaveState(form);
-        });
-        target.querySelectorAll('[data-family-publish-state-form]').forEach((form) => {
-            syncFamilyPublishStateSaveState(form);
-        });
+        bindFamilyFallbackControls(target);
+        bindFamilyFontDisplayControls(target);
+        bindFamilyDeliveryControls(target);
+        bindFamilyPublishStateControls(target);
     }
 
     async function hydrateFamilyDetails(toggle) {
@@ -11356,21 +11358,31 @@
         handleDetectedUploadClick(event);
     }
 
-    function bindFamilyFallbackControls() {
-        document.querySelectorAll('.tasty-fonts-fallback-selector').forEach((element) => {
+    function bindFamilyFallbackControls(root = document) {
+        const scope = root || document;
+
+        scope.querySelectorAll('.tasty-fonts-fallback-selector').forEach((element) => {
             const form = element.closest('[data-family-fallback-form]');
 
-            element.addEventListener('change', () => {
-                updateInlineStackPreview(element.dataset.fontFamily || '');
+            if (element.dataset.familyFallbackBound !== '1') {
+                element.dataset.familyFallbackBound = '1';
+                element.addEventListener('change', () => {
+                    updateInlineStackPreview(element.dataset.fontFamily || '');
 
-                syncFamilyFallbackSaveState(form);
-                setFamilyFallbackFeedback(form, '', '');
-            });
+                    syncFamilyFallbackSaveState(form);
+                    setFamilyFallbackFeedback(form, '', '');
+                });
+            }
             updateInlineStackPreview(element.dataset.fontFamily || '');
             syncFamilyFallbackSaveState(form);
         });
 
-        document.querySelectorAll('[data-family-fallback-form]').forEach((form) => {
+        scope.querySelectorAll('[data-family-fallback-form]').forEach((form) => {
+            if (form.dataset.familyFallbackSubmitBound === '1') {
+                return;
+            }
+
+            form.dataset.familyFallbackSubmitBound = '1';
             form.addEventListener('submit', async (event) => {
                 if (!hasRestConfig() || !window.fetch) {
                     return;
@@ -11388,31 +11400,46 @@
         });
     }
 
-    function bindFamilyFontDisplayControls() {
-        document.querySelectorAll('.tasty-fonts-font-display-selector').forEach((element) => {
+    function bindFamilyFontDisplayControls(root = document) {
+        const scope = root || document;
+
+        scope.querySelectorAll('.tasty-fonts-font-display-selector').forEach((element) => {
             const form = element.closest('[data-family-font-display-form]');
 
-            element.addEventListener('change', () => {
-                syncFamilyFontDisplaySaveState(form);
-                setFamilyFontDisplayFeedback(form, '', '');
-            });
+            if (element.dataset.familyFontDisplayBound !== '1') {
+                element.dataset.familyFontDisplayBound = '1';
+                element.addEventListener('change', () => {
+                    syncFamilyFontDisplaySaveState(form);
+                    setFamilyFontDisplayFeedback(form, '', '');
+                });
+            }
             syncFamilyFontDisplaySaveState(form);
         });
     }
 
-    function bindFamilyDeliveryControls() {
-        document.querySelectorAll('.tasty-fonts-family-delivery-selector').forEach((element) => {
+    function bindFamilyDeliveryControls(root = document) {
+        const scope = root || document;
+
+        scope.querySelectorAll('.tasty-fonts-family-delivery-selector').forEach((element) => {
             const form = element.closest('[data-family-delivery-form]');
 
-            element.addEventListener('change', () => {
-                syncFamilyDeliverySaveState(form);
-                setFamilyDeliveryFeedback(form, '', '');
-            });
+            if (element.dataset.familyDeliveryBound !== '1') {
+                element.dataset.familyDeliveryBound = '1';
+                element.addEventListener('change', () => {
+                    syncFamilyDeliverySaveState(form);
+                    setFamilyDeliveryFeedback(form, '', '');
+                });
+            }
 
             syncFamilyDeliverySaveState(form);
         });
 
-        document.querySelectorAll('[data-family-delivery-form]').forEach((form) => {
+        scope.querySelectorAll('[data-family-delivery-form]').forEach((form) => {
+            if (form.dataset.familyDeliverySubmitBound === '1') {
+                return;
+            }
+
+            form.dataset.familyDeliverySubmitBound = '1';
             form.addEventListener('submit', async (event) => {
                 if (!hasRestConfig() || !window.fetch) {
                     return;
@@ -11430,19 +11457,29 @@
         });
     }
 
-    function bindFamilyPublishStateControls() {
-        document.querySelectorAll('.tasty-fonts-family-publish-state-selector').forEach((element) => {
+    function bindFamilyPublishStateControls(root = document) {
+        const scope = root || document;
+
+        scope.querySelectorAll('.tasty-fonts-family-publish-state-selector').forEach((element) => {
             const form = element.closest('[data-family-publish-state-form]');
 
-            element.addEventListener('change', () => {
-                syncFamilyPublishStateSaveState(form);
-                setFamilyPublishStateFeedback(form, '', '');
-            });
+            if (element.dataset.familyPublishStateBound !== '1') {
+                element.dataset.familyPublishStateBound = '1';
+                element.addEventListener('change', () => {
+                    syncFamilyPublishStateSaveState(form);
+                    setFamilyPublishStateFeedback(form, '', '');
+                });
+            }
 
             syncFamilyPublishStateSaveState(form);
         });
 
-        document.querySelectorAll('[data-family-publish-state-form]').forEach((form) => {
+        scope.querySelectorAll('[data-family-publish-state-form]').forEach((form) => {
+            if (form.dataset.familyPublishStateSubmitBound === '1') {
+                return;
+            }
+
+            form.dataset.familyPublishStateSubmitBound = '1';
             form.addEventListener('submit', async (event) => {
                 if (!hasRestConfig() || !window.fetch) {
                     return;
@@ -12828,6 +12865,16 @@
                 if (anySettingsFormHasUnsavedChanges()) {
                     event.preventDefault();
                     syncDeveloperToolAvailability();
+                    return;
+                }
+
+                const blockedMessage = submitButton instanceof HTMLElement
+                    ? String(submitButton.getAttribute('data-delete-blocked') || form.getAttribute('data-developer-blocked-message') || '').trim()
+                    : String(form.getAttribute('data-developer-blocked-message') || '').trim();
+
+                if (blockedMessage !== '') {
+                    event.preventDefault();
+                    showToast(blockedMessage, 'error');
                     return;
                 }
 

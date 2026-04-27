@@ -7,6 +7,7 @@ use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Cli\Command as CliCommand;
+use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
@@ -2594,6 +2595,22 @@ $tests['rest_controller_runs_safe_advanced_tools_action_and_returns_refreshed_pa
     assertSameValue(true, is_array($data['logs'] ?? null), 'The tools action route should return refreshed activity entries.');
 };
 
+$tests['rest_controller_rejects_destructive_bulk_delete_tools_actions'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+
+    foreach (['delete_all_exports', 'delete_all_snapshots'] as $action) {
+        $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/tools/action');
+        $request->set_param('action', $action);
+
+        $response = $services['rest']->runToolsAction($request);
+
+        assertSameValue(true, is_wp_error($response), 'Destructive bulk delete actions should not be executable through the safe REST tools/action endpoint.');
+        assertSameValue('tasty_fonts_invalid_tools_action', $response instanceof WP_Error ? $response->get_error_code() : '', 'Rejected destructive tools actions should keep the shared invalid-action error code.');
+    }
+};
+
 $tests['rest_controller_lists_rollback_snapshots_from_snapshot_service'] = static function (): void {
     resetTestState();
 
@@ -4301,7 +4318,7 @@ $tests['admin_controller_clears_plugin_caches_and_logs_the_reset'] = static func
 
     $services = makeServiceGraph();
     $transientStore = [
-        TransientKey::forSite('tasty_fonts_catalog_v2') => ['cached'],
+        TransientKey::forSite(CatalogService::TRANSIENT_CATALOG) => ['cached'],
         TransientKey::forSite('tasty_fonts_css_v2') => 'cached',
         TransientKey::forSite('tasty_fonts_css_hash_v2') => 'hash',
         TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG) => ['google'],
@@ -4516,6 +4533,109 @@ $tests['handle_admin_actions_returns_early_after_first_matching_handler'] = stat
     // If the dispatch stops after clear-log, only the "Activity log cleared." entry should be present.
     $logMessages = implode(' ', array_column($services['log']->all(), 'message'));
     assertNotContainsValue('rescanned', $logMessages, 'Only the clear-log handler should have fired; the rescan log message should be absent.');
+};
+
+$tests['handle_admin_actions_dispatches_bulk_snapshot_delete_and_redirects'] = static function (): void {
+    resetTestState();
+
+    global $isAdminRequest;
+    global $redirectLocation;
+
+    $isAdminRequest = true;
+    $_POST['tasty_fonts_delete_all_rollback_snapshots'] = '1';
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    assertFalseValue(is_wp_error($services['snapshots']->createSnapshot('manual')), 'A rollback snapshot should be created before exercising the bulk snapshot POST handler.');
+    add_action(
+        'tasty_fonts_before_admin_redirect_exit',
+        static function (): void {
+            throw new WpDieException('redirect');
+        }
+    );
+
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected: the redirect handler terminates after wp_safe_redirect().
+    }
+
+    $logMessages = implode(' ', array_column($services['log']->all(), 'message'));
+    assertSameValue([], $services['snapshots']->listSnapshots(), 'The bulk snapshot POST handler should delete retained rollback snapshots.');
+    assertContainsValue('All rollback snapshots deleted.', $logMessages, 'The bulk snapshot POST handler should log the shared success message.');
+    assertSameValue(false, empty($redirectLocation), 'The bulk snapshot POST handler should redirect after completion.');
+};
+
+$tests['handle_admin_actions_dispatches_guarded_bulk_export_delete_and_redirects'] = static function (): void {
+    resetTestState();
+
+    global $isAdminRequest;
+    global $redirectLocation;
+
+    $isAdminRequest = true;
+    $_POST['tasty_fonts_delete_all_site_transfer_export_bundles'] = '1';
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $fontPath = (string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($fontPath, 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+    assertFalseValue(is_wp_error($services['site_transfer']->buildExportBundle(true)), 'A retained export bundle should be created before exercising the bulk export POST handler.');
+
+    $exportId = (string) ($services['site_transfer']->listExportBundles()[0]['id'] ?? '');
+    assertFalseValue(is_wp_error($services['site_transfer']->setExportBundleProtected($exportId, true)), 'The retained export should be locked before exercising the guarded bulk export POST handler.');
+    add_action(
+        'tasty_fonts_before_admin_redirect_exit',
+        static function (): void {
+            throw new WpDieException('redirect');
+        }
+    );
+
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected: the redirect handler terminates after wp_safe_redirect().
+    }
+
+    $logMessagesAfterBlockedAttempt = implode(' ', array_column($services['log']->all(), 'message'));
+    assertSameValue(1, count($services['site_transfer']->listExportBundles()), 'The bulk export POST handler should preserve locked exports when blocked.');
+    assertNotContainsValue('All site transfer export bundles deleted.', $logMessagesAfterBlockedAttempt, 'The blocked bulk export POST handler should not log a deletion success message.');
+    assertSameValue(false, empty($redirectLocation), 'The blocked bulk export POST handler should still redirect with an error notice.');
+
+    assertFalseValue(is_wp_error($services['site_transfer']->setExportBundleProtected($exportId, false)), 'The retained export should be unlockable before the successful bulk export POST handler path.');
+
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected: the redirect handler terminates after wp_safe_redirect().
+    }
+
+    $logMessagesAfterSuccess = implode(' ', array_column($services['log']->all(), 'message'));
+    assertSameValue([], $services['site_transfer']->listExportBundles(), 'The bulk export POST handler should delete all retained exports after they are unlocked.');
+    assertContainsValue('All site transfer export bundles deleted.', $logMessagesAfterSuccess, 'The bulk export POST handler should log the shared success message after deletion.');
 };
 
 $tests['handle_admin_actions_records_failed_site_transfer_imports_and_queues_inline_status'] = static function (): void {

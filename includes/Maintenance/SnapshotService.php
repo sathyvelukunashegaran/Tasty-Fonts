@@ -32,7 +32,7 @@ use ZipArchive;
  *     library: LibraryMap,
  *     files: list<SnapshotFileEntry>
  * }
- * @phpstan-type SnapshotSummary array{id: string, created_at: string, reason: string, plugin_version: string, families: int, files: int, size: int, label: string, family_names: list<string>, role_families: list<string>}
+ * @phpstan-type SnapshotSummary array{id: string, created_at: string, reason: string, plugin_version: string, families: int, files: int, font_files: int, storage_files: int, size: int, label: string, family_names: list<string>, role_families: list<string>}
  * @phpstan-type SnapshotCreateResult array{snapshot: SnapshotSummary, message: string}
  * @phpstan-type SnapshotRestorePreview array{id: string, created_at: string, reason: string, plugin_version: string, families: int, files: int, settings_changed: int, families_added: int, families_removed: int, families_changed: int}
  */
@@ -516,18 +516,46 @@ final class SnapshotService
             $roleFamilies = $this->snapshotRoleFamilies($manifest['roles']);
         }
 
+        $fontFileCount = $this->countSnapshotFontFiles($manifest['files']);
+        $storageFileCount = count($manifest['files']);
+
         return [
             'id' => $manifest['id'],
             'created_at' => $manifest['created_at'],
             'reason' => $manifest['reason'],
             'plugin_version' => $manifest['plugin_version'],
             'families' => count($manifest['library']),
-            'files' => count($manifest['files']),
+            'files' => $storageFileCount,
+            'font_files' => $fontFileCount,
+            'storage_files' => $storageFileCount,
             'size' => max(0, $size),
             'label' => '',
             'family_names' => $this->snapshotFamilyNames($manifest['library']),
             'role_families' => $roleFamilies,
         ];
+    }
+
+    /**
+     * @param list<SnapshotFileEntry> $files
+     */
+    private function countSnapshotFontFiles(array $files): int
+    {
+        $count = 0;
+
+        foreach ($files as $file) {
+            if ($this->isSnapshotFontFile($file['relative_path'])) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private function isSnapshotFontFile(string $relativePath): bool
+    {
+        $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+
+        return in_array($extension, ['woff2', 'woff', 'ttf', 'otf', 'eot', 'svg'], true);
     }
 
     /**
@@ -821,6 +849,8 @@ final class SnapshotService
                 'plugin_version' => FontUtils::scalarStringValue($map['plugin_version'] ?? ''),
                 'families' => max(0, FontUtils::scalarIntValue($map['families'] ?? 0)),
                 'files' => max(0, FontUtils::scalarIntValue($map['files'] ?? 0)),
+                'font_files' => max(0, FontUtils::scalarIntValue($map['font_files'] ?? 0)),
+                'storage_files' => max(0, FontUtils::scalarIntValue($map['storage_files'] ?? $map['files'] ?? 0)),
                 'size' => max(0, FontUtils::scalarIntValue($map['size'] ?? 0)),
                 'label' => $this->normalizeSnapshotLabel(FontUtils::scalarStringValue($map['label'] ?? '')),
                 'family_names' => array_values(

@@ -140,9 +140,20 @@
     align-items: center;
     justify-content: center;
     align-self: center;
+    position: relative;
     min-width: var(--tasty-layout-0);
-    padding-right: var(--tasty-masthead-logo-padding-inline);
-    border-right: var(--tasty-layout-1px) solid var(--tasty-masthead-logo-divider);
+    padding-inline-end: var(--tasty-masthead-logo-padding-inline);
+    border-inline-end: var(--tasty-layout-0);
+}
+
+.tasty-fonts-page-header-logo-wrap::after {
+    content: "";
+    position: absolute;
+    inset-block: var(--tasty-masthead-logo-divider-inset-block);
+    inset-inline-end: var(--tasty-layout-0);
+    width: var(--tasty-layout-1px);
+    background: var(--tasty-masthead-logo-divider);
+    pointer-events: none;
 }
 
 .tasty-fonts-page-header-brand {
@@ -965,6 +976,10 @@
     padding: var(--tasty-card-padding);
 }
 
+.tasty-fonts-card.tasty-fonts-page-header {
+    padding: var(--tasty-masthead-padding-block) var(--tasty-masthead-padding-inline);
+}
+
 .tasty-fonts-card-head {
     display: flex;
     justify-content: space-between;
@@ -1434,7 +1449,17 @@ h3.tasty-fonts-section-title {
 }
 
 .tasty-fonts-role-grid .tasty-fonts-role-box + .tasty-fonts-role-box {
-    border-left: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
+    border-inline-start: var(--tasty-layout-0);
+}
+
+.tasty-fonts-role-grid .tasty-fonts-role-box + .tasty-fonts-role-box::before {
+    content: "";
+    position: absolute;
+    inset-block: var(--tasty-rail-divider-inset-block);
+    inset-inline-start: var(--tasty-layout-0);
+    width: var(--tasty-layout-1px);
+    background: var(--tasty-rail-divider);
+    pointer-events: none;
 }
 
 .tasty-fonts-role-box .tasty-fonts-panel-head {
@@ -1976,6 +2001,18 @@ h3.tasty-fonts-section-title {
     box-shadow: none;
 }
 
+.tasty-fonts-card.tasty-fonts-top-panel {
+    --tasty-top-panel-rail-offset-negative-current: var(--tasty-top-panel-rail-offset-negative);
+    padding: var(--tasty-surface-card-padding);
+}
+
+.tasty-fonts-top-panel .tasty-fonts-role-actions,
+.tasty-fonts-top-panel .tasty-fonts-role-grid,
+.tasty-fonts-top-panel .tasty-fonts-role-command-notice {
+    width: auto;
+    margin-inline: var(--tasty-top-panel-rail-offset-negative-current);
+}
+
 .tasty-fonts-role-command-card--sitewide {
     border-color: var(--tasty-border-subtle);
 }
@@ -1993,8 +2030,22 @@ h3.tasty-fonts-section-title {
     background: transparent;
 }
 
+.tasty-fonts-role-actions .tasty-fonts-role-command-card {
+    position: relative;
+}
+
 .tasty-fonts-role-actions .tasty-fonts-role-command-card + .tasty-fonts-role-command-card {
-    border-left: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
+    border-inline-start: var(--tasty-layout-0);
+}
+
+.tasty-fonts-role-actions .tasty-fonts-role-command-card + .tasty-fonts-role-command-card::before {
+    content: "";
+    position: absolute;
+    inset-block: var(--tasty-rail-divider-inset-block);
+    inset-inline-start: var(--tasty-layout-0);
+    width: var(--tasty-layout-1px);
+    background: var(--tasty-rail-divider);
+    pointer-events: none;
 }
 
 @media (max-width: 960px) {
@@ -2003,8 +2054,12 @@ h3.tasty-fonts-section-title {
     }
 
     .tasty-fonts-role-actions .tasty-fonts-role-command-card + .tasty-fonts-role-command-card {
-        border-top: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
-        border-left: var(--tasty-layout-0);
+        border-block-start: var(--tasty-layout-1px) solid var(--tasty-rail-divider);
+        border-inline-start: var(--tasty-layout-0);
+    }
+
+    .tasty-fonts-role-actions .tasty-fonts-role-command-card + .tasty-fonts-role-command-card::before {
+        display: none;
     }
 }
 
@@ -8214,17 +8269,18 @@ h3.tasty-fonts-section-title {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    align-self: start;
     width: var(--tasty-icon-button-size);
     min-width: var(--tasty-icon-button-size);
     height: var(--tasty-icon-button-size);
     min-height: var(--tasty-icon-button-size);
     padding: var(--tasty-layout-0);
     border-color: var(--tasty-border-subtle);
-    border-radius: var(--tasty-radius-pill);
+    border-radius: var(--tasty-radius-control);
     background: rgba(var(--tasty-white-rgb), var(--tasty-alpha-72));
     color: var(--tasty-text);
     line-height: var(--tasty-line-height-solid);
-    box-shadow: var(--tasty-shadow-flat);
+    box-shadow: var(--tasty-control-shadow);
     transition: var(--tasty-transition-control);
 }
 
@@ -8237,16 +8293,16 @@ h3.tasty-fonts-section-title {
 }
 
 .tasty-fonts-log-toggle-icon {
-    width: var(--tasty-layout-8px);
-    height: var(--tasty-layout-8px);
+    width: var(--tasty-layout-7px);
+    height: var(--tasty-layout-7px);
     border-right: var(--tasty-layout-2px) solid currentColor;
     border-bottom: var(--tasty-layout-2px) solid currentColor;
-    transform: translateY(var(--tasty-layout-neg-2px)) rotate(var(--tasty-layout-45deg));
+    transform: translateY(var(--tasty-layout-neg-1px)) rotate(var(--tasty-layout-45deg));
     transition: transform var(--tasty-motion-reveal) var(--tasty-easing-emphasized);
 }
 
 .tasty-fonts-log-toggle[aria-expanded="true"] .tasty-fonts-log-toggle-icon {
-    transform: translateY(var(--tasty-layout-2px)) rotate(var(--tasty-layout-225deg));
+    transform: translateY(var(--tasty-layout-1px)) rotate(var(--tasty-layout-225deg));
 }
 
 .tasty-fonts-log-details {
@@ -11935,6 +11991,16 @@ h3.tasty-fonts-section-title {
     min-width: var(--tasty-layout-0);
 }
 
+#tasty-fonts-diagnostics-page .tasty-fonts-developer-setting-toggle {
+    flex: var(--tasty-layout-0) var(--tasty-layout-0) auto;
+    min-width: var(--tasty-layout-0);
+    width: auto;
+    padding: var(--tasty-layout-0);
+    border: var(--tasty-layout-0);
+    background: transparent;
+    box-shadow: none;
+}
+
 #tasty-fonts-diagnostics-page .tasty-fonts-developer-row-form .tasty-fonts-developer-confirm-lock {
     flex: var(--tasty-layout-1) var(--tasty-layout-1) var(--tasty-layout-100pct);
     min-width: min(var(--tasty-layout-100pct), var(--tasty-layout-360px));
@@ -12338,8 +12404,10 @@ h3.tasty-fonts-section-title {
 }
 
 #tasty-fonts-diagnostics-page #tasty-fonts-site-transfer-form > .tasty-fonts-health-row-copy,
-#tasty-fonts-diagnostics-page #tasty-fonts-site-transfer-form .tasty-fonts-site-transfer-import-stack {
+#tasty-fonts-diagnostics-page #tasty-fonts-site-transfer-form .tasty-fonts-site-transfer-import-stack,
+#tasty-fonts-diagnostics-page .tasty-fonts-transfer-row--snapshot > .tasty-fonts-health-row-copy {
     display: block;
+    grid-column: var(--tasty-layout-1) / var(--tasty-layout-neg-1);
     justify-self: stretch;
     width: var(--tasty-layout-100pct);
     max-width: none;
@@ -12586,6 +12654,7 @@ h3.tasty-fonts-section-title {
     grid-column: var(--tasty-layout-2);
     align-self: start;
     justify-self: end;
+    margin-inline-end: var(--tasty-transfer-action-rail-offset);
 }
 
 #tasty-fonts-diagnostics-page .tasty-fonts-snapshot-row {
@@ -13489,10 +13558,13 @@ h3.tasty-fonts-section-title {
     padding: var(--tasty-layout-0) var(--tasty-layout-8px);
 }
 
-/* Select and search field width — tighter */
-#tasty-fonts-diagnostics-page .tasty-fonts-activity-select,
-#tasty-fonts-diagnostics-page .tasty-fonts-search-field--activity {
+/* Activity filters — keep account compact and give search enough room for its prompt. */
+#tasty-fonts-diagnostics-page .tasty-fonts-activity-select {
     --tasty-activity-filter-field-width: clamp(var(--tasty-layout-140px), var(--tasty-layout-16vw), var(--tasty-layout-180px));
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-search-field--activity {
+    --tasty-activity-filter-field-width: clamp(var(--tasty-layout-260px), var(--tasty-layout-24vw), var(--tasty-layout-360px));
 }
 
 /* Clear Log button — icon-only to match other destructive actions */
@@ -13518,6 +13590,142 @@ h3.tasty-fonts-section-title {
     border-color: var(--tasty-danger);
     color: var(--tasty-danger);
     box-shadow: none;
+}
+
+/*
+ * Compact icon-only chrome: keep the 40px accessible hit target while
+ * drawing a calmer 32px visual surface inside it. This prevents utility
+ * icons from reading as oversized square buttons across the dashboard.
+ */
+.tasty-fonts-toast-dismiss,
+.tasty-fonts-select-clear,
+.tasty-fonts-log-toggle.button,
+.tasty-fonts-admin .tasty-fonts-output-copy-button.button,
+.tasty-fonts-admin .tasty-fonts-output-download-button.button,
+.tasty-fonts-admin .tasty-fonts-preview-copy-css-button.button,
+#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button,
+#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-copy-button.button,
+#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-download-button.button,
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button.button:not(.is-awaiting-confirmation),
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button:not(.is-awaiting-confirmation),
+#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button {
+    --tasty-icon-chrome-current-background: var(--tasty-icon-chrome-background-subtle);
+    --tasty-icon-chrome-current-border: var(--tasty-icon-chrome-border-subtle);
+    position: relative;
+    width: var(--tasty-icon-button-size);
+    min-width: var(--tasty-icon-button-size);
+    height: var(--tasty-icon-button-size);
+    min-height: var(--tasty-icon-button-size);
+    padding: var(--tasty-layout-0);
+    border-color: transparent;
+    background: transparent;
+    color: var(--tasty-icon-chrome-color);
+    box-shadow: none;
+    isolation: isolate;
+}
+
+.tasty-fonts-toast-dismiss,
+.tasty-fonts-select-clear {
+    --tasty-icon-chrome-current-background: var(--tasty-icon-chrome-background);
+    --tasty-icon-chrome-current-border: var(--tasty-icon-chrome-border);
+}
+
+.tasty-fonts-select-clear {
+    position: absolute;
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button.button:not(.is-awaiting-confirmation),
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button:not(.is-awaiting-confirmation) {
+    flex: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-icon-button-size);
+    max-width: var(--tasty-icon-button-size);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button {
+    --tasty-icon-chrome-current-background: var(--tasty-surface-danger);
+    --tasty-icon-chrome-current-border: var(--tasty-border-danger-soft);
+    color: var(--tasty-danger);
+}
+
+.tasty-fonts-toast-dismiss::after,
+.tasty-fonts-select-clear::after,
+.tasty-fonts-log-toggle.button::after,
+.tasty-fonts-admin .tasty-fonts-output-copy-button.button::after,
+.tasty-fonts-admin .tasty-fonts-output-download-button.button::after,
+.tasty-fonts-admin .tasty-fonts-preview-copy-css-button.button::after,
+#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button::after,
+#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-copy-button.button::after,
+#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-download-button.button::after,
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button.button:not(.is-awaiting-confirmation)::after,
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button:not(.is-awaiting-confirmation)::after,
+#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button::after {
+    content: "";
+    position: absolute;
+    inset: var(--tasty-icon-chrome-inset);
+    z-index: var(--tasty-layout-0);
+    border: var(--tasty-layout-1px) solid var(--tasty-icon-chrome-current-border);
+    border-radius: var(--tasty-icon-chrome-radius);
+    background: var(--tasty-icon-chrome-current-background);
+    box-shadow: none;
+    pointer-events: none;
+    transition: var(--tasty-transition-control);
+}
+
+.tasty-fonts-toast-dismiss > *,
+.tasty-fonts-log-toggle.button > *,
+.tasty-fonts-admin .tasty-fonts-page-notice-icon-action.button > *,
+.tasty-fonts-admin .tasty-fonts-output-copy-button.button::before,
+.tasty-fonts-admin .tasty-fonts-output-download-button.button::before,
+.tasty-fonts-admin .tasty-fonts-preview-copy-css-button.button::before,
+#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button::before,
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button:not(.is-awaiting-confirmation)::before,
+#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button::before {
+    position: relative;
+    z-index: var(--tasty-layout-1);
+}
+
+.tasty-fonts-toast-dismiss:hover,
+.tasty-fonts-toast-dismiss:focus,
+.tasty-fonts-select-clear:hover,
+.tasty-fonts-select-clear:focus-visible,
+.tasty-fonts-log-toggle.button:hover,
+.tasty-fonts-log-toggle.button:focus,
+.tasty-fonts-admin .tasty-fonts-output-download-button.button:hover,
+.tasty-fonts-admin .tasty-fonts-output-download-button.button:focus-visible,
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button.button:not(.is-awaiting-confirmation):hover,
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button.button:not(.is-awaiting-confirmation):focus-visible {
+    --tasty-icon-chrome-current-background: var(--tasty-icon-chrome-background-hover);
+    --tasty-icon-chrome-current-border: var(--tasty-icon-chrome-border-subtle);
+    color: var(--tasty-icon-chrome-color-hover);
+    outline: none;
+}
+
+.tasty-fonts-admin .tasty-fonts-output-copy-button.button:hover:not(.is-copied),
+.tasty-fonts-admin .tasty-fonts-output-copy-button.button:focus-visible:not(.is-copied),
+.tasty-fonts-admin .tasty-fonts-preview-copy-css-button.button:hover:not(.is-copied),
+.tasty-fonts-admin .tasty-fonts-preview-copy-css-button.button:focus-visible:not(.is-copied),
+#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button:hover:not(.is-copied),
+#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button:focus-visible:not(.is-copied) {
+    --tasty-icon-chrome-current-background: var(--tasty-copy-hover-background);
+    --tasty-icon-chrome-current-border: var(--tasty-copy-hover-border);
+}
+
+.tasty-fonts-admin .tasty-fonts-output-copy-button.button.is-copied,
+.tasty-fonts-admin .tasty-fonts-preview-copy-css-button.button.is-copied,
+#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button.is-copied {
+    --tasty-icon-chrome-current-background: rgba(var(--tasty-success-rgb), var(--tasty-alpha-10));
+    --tasty-icon-chrome-current-border: rgba(var(--tasty-success-rgb), var(--tasty-alpha-24));
+    color: var(--tasty-success);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button:hover,
+#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button:focus {
+    --tasty-icon-chrome-current-background: var(--tasty-surface-danger-strong);
+    --tasty-icon-chrome-current-border: var(--tasty-danger);
+    color: var(--tasty-danger);
+}
+
+#tasty-fonts-diagnostics-page .tasty-fonts-snapshot-icon-button.is-awaiting-confirmation::after {
+    content: none;
 }
 
 /* Activity shell */
@@ -13883,7 +14091,15 @@ h3.tasty-fonts-section-title {
             "logo nav";
         grid-template-columns: auto minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
         align-items: start;
-        padding: var(--tasty-masthead-padding-block) var(--tasty-masthead-padding-inline-compact);
+    }
+
+    .tasty-fonts-card.tasty-fonts-page-header,
+    .tasty-fonts-card.tasty-fonts-top-panel {
+        padding: var(--tasty-masthead-padding-block-compact) var(--tasty-masthead-padding-inline-compact);
+    }
+
+    .tasty-fonts-card.tasty-fonts-top-panel {
+        --tasty-top-panel-rail-offset-negative-current: var(--tasty-top-panel-rail-offset-negative-compact);
     }
 
     .tasty-fonts-page-header-nav {
@@ -14011,6 +14227,12 @@ h3.tasty-fonts-section-title {
 
     .tasty-fonts-role-command-card--utilities {
         grid-column: var(--tasty-layout-1) / var(--tasty-layout-neg-1);
+        border-block-start: var(--tasty-layout-1px) solid var(--tasty-rail-divider);
+        border-inline-start: var(--tasty-layout-0);
+    }
+
+    .tasty-fonts-role-actions .tasty-fonts-role-command-card--utilities::before {
+        display: none;
     }
 
     .tasty-fonts-preview-toolbar-actions {
@@ -14335,6 +14557,16 @@ h3.tasty-fonts-section-title {
         padding: var(--tasty-space-4);
     }
 
+    .tasty-fonts-card.tasty-fonts-top-panel {
+        --tasty-top-panel-rail-offset-negative-current: var(--tasty-top-panel-rail-offset-negative-mobile);
+        padding: var(--tasty-surface-card-padding-tight);
+    }
+
+    .tasty-fonts-top-panel .tasty-fonts-role-actions,
+    .tasty-fonts-top-panel .tasty-fonts-role-grid {
+        margin-inline: var(--tasty-top-panel-rail-offset-mobile-nested);
+    }
+
     .tasty-fonts-studio-section-title {
         max-width: none;
         font-size: var(--tasty-type-section-title-size-mobile);
@@ -14567,17 +14799,26 @@ h3.tasty-fonts-section-title {
             "brand"
             "nav";
         grid-template-columns: var(--tasty-layout-1fr);
-        padding: var(--tasty-space-2-5) var(--tasty-space-3);
         gap: var(--tasty-space-2);
+    }
+
+    .tasty-fonts-card.tasty-fonts-page-header {
+        padding: var(--tasty-masthead-padding-block-mobile) var(--tasty-masthead-padding-inline-mobile);
     }
 
     .tasty-fonts-page-header-logo-wrap {
         justify-content: flex-start;
         align-self: auto;
-        padding-right: var(--tasty-layout-0);
-        padding-bottom: var(--tasty-masthead-logo-padding-block-mobile);
-        border-right: var(--tasty-layout-0) solid transparent;
-        border-bottom: var(--tasty-layout-1px) solid var(--tasty-masthead-logo-divider);
+        padding-inline-end: var(--tasty-layout-0);
+        padding-block-end: var(--tasty-masthead-logo-padding-block-mobile);
+        border-inline-end: var(--tasty-layout-0);
+    }
+
+    .tasty-fonts-page-header-logo-wrap::after {
+        inset-block: auto var(--tasty-layout-0);
+        inset-inline: var(--tasty-layout-0);
+        width: auto;
+        height: var(--tasty-layout-1px);
     }
 
     .tasty-fonts-page-header-copy {
@@ -14630,11 +14871,15 @@ h3.tasty-fonts-section-title {
 
     .tasty-fonts-role-grid .tasty-fonts-role-box + .tasty-fonts-role-box,
     .tasty-fonts-role-grid.is-three-columns .tasty-fonts-role-box:nth-child(even) {
-        border-left: var(--tasty-layout-0);
+        border-inline-start: var(--tasty-layout-0);
     }
 
     .tasty-fonts-role-grid .tasty-fonts-role-box + .tasty-fonts-role-box {
-        border-top: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
+        border-block-start: var(--tasty-layout-1px) solid var(--tasty-rail-divider);
+    }
+
+    .tasty-fonts-role-grid .tasty-fonts-role-box + .tasty-fonts-role-box::before {
+        display: none;
     }
 }
 

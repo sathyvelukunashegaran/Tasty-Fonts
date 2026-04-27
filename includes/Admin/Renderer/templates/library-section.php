@@ -57,6 +57,7 @@
                                             <option value="published"><?php esc_html_e('Published', 'tasty-fonts'); ?></option>
                                             <option value="library_only"><?php esc_html_e('In Library Only', 'tasty-fonts'); ?></option>
                                             <option value="same-origin"><?php esc_html_e('Self-hosted', 'tasty-fonts'); ?></option>
+                                            <option value="url-import"><?php esc_html_e('URL Import', 'tasty-fonts'); ?></option>
                                             <option value="google-cdn"><?php esc_html_e('Google CDN', 'tasty-fonts'); ?></option>
                                             <option value="bunny-cdn"><?php esc_html_e('Bunny CDN', 'tasty-fonts'); ?></option>
                                             <option value="adobe-hosted"><?php esc_html_e('Adobe-hosted', 'tasty-fonts'); ?></option>

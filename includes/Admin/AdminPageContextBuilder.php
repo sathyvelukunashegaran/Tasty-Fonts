@@ -379,6 +379,22 @@ final class AdminPageContextBuilder
                 'dry_run_supported' => false,
             ],
             [
+                'id' => 'delete_all_snapshots',
+                'kind' => 'destructive',
+                'label' => __('Delete all snapshots', 'tasty-fonts'),
+                'confirm_phrase' => 'DELETE SNAPSHOTS',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'delete_all_exports',
+                'kind' => 'destructive',
+                'label' => __('Delete all exports', 'tasty-fonts'),
+                'confirm_phrase' => 'DELETE EXPORTS',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
                 'id' => 'create_rollback_snapshot',
                 'kind' => 'snapshot',
                 'label' => __('Create rollback snapshot', 'tasty-fonts'),
@@ -2210,6 +2226,14 @@ final class AdminPageContextBuilder
                 ),
                 'last_run' => '',
             ],
+            'delete_all_snapshots' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
+            'delete_all_exports' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
         ];
         $messageMap = [
             'clear_plugin_caches' => __('Plugin caches cleared and generated assets refreshed.', 'tasty-fonts'),
@@ -2220,6 +2244,8 @@ final class AdminPageContextBuilder
             'repair_storage_scaffold' => __('Storage scaffold repaired.', 'tasty-fonts'),
             'reset_plugin_settings' => __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts'),
             'wipe_managed_font_library' => __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts'),
+            'delete_all_snapshots' => __('All rollback snapshots deleted.', 'tasty-fonts'),
+            'delete_all_exports' => __('All site transfer export bundles deleted.', 'tasty-fonts'),
         ];
 
         foreach ($messageMap as $slug => $message) {

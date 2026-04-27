@@ -601,6 +601,21 @@ test('admin contracts match library rows against query and filter combinations',
     assert.equal(
         rowMatchesLibraryFilters(
             {
+                name: 'foundry sans',
+                sources: 'published same-origin url-import',
+                categories: 'sans-serif',
+            },
+            {
+                query: '',
+                sourceFilter: 'url-import',
+                categoryFilter: 'all',
+            }
+        ),
+        true
+    );
+    assert.equal(
+        rowMatchesLibraryFilters(
+            {
                 name: 'inter',
                 sources: 'same-origin',
                 categories: 'sans-serif',

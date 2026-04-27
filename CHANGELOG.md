@@ -4,14 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added Advanced Tools bulk cleanup actions for deleting all rollback snapshots and all retained site-transfer export bundles, with confirmation phrases, admin POST handlers, activity logs, and guardrails that block export deletion while any bundle is locked.
+- Added a URL Import source filter for the Font Library so custom CSS URL import families can be isolated in library views while still retaining their self-hosted or external-request delivery filters.
+
 ### Changed
 
 - Moved font import workflow controls into Settings > Behavior, keeping Google Fonts, Bunny Fonts, and custom uploads enabled by default while Adobe Fonts and URL imports remain opt-in.
+- Moved Show Onboarding Hints and Show Activity Log into the Advanced Tools Developer tab so Settings > Behavior focuses on import workflows, font capabilities, cleanup, and access.
 - Simplified Advanced Tools developer controls so the release rail appears first and saves channel changes immediately without a separate save button.
+- Refined Advanced Tools transfer/activity surfaces, hidden activity-log messaging, destructive tool summaries, and snapshot rows so retained exports, locked exports, font files, and storage files are easier to understand.
+- Polished admin masthead, top-panel rails, transfer actions, select clears, log toggles, copy/download buttons, and compact icon chrome using shared design tokens.
+- Bumped the catalog cache transient namespace and tagged custom CSS URL import delivery profiles with URL Import filter tokens.
 
 ### Fixed
 
 - Added end-to-end workflow gating so disabled font import workflows are reflected in Add Fonts UI panels and rejected consistently by REST/admin actions.
+- Fixed hydrated family details so fallback, display, delivery, and publish-state controls bind only once while still initializing correctly after AJAX replacement.
+- Fixed bulk export deletion paths so locked site-transfer bundles are preserved and blocked actions expose disabled-state messaging to both the UI and controller responses.
 
 ## [1.15.0-beta.2] - 2026-04-27
 

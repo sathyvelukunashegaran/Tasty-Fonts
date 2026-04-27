@@ -1607,6 +1607,57 @@ $tests['catalog_service_includes_live_role_families_in_published_filter_and_emit
     assertSameValue(true, in_array('cursive', $categoryTokens, true), 'Handwriting families should match the Cursive type filter.');
 };
 
+$tests['catalog_service_emits_url_import_filter_token_for_custom_css_url_profiles'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Foundry Sans',
+        'foundry-sans',
+        [
+            'id' => 'custom-self-hosted',
+            'label' => 'Self-hosted custom CSS',
+            'provider' => 'custom',
+            'type' => 'self_hosted',
+            'variants' => ['400'],
+            'faces' => [],
+            'meta' => [
+                'source_type' => 'custom_css_url',
+                'source_css_url' => 'https://assets.example.com/fonts.css',
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Remote Sans',
+        'remote-sans',
+        [
+            'id' => 'custom-remote',
+            'label' => 'Remote custom CSS',
+            'provider' => 'custom',
+            'type' => 'cdn',
+            'variants' => ['400'],
+            'faces' => [],
+            'meta' => [
+                'source_type' => 'custom_css_url',
+                'source_css_url' => 'https://assets.example.com/remote.css',
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $catalog = $services['catalog']->getCatalog();
+    $selfHostedTokens = (array) ($catalog['Foundry Sans']['delivery_filter_tokens'] ?? []);
+    $remoteTokens = (array) ($catalog['Remote Sans']['delivery_filter_tokens'] ?? []);
+
+    assertSameValue(true, in_array('url-import', $selfHostedTokens, true), 'Self-hosted custom CSS URL profiles should match the URL Import library filter.');
+    assertSameValue(true, in_array('same-origin', $selfHostedTokens, true), 'Self-hosted custom CSS URL profiles should continue to match the Self-hosted library filter.');
+    assertSameValue(true, in_array('url-import', $remoteTokens, true), 'Remote custom CSS URL profiles should match the URL Import library filter.');
+    assertSameValue(true, in_array('external-request', $remoteTokens, true), 'Remote custom CSS URL profiles should continue to match external-request filters.');
+};
+
 $tests['catalog_service_inferrs_monospace_category_from_family_name_when_metadata_is_missing'] = static function (): void {
     resetTestState();
 
@@ -1705,7 +1756,7 @@ $tests['catalog_service_maybe_invalidate_from_attachment_is_safe_when_catalog_tr
     $services['catalog']->maybeInvalidateFromAttachment(50);
 
     // Should attempt to delete the transient without throwing.
-    assertSameValue(true, in_array(TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true), 'maybeInvalidateFromAttachment() should still call delete_transient even when no cached catalog transient is present.');
+    assertSameValue(true, in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true), 'maybeInvalidateFromAttachment() should still call delete_transient even when no cached catalog transient is present.');
 };
 
 $tests['catalog_service_maybe_invalidate_from_attachment_ignores_paths_outside_font_storage'] = static function (): void {
@@ -1719,12 +1770,12 @@ $tests['catalog_service_maybe_invalidate_from_attachment_ignores_paths_outside_f
 
     $outsideRoot = uniqueTestDirectory('outside-root') . '/image.jpg';
     $attachedFilePaths[60] = $outsideRoot;
-    $transientStore[TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2')] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['cached' => true];
 
     $services['catalog']->maybeInvalidateFromAttachment(60);
 
     assertFalseValue(
-        in_array(TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true),
         'maybeInvalidateFromAttachment() should leave the catalog cache intact when the attachment path is outside the font storage root.'
     );
 };
@@ -1743,13 +1794,13 @@ $tests['catalog_service_maybe_invalidate_from_attachment_normalises_windows_styl
     // Simulate an attachment path that uses backslashes (Windows ABSPATH separators).
     $windowsStylePath = str_replace('/', '\\', $root . '/google/inter/inter-400-normal.woff2');
     $attachedFilePaths[70] = $windowsStylePath;
-    $transientStore[TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2')] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['cached' => true];
 
     $services['catalog']->maybeInvalidateFromAttachment(70);
 
     assertSameValue(
         true,
-        in_array(TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true),
         'maybeInvalidateFromAttachment() should treat backslash-separated paths as equivalent to their forward-slash counterparts.'
     );
 };

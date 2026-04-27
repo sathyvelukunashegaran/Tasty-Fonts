@@ -585,6 +585,7 @@ $tests['admin_page_renderer_renders_single_page_library_tab_for_empty_and_popula
 
     assertContainsValue('No Fonts Yet', $emptyOutput, 'The unified Library tab should preserve the empty-library state.');
     assertContainsValue('<h2 class="screen-reader-text" id="tasty-fonts-library-panel-title">Font Library</h2>', $emptyOutput, 'The library panel should keep an accessible stable section heading regardless of tab activation order.');
+	assertContainsValue('<option value="url-import">URL Import</option>', $emptyOutput, 'The library source filter should let users isolate fonts imported from URL CSS.');
 	assertContainsValue('id="tasty-fonts-add-font-tab-url"', $emptyOutput, 'The Add Fonts panel should still expose a From URL entry point.');
 	assertContainsValue('Workflow Off', $emptyOutput, 'The From URL panel should show the font import workflow state when URL imports are off.');
 	assertContainsValue('Enable URL Imports is turned on in Settings &gt; Behavior', $emptyOutput, 'The From URL panel should explain where to enable the workflow.');
@@ -2596,6 +2597,7 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
 	                'implicit_admin_labels' => ['Admin User (admin)'],
 	            ],
 	            'block_editor_font_library_sync_enabled' => false,
+	            'show_activity_log' => true,
 	            'training_wheels_off' => true,
 	            'variable_fonts_enabled' => true,
 	            'delete_uploaded_files_on_uninstall' => false,
@@ -2623,6 +2625,8 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
 	                        'plugin_version' => '1.14.0-beta.1',
 	                        'families' => 2,
 	                        'files' => 6,
+	'font_files' => 2,
+	'storage_files' => 6,
 	                        'size' => 4096,
 	                        'label' => 'Before client review',
 	                        'family_names' => ['Inter', 'Roboto Slab'],
@@ -2659,9 +2663,11 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Automatic.css', $output, 'The Integrations tab should expose the Automatic.css integration card.');
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Integrations tab should no longer render a duplicate Gutenberg sync row title.');
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Integrations tab should no longer render a duplicate Automatic.css sync row title.');
-    assertContainsValue('Show Onboarding Hints', $output, 'The Behavior tab should expose the onboarding-hints toggle with positive wording.');
-    assertNotContainsValue('Hide Onboarding Hints', $output, 'The Behavior tab should not frame onboarding hints as a hide setting.');
+	assertNotContainsValue('Configure onboarding hints, import workflows, activity visibility, font capabilities, and admin access.', $output, 'The Behavior tab should no longer describe Advanced Tools guidance or activity visibility settings.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-panel-maintenance"[\s\S]*Show Onboarding Hints[\s\S]*Show Activity Log/', $output), 'The Advanced Tools Developer tab should expose onboarding and activity visibility settings together.');
+    assertNotContainsValue('Hide Onboarding Hints', $output, 'The onboarding hints setting should not be framed as a hide setting.');
     assertSameValue(1, preg_match('/name="training_wheels_off" value="1"[\s\S]*name="training_wheels_off" value="0"/', $output), 'The positive onboarding hints toggle should still submit the stored inverse setting correctly.');
+    assertSameValue(1, preg_match('/name="show_activity_log" value="0"[\s\S]*name="show_activity_log" value="1"/', $output), 'The activity log toggle should submit an explicit off value from Advanced Tools.');
     assertNotContainsValue('Advanced Import Gates', $output, 'The Advanced Tools Developer tab should no longer host font import workflow toggles.');
     assertContainsValue('Font Import Workflows', $output, 'The Behavior tab should group font import workflow toggles.');
     assertContainsValue('Enable Google Fonts Imports', $output, 'The Behavior tab should expose the Google Fonts import workflow toggle.');
@@ -2691,13 +2697,14 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertNotContainsValue('Enable Block Editor Font Library Sync', $output, 'The Behavior panel should no longer render the Gutenberg sync toggle after it moves into Integrations.');
     assertContainsValue('Font Capabilities', $output, 'The Behavior tab should group font-role options separately from admin-experience toggles.');
     assertContainsValue('Roles &amp; Axes', $output, 'The Behavior tab should explain that font capability settings cover roles and axes.');
-    assertContainsValue('Admin Experience', $output, 'The Behavior tab should group guidance and activity visibility controls.');
-    assertContainsValue('Guidance &amp; Logs', $output, 'The Behavior tab should label the helper/activity category consistently.');
+    assertContainsValue('Admin Experience', $output, 'The Advanced Tools Developer tab should group guidance and activity visibility controls.');
+    assertContainsValue('Guidance &amp; Logs', $output, 'The Advanced Tools Developer tab should label the helper/activity category consistently.');
     assertContainsValue('Cleanup &amp; Access', $output, 'The Behavior tab should group uninstall cleanup and admin access controls together.');
     assertContainsValue('Files &amp; Permissions', $output, 'The Behavior tab should label cleanup/access controls with their shared permission scope.');
     assertContainsValue('Enable Monospace Role', $output, 'The Behavior panel should still render the monospace toggle.');
     assertContainsValue('Enable Variable Fonts', $output, 'The Behavior panel should render the opt-in variable font toggle.');
     assertContainsValue('Keep Uploaded Fonts on Uninstall', $output, 'The Behavior panel should render the uninstall retention toggle with positive wording.');
+    assertNotContainsValue('Configure onboarding hints, import workflows, activity visibility, font capabilities, and admin access.', $output, 'The old Behavior tab summary should not mention moved Advanced Tools settings.');
     assertNotContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should not frame uploaded font retention as a delete setting.');
     assertSameValue(1, preg_match('/name="delete_uploaded_files_on_uninstall" value="1"[\s\S]*name="delete_uploaded_files_on_uninstall" value="0"/', $output), 'The positive uninstall retention toggle should still submit the stored inverse setting correctly.');
     assertContainsValue('Enable Additional Access Rules', $output, 'The admin-access panel should expose the master toggle for fine-grained access with positive wording.');
@@ -2763,6 +2770,7 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertSameValue(1, preg_match('/<div class="tasty-fonts-site-transfer-summary-item"[^>]*data-state="neutral"[^>]*>\s*<span class="tasty-fonts-site-transfer-summary-label">Google API key<\/span>\s*<span class="tasty-fonts-site-transfer-summary-value" data-site-transfer-summary="google">Optional<\/span>/s', $output), 'The optional Google API key summary should start neutral instead of showing as a passing check.');
     assertContainsValue('Snapshots &amp; Support', $output, 'The Transfer tab should group rollback and support bundle tools.');
     assertContainsValue('Before client review', $output, 'Snapshot rows should expose friendly snapshot names.');
+	assertContainsValue('2 font files · 6 storage files · 2 font families', $output, 'Snapshot rows should distinguish font files from captured storage files.');
     assertContainsValue('Families: Inter, Roboto Slab', $output, 'Snapshot rows should summarize the font families inside the restore point.');
     assertContainsValue('Live roles: Inter', $output, 'Snapshot rows should summarize the live role families inside the restore point.');
     assertContainsValue('name="tasty_fonts_snapshot_label"', $output, 'Snapshot rows should allow friendly renaming.');
@@ -4746,6 +4754,14 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                     'summary' => '2 managed font families in the library.',
                     'last_run' => '',
                 ],
+                'delete_all_snapshots' => [
+                    'summary' => '1 rollback snapshot retained.',
+                    'last_run' => '',
+                ],
+                'delete_all_exports' => [
+                    'summary' => '1 retained export bundle. 1 locked.',
+                    'last_run' => '',
+                ],
             ],
             'site_transfer' => [
                 'available' => true,
@@ -4754,6 +4770,11 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                 'export_rename_action_field' => 'tasty_fonts_rename_site_transfer_export_bundle',
                 'export_protect_action_field' => 'tasty_fonts_protect_site_transfer_export_bundle',
                 'export_delete_action_field' => 'tasty_fonts_delete_site_transfer_export_bundle',
+                'export_delete_all_action_field' => 'tasty_fonts_delete_all_site_transfer_export_bundles',
+                'export_delete_all_blocked' => true,
+                'export_delete_all_blocked_message' => 'One or more export bundles are locked. Unprotect all export bundles before deleting all exports.',
+                'protected_export_count' => 1,
+                'export_bundle_count' => 1,
                 'export_retention_limit' => 5,
                 'export_retention_min' => 1,
                 'export_retention_max' => 10,
@@ -4778,8 +4799,12 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                 'import_google_api_key_field' => 'tasty_fonts_import_google_api_key',
                 'import_action_field' => 'tasty_fonts_import_site_transfer_bundle',
                 'effective_upload_limit_label' => '32 MB',
+                'snapshot_action_field' => 'tasty_fonts_create_rollback_snapshot',
+                'snapshot_restore_action_field' => 'tasty_fonts_restore_rollback_snapshot',
                 'snapshot_rename_action_field' => 'tasty_fonts_rename_rollback_snapshot',
                 'snapshot_delete_action_field' => 'tasty_fonts_delete_rollback_snapshot',
+                'snapshot_delete_all_action_field' => 'tasty_fonts_delete_all_rollback_snapshots',
+                'snapshot_count' => 1,
                 'snapshot_retention_limit' => 4,
                 'snapshot_retention_min' => 1,
                 'snapshot_retention_max' => 10,
@@ -4791,6 +4816,8 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                         'plugin_version' => '1.14.0-beta.1',
                         'families' => 2,
                         'files' => 6,
+						'font_files' => 2,
+						'storage_files' => 6,
                         'size' => 4096,
                         'label' => 'Before client review',
                         'family_names' => ['Inter', 'Roboto Slab'],
@@ -4902,9 +4929,9 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('Preload only applies to local WOFF2 files used by published sitewide roles.', $output, 'Advisories should explain why the result appears.');
     assertNotContainsValue('tasty-fonts-overview-pass-strip', $output, 'Overview should not render the old unexplained passing-pill strip.');
     assertContainsValue('Runtime Details', $output, 'Overview should group runtime output under a clear debugging detail section.');
-    assertContainsValue('Active Output', $output, 'Overview should label runtime facts as active output details.');
+    assertContainsValue('Fonts in Frontend CSS', $output, 'Overview should label runtime facts as frontend CSS output details.');
     assertContainsValue('class="tasty-fonts-health-board tasty-fonts-overview-reference-board"', $output, 'Runtime details should use the same board pattern as health.');
-    assertContainsValue('No families on the front end yet.', $output, 'Runtime details should explain when no managed families are active.');
+    assertContainsValue('No families in frontend CSS yet.', $output, 'Runtime details should explain when no managed families are being served by CSS.');
     assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--info"', $output, 'Runtime idle should render as an actionable non-passing state.');
     assertContainsValue('tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--navigate tasty-fonts-runtime-empty-action', $output, 'Runtime idle should link to the place where sitewide roles are published.');
     assertSameValue(1, preg_match('/tasty-fonts-runtime-empty-action[\s\S]*?>\s*Deploy Fonts\s*<\/a>/', $output), 'Runtime idle should expose a clear Deploy Fonts action.');
@@ -4920,6 +4947,16 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertNotContainsValue('class="button button-secondary" href="https://example.test/wp-admin/admin.php?action=tasty_fonts_download_generated_css"', $output, 'Generated CSS should not render a detached toolbar download button.');
     assertContainsValue('Clear Caches &amp; Rebuild', $output, 'The maintenance tab should render existing guarded cache rebuild action.');
     assertContainsValue('Wipe the managed font library, remove managed files, and rebuild empty storage?', $output, 'The maintenance tab should keep destructive confirmation copy for library wipes.');
+    assertContainsValue('Delete all snapshots', $output, 'The danger zone should expose a bulk snapshot deletion action.');
+    assertContainsValue('Delete all exports', $output, 'The danger zone should expose a guarded bulk export deletion action.');
+    assertSameValue(1, preg_match('/name="tasty_fonts_delete_all_rollback_snapshots"[\s\S]*?value="1"/', $output), 'Bulk snapshot deletion should submit through its dedicated admin action field.');
+    assertSameValue(1, preg_match('/name="tasty_fonts_delete_all_site_transfer_export_bundles"[\s\S]*?value="1"/', $output), 'Bulk export deletion should submit through its dedicated admin action field.');
+    assertContainsValue('Delete all rollback snapshots permanently?', $output, 'Bulk snapshot deletion should render destructive confirmation copy.');
+    assertContainsValue('Delete all site transfer export bundles permanently?', $output, 'Bulk export deletion should render destructive confirmation copy.');
+    assertContainsValue('data-delete-blocked="One or more export bundles are locked. Unprotect all export bundles before deleting all exports."', $output, 'Bulk export deletion should expose a blocked-click reason while exports are locked.');
+    assertContainsValue('aria-disabled="true"', $output, 'Bulk export deletion should communicate unavailable state while exports are locked.');
+    assertContainsValue('data-help-tooltip="One or more export bundles are locked. Unprotect all export bundles before deleting all exports."', $output, 'Bulk export deletion should expose a hover help reason while exports are locked.');
+    assertContainsValue('1 retained export bundle. 1 locked', $output, 'The danger-zone export summary should indicate locked retained exports.');
     assertNotContainsValue('data-developer-confirm-input="WIPE LIBRARY"', $output, 'The maintenance tab should not render the typed confirmation unlock panel.');
     assertContainsValue('Transfer &amp; Recovery', $output, 'The transfer tab should render the redesigned transfer and recovery workflow.');
     assertContainsValue('Export Bundle', $output, 'The transfer tab should render the existing export workflow.');
@@ -4938,6 +4975,69 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('data-site-transfer-form', $output, 'The transfer tab should keep the JS contract for dry-run imports.');
     assertNotContainsValue('tasty-fonts-site-transfer-headline', $output, 'Transfer should use the shared contextual header instead of a separate panel headline.');
     assertContainsValue('id="tasty-fonts-diagnostics-panel-activity"', $output, 'The activity log should now live inside the Advanced Tools command center.');
+};
+
+$tests['admin_page_renderer_renders_transfer_activity_hidden_state_when_activity_log_is_hidden'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    try {
+        $renderer->renderPage([
+            'storage' => ['root' => '/tmp/uploads/fonts'],
+            'catalog' => [],
+            'available_families' => [],
+            'roles' => [],
+            'logs' => [],
+            'activity_actor_options' => [],
+            'family_fallbacks' => [],
+            'family_font_displays' => [],
+            'family_font_display_options' => [],
+            'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+            'preview_size' => 32,
+            'font_display' => 'swap',
+            'font_display_options' => [],
+            'minify_css_output' => true,
+            'preload_primary_fonts' => true,
+            'remote_connection_hints' => true,
+            'block_editor_font_library_sync_enabled' => false,
+            'training_wheels_off' => false,
+            'show_activity_log' => false,
+            'diagnostic_items' => [],
+            'overview_metrics' => [],
+            'site_transfer' => [
+                'available' => true,
+                'message' => '',
+                'logs' => [
+                    [
+                        'time' => '2026-04-27 21:00:00',
+                        'actor' => 'admin',
+                        'message' => 'Hidden transfer event should stay hidden.',
+                        'category' => 'transfer',
+                    ],
+                ],
+                'actor_options' => ['admin'],
+            ],
+            'output_panels' => [],
+            'generated_css_panel' => [],
+            'preview_panels' => [],
+            'local_environment_notice' => [],
+            'toasts' => [],
+            'apply_everywhere' => false,
+            'role_deployment' => [],
+        ]);
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $output = (string) ob_get_clean();
+
+    assertSameValue(2, substr_count($output, 'tasty-fonts-health-board tasty-fonts-advanced-activity-board'), 'Transfer and Activity tabs should use the same activity-board surface class.');
+    assertNotContainsValue('tasty-fonts-site-transfer-log-card', $output, 'The Transfer tab should not use separate log-card CSS when mirroring the Activity tab.');
+    assertContainsValue('Activity Log Hidden', $output, 'Hidden activity panels should explain that the activity log is hidden.');
+    assertContainsValue('Enable Show Activity Log in Settings -&gt; Behavior to review the full event timeline here.', $output, 'The Transfer tab hidden state should use the same hidden-state copy as the Activity tab.');
+    assertNotContainsValue('Hidden transfer event should stay hidden.', $output, 'Transfer-specific activity entries should stay hidden with the activity log preference off.');
 };
 
 $tests['admin_page_renderer_renders_local_environment_notice_at_the_end_of_deploy_fonts_with_reminder_actions'] = static function (): void {

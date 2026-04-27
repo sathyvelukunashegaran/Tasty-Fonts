@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use TastyFonts\Fonts\AssetService;
+use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
@@ -117,20 +118,20 @@ $tests['plugin_attachment_hooks_only_invalidate_catalog_for_files_within_font_st
     Plugin::instance()->boot();
 
     $attachedFilePaths[100] = uniqueTestDirectory('outside-root') . '/inter.woff2';
-    $transientStore[TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2')] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['cached' => true];
     do_action('add_attachment', 100);
 
     assertFalseValue(
-        in_array(TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true),
         'Attachment hooks should ignore media changes outside uploads/fonts.'
     );
 
     $attachedFilePaths[101] = $root . '/google/inter/inter-400-normal.woff2';
-    $transientStore[TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2')] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['cached' => true];
     do_action('delete_attachment', 101);
 
     assertTrueValue(
-        in_array(TastyFonts\Support\TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true),
         'Attachment hooks should invalidate the cached catalog when a font attachment changes inside uploads/fonts.'
     );
     assertContainsValue(

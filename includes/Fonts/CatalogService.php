@@ -37,7 +37,7 @@ use SplFileInfo;
  */
 final class CatalogService
 {
-    public const TRANSIENT_CATALOG = 'tasty_fonts_catalog_v2';
+    public const TRANSIENT_CATALOG = 'tasty_fonts_catalog_v3';
     private const LOCAL_FORMATS = ['woff2', 'woff', 'ttf', 'otf'];
     private const IMPORTED_SOURCES = ['google', 'bunny', 'custom'];
     private const DEFAULT_COUNTS = [
@@ -904,11 +904,28 @@ final class CatalogService
             $tokens[] = 'bunny-cdn';
         }
 
+        if ($this->isCustomCssUrlDelivery($activeDelivery, $provider)) {
+            $tokens[] = 'url-import';
+        }
+
         if ($provider === 'adobe') {
             $tokens[] = 'adobe-hosted';
         }
 
         return $this->uniqueTokens($tokens);
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    private function isCustomCssUrlDelivery(array $profile, string $provider): bool
+    {
+        $sourceType = strtolower(trim($this->profileMetaString($profile, 'source_type')));
+        $sourceUrl = trim($this->profileMetaString($profile, 'source_css_url'));
+
+        return $provider === 'custom'
+            && $sourceUrl !== ''
+            && in_array($sourceType, ['', 'custom_css_url'], true);
     }
 
     /**

@@ -811,6 +811,13 @@ $tests['site_transfer_service_retains_recent_export_bundles_and_respects_protect
     $deleteProtected = $services['site_transfer']->deleteExportBundle($protectedId);
 
     assertSameValue(true, is_wp_error($deleteProtected), 'Protected export bundles should reject deletion.');
+    assertSameValue('tasty_fonts_transfer_export_protected', $deleteProtected instanceof WP_Error ? $deleteProtected->get_error_code() : '', 'Protected export bundle deletion should use the dedicated locked-export error code.');
+
+    $bulkDeleteProtected = $services['site_transfer']->deleteAllExportBundlesUnlessProtected();
+
+    assertSameValue(true, is_wp_error($bulkDeleteProtected), 'Bulk export deletion should reject protected export bundles.');
+    assertSameValue('tasty_fonts_transfer_export_bulk_delete_blocked', $bulkDeleteProtected instanceof WP_Error ? $bulkDeleteProtected->get_error_code() : '', 'Bulk export deletion should use a specific locked-export error code.');
+    assertSameValue(count($afterProtect), count($services['site_transfer']->listExportBundles()), 'Blocked bulk export deletion should preserve retained export history.');
 
     $unprotectResult = $services['site_transfer']->setExportBundleProtected($protectedId, false);
     $deleteResult = $services['site_transfer']->deleteExportBundle($protectedId);
@@ -818,6 +825,11 @@ $tests['site_transfer_service_retains_recent_export_bundles_and_respects_protect
     assertFalseValue(is_wp_error($unprotectResult), 'Protected export bundles should be unprotectable.');
     assertFalseValue(is_wp_error($deleteResult), 'Unprotected export bundles should be deletable.');
     assertSameValue(false, in_array($protectedId, array_column($services['site_transfer']->listExportBundles(), 'id'), true), 'Deleted export bundles should be removed from history.');
+
+    $bulkDeleteResult = $services['site_transfer']->deleteAllExportBundlesUnlessProtected();
+
+    assertFalseValue(is_wp_error($bulkDeleteResult), 'Bulk export deletion should succeed after all exports are unprotected.');
+    assertSameValue([], $services['site_transfer']->listExportBundles(), 'Successful bulk export deletion should clear retained export history.');
 };
 
 $tests['admin_controller_delete_plugin_managed_files_clears_storage_exports_and_snapshots'] = static function (): void {
@@ -876,6 +888,73 @@ $tests['admin_controller_delete_plugin_managed_files_clears_storage_exports_and_
     assertSameValue('preserve-key', (string) ($services['settings']->getSettings()['google_api_key'] ?? ''), 'Managed-file cleanup should preserve unrelated settings such as the Google API key.');
     assertSameValue(1, (int) ($result['deleted_export_bundles'] ?? 0), 'Managed-file cleanup should report deleted export bundle metadata count.');
     assertSameValue(1, (int) ($result['deleted_snapshots'] ?? 0), 'Managed-file cleanup should report deleted snapshot metadata count.');
+};
+
+$tests['admin_controller_deletes_all_snapshots_and_blocks_locked_bulk_export_deletes'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['developer_tools']->ensureStorageScaffolding();
+    $fontPath = (string) $services['storage']->pathForRelativePath('upload/inter/inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile($fontPath, 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-upload',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'local',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'upload/inter/inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $export = $services['site_transfer']->buildExportBundle(true);
+    $snapshotOne = $services['snapshots']->createSnapshot('manual');
+    $snapshotTwo = $services['snapshots']->createSnapshot('before_reset_settings');
+
+    assertFalseValue(is_wp_error($export), 'A retained export bundle should be created before bulk export delete testing.');
+    assertFalseValue(is_wp_error($snapshotOne), 'The first rollback snapshot should be created before bulk snapshot delete testing.');
+    assertFalseValue(is_wp_error($snapshotTwo), 'The second rollback snapshot should be created before bulk snapshot delete testing.');
+
+    $exportId = (string) ($services['site_transfer']->listExportBundles()[0]['id'] ?? '');
+    $protectResult = $services['site_transfer']->setExportBundleProtected($exportId, true);
+
+    assertFalseValue(is_wp_error($protectResult), 'The retained export should be lockable before testing guarded bulk deletion.');
+
+    $blockedDelete = $services['controller']->deleteAllSiteTransferExportBundles();
+
+    assertSameValue(true, is_wp_error($blockedDelete), 'Controller bulk export deletion should reject locked retained exports.');
+    assertSameValue('tasty_fonts_transfer_export_bulk_delete_blocked', $blockedDelete instanceof WP_Error ? $blockedDelete->get_error_code() : '', 'Controller bulk export deletion should surface the locked-export error code.');
+    assertSameValue(1, count($services['site_transfer']->listExportBundles()), 'Blocked controller bulk export deletion should preserve export history.');
+
+    $snapshotDelete = $services['controller']->deleteAllRollbackSnapshots();
+
+    assertSameValue('All rollback snapshots deleted.', (string) ($snapshotDelete['message'] ?? ''), 'Controller bulk snapshot deletion should return the shared success message.');
+    assertSameValue(2, (int) ($snapshotDelete['deleted_snapshots'] ?? 0), 'Controller bulk snapshot deletion should report deleted snapshot metadata count.');
+    assertSameValue([], $services['snapshots']->listSnapshots(), 'Controller bulk snapshot deletion should clear retained snapshots.');
+
+    $unprotect = $services['site_transfer']->setExportBundleProtected($exportId, false);
+    $exportDelete = $services['controller']->deleteAllSiteTransferExportBundles();
+
+    assertFalseValue(is_wp_error($unprotect), 'The retained export should be unlockable before successful bulk deletion.');
+    assertFalseValue(is_wp_error($exportDelete), 'Controller bulk export deletion should succeed after exports are unlocked.');
+    assertSameValue('All site transfer export bundles deleted.', (string) ($exportDelete['message'] ?? ''), 'Controller bulk export deletion should return the shared success message.');
+    assertSameValue(1, (int) ($exportDelete['deleted_export_bundles'] ?? 0), 'Controller bulk export deletion should report deleted export metadata count.');
+    assertSameValue([], $services['site_transfer']->listExportBundles(), 'Controller bulk export deletion should clear retained export history when nothing is locked.');
 };
 
 $tests['site_transfer_service_rejects_checksum_mismatches_during_bundle_validation'] = static function (): void {
@@ -1276,6 +1355,8 @@ $tests['snapshot_service_creates_sanitized_rollback_snapshots_and_restores_state
     assertSameValue(true, $snapshotId !== '', 'Rollback snapshots should return a stable snapshot id.');
     assertSameValue(['Inter'], $summary['family_names'] ?? [], 'Rollback snapshot summaries should expose captured family names for the recovery UI.');
     assertSameValue(['Inter'], $summary['role_families'] ?? [], 'Rollback snapshot summaries should expose live role families for the recovery UI.');
+    assertSameValue(1, (int) ($summary['font_files'] ?? -1), 'Rollback snapshot summaries should count actual font files separately from storage scaffolding.');
+    assertSameValue(13, (int) ($summary['storage_files'] ?? -1), 'Rollback snapshot summaries should still expose the total captured storage file count.');
 
     $zipPath = null;
     foreach (glob((string) $GLOBALS['uploadBaseDir'] . '/tasty-fonts-snapshots/*.zip') ?: [] as $candidate) {
@@ -2158,7 +2239,7 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
         'family_fallbacks' => [],
     ];
     $optionStore[SettingsRepository::OPTION_ROLES] = [];
-    $transientStore[TransientKey::forSite('tasty_fonts_catalog_v2')] = ['stale' => true];
+    $transientStore[TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['stale' => true];
     $transientStore[TransientKey::forSite('tasty_fonts_css_v2')] = 'stale-css';
     $transientStore[TransientKey::forSite('tasty_fonts_css_hash_v2')] = 'stale-hash';
 
@@ -2178,7 +2259,7 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     $generatedPath = $storage->getGeneratedCssPath();
 
     assertSameValue(false, is_string($generatedPath) && file_exists($generatedPath), 'Refreshing generated assets should defer writing the generated CSS file.');
-    assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_catalog_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the catalog cache first.');
+    assertSameValue(true, in_array(TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true), 'Refreshing generated assets should invalidate the catalog cache first.');
     assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS payload.');
     assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_hash_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS hash.');
     assertSameValue(false, array_key_exists(TransientKey::forSite('tasty_fonts_css_v2'), $transientStore), 'Refreshing generated assets should leave CSS transient regeneration to the next request.');
@@ -2740,6 +2821,8 @@ $tests['admin_page_context_builder_exposes_advanced_tools_context'] = static fun
     assertSameValue(false, $advancedTools === [], 'The page context should expose a structured Advanced Tools payload.');
     assertSameValue(true, in_array('repair_storage_scaffold', $toolActionIds, true), 'Advanced Tools should expose structured safe action descriptors.');
     assertSameValue(true, in_array('site_transfer_import', $toolActionIds, true), 'Advanced Tools should expose structured destructive action descriptors.');
+    assertSameValue(true, in_array('delete_all_snapshots', $toolActionIds, true), 'Advanced Tools should expose the bulk snapshot delete descriptor.');
+    assertSameValue(true, in_array('delete_all_exports', $toolActionIds, true), 'Advanced Tools should expose the guarded bulk export delete descriptor.');
     assertSameValue(true, isset($manifest['roles']), 'The runtime manifest should expose the role resolution matrix.');
     assertSameValue(true, isset($manifest['families']), 'The runtime manifest should expose the active delivery matrix.');
     assertSameValue(true, isset($manifest['preload_urls']), 'The runtime manifest should expose runtime preload URLs.');

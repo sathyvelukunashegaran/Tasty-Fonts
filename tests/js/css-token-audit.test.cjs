@@ -189,8 +189,12 @@ test('admin compact icon controls use 40px targets and help controls stay visual
   assert.match(tokensCss, /--tasty-hit-target-min:\s*var\(--tasty-layout-40px\);/);
   assert.match(tokensCss, /--tasty-hit-target-comfort:\s*var\(--tasty-layout-44px\);/);
   assert.match(tokensCss, /--tasty-icon-button-size:\s*var\(--tasty-hit-target-min\);/);
+  assert.match(tokensCss, /--tasty-icon-chrome-size:\s*var\(--tasty-control-height-compact\);/);
+  assert.match(tokensCss, /--tasty-icon-chrome-inset:\s*calc\(\(var\(--tasty-icon-button-size\) - var\(--tasty-icon-chrome-size\)\) \/ var\(--tasty-layout-2\)\);/);
   assert.match(tokensCss, /--tasty-help-button-size:\s*var\(--tasty-pill-height-compact\);/);
   assert.match(tokensCss, /--tasty-clear-button-size:\s*var\(--tasty-hit-target-min\);/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-log-toggle.button::after'), /var\(--tasty-icon-chrome-inset\)/);
+  assert.match(cssBlockForSelector(adminCss, '#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button::after'), /var\(--tasty-icon-chrome-inset\)/);
 
   for (const { selector, token } of targetContracts) {
     assert.match(

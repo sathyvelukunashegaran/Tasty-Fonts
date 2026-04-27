@@ -507,6 +507,30 @@ final class SiteTransferService
     }
 
     /**
+     * @return array{message: string, deleted_export_bundles: int, deleted_export_files: int}|WP_Error
+     */
+    public function deleteAllExportBundlesUnlessProtected(): array|WP_Error
+    {
+        $protectedCount = 0;
+
+        foreach ($this->listExportBundles() as $bundle) {
+            if (!empty($bundle['protected'])) {
+                $protectedCount++;
+            }
+        }
+
+        if ($protectedCount > 0) {
+            return new WP_Error(
+                'tasty_fonts_transfer_export_bulk_delete_blocked',
+                __('One or more export bundles are locked. Unprotect all export bundles before deleting all exports.', 'tasty-fonts'),
+                ['protected_export_count' => $protectedCount]
+            );
+        }
+
+        return $this->deleteAllExportBundles();
+    }
+
+    /**
      * @return ValidatedImportBundle|WP_Error
      */
     public function validateImportBundle(string $zipPath): array|WP_Error

@@ -75,6 +75,8 @@ final class AdminController
     private const ACTION_RESTORE_ROLLBACK_SNAPSHOT = 'tasty_fonts_restore_rollback_snapshot';
     private const ACTION_RENAME_ROLLBACK_SNAPSHOT = 'tasty_fonts_rename_rollback_snapshot';
     private const ACTION_DELETE_ROLLBACK_SNAPSHOT = 'tasty_fonts_delete_rollback_snapshot';
+    private const ACTION_DELETE_ALL_ROLLBACK_SNAPSHOTS = 'tasty_fonts_delete_all_rollback_snapshots';
+    private const ACTION_DELETE_ALL_SITE_TRANSFER_EXPORT_BUNDLES = 'tasty_fonts_delete_all_site_transfer_export_bundles';
     private const IMPORT_SITE_TRANSFER_FILE_FIELD = 'tasty_fonts_site_transfer_bundle';
     private const IMPORT_SITE_TRANSFER_STAGE_TOKEN_FIELD = 'tasty_fonts_site_transfer_stage_token';
     private const IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD = 'tasty_fonts_import_google_api_key';
@@ -340,6 +342,10 @@ final class AdminController
             return;
         }
 
+        if ($this->handleDeleteAllRollbackSnapshotsAction()) {
+            return;
+        }
+
         if ($this->handleRenameSiteTransferExportBundleAction()) {
             return;
         }
@@ -349,6 +355,10 @@ final class AdminController
         }
 
         if ($this->handleDeleteSiteTransferExportBundleAction()) {
+            return;
+        }
+
+        if ($this->handleDeleteAllSiteTransferExportBundlesAction()) {
             return;
         }
 
@@ -1541,6 +1551,23 @@ final class AdminController
     /**
      * @return Payload
      */
+    public function deleteAllRollbackSnapshots(): array
+    {
+        $result = $this->snapshots->deleteAllSnapshots();
+        $message = __('All rollback snapshots deleted.', 'tasty-fonts');
+        $this->log->add($message, $this->buildTransferLogContext('rollback_snapshots_deleted_all'));
+
+        return [
+            'message' => $message,
+            'snapshots' => $this->snapshots->listSnapshots(),
+            'deleted_snapshots' => $this->intValue($result, 'deleted_snapshots'),
+            'deleted_snapshot_files' => $this->intValue($result, 'deleted_snapshot_files'),
+        ];
+    }
+
+    /**
+     * @return Payload
+     */
     public function buildAdvancedToolsPayload(): array
     {
         $context = $this->buildPageContext();
@@ -1682,6 +1709,28 @@ final class AdminController
         return [
             'message' => $message,
             'export_bundles' => $this->siteTransfer->listExportBundles(),
+        ];
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function deleteAllSiteTransferExportBundles(): array|WP_Error
+    {
+        $result = $this->siteTransfer->deleteAllExportBundlesUnlessProtected();
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $message = __('All site transfer export bundles deleted.', 'tasty-fonts');
+        $this->log->add($message, $this->buildTransferLogContext('site_transfer_exports_deleted_all'));
+
+        return [
+            'message' => $message,
+            'export_bundles' => $this->siteTransfer->listExportBundles(),
+            'deleted_export_bundles' => $this->intValue($result, 'deleted_export_bundles'),
+            'deleted_export_files' => $this->intValue($result, 'deleted_export_files'),
         ];
     }
 
@@ -2392,6 +2441,19 @@ final class AdminController
         $this->redirectWithSuccess($this->stringValue($result, 'message', __('Rollback snapshot deleted.', 'tasty-fonts')));
     }
 
+    private function handleDeleteAllRollbackSnapshotsAction(): bool
+    {
+        if (!isset($_POST[self::ACTION_DELETE_ALL_ROLLBACK_SNAPSHOTS])) {
+            return false;
+        }
+
+        check_admin_referer(self::ACTION_DELETE_ALL_ROLLBACK_SNAPSHOTS);
+
+        $result = $this->deleteAllRollbackSnapshots();
+
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('All rollback snapshots deleted.', 'tasty-fonts')));
+    }
+
     private function handleRenameSiteTransferExportBundleAction(): bool
     {
         if (!isset($_POST[self::ACTION_RENAME_SITE_TRANSFER_EXPORT_BUNDLE])) {
@@ -2446,6 +2508,23 @@ final class AdminController
         }
 
         $this->redirectWithSuccess($this->stringValue($result, 'message', __('Export bundle deleted.', 'tasty-fonts')));
+    }
+
+    private function handleDeleteAllSiteTransferExportBundlesAction(): bool
+    {
+        if (!isset($_POST[self::ACTION_DELETE_ALL_SITE_TRANSFER_EXPORT_BUNDLES])) {
+            return false;
+        }
+
+        check_admin_referer(self::ACTION_DELETE_ALL_SITE_TRANSFER_EXPORT_BUNDLES);
+
+        $result = $this->deleteAllSiteTransferExportBundles();
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
+
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('All site transfer export bundles deleted.', 'tasty-fonts')));
     }
 
     private function handleImportSiteTransferBundleAction(): bool
@@ -2926,6 +3005,44 @@ final class AdminController
         $logs = $this->normalizePayloadList($baseContext['logs'] ?? []);
         $advancedTools = is_array($baseContext['advanced_tools'] ?? null) ? $baseContext['advanced_tools'] : [];
         $advancedTools['snapshots'] = $this->snapshots->listSnapshots();
+        $siteTransferContext = $this->buildSiteTransferContext($logs);
+        $developerToolStatuses = is_array($baseContext['developer_tool_statuses'] ?? null) ? $baseContext['developer_tool_statuses'] : [];
+        $snapshotCount = $this->intValue($siteTransferContext, 'snapshot_count');
+        $exportBundleCount = $this->intValue($siteTransferContext, 'export_bundle_count');
+        $protectedExportCount = $this->intValue($siteTransferContext, 'protected_export_count');
+        $developerToolStatuses['delete_all_snapshots'] = array_merge(
+            is_array($developerToolStatuses['delete_all_snapshots'] ?? null) ? $developerToolStatuses['delete_all_snapshots'] : [],
+            [
+                'summary' => $snapshotCount > 0
+                    ? sprintf(
+                        /* translators: %d: retained rollback snapshot count */
+                        _n('%d rollback snapshot retained.', '%d rollback snapshots retained.', $snapshotCount, 'tasty-fonts'),
+                        $snapshotCount
+                    )
+                    : __('No rollback snapshots retained.', 'tasty-fonts'),
+            ]
+        );
+        $exportSummary = $exportBundleCount > 0
+            ? sprintf(
+                /* translators: %d: retained site transfer export bundle count */
+                _n('%d retained export bundle.', '%d retained export bundles.', $exportBundleCount, 'tasty-fonts'),
+                $exportBundleCount
+            )
+            : __('No retained export bundles.', 'tasty-fonts');
+
+        if ($protectedExportCount > 0) {
+            $exportSummary .= ' ' . sprintf(
+                /* translators: %d: locked site transfer export bundle count */
+                _n('%d locked.', '%d locked.', $protectedExportCount, 'tasty-fonts'),
+                $protectedExportCount
+            );
+        }
+
+        $developerToolStatuses['delete_all_exports'] = array_merge(
+            is_array($developerToolStatuses['delete_all_exports'] ?? null) ? $developerToolStatuses['delete_all_exports'] : [],
+            ['summary' => $exportSummary]
+        );
+        $advancedTools['developer_tool_statuses'] = $developerToolStatuses;
 
         return array_merge(
             $baseContext,
@@ -2956,8 +3073,9 @@ final class AdminController
                         'tf_studio' => 'cli',
                     ]),
                 ],
+                'developer_tool_statuses' => $developerToolStatuses,
                 'advanced_tools' => $advancedTools,
-                'site_transfer' => $this->buildSiteTransferContext($logs),
+                'site_transfer' => $siteTransferContext,
             ]
         );
     }
@@ -3027,6 +3145,15 @@ final class AdminController
         $capability = $this->siteTransfer->getCapabilityStatus();
         $effectiveUploadLimitBytes = $this->getEffectiveSiteTransferUploadLimitBytes();
         $transferLogs = $this->pageContextBuilder->buildTransferLogEntries($logs);
+        $exportBundles = $this->buildSiteTransferExportBundlesContext();
+        $rollbackSnapshots = $this->snapshots->listSnapshots();
+        $protectedExportCount = 0;
+
+        foreach ($exportBundles as $exportBundle) {
+            if (!empty($exportBundle['protected'])) {
+                $protectedExportCount++;
+            }
+        }
 
         return [
             'available' => !empty($capability['available']),
@@ -3037,7 +3164,12 @@ final class AdminController
             'export_rename_action_field' => self::ACTION_RENAME_SITE_TRANSFER_EXPORT_BUNDLE,
             'export_protect_action_field' => self::ACTION_PROTECT_SITE_TRANSFER_EXPORT_BUNDLE,
             'export_delete_action_field' => self::ACTION_DELETE_SITE_TRANSFER_EXPORT_BUNDLE,
-            'export_bundles' => $this->buildSiteTransferExportBundlesContext(),
+            'export_delete_all_action_field' => self::ACTION_DELETE_ALL_SITE_TRANSFER_EXPORT_BUNDLES,
+            'export_bundles' => $exportBundles,
+            'export_bundle_count' => count($exportBundles),
+            'protected_export_count' => $protectedExportCount,
+            'export_delete_all_blocked' => $protectedExportCount > 0,
+            'export_delete_all_blocked_message' => __('One or more export bundles are locked. Unprotect all export bundles before deleting all exports.', 'tasty-fonts'),
             'export_retention_limit' => $this->siteTransfer->retentionLimit(),
             'export_retention_min' => SiteTransferService::MIN_EXPORT_RETENTION_LIMIT,
             'export_retention_max' => SiteTransferService::MAX_EXPORT_RETENTION_LIMIT,
@@ -3045,7 +3177,9 @@ final class AdminController
             'snapshot_restore_action_field' => self::ACTION_RESTORE_ROLLBACK_SNAPSHOT,
             'snapshot_rename_action_field' => self::ACTION_RENAME_ROLLBACK_SNAPSHOT,
             'snapshot_delete_action_field' => self::ACTION_DELETE_ROLLBACK_SNAPSHOT,
-            'snapshots' => $this->snapshots->listSnapshots(),
+            'snapshot_delete_all_action_field' => self::ACTION_DELETE_ALL_ROLLBACK_SNAPSHOTS,
+            'snapshots' => $rollbackSnapshots,
+            'snapshot_count' => count($rollbackSnapshots),
             'snapshot_retention_limit' => $this->snapshots->retentionLimit(),
             'snapshot_retention_min' => SnapshotService::MIN_SNAPSHOT_RETENTION_LIMIT,
             'snapshot_retention_max' => SnapshotService::MAX_SNAPSHOT_RETENTION_LIMIT,
