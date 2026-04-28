@@ -96,7 +96,7 @@ All notable changes to this project will be documented in this file.
 - Centralized managed-storage file metadata scanning for rollback snapshots and support bundles, removing the actionable duplicate-code reported by jscpd.
 - Moved Bunny Fonts cache reads to a fresh v2 transient namespace so stale pre-v2 cached family metadata is ignored.
 - Removed the deprecated plaintext WP-CLI `--google-api-key=<key>` input path; use `--prompt-google-api-key` or `--google-api-key-stdin` instead.
-- Removed AI-agent instruction files from Git tracking while keeping them local-only via ignore rules, and expanded ignores for local Playwright, prompt-export, report, zip, and research screenshot artifacts.
+- Removed local instruction files from Git tracking while keeping them local-only via ignore rules, and expanded ignores for local Playwright, prompt-export, report, zip, and research screenshot artifacts.
 
 ### Fixed
 
@@ -142,7 +142,7 @@ All notable changes to this project will be documented in this file.
 - Centralized managed-storage file metadata scanning for rollback snapshots and support bundles, removing the actionable duplicate-code reported by jscpd.
 - Moved Bunny Fonts cache reads to a fresh v2 transient namespace so stale pre-v2 cached family metadata is ignored.
 - Removed the deprecated plaintext WP-CLI `--google-api-key=<key>` input path; use `--prompt-google-api-key` or `--google-api-key-stdin` instead.
-- Removed AI-agent instruction files from Git tracking while keeping them local-only via ignore rules, and expanded ignores for local Playwright, prompt-export, report, zip, and research screenshot artifacts.
+- Removed local instruction files from Git tracking while keeping them local-only via ignore rules, and expanded ignores for local Playwright, prompt-export, report, zip, and research screenshot artifacts.
 
 ### Fixed
 
@@ -224,7 +224,7 @@ All notable changes to this project will be documented in this file.
 - Consolidated repeated admin renderer and messaging logic into shared helpers so the library and studio views reuse the same formatting and render support paths.
 - Updated the shared quality workflow and local pre-commit hook to run PHPStan alongside the repo-local `bin/run-jscpd` entrypoint, and documented the local git-hook setup.
 - Raised the repo's enforced PHPStan level from 9 to 10, backed by shared mixed-data normalization helpers and stricter internal contracts across admin, provider, runtime, updater, repository, integration, and filesystem code paths.
-- Tightened release packaging so GitHub archive builds exclude repository-only tooling, hooks, agent metadata, and other development-only files from distributable plugin zip files.
+- Tightened release packaging so GitHub archive builds exclude repository-only tooling, hooks, local metadata, and other development-only files from distributable plugin zip files.
 - Reworked Output Settings into focused Minimal, Variables only, Classes only, and Custom flows with grouped disclosure controls for class and variable subfeatures.
 - Changed default Heading and Body fallback-only stacks from `sans-serif` to `system-ui, sans-serif`, with a one-time migration for legacy fallback-only role defaults.
 - Kept Classes only generated CSS previews annotated with a display-only note explaining why the retained `:root` role variables still exist for integrations and editor parity.
@@ -240,7 +240,7 @@ All notable changes to this project will be documented in this file.
 - Added optional Tasty Fonts admin-access controls so administrators can delegate plugin access to selected non-administrator roles and specific users.
 - Added a dry-run site transfer validation flow that stages import bundles before destructive import and surfaces transfer activity directly in the Transfer tab.
 - Added `jscpd` duplicate-code scanning to the quality workflow alongside a committed `.jscpd.json` baseline.
-- Added a `tasty-canvas` JavaScript contract test plus shared agent-instruction files (`AGENTS.md`, `CLAUDE.md`, and `.agents/`) for repository-local Codex and Claude guidance.
+- Added a `tasty-canvas` JavaScript contract test plus local development instruction files.
 - Added a shared `bin/run-jscpd` runner, a tracked `.githooks/pre-commit` hook, and a `bin/setup-git-hooks` installer so local clones can run the duplication scan automatically on commit.
 - Added root Composer PHPStan tooling plus a WordPress-aware config/bootstrap so the repo can enforce static analysis consistently in CI and local hooks.
 - Added editable Heading, Body, and Monospace role fallback controls in Studio so fallback-only roles can use intentional stacks without selecting a library family.
@@ -310,7 +310,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Added `jscpd` duplicate-code scanning to the quality workflow alongside a committed `.jscpd.json` baseline.
-- Added a `tasty-canvas` JavaScript contract test plus shared agent-instruction files (`AGENTS.md`, `CLAUDE.md`, and `.agents/`) for repository-local Codex and Claude guidance.
+- Added a `tasty-canvas` JavaScript contract test plus local development instruction files.
 - Added a shared `bin/run-jscpd` runner, a tracked `.githooks/pre-commit` hook, and a `bin/setup-git-hooks` installer so local clones can run the duplication scan automatically on commit.
 - Added root Composer PHPStan tooling plus a WordPress-aware config/bootstrap so the repo can enforce static analysis consistently in CI and local hooks.
 
@@ -320,7 +320,7 @@ All notable changes to this project will be documented in this file.
 - Consolidated repeated admin renderer and messaging logic into shared helpers so the library and studio views reuse the same formatting and render support paths.
 - Updated the shared quality workflow and local pre-commit hook to run PHPStan alongside the repo-local `bin/run-jscpd` entrypoint, and documented the local git-hook setup.
 - Raised the repo's enforced PHPStan level from 9 to 10, backed by shared mixed-data normalization helpers and stricter internal contracts across admin, provider, runtime, updater, repository, integration, and filesystem code paths.
-- Tightened release packaging so GitHub archive builds exclude repository-only tooling, hooks, agent metadata, and other development-only files from distributable plugin zip files.
+- Tightened release packaging so GitHub archive builds exclude repository-only tooling, hooks, local metadata, and other development-only files from distributable plugin zip files.
 
 ### Fixed
 

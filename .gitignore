@@ -1,5 +1,6 @@
 # macOS artifacts
 .DS_Store
+**/.DS_Store
 .AppleDouble
 .LSOverride
 .Spotlight-V100
@@ -37,7 +38,9 @@ playwright-report/
 output/
 output/playwright/
 .playwright-cli/
-docs/
+docs/*
+docs/prd/
+docs/reviews/
 
 # Logs and temporary/cache files
 *.log
@@ -49,26 +52,28 @@ pnpm-debug.log*
 tmp/
 cache/
 
-# AI agent context files
+# Local workspace files
 jscpd-report.json
 report/
-.agents/
-CLAUDE.md
-.agents/tasks/todo-*.md
 
 # Local Playwright MCP artifacts
 .playwright-mcp/
 
 # Local research screenshots (repo root)
 kicker-*.png
+kicker-dot-fix.png
+kicker-zoom.png
 masthead-warmer.png
 neutral-bg.png
 three-color-*.png
+three-color-advanced-rails.png
+three-color-advanced.png
+three-color-deploy.png
+three-color-generated-css.png
+three-color-settings.png
+three-color-syntax.png
 
 # Optional local build/release artifacts
 dist/
 build/
 *.zip
-
-# Local AI planning exports
-prompt-exports/

@@ -375,7 +375,7 @@
 /*
  * Interactive surface — the card itself is the click target.
  * Currently used by .tasty-fonts-font-card and .tasty-fonts-search-card.
- * Adding a new .is-interactive use requires updating the DESIGN.md appendix.
+ * Adding a new .is-interactive use requires updating the surface audit notes.
  */
 .tasty-fonts-surface.is-interactive {
     box-shadow: var(--tasty-shadow-rise-1);
@@ -416,8 +416,7 @@
  * surface, replacing the previous "hero only" use on the masthead,
  * the role rail, and the preview specimen board. It is the
  * canonical "this is a card" boundary line, paired with the faint
- * card border. See DESIGN.md → Surface System and the
- * "Where Amber Appears" appendix.
+ * card border. See the surface system and amber-use notes.
  *
  * Compositional cells (.tasty-fonts-studio-card, .tasty-fonts-role-box,
  * .tasty-fonts-code-card) and inline notifications (.tasty-fonts-banner)
@@ -467,7 +466,7 @@
 /*
  * Repointed card classes — the existing markup classes survive but
  * each class's primary chrome declaration consumes the surface tokens.
- * The full list is the migration mapping in DESIGN.md.
+ * The full list is the surface-system migration mapping.
  */
 .tasty-fonts-card,
 .tasty-fonts-font-card,

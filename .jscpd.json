@@ -19,7 +19,6 @@
     "**/languages/**",
     "**/node_modules/**",
     "**/output/**",
-    "**/prompt-exports/**",
     "**/screenshots/**",
     "**/tests/**",
     "**/tmp/**",
@@ -27,7 +26,6 @@
     "**/wiki/**"
   ],
   "reporters": [
-    "ai",
     "json"
   ],
   "gitignore": true,

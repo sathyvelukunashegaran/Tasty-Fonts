@@ -4,7 +4,7 @@
  * The plugin uses ONE container chrome contract: the surface system.
  * Three modes (.tasty-fonts-surface resting, .is-interactive, .is-priority)
  * plus a separate .tasty-fonts-banner component for inline notifications.
- * See DESIGN.md → "Surface System".
+ * See the surface system notes.
  *
  * Every card-like selector in admin.css MUST consume the surface tokens
  * (`--tasty-surface-card-*` for cards, `--tasty-surface-banner-*` for
@@ -43,7 +43,7 @@ const adminCssPath = path.join(repoRoot, 'assets/css/admin.css');
 /**
  * Compositional cells — selectors that intentionally have no chrome
  * because their parent rail/grid owns the border + radius. These
- * appear in the migration table in DESIGN.md as "Compositional".
+ * appear in the surface migration table as "Compositional".
  */
 const COMPOSITIONAL_SELECTORS = new Set([
   '.tasty-fonts-studio-card',
@@ -285,7 +285,7 @@ test('every card-like selector in admin.css consumes the Surface System tokens',
       violations.push(
         `admin.css:${lineNumber}: selector "${selector}" defines its own card chrome ` +
         `(background + border/radius + padding + box-shadow) without consuming ` +
-        `--tasty-surface-card-* tokens. Repoint to the Surface System (DESIGN.md → Surface System).`
+        `--tasty-surface-card-* tokens. Repoint to the Surface System.`
       );
     }
   }

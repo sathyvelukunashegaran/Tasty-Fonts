@@ -317,9 +317,8 @@ find . -name '*.php' -not -path './output/*' -not -path './tmp/*' -not -path './
 ```
 
 ### AI Usage
-AI is used in this repository only to help generate test cases and documentation. Plugin code, architecture, and release behavior are authored and reviewed manually by [Tasty WP](https://github.com/sathyvelukunashegaran).
 
----
+AI is used in this repository only to help generate test cases and documentation. Plugin code, architecture, and release behavior are authored and reviewed manually by [Tasty WP](https://github.com/sathyvelukunashegaran).
 
 ## Contributing
 
