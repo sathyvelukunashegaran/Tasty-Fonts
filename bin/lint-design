@@ -11,19 +11,35 @@ const defaultTargets = [
   'assets/js',
   'includes/Admin'
 ];
+const configuredTimeoutMs = Number.parseInt(process.env.TASTY_FONTS_DESIGN_LINT_TIMEOUT_MS || '120000', 10);
+const timeoutMs = Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0 ? configuredTimeoutMs : 120000;
+
+function formatTimeout(ms) {
+  return ms >= 1000 ? `${Math.round(ms / 1000)}s` : `${ms}ms`;
+}
 
 const passthroughArgs = process.argv.slice(2);
-const impeccableArgs = passthroughArgs.length > 0
-  ? ['-y', 'impeccable@latest', 'detect', ...passthroughArgs]
-  : ['-y', 'impeccable@latest', 'detect', '--fast', ...defaultTargets];
+const scanArgs = passthroughArgs.length > 0
+  ? [...passthroughArgs]
+  : ['--fast', ...defaultTargets];
+
+const impeccableArgs = ['-y', 'impeccable@latest', 'detect', ...scanArgs];
+
+console.error(`Running design lint: ${executable} ${impeccableArgs.join(' ')}`);
 
 const result = spawnSync(executable, impeccableArgs, {
   cwd: root,
-  stdio: ['ignore', 'inherit', 'inherit']
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'pipe'],
+  timeout: timeoutMs
 });
 
 if (result.error) {
-  console.error(result.error.message);
+  if (result.error.code === 'ETIMEDOUT') {
+    console.error(`Design lint timed out after ${formatTimeout(timeoutMs)}.`);
+  } else {
+    console.error(result.error.message);
+  }
   process.exit(1);
 }
 
@@ -32,4 +48,29 @@ if (result.signal) {
   process.exit(1);
 }
 
-process.exit(result.status ?? 1);
+const stdout = result.stdout || '';
+const stderr = result.stderr || '';
+
+if (stderr) {
+  process.stderr.write(stderr);
+}
+
+const status = result.status ?? 1;
+const trimmed = stdout.trim();
+
+if (stdout) {
+  process.stdout.write(stdout);
+  if (!stdout.endsWith('\n')) {
+    process.stdout.write('\n');
+  }
+}
+
+if (status === 0) {
+  if (!trimmed || trimmed === '[]') {
+    console.error('No design lint issues found.');
+  } else {
+    console.error('Design lint completed successfully.');
+  }
+}
+
+process.exit(status);

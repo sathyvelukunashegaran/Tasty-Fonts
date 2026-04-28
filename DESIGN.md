@@ -58,12 +58,18 @@ rounded:
   pill: "999px"
 spacing:
   space-1: "4px"
+  space-1-5: "6px"
   space-2: "8px"
+  space-2-5: "10px"
   space-3: "12px"
+  space-3-5: "14px"
   space-4: "16px"
+  space-4-5: "18px"
   space-5: "20px"
   space-6: "24px"
+  space-7: "28px"
   space-8: "32px"
+  space-9: "36px"
   space-10: "40px"
 components:
   button-primary:
@@ -109,6 +115,18 @@ components:
     typography: "{typography.label}"
     rounded: "{rounded.control}"
     height: "34px"
+  toggle-on:
+    backgroundColor: "{colors.primary-blue}"
+    textColor: "{colors.tertiary-paper}"
+    rounded: "{rounded.control}"
+    width: "42px"
+    height: "24px"
+  code-window:
+    backgroundColor: "{colors.neutral-ink}"
+    textColor: "{colors.tertiary-paper}"
+    typography: "{typography.mono}"
+    rounded: "{rounded.hero}"
+    padding: "24px"
 ---
 
 # Design System: Tasty Foundry
@@ -126,14 +144,15 @@ Tasty Foundry may borrow Stripe-like product discipline, but it must not copy St
 **Key Characteristics:**
 
 - WordPress-native product UI with a more refined surface treatment than default admin chrome.
+- `assets/css/tokens.css` is the canonical source for color, spacing, typography, radius, shadow, motion, layer, and component contracts.
 - Restrained three-color palette: Tasty Blue, Warm Amber, Soft Cream, plus neutrals.
 - Font work stays visually louder than the shell around it.
 - State is shown through icons, copy, surface tone, filled or outlined chrome, and focus treatment, not red or green alone.
-- Components are familiar on purpose: buttons, fields, tabs, cards, rows, chips, and diagnostics should disappear into the workflow.
+- Components are familiar on purpose: buttons, fields, toggles, tabs, cards, rows, chips, and diagnostics should disappear into the workflow.
 
 ## 2. Colors
 
-The palette is restrained and operational: Tasty Blue handles action and selection, Warm Amber handles caution and claimable copy moments, Soft Cream handles hero paper surfaces, and neutrals carry almost everything else.
+The palette is restrained and operational: Tasty Blue handles action and selection, Warm Amber handles caution and claimable copy moments, Soft Cream handles hero paper surfaces, and neutrals carry almost everything else. Frontmatter stores hex values for Stitch compatibility; runtime CSS upgrades the primitives to OKLCH inside `@supports` so modern browsers receive tinted neutrals and smoother hue behavior.
 
 ### Primary
 
@@ -169,6 +188,8 @@ The palette is restrained and operational: Tasty Blue handles action and selecti
 
 **The Neutral Workbench Rule.** The shell field stays neutral. Do not reintroduce blue radials, diagonal beams, or full-surface color washes that flatten the cream masthead, amber cues, or lifted card language.
 
+**The Hex Frontmatter, OKLCH Runtime Rule.** Hex tokens in this file are the interoperable contract. The OKLCH overrides in `assets/css/tokens.css` are the runtime refinement. Do not create competing values in prose, PHP templates, or admin CSS.
+
 ## 3. Typography
 
 **Display Font:** WordPress/admin system stack with optical tracking refinements.
@@ -198,7 +219,7 @@ The palette is restrained and operational: Tasty Blue handles action and selecti
 
 ## 4. Elevation
 
-Tasty Foundry uses structural depth: faint borders, precise radius, navy shadow falloff, top hairlines, and occasional inset paper treatment. Surfaces are calm at rest. Lift appears when a card is interactive, selected, focused, or temporarily asking for attention. Glow is rare and must prove a workflow purpose.
+Tasty Foundry uses structural depth: faint borders, precise radius, navy shadow falloff, top hairlines, and occasional inset paper treatment. Surfaces are calm at rest. Lift appears when a card is interactive, selected, focused, or temporarily asking for attention. Glow is rare and must prove a workflow purpose. Motion follows the same restraint: color-only shifts are quick, control hover is short, disclosures are deliberate, and copied or publish feedback is the only celebratory motion.
 
 ### Shadow Vocabulary
 
@@ -221,6 +242,8 @@ Tasty Foundry uses structural depth: faint borders, precise radius, navy shadow 
 
 **The No Decorative Glow Rule.** Glow must be tied to a state or a tiny atmospheric role already named here. Do not add glass, blur, bloom, or ambient gradients because a screen feels empty.
 
+**The Semantic Motion Rule.** Use `--tasty-motion-hairline`, `--tasty-motion-tap`, `--tasty-motion-hover`, `--tasty-motion-reveal`, `--tasty-motion-stage`, or `--tasty-motion-celebrate` by intent. Do not write ad-hoc durations in `admin.css`.
+
 ## 5. Components
 
 Components should feel familiar, dense, and reliable. They use standard product affordances, stable dimensions, keyboard-visible focus, and tokenized state changes.
@@ -232,6 +255,12 @@ Components should feel familiar, dense, and reliable. They use standard product 
 - **Hover / Focus:** darker blue on hover, `--tasty-shadow-focus` on keyboard focus, `--tasty-transition-control` for color, border, shadow, and transform.
 - **Secondary:** neutral raised surface, slate border, ink text. It should read as a tool, not a ghost link.
 - **Destructive:** no red. Use icon prefix, bolder label, pressed inset hover/focus/active feedback, and the existing two-step confirmation pattern.
+
+### Toggles
+
+- **Shape:** compact 42px by 24px switch, 6px track radius, and squared 20px thumb. It should read as a WordPress setting control with Tasty polish, not an iOS clone.
+- **On State:** Tasty Blue track with a restrained inset and outline shadow. The checked state communicates selection through thumb position, label copy, and blue fill together.
+- **Off / Disabled:** neutral gradient track, muted copy, and no amber or red. Disabled states stay legible and still expose why the control is unavailable.
 
 ### Chips
 
@@ -269,6 +298,10 @@ The specimen board is the canonical paper surface. It uses Soft Cream, 12px radi
 
 Settings screens use compact row boards, not loose option dumps. Group headers describe the decision, rows align label, passive help, state dot, and control, and nested content stays as inset detail inside the same board. Output, Integrations, Behavior, and access controls must share this table-like language.
 
+### Signature Component: Inline Banner
+
+Banners are inline notifications, not cards and not alerts with colored side rails. They use the resting card surface, a faint full border, the shared top hairline, compact grid spacing, and explicit copy. Advisory tone comes from text, iconography, and optional Warm Amber details rather than a stripe.
+
 ### Signature Component: Code And Diagnostics Windows
 
 Code windows use ink, paper, blue, amber, and neutrals only. Tasty Blue marks structure: selectors, properties, at-rules, keywords. Warm Amber marks values: strings, numbers, functions, attributes. Avoid syntax rainbows.
@@ -284,6 +317,7 @@ Code windows use ink, paper, blue, amber, and neutrals only. Tasty Blue marks st
 - **Do** use icons, labels, filled or outlined chrome, and pressed treatment for state. Color alone is insufficient.
 - **Do** keep settings, transfer, diagnostics, and advanced tools row-based where the user is scanning decisions or actions.
 - **Do** use tokenized typography, spacing, radius, shadows, and motion from `assets/css/tokens.css` before adding new values.
+- **Do** use the composite transition tokens (`--tasty-transition-control`, `--tasty-transition-card`, `--tasty-transition-rail`, `--tasty-transition-fade`) instead of restating property lists.
 - **Do** collapse animations and transitions through the reduced-motion contract.
 - **Do** make keyboard focus visible and preserve WordPress admin semantics.
 
@@ -299,4 +333,5 @@ Code windows use ink, paper, blue, amber, and neutrals only. Tasty Blue marks st
 - **Don't** use gradient text, default glassmorphism, modal-first workflows, or repeated identical icon-card grids.
 - **Don't** add nested cards inside cards. Use rows, dividers, grouped tables, or inset detail regions.
 - **Don't** introduce raw color, raw typography, raw motion duration, or ad-hoc shadow values in `admin.css` when a token exists.
+- **Don't** fork card chrome. New card-like containers must use `.tasty-fonts-surface` or join the shared hairline selector list with a documented reason.
 - **Don't** use display typography for labels, buttons, tables, or data.

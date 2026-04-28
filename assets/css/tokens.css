@@ -774,7 +774,7 @@
     /* Masthead and structural gradients */
     --tasty-shell-gap: var(--tasty-space-4);
     --tasty-shell-padding: var(--tasty-space-4);
-    --tasty-shell-border: rgba(var(--tasty-white-rgb), 0.72);
+    --tasty-shell-border: rgba(var(--tasty-gray-600-rgb), 0.16);
     --tasty-shell-fuse-top: -118px;
     --tasty-shell-fuse-right: -120px;
     --tasty-shell-fuse-width: min(52vw, 560px);
@@ -864,8 +864,9 @@
      * highlights were swallowed, and the "lifted white card" language
      * stopped reading because the field was already cool-tinted.
      *
-     * --tasty-gradient-page is now just a quiet gray-50 → white → gray-50
-     *   paper stripe. No blue radials, no cyan glow. True neutral.
+     * --tasty-gradient-page is now a quiet gray-100 → gray-50 → gray-100
+     *   workspace field so the brighter plugin panels stand forward.
+     *   No blue radials, no cyan glow. True neutral.
      * --tasty-gradient-fuse becomes a soft warm cream/amber wash so the
      *   ::before corner highlight harmonizes with the masthead amber
      *   instead of duplicating the blue brand color. Reduced opacity
@@ -876,7 +877,7 @@
      *   reference that may have picked it up.
      */
     --tasty-gradient-fuse: linear-gradient(115deg, rgba(var(--tasty-warm-amber-rgb), 0.18) 0%, rgba(var(--tasty-paper-rgb), 0.5) 52%, rgba(var(--tasty-warm-amber-rgb), 0.08) 100%);
-    --tasty-gradient-page: linear-gradient(180deg, var(--tasty-gray-50) 0%, var(--tasty-white) 48%, var(--tasty-gray-50) 100%);
+    --tasty-gradient-page: linear-gradient(180deg, var(--tasty-gray-100) 0%, var(--tasty-gray-50) 44%, var(--tasty-gray-100) 100%);
     --tasty-gradient-page-beam: linear-gradient(135deg, transparent 0%, transparent 100%);
     --tasty-gradient-header: radial-gradient(circle at 5% -32%, rgba(var(--tasty-brand-cyan-rgb), 0.1) 0%, rgba(var(--tasty-brand-cyan-rgb), 0) 36%), linear-gradient(180deg, rgba(var(--tasty-white-rgb), 1) 0%, rgba(var(--tasty-white-rgb), 0.96) 100%);
     /*
