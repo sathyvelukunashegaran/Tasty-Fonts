@@ -6,7 +6,7 @@ Manage draft roles, preview them, and publish live typography.
 
 - you are assigning heading and body fonts
 - you want to compare draft output against the live site
-- you need to understand `Save Draft` versus `Apply Sitewide`
+- you need to understand `Save Draft` versus `Publish Roles`
 
 ## The Big Idea
 
@@ -55,7 +55,7 @@ Use this when:
 
 Your draft is safe until you explicitly apply it or overwrite it with a new one.
 
-![Deploy Fonts dirty state — unsaved role changes highlighted before Save Draft or Apply Sitewide](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts-dirty-state.png)
+![Deploy Fonts dirty state — unsaved role changes highlighted before Save Draft or Publish Roles](https://raw.githubusercontent.com/sathyvelukunashegaran/Tasty-Custom-Fonts/main/screenshots/deploy-fonts-dirty-state.png)
 
 ### 3. Use The Preview Workspace
 
@@ -80,11 +80,11 @@ The five preview scenes are:
 
 > **Note:** previews always force `font-display: swap` for safety, even when your live output uses a different value. This ensures you see the font rather than a blank period during testing.
 
-### 4. Apply Sitewide
+### 4. Publish Roles
 
-`Apply Sitewide` promotes the current draft roles to live output. After that, the plugin serves the updated role CSS on the frontend, in Gutenberg, and in Etch.
+`Publish Roles` promotes the current draft roles to live output. After that, the plugin serves the updated role CSS on the frontend, in Gutenberg, and in Etch.
 
-> **What applies sitewide actually does:** the plugin regenerates `tasty-fonts.css` with the new `--font-heading` and `--font-body` variable values, updates any associated Gutenberg typography presets, and notifies the Etch canvas of the change. Visitors see the updated fonts on their next page load.
+> **What publishing roles actually does:** the plugin regenerates `tasty-fonts.css` with the new `--font-heading` and `--font-body` variable values, updates any associated Gutenberg typography presets, and notifies the Etch canvas of the change. Visitors see the updated fonts on their next page load.
 
 ### 5. Review Snippet Panels
 

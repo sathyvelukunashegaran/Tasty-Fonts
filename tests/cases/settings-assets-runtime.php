@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use TastyFonts\Admin\AdminPageContextBuilder;
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Admin\AdminPageViewBuilder;
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
@@ -390,11 +391,12 @@ $tests['developer_tools_reset_plugin_settings_preserves_library_and_files'] = st
     assertSameValue(true, $services['imports']->getFamily('inter') !== null, 'Reset plugin settings should preserve the saved font library.');
     assertSameValue('swap', (string) ($result['font_display'] ?? ''), 'Reset plugin settings should restore the default font-display.');
     assertSameValue(false, !empty($result['training_wheels_off']), 'Reset plugin settings should restore behavior toggles to their defaults.');
-    assertSameValue(true, !empty($result['google_font_imports_enabled']), 'Reset plugin settings should restore Google Fonts imports to the default-on workflow.');
-    assertSameValue(true, !empty($result['bunny_font_imports_enabled']), 'Reset plugin settings should restore Bunny Fonts imports to the default-on workflow.');
-    assertSameValue(true, !empty($result['local_font_uploads_enabled']), 'Reset plugin settings should restore custom uploads to the default-on workflow.');
+    assertSameValue(false, !empty($result['google_font_imports_enabled']), 'Reset plugin settings should restore Google Fonts imports to the default-off workflow.');
+    assertSameValue(false, !empty($result['bunny_font_imports_enabled']), 'Reset plugin settings should restore Bunny Fonts imports to the default-off workflow.');
+    assertSameValue(false, !empty($result['local_font_uploads_enabled']), 'Reset plugin settings should restore custom uploads to the default-off workflow.');
     assertSameValue(false, !empty($result['adobe_font_imports_enabled']), 'Reset plugin settings should restore Adobe imports to the default-off workflow.');
     assertSameValue(false, !empty($result['custom_css_url_imports_enabled']), 'Reset plugin settings should restore URL imports to the default-off workflow.');
+    assertSameValue(true, !empty($result['delete_uploaded_files_on_uninstall']), 'Reset plugin settings should restore the keep-uploaded-fonts toggle to off.');
     assertSameValue('', (string) ($result['google_api_key'] ?? ''), 'Reset plugin settings should clear the saved Google API key.');
     assertSameValue(false, array_key_exists(AdminController::LOCAL_ENV_NOTICE_OPTION, $optionStore), 'Reset plugin settings should clear suppressed notice preferences.');
     assertSameValue(1, did_action('tasty_fonts_before_reset_settings'), 'Reset plugin settings should emit a before hook.');
@@ -624,6 +626,7 @@ $tests['developer_tools_reset_integration_detection_state_and_suppressed_notices
     $services = makeServiceGraph();
     $services['settings']->saveSettings([
         'block_editor_font_library_sync_enabled' => '1',
+        'etch_integration_enabled' => '0',
         'bricks_integration_enabled' => '1',
         'oxygen_integration_enabled' => '0',
         'acss_font_role_sync_enabled' => '1',
@@ -645,6 +648,7 @@ $tests['developer_tools_reset_integration_detection_state_and_suppressed_notices
             || $storedSettings['block_editor_font_library_sync_enabled'] === null,
         'Integration reset should clear the stored block editor sync preference back to an unconfigured state.'
     );
+    assertSameValue(null, $settings['etch_integration_enabled'], 'Integration reset should clear Etch detection state.');
     assertSameValue(null, $settings['bricks_integration_enabled'], 'Integration reset should clear Bricks detection state.');
     assertSameValue(null, $settings['oxygen_integration_enabled'], 'Integration reset should clear Oxygen detection state.');
     assertSameValue(null, $settings['acss_font_role_sync_enabled'], 'Integration reset should clear Automatic.css detection state.');
@@ -1046,6 +1050,7 @@ $tests['site_transfer_service_import_replaces_existing_state_and_accepts_a_fresh
     ]);
     $services['settings']->saveRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
     $services['settings']->saveAppliedRoles(['heading' => 'Inter', 'body' => 'Inter'], []);
+    $services['settings']->setAutoApplyRoles(true);
 
     $bundle = $services['site_transfer']->buildExportBundle();
     assertFalseValue(is_wp_error($bundle), 'Building the source bundle for import testing should succeed.');
@@ -2594,6 +2599,7 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
     }
 
     assertSameValue(true, isset($checksBySlug['site_transfer']), 'Health checks should expose site transfer capability.');
+    assertSameValue(false, isset($checksBySlug['sitewide_delivery']), 'Health checks should not expose the deferred sitewide delivery warning in this pass.');
     assertSameValue(true, isset($checksBySlug['self_hosted_files']), 'Health checks should expose self-hosted file integrity.');
     assertSameValue(true, isset($checksBySlug['external_stylesheets']), 'Health checks should expose external stylesheet delivery.');
     assertSameValue(true, isset($checksBySlug['font_preload']), 'Health checks should expose preload readiness.');
@@ -2602,6 +2608,68 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
     assertSameValue('info', (string) ($checksBySlug['google_fonts_api']['severity'] ?? ''), 'Missing Google API keys should be advisory, not a passing verified check.');
     assertSameValue(true, isset($checksBySlug['update_channel']), 'Health checks should expose update channel readiness.');
     assertSameValue('critical', (string) ($summary['status'] ?? ''), 'Health summaries should elevate critical checks above warnings and notices.');
+};
+
+$tests['health_check_service_does_not_warn_for_block_editor_sync_while_sitewide_delivery_is_off'] = static function (): void {
+    resetTestState();
+
+    $health = new HealthCheckService();
+    $checks = $health->build(
+        [
+            'path' => '/tmp/generated.css',
+            'url' => 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css',
+            'exists' => true,
+            'size' => 128,
+            'last_modified' => 1710000000,
+        ],
+        ['available' => true, 'root' => '/tmp/tasty-fonts'],
+        ['css_delivery_mode' => 'file'],
+        ['families' => 0, 'files' => 0],
+        ['available' => true, 'message' => 'Ready.'],
+        [
+            'delivery' => ['auto_apply_roles' => false],
+            'editor' => ['block_editor_sync_enabled' => true],
+        ],
+        [],
+        [],
+        ['environment_type' => 'local']
+    );
+    $checksBySlug = [];
+
+    foreach ($checks as $check) {
+        $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+    }
+
+    assertSameValue('ok', (string) ($checksBySlug['block_editor_sync']['severity'] ?? ''), 'Saved Block Editor sync preferences should not warn while Sitewide Delivery keeps sync inactive.');
+    assertContainsValue('does not show', (string) ($checksBySlug['block_editor_sync']['message'] ?? ''), 'Inactive Block Editor sync should use the non-warning health message.');
+
+    $checks = $health->build(
+        [
+            'path' => '/tmp/generated.css',
+            'url' => 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css',
+            'exists' => true,
+            'size' => 128,
+            'last_modified' => 1710000000,
+        ],
+        ['available' => true, 'root' => '/tmp/tasty-fonts'],
+        ['css_delivery_mode' => 'file'],
+        ['families' => 0, 'files' => 0],
+        ['available' => true, 'message' => 'Ready.'],
+        [
+            'delivery' => ['auto_apply_roles' => true],
+            'editor' => ['block_editor_sync_enabled' => true],
+        ],
+        [],
+        [],
+        ['environment_type' => 'local']
+    );
+    $checksBySlug = [];
+
+    foreach ($checks as $check) {
+        $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+    }
+
+    assertSameValue('warning', (string) ($checksBySlug['block_editor_sync']['severity'] ?? ''), 'Block Editor sync should still warn on local sites when Sitewide Delivery makes it active.');
 };
 
 $tests['admin_page_context_builder_does_not_report_hydrated_self_hosted_urls_as_missing_files'] = static function (): void {
@@ -2839,6 +2907,59 @@ $tests['admin_page_context_builder_exposes_advanced_tools_context'] = static fun
     );
 };
 
+$tests['admin_page_context_builder_surfaces_available_disabled_integrations_as_worth_reviewing_health'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        AcssIntegrationService::OPTION_HEADING_FONT_FAMILY => '',
+        AcssIntegrationService::OPTION_TEXT_FONT_FAMILY => '',
+    ];
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'auto_apply_roles' => false,
+        'block_editor_font_library_sync_enabled' => false,
+        'etch_integration_enabled' => false,
+    ]);
+    $services['settings']->saveAcssFontRoleSyncState(false, false, '', '');
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+
+    $context = $builder->build();
+    $advancedTools = is_array($context['advanced_tools'] ?? null) ? $context['advanced_tools'] : [];
+    $healthChecks = is_array($advancedTools['health_checks'] ?? null) ? $advancedTools['health_checks'] : [];
+    $checksBySlug = [];
+
+    foreach ($healthChecks as $check) {
+        if (is_array($check)) {
+            $checksBySlug[(string) ($check['slug'] ?? '')] = $check;
+        }
+    }
+
+    foreach (['integration_gutenberg', 'integration_etch', 'integration_automatic_css'] as $slug) {
+        assertSameValue(true, isset($checksBySlug[$slug]), $slug . ' should appear in Overview health when the available integration is not delivering output.');
+        assertSameValue('info', (string) ($checksBySlug[$slug]['severity'] ?? ''), $slug . ' should be Worth reviewing, not Action needed.');
+        assertSameValue('review_integrations', (string) ($checksBySlug[$slug]['action']['slug'] ?? ''), $slug . ' should route users back to Integrations settings.');
+    }
+};
+
 $tests['admin_page_context_builder_reports_acss_sync_waiting_for_sitewide_roles'] = static function (): void {
     resetTestState();
 
@@ -2870,8 +2991,108 @@ $tests['admin_page_context_builder_reports_acss_sync_waiting_for_sitewide_roles'
     $context = $builder->build();
 
     assertSameValue('waiting_for_sitewide_roles', (string) ($context['acss_integration']['status'] ?? ''), 'Automatic.css sync should report that it is waiting when sitewide role delivery is still off.');
+    assertSameValue('Needs Sitewide Delivery', (string) ($context['acss_integration']['status_label'] ?? ''), 'Automatic.css should use dependency-focused Sitewide Delivery badge copy.');
+    assertContainsValue('Turn on Sitewide Delivery', (string) ($context['acss_integration']['status_copy'] ?? ''), 'Automatic.css waiting help should explain the Sitewide Delivery dependency.');
+    assertSameValue(true, (bool) ($context['acss_integration']['control_disabled'] ?? false), 'Automatic.css should render as dependency-disabled while Sitewide Delivery is off.');
+    assertSameValue(false, (bool) ($context['acss_integration']['control_checked'] ?? true), 'Automatic.css should not visually appear enabled while Sitewide Delivery is off.');
+    assertSameValue('1', (string) ($context['acss_integration']['submitted_enabled_value'] ?? ''), 'Automatic.css should preserve the saved opt-in while the dependency disables the visible switch.');
     assertSameValue('', (string) ($context['acss_integration']['current']['heading'] ?? ''), 'Automatic.css integration context should expose the current heading font-family value.');
     assertSameValue('', (string) ($context['acss_integration']['current']['body'] ?? ''), 'Automatic.css integration context should expose the current text font-family value.');
+};
+
+$tests['admin_page_context_builder_reports_integration_dependencies_separately_from_live_delivery'] = static function (): void {
+    $buildContext = static function (callable $setup): array {
+        resetTestState();
+        add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+        $services = makeServiceGraph();
+        $setup($services);
+
+        $builder = new AdminPageContextBuilder(
+            $services['storage'],
+            $services['settings'],
+            $services['log'],
+            $services['catalog'],
+            $services['assets'],
+            new CssBuilder(),
+            $services['adobe'],
+            $services['google'],
+            $services['acss_integration'],
+            $services['bricks_integration'],
+            $services['oxygen_integration']
+        );
+
+        return $builder->build();
+    };
+
+    $configuredContext = $buildContext(static function (array $services): void {
+        $services['settings']->saveSettings([
+            'block_editor_font_library_sync_enabled' => '1',
+            'bricks_integration_enabled' => '1',
+        ]);
+    });
+
+    assertSameValue('Needs Sitewide Delivery', (string) ($configuredContext['gutenberg_integration']['status_label'] ?? ''), 'Enabled WordPress integration setup should explain the missing Sitewide Delivery dependency before publishing.');
+    assertSameValue('Needs Sitewide Delivery', (string) ($configuredContext['bricks_integration']['status_label'] ?? ''), 'Enabled Bricks setup should explain the missing Sitewide Delivery dependency before publishing.');
+    assertSameValue('1', (string) ($configuredContext['gutenberg_integration']['submitted_enabled_value'] ?? ''), 'The saved WordPress integration opt-in should be preserved while Sitewide Delivery disables the visible control.');
+    assertSameValue('1', (string) ($configuredContext['bricks_integration']['submitted_enabled_value'] ?? ''), 'The saved Bricks integration opt-in should be preserved while Sitewide Delivery disables the visible control.');
+
+    $liveContext = $buildContext(static function (array $services): void {
+        global $automaticCssSettings;
+
+        $automaticCssSettings = [
+            AcssIntegrationService::OPTION_HEADING_FONT_FAMILY => AcssIntegrationService::DESIRED_HEADING_VALUE,
+            AcssIntegrationService::OPTION_TEXT_FONT_FAMILY => AcssIntegrationService::DESIRED_TEXT_VALUE,
+            AcssIntegrationService::OPTION_HEADING_FONT_WEIGHT => AcssIntegrationService::DESIRED_HEADING_WEIGHT_VALUE,
+            AcssIntegrationService::OPTION_TEXT_FONT_WEIGHT => AcssIntegrationService::DESIRED_TEXT_WEIGHT_VALUE,
+        ];
+
+        $services['settings']->setAutoApplyRoles(true);
+        $services['settings']->saveAcssFontRoleSyncState(true, true, '', '', '', '');
+        $services['settings']->saveSettings([
+            'bricks_integration_enabled' => '1',
+            'bricks_theme_styles_sync_enabled' => '1',
+        ]);
+        $services['bricks_integration']->applyThemeStylesSync();
+    });
+
+    assertSameValue('Live', (string) ($liveContext['acss_integration']['status_label'] ?? ''), 'Automatic.css should claim Live only when Sitewide delivery is on and mapping is applied.');
+    assertContainsValue('Sitewide delivery is distributing', (string) ($liveContext['acss_integration']['status_copy'] ?? ''), 'Live Automatic.css help should name Sitewide delivery as the delivery path.');
+
+    $view = (new AdminPageViewBuilder(new Storage()))->build($liveContext);
+    assertSameValue('Live', (string) ($view['bricksIntegration']['theme_styles']['ui']['status_label'] ?? ''), 'Bricks Theme Style role output should render as Live when the applied mapping matches.');
+    assertContainsValue('Sitewide delivery is distributing', (string) ($view['bricksIntegration']['theme_styles']['ui']['status_help'] ?? ''), 'Bricks live help should name Sitewide delivery as the delivery path.');
+
+    $staleContext = $buildContext(static function (array $services): void {
+        global $automaticCssSettings;
+
+        $automaticCssSettings = [
+            AcssIntegrationService::OPTION_HEADING_FONT_FAMILY => 'Inter',
+            AcssIntegrationService::OPTION_TEXT_FONT_FAMILY => 'System UI',
+            AcssIntegrationService::OPTION_HEADING_FONT_WEIGHT => '700',
+            AcssIntegrationService::OPTION_TEXT_FONT_WEIGHT => '400',
+        ];
+
+        $services['settings']->setAutoApplyRoles(true);
+        $services['settings']->saveAcssFontRoleSyncState(true, true, '', '', '', '');
+        $services['settings']->saveSettings([
+            'bricks_integration_enabled' => '1',
+            'bricks_theme_styles_sync_enabled' => '1',
+        ]);
+        update_option(BricksIntegrationService::OPTION_SYNC_STATE, [
+            'theme_styles' => [
+                'applied' => true,
+                'target_mode' => BricksIntegrationService::TARGET_MODE_MANAGED,
+                'target_style_id' => BricksIntegrationService::MANAGED_THEME_STYLE_ID,
+            ],
+        ], false);
+    });
+
+    assertSameValue('Needs reapply', (string) ($staleContext['acss_integration']['status_label'] ?? ''), 'Automatic.css stale mapping should render the Needs reapply badge.');
+    assertSameValue('out_of_sync', (string) ($staleContext['bricks_integration']['theme_styles']['status'] ?? ''), 'Bricks Theme Style stale mapping should keep a distinct out-of-sync state for presentation.');
+
+    $staleView = (new AdminPageViewBuilder(new Storage()))->build($staleContext);
+    assertSameValue('Needs reapply', (string) ($staleView['bricksIntegration']['theme_styles']['ui']['status_label'] ?? ''), 'Bricks Theme Style stale mapping should render the Needs reapply badge.');
 };
 
 $tests['admin_page_context_builder_treats_unavailable_integrations_as_inactive_even_when_previously_enabled'] = static function (): void {
@@ -3040,11 +3261,13 @@ $tests['admin_controller_preserves_unavailable_integration_detection_state_on_se
     global $optionStore;
 
     $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'etch_integration_enabled' => null,
         'bricks_integration_enabled' => null,
         'oxygen_integration_enabled' => null,
         'acss_font_role_sync_enabled' => null,
     ];
 
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => false);
     add_filter('tasty_fonts_bricks_integration_available', static fn (): bool => false);
     add_filter('tasty_fonts_oxygen_integration_available', static fn (): bool => false);
     add_filter('tasty_fonts_acss_integration_available', static fn (): bool => false);
@@ -3052,16 +3275,19 @@ $tests['admin_controller_preserves_unavailable_integration_detection_state_on_se
     $services = makeServiceGraph();
     $saved = $services['settings']->getSettings();
 
+    assertSameValue(null, $saved['etch_integration_enabled'], 'Etch integration should start unconfigured for this regression test.');
     assertSameValue(null, $saved['bricks_integration_enabled'], 'Bricks integration should start unconfigured for this regression test.');
     assertSameValue(null, $saved['oxygen_integration_enabled'], 'Oxygen integration should start unconfigured for this regression test.');
     assertSameValue(null, $saved['acss_font_role_sync_enabled'], 'Automatic.css integration should start unconfigured for this regression test.');
 
     $result = $services['controller']->saveSettingsValues([
+        'etch_integration_enabled' => '0',
         'bricks_integration_enabled' => '0',
         'oxygen_integration_enabled' => '0',
         'acss_font_role_sync_enabled' => '0',
     ]);
 
+    assertSameValue(null, $result['settings']['etch_integration_enabled'], 'Saving settings while Etch is unavailable should preserve its unconfigured detection state so later installs can still auto-enable it.');
     assertSameValue(null, $result['settings']['bricks_integration_enabled'], 'Saving settings while Bricks is unavailable should preserve its unconfigured detection state so later installs can still auto-enable it.');
     assertSameValue(null, $result['settings']['oxygen_integration_enabled'], 'Saving settings while Oxygen is unavailable should preserve its unconfigured detection state so later installs can still auto-enable it.');
     assertSameValue(null, $result['settings']['acss_font_role_sync_enabled'], 'Saving settings while Automatic.css is unavailable should preserve its unconfigured detection state so later installs can still auto-enable it.');
@@ -3252,6 +3478,8 @@ $tests['runtime_service_enqueues_adobe_stylesheet_and_exposes_it_to_etch_canvas'
     global $localizedScripts;
     global $remoteGetResponses;
 
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+
     $services = makeServiceGraph();
     $currentUserCapabilities['edit_posts'] = true;
     $services['settings']->saveAdobeProject('abc1234', true);
@@ -3300,6 +3528,7 @@ $tests['runtime_service_exposes_acss_inline_weight_styles_to_etch_canvas'] = sta
     global $localizedScripts;
 
     add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
 
     $services = makeServiceGraph();
     $currentUserCapabilities['edit_posts'] = true;
@@ -3357,6 +3586,7 @@ $tests['runtime_service_exposes_acss_runtime_stylesheet_to_etch_canvas_when_sync
     global $registeredStyles;
 
     add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
 
     $registeredStyles[AcssIntegrationService::RUNTIME_STYLESHEET_HANDLE] = [
         'src' => 'https://example.test/wp-content/uploads/automatic-css/automatic.css',
@@ -3423,6 +3653,8 @@ $tests['runtime_service_ignores_public_etch_query_parameters_without_editor_acce
     global $enqueuedScripts;
     global $isUserLoggedIn;
     global $localizedScripts;
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
 
     $services = makeServiceGraph();
     $isUserLoggedIn = false;
@@ -4464,6 +4696,7 @@ $tests['block_editor_font_library_sync_omits_registered_axis_defaults_from_face_
         'variable_fonts_enabled' => '1',
         'block_editor_font_library_sync_enabled' => '1',
     ]);
+    $services['settings']->setAutoApplyRoles(true);
 
     $baseUrl = 'https://example.test/wp-json/wp/v2/font-families';
     $findUrl = $baseUrl . '?slug=tasty-fonts-inter-variable&context=edit';
@@ -4499,6 +4732,7 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
     $settings = new SettingsRepository();
     $defaults = $settings->getSettings();
 
+    assertSameValue(null, $defaults['etch_integration_enabled'], 'Etch integration should start unconfigured so supported sites can default on once detected.');
     assertSameValue(null, $defaults['bricks_integration_enabled'], 'Bricks integration should start unconfigured so supported sites can default on once detected.');
     assertSameValue(null, $defaults['oxygen_integration_enabled'], 'Oxygen integration should start unconfigured so supported sites can default on once detected.');
     assertSameValue(false, $defaults['bricks_theme_styles_sync_enabled'], 'Bricks Theme Style sync should default off until the user opts into deeper integration.');
@@ -4507,6 +4741,7 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
     assertSameValue(false, $defaults['bricks_disable_google_fonts_enabled'], 'Bricks Google font disabling should default off until the user opts into Tasty-only picker mode.');
 
     $saved = $settings->saveSettings([
+        'etch_integration_enabled' => '0',
         'bricks_integration_enabled' => '1',
         'bricks_theme_styles_sync_enabled' => '1',
         'bricks_theme_style_target_mode' => 'selected',
@@ -4515,6 +4750,7 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
         'oxygen_integration_enabled' => '0',
     ]);
 
+    assertSameValue(false, $saved['etch_integration_enabled'], 'Saving the Etch integration toggle should persist an explicit disabled state.');
     assertSameValue(true, $saved['bricks_integration_enabled'], 'Saving the Bricks integration toggle should persist an explicit enabled state.');
     assertSameValue(true, $saved['bricks_theme_styles_sync_enabled'], 'Saving Bricks Theme Style sync should persist an explicit enabled state.');
     assertSameValue('selected', $saved['bricks_theme_style_target_mode'], 'Saving the Bricks Theme Style mode should persist the selected targeting strategy.');
@@ -5328,6 +5564,35 @@ $tests['runtime_service_enqueues_etch_frontend_override_when_minimal_output_pres
         $css,
         'The Etch frontend override should map live heading typography back to the Tasty heading role variable.'
     );
+};
+
+$tests['runtime_service_skips_etch_frontend_override_when_etch_integration_is_explicitly_disabled'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $inlineStyles;
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => '',
+            'body' => '',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        []
+    );
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings([
+        'etch_integration_enabled' => '0',
+    ]);
+
+    $services['runtime']->enqueueEtchFrontendOverride();
+
+    assertSameValue(false, isset($enqueuedStyles['tasty-fonts-etch-runtime-override']), 'Explicitly disabling Etch integration should prevent the Etch frontend runtime override from being enqueued.');
+    assertSameValue(false, isset($inlineStyles['tasty-fonts-etch-runtime-override']), 'Explicitly disabling Etch integration should prevent Etch frontend runtime override CSS from being emitted.');
 };
 
 $tests['runtime_service_appends_generic_editor_role_bridge_when_minimal_output_preset_is_active'] = static function (): void {

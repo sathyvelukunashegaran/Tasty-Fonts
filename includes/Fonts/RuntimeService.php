@@ -99,7 +99,7 @@ final class RuntimeService
 
     public function enqueueEtchFrontendOverride(): void
     {
-        if (is_admin()) {
+        if (is_admin() || !$this->etchIntegrationEnabled()) {
             return;
         }
 
@@ -185,6 +185,10 @@ final class RuntimeService
      */
     public function enqueueEtchCanvas(): void
     {
+        if (!$this->etchIntegrationEnabled()) {
+            return;
+        }
+
         $this->assets->enqueue('tasty-fonts-etch');
         $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets());
     }
@@ -376,6 +380,10 @@ final class RuntimeService
 
     private function enqueueEtchCanvasBridge(): void
     {
+        if (!$this->etchIntegrationEnabled()) {
+            return;
+        }
+
         $stylesheetUrls = $this->getCanvasStylesheetUrls();
         $inlineCss = $this->getCanvasInlineCss();
 
@@ -849,6 +857,14 @@ JS;
         return $available;
     }
 
+    private function etchIntegrationEnabled(): bool
+    {
+        $settings = $this->settings->getSettings();
+
+        return $this->etchIntegrationAvailable()
+            && (($settings['etch_integration_enabled'] ?? null) !== false);
+    }
+
     /**
      * @param NormalizedSettings $settings
      */
@@ -875,7 +891,7 @@ JS;
             return '';
         }
 
-        if (in_array($context, ['frontend', 'canvas'], true) && !$this->etchIntegrationAvailable()) {
+        if (in_array($context, ['frontend', 'canvas'], true) && !$this->etchIntegrationEnabled()) {
             return '';
         }
 
@@ -987,7 +1003,7 @@ JS;
             ? sanitize_text_field(wp_unslash((string) $_GET['etch']))
             : '';
 
-        if ($etch === '' || !$this->canUseEtchCanvasQueryParameter()) {
+        if ($etch === '' || !$this->canUseEtchCanvasQueryParameter() || !$this->etchIntegrationEnabled()) {
             return false;
         }
 

@@ -336,3 +336,37 @@ test('.tasty-fonts-banner is defined and consumes the banner tokens', () => {
     '.tasty-fonts-banner must consume --tasty-surface-banner-* tokens'
   );
 });
+
+test('admin CSS does not use side-stripe accents', () => {
+  const source = fs.readFileSync(adminCssPath, 'utf8');
+  const violations = [];
+  const stripeWidth = /\b(?:[2-9]\d*px|var\(--tasty-layout-[2-9]+px\))\b/i;
+  const sideBorderProperty = /^\s*border-(left|right|inline-start|inline-end)(\s|-width)?\s*:/i;
+  const anchoredToSide = /(?:left|right|inset-inline-start|inset-inline-end)\s*:\s*(0|var\(--tasty-layout-0\))/i;
+  const anchoredToTop = /(?:top|inset-block-start)\s*:\s*(0|var\(--tasty-layout-0\))/i;
+  const anchoredToBottom = /(?:bottom|inset-block-end)\s*:\s*(0|var\(--tasty-layout-0\))/i;
+  const sideStripeSize = /(?:width|inline-size)\s*:\s*[^;]*(?:[2-9]\d*px|var\(--tasty-layout-[2-9]+px\))/i;
+
+  for (const { selector, body, lineNumber } of iterateRules(source)) {
+    const decls = body.split(';');
+    for (const decl of decls) {
+      if (sideBorderProperty.test(decl) && stripeWidth.test(decl)) {
+        // Exempt rotated shapes (like checkmarks) which are constructed via borders.
+        if (/transform\s*:[^;]*rotate/i.test(body) && /border-(top|bottom)\s*:/i.test(body)) {
+          continue;
+        }
+        violations.push(`admin.css:${lineNumber}: forbidden side-stripe accent on "${selector}": ${decl.trim()}`);
+      }
+    }
+
+    if (/::(?:before|after)/.test(selector) && /position\s*:\s*absolute/i.test(body)) {
+       if (anchoredToSide.test(body) && anchoredToTop.test(body) && anchoredToBottom.test(body)) {
+          if (sideStripeSize.test(body)) {
+             violations.push(`admin.css:${lineNumber}: forbidden pseudo-element side-stripe accent on "${selector}"`);
+          }
+       }
+    }
+  }
+
+  assert.deepEqual(violations, [], violations.join('\\n'));
+});

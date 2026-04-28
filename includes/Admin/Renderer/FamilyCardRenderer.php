@@ -84,6 +84,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      * @param CategoryAliasOwners $categoryAliasOwners
      * @param RendererFlagOptions $extendedVariableOptions
      * @param RendererFlagOptions $classOutputOptions
+     * @param RoleSet|null $roleUsageRoles
      */
     public function renderFamilyCardDetails(
         array $family,
@@ -95,7 +96,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         array $categoryAliasOwners = [],
         array $extendedVariableOptions = [],
         bool $monospaceRoleEnabled = false,
-        array $classOutputOptions = []
+        array $classOutputOptions = [],
+        ?array $roleUsageRoles = null
     ): void {
         $view = $this->buildFamilyTemplateView(
             $family,
@@ -107,7 +109,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $categoryAliasOwners,
             $extendedVariableOptions,
             $monospaceRoleEnabled,
-            $classOutputOptions
+            $classOutputOptions,
+            $roleUsageRoles
         );
         $view['includeDetails'] = true;
         $this->renderTemplate('family-card-details.php', $view);
@@ -122,6 +125,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      * @param CategoryAliasOwners $categoryAliasOwners
      * @param RendererFlagOptions $extendedVariableOptions
      * @param RendererFlagOptions $classOutputOptions
+     * @param RoleSet|null $roleUsageRoles
      */
     public function renderFamilySummaryRow(
         array $family,
@@ -133,7 +137,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         array $categoryAliasOwners = [],
         array $extendedVariableOptions = [],
         bool $monospaceRoleEnabled = false,
-        array $classOutputOptions = []
+        array $classOutputOptions = [],
+        ?array $roleUsageRoles = null
     ): void {
         $view = $this->buildFamilyTemplateView(
             $family,
@@ -145,7 +150,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $categoryAliasOwners,
             $extendedVariableOptions,
             $monospaceRoleEnabled,
-            $classOutputOptions
+            $classOutputOptions,
+            $roleUsageRoles
         );
         $view['trainingWheelsOff'] = $this->trainingWheelsOff;
         $view['includeDetails'] = false;
@@ -202,6 +208,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      * @param CategoryAliasOwners $categoryAliasOwners
      * @param RendererFlagOptions $extendedVariableOptions
      * @param RendererFlagOptions $classOutputOptions
+     * @param RoleSet|null $roleUsageRoles
      * @return FamilyCardView
      */
     private function buildFamilyTemplateView(
@@ -214,13 +221,18 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         array $categoryAliasOwners = [],
         array $extendedVariableOptions = [],
         bool $monospaceRoleEnabled = false,
-        array $classOutputOptions = []
+        array $classOutputOptions = [],
+        ?array $roleUsageRoles = null
     ): array {
         $familyName = $this->stringValue($family, 'family');
         $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
         $isHeading = $roles['heading'] === $familyName;
         $isBody = $roles['body'] === $familyName;
         $isMonospace = $monospaceRoleEnabled && ($roles['monospace'] === $familyName);
+        $roleUsageRoles = is_array($roleUsageRoles) ? $roleUsageRoles : $roles;
+        $isLiveHeading = $this->stringValue($roleUsageRoles, 'heading') === $familyName;
+        $isLiveBody = $this->stringValue($roleUsageRoles, 'body') === $familyName;
+        $isLiveMonospace = $monospaceRoleEnabled && ($this->stringValue($roleUsageRoles, 'monospace') === $familyName);
         $fontCategory = strtolower(trim($this->stringValue($family, 'font_category')));
         $assignedRoleKeys = array_values(
             array_filter(
@@ -231,7 +243,17 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                 ]
             )
         );
-        $isRoleFamily = $assignedRoleKeys !== [];
+        $liveRoleKeys = array_values(
+            array_filter(
+                [
+                    $isLiveHeading ? 'heading' : null,
+                    $isLiveBody ? 'body' : null,
+                    $isLiveMonospace ? 'monospace' : null,
+                ]
+            )
+        );
+        $isRoleFamily = $liveRoleKeys !== [];
+        $isDraftRoleFamily = $assignedRoleKeys !== [];
         $fontTypeDescriptor = $this->buildFontTypeDescriptor($family);
         $sourceTokens = $this->normalizeStringList($family['delivery_filter_tokens'] ?? []);
         $categoryTokens = $this->normalizeStringList($family['font_category_tokens'] ?? []);

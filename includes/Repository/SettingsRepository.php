@@ -92,7 +92,7 @@ final class SettingsRepository
     private const DEFAULT_SETTINGS = [
         'auto_apply_roles' => false,
         'applied_roles' => [],
-        'delete_uploaded_files_on_uninstall' => false,
+        'delete_uploaded_files_on_uninstall' => true,
         'css_delivery_mode' => 'file',
         'font_display' => 'swap',
         'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_OFF,
@@ -124,6 +124,7 @@ final class SettingsRepository
         'remote_connection_hints' => true,
         'update_channel' => self::UPDATE_CHANNEL_STABLE,
         'block_editor_font_library_sync_enabled' => null,
+        'etch_integration_enabled' => null,
         'bricks_integration_enabled' => null,
         'bricks_theme_styles_sync_enabled' => false,
         'bricks_theme_style_target_mode' => 'managed',
@@ -136,10 +137,10 @@ final class SettingsRepository
         'training_wheels_off' => false,
         'monospace_role_enabled' => false,
         'variable_fonts_enabled' => false,
-        'google_font_imports_enabled' => true,
-        'bunny_font_imports_enabled' => true,
+        'google_font_imports_enabled' => false,
+        'bunny_font_imports_enabled' => false,
         'adobe_font_imports_enabled' => false,
-        'local_font_uploads_enabled' => true,
+        'local_font_uploads_enabled' => false,
         'custom_css_url_imports_enabled' => false,
         'admin_access_custom_enabled' => false,
         'admin_access_role_slugs' => [],
@@ -225,6 +226,7 @@ final class SettingsRepository
         $settings['block_editor_font_library_sync_enabled'] = $this->normalizeBlockEditorFontLibrarySyncSetting(
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
+        $settings['etch_integration_enabled'] = $this->normalizeOptionalBoolean($settings['etch_integration_enabled'] ?? null);
         $settings['bricks_integration_enabled'] = $this->normalizeOptionalBoolean($settings['bricks_integration_enabled'] ?? null);
         $settings['bricks_theme_styles_sync_enabled'] = !empty($settings['bricks_theme_styles_sync_enabled']);
         $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($settings['bricks_theme_style_target_mode'] ?? 'managed');
@@ -443,6 +445,11 @@ final class SettingsRepository
 
         if (array_key_exists('block_editor_font_library_sync_enabled', $input)) {
             $settings['block_editor_font_library_sync_enabled'] = !empty($input['block_editor_font_library_sync_enabled']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('etch_integration_enabled', $input)) {
+            $settings['etch_integration_enabled'] = $this->normalizeOptionalBoolean($input['etch_integration_enabled']);
             $settingsChanged = true;
         }
 
@@ -833,6 +840,7 @@ final class SettingsRepository
     {
         $settings = $this->getSettings();
         $settings['block_editor_font_library_sync_enabled'] = null;
+        $settings['etch_integration_enabled'] = null;
         $settings['bricks_integration_enabled'] = null;
         $settings['bricks_theme_styles_sync_enabled'] = false;
         $settings['bricks_theme_style_target_mode'] = 'managed';
@@ -1131,6 +1139,7 @@ final class SettingsRepository
         $settings['block_editor_font_library_sync_enabled'] = $this->normalizeBlockEditorFontLibrarySyncSetting(
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
+        $settings['etch_integration_enabled'] = $this->normalizeOptionalBoolean($settings['etch_integration_enabled'] ?? null);
         $settings['bricks_integration_enabled'] = $this->normalizeOptionalBoolean($settings['bricks_integration_enabled'] ?? null);
         $settings['bricks_theme_styles_sync_enabled'] = !empty($settings['bricks_theme_styles_sync_enabled']);
         $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($settings['bricks_theme_style_target_mode'] ?? 'managed');

@@ -6,12 +6,22 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added an Advanced Tools Health triage model with Action Needed, Worth Reviewing, and Checks Passed groups so diagnostics separate urgent recovery work from advisory and passing checks.
+- Added an Advanced Tools Debug Details panel with runtime CSS paths, URLs, file facts, runtime family counts, generated CSS status, and copy-friendly support values.
+- Added live/draft role usage chips to Font Library family cards so Heading, Body, and Monospace assignments show whether they are published sitewide or only staged in draft roles.
+- Added update-channel option labels that include the latest available Stable, Beta, or Nightly version in the Advanced Tools Developer release rail.
 - Added hosted import workflow, generated CSS seam, library mutation, and admin action regression coverage for the extracted service modules.
 - Added Advanced Tools bulk cleanup actions for deleting all rollback snapshots and all retained site-transfer export bundles, with confirmation phrases, admin POST handlers, activity logs, and guardrails that block export deletion while any bundle is locked.
 - Added a URL Import source filter for the Font Library so custom CSS URL import families can be isolated in library views while still retaining their self-hosted or external-request delivery filters.
 
 ### Changed
 
+- Reworked the Advanced Tools overview around collapsible health triage, focused primary actions, clearer status labels, and a separate Debug Details surface instead of mixing runtime facts into the health checklist.
+- Refined Settings rows with changed-state indicators, clearer dependency-disabled states, Compact Mode wording, safer save/reset shell behavior, and better guidance for Sitewide Delivery, integrations, and transfer actions.
+- Clarified sitewide role deployment states and publish controls so Off, Live, and Pending Publish states describe whether saved role assignments are draft-only or served to visitors and integrations.
+- Updated Font Library card actions, source chips, role controls, and delete guardrails so live role usage and staged role changes stay visually distinct.
+- Tightened integration/runtime behavior so Block Editor Font Library sync, Etch canvas loading, Bricks integration output, and monospace role CSS respect their saved settings and Sitewide Delivery dependencies.
+- Refreshed admin CSS tokens, row-board styling, health surfaces, preview/snippet controls, and final documentation screenshots for the latest calmer Settings, Library, and Advanced Tools layouts.
 - Refactored generated CSS handling behind the existing AssetService façade into focused cache, canonical stylesheet, regeneration queue, delivery, and inline nonce services.
 - Replaced the shared hosted-provider import trait with a reusable hosted import workflow, request/config/provider adapter layer, and shared variant planner for Google and Bunny imports.
 - Split library catalog discovery, delivery/profile mutations, publish-state changes, role protection checks, and admin maintenance actions into focused service modules while preserving the existing public controller/service entry points.
@@ -24,6 +34,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Fixed Advanced Tools health output so runtime reference data no longer dilutes the actionable checklist and passing diagnostics are labeled as OK rather than over-claiming verification.
+- Fixed settings save/reset handling for compact mode, monospace role support, and integration toggles so persisted behavior matches the current Settings UI.
+- Fixed generated CSS, preview, Block Editor, and integration runtime paths to honor disabled sitewide delivery and monospace role state consistently.
+- Fixed Font Library role badges and delete blocking so draft role assignments are not mistaken for live sitewide usage.
 - Added end-to-end workflow gating so disabled font import workflows are reflected in Add Fonts UI panels and rejected consistently by REST/admin actions.
 - Fixed hydrated family details so fallback, display, delivery, and publish-state controls bind only once while still initializing correctly after AJAX replacement.
 - Fixed bulk export deletion paths so locked site-transfer bundles are preserved and blocked actions expose disabled-state messaging to both the UI and controller responses.

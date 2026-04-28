@@ -205,8 +205,12 @@ final class BlockEditorFontLibraryService
      */
     private function shouldSync(array $result, string $provider, bool $force = false): bool
     {
-        if (!$force && !$this->settings->isBlockEditorFontLibrarySyncEnabled()) {
-            return false;
+        if (!$force) {
+            $settings = $this->settings->getSettings();
+
+            if (empty($settings['block_editor_font_library_sync_enabled']) || empty($settings['auto_apply_roles'])) {
+                return false;
+            }
         }
 
         if (!apply_filters('tasty_fonts_sync_block_editor_font_library', true, $result, $provider)) {

@@ -454,6 +454,7 @@
     --tasty-font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     --tasty-font-family-inherit: inherit;
     --tasty-font-size-minimum: 12px;
+    --tasty-font-size-utility-minimum: 10px;
     --tasty-font-size-3xs: var(--tasty-font-size-minimum);
     --tasty-font-size-2xs: var(--tasty-font-size-minimum);
     --tasty-font-size-xs: var(--tasty-font-size-minimum);
@@ -565,6 +566,7 @@
     --tasty-type-preview-metric-size: clamp(22px, calc(var(--tasty-preview-base, 32px) * 0.95), 34px);
     --tasty-icon-size-regular: 18px;
     --tasty-icon-size-preview: 44px;
+    --tasty-page-notice-icon-offset-y: var(--tasty-layout-1px);
 
     /* Shadows — restrained product depth, no decorative color bloom */
     --tasty-shadow-card: 0 1px 1px rgba(var(--tasty-shadow-color-rgb), 0.04), 0 8px 24px -20px rgba(var(--tasty-shadow-color-rgb), 0.24);
@@ -680,11 +682,14 @@
     --tasty-library-card-inline-gap: var(--tasty-space-2);
     --tasty-library-search-preview-size: clamp(15px, 0.98vw, 16px);
     --tasty-library-preview-padding: var(--tasty-space-4);
+    --tasty-library-preview-padding-compact: var(--tasty-space-3);
     --tasty-library-preview-background: var(--tasty-gradient-surface-inset);
     --tasty-library-preview-border: var(--tasty-border-subtle);
     --tasty-library-preview-border-strong: var(--tasty-border-subtle-strong);
     --tasty-library-inline-preview-min-height: 90px;
+    --tasty-library-inline-preview-min-height-compact: var(--tasty-layout-76px);
     --tasty-library-preview-size: clamp(22px, 2.2vw, 30px);
+    --tasty-library-preview-size-compact: clamp(20px, 1.9vw, 26px);
     --tasty-library-import-preview-size: clamp(24px, 2.2vw, 34px);
     --tasty-library-import-preview-size-mobile: clamp(20px, 8vw, 28px);
     --tasty-library-specimen-size: clamp(30px, 3.2vw, 46px);
@@ -696,13 +701,16 @@
     --tasty-library-sidebar-padding: 14px;
     --tasty-library-meta-panel-padding: var(--tasty-space-3);
     --tasty-library-meta-panel-gap: 10px;
-    --tasty-library-stack-copy-width: 20rem;
     --tasty-library-monospace-preview-padding-block: 18px;
     --tasty-library-monospace-preview-padding-inline: var(--tasty-space-5);
     --tasty-library-monospace-preview-size: clamp(20px, 1.9vw, 26px);
+    --tasty-library-monospace-preview-size-compact: clamp(18px, 1.7vw, 22px);
     --tasty-role-card-padding: var(--tasty-space-5);
     --tasty-role-card-gap: var(--tasty-space-3);
     --tasty-role-card-head-gap: var(--tasty-space-3);
+    --tasty-role-card-head-column-gap: var(--tasty-space-1);
+    --tasty-role-card-icon-size: var(--tasty-hit-target-comfort);
+    --tasty-role-card-icon-glyph-size: var(--tasty-layout-22px);
     --tasty-role-card-meta-inline-size: clamp(10.5rem, 42%, 12.5rem);
     --tasty-role-card-field-gap: var(--tasty-space-4);
     --tasty-role-card-field-row-gap: var(--tasty-space-3);
@@ -826,6 +834,7 @@
     --tasty-top-panel-rail-offset: var(--tasty-surface-card-padding);
     --tasty-top-panel-rail-offset-compact: var(--tasty-masthead-padding-block-compact);
     --tasty-top-panel-rail-offset-mobile: var(--tasty-surface-card-padding-tight);
+    --tasty-top-panel-rail-offset-current: var(--tasty-top-panel-rail-offset);
     --tasty-top-panel-rail-offset-negative: calc(var(--tasty-top-panel-rail-offset) * var(--tasty-layout-neg-1));
     --tasty-top-panel-rail-offset-negative-compact: calc(var(--tasty-top-panel-rail-offset-compact) * var(--tasty-layout-neg-1));
     --tasty-top-panel-rail-offset-negative-mobile: calc(var(--tasty-top-panel-rail-offset-mobile) * var(--tasty-layout-neg-1));

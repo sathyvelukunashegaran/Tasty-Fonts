@@ -16,6 +16,30 @@ use TastyFonts\Support\FontUtils;
 trait SharedRenderHelpers
 {
     /**
+     * @param array{class?: string, id?: string, actions?: callable(): void} $options
+     */
+    public function renderRichEmptyState(string $title, string $copy, array $options = []): void
+    {
+        $extraClass = trim($this->stringValue($options, 'class'));
+        $className = trim('tasty-fonts-empty-state tasty-fonts-empty-state--rich' . ($extraClass !== '' ? ' ' . $extraClass : ''));
+        $id = trim($this->stringValue($options, 'id'));
+        $actions = $options['actions'] ?? null;
+        ?>
+        <div<?php echo $id !== '' ? ' id="' . esc_attr($id) . '"' : ''; ?> class="<?php echo esc_attr($className); ?>">
+            <div class="tasty-fonts-empty-state-body">
+                <h3 class="tasty-fonts-empty-state-title"><?php echo esc_html($title); ?></h3>
+                <p class="tasty-fonts-empty-state-copy"><?php echo esc_html($copy); ?></p>
+            </div>
+            <?php if (is_callable($actions)): ?>
+                <div class="tasty-fonts-empty-state-actions">
+                    <?php $actions(); ?>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
      * @param list<ActivityLogEntry> $entries
      */
     public function renderLogList(array $entries, string $className = 'tasty-fonts-log-list', int $pageSize = 5, string $idPrefix = 'activity'): void
@@ -75,7 +99,15 @@ trait SharedRenderHelpers
                     <span class="tasty-fonts-log-marker" aria-hidden="true"></span>
                     <div class="tasty-fonts-log-content">
                         <div class="tasty-fonts-log-message-row tasty-fonts-log-summary-row">
-                            <div class="tasty-fonts-log-message tasty-fonts-log-summary"><?php echo esc_html($summary); ?></div>
+                            <div class="tasty-fonts-log-primary">
+                                <div class="tasty-fonts-log-message tasty-fonts-log-summary"><?php echo esc_html($summary); ?></div>
+                                <div class="tasty-fonts-log-meta">
+                                    <span class="tasty-fonts-log-time"><?php echo esc_html($time); ?></span>
+                                    <?php if ($actor !== ''): ?>
+                                        <span class="tasty-fonts-log-actor"><?php echo esc_html($actor); ?></span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                             <span class="tasty-fonts-log-chips" aria-label="<?php esc_attr_e('Activity metadata', 'tasty-fonts'); ?>">
                                 <span class="tasty-fonts-log-chip tasty-fonts-log-chip--status"><?php echo esc_html($statusLabel); ?></span>
                                 <?php if ($source !== ''): ?>
@@ -95,12 +127,6 @@ trait SharedRenderHelpers
                                 <span class="tasty-fonts-log-toggle-icon" aria-hidden="true"></span>
                                 <span class="screen-reader-text"><?php esc_html_e('Details', 'tasty-fonts'); ?></span>
                             </button>
-                        </div>
-                        <div class="tasty-fonts-log-meta">
-                            <span class="tasty-fonts-log-time"><?php echo esc_html($time); ?></span>
-                            <?php if ($actor !== ''): ?>
-                                <span class="tasty-fonts-log-actor"><?php echo esc_html($actor); ?></span>
-                            <?php endif; ?>
                         </div>
                         <div
                             id="<?php echo esc_attr($detailId); ?>"
@@ -399,6 +425,78 @@ trait SharedRenderHelpers
             </div>
             <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($summary); ?></p>
         </div>
+        <?php
+    }
+
+    public function renderAddFontsWorkflowDisabledNotice(string $workflowLabel, string $settingsUrl, string $copy = '', string $buttonLabel = ''): void
+    {
+        if ($copy === '') {
+            $copy = sprintf(
+                __('%s is disabled until its font import workflow is turned on in Settings > Behavior.', 'tasty-fonts'),
+                $workflowLabel
+            );
+        }
+
+        if ($buttonLabel === '') {
+            $buttonLabel = __('Open Behavior Settings', 'tasty-fonts');
+        }
+        ?>
+        <div class="tasty-fonts-empty tasty-fonts-empty--panel tasty-fonts-empty--workflow-disabled" role="note">
+            <p><?php echo esc_html($copy); ?></p>
+            <?php if ($settingsUrl !== ''): ?>
+                <p><a class="button" href="<?php echo esc_url($settingsUrl); ?>"><?php echo esc_html($buttonLabel); ?></a></p>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    public function renderAddFontsSourceStatusCard(array $config): void
+    {
+        $title = $this->stringValue($config, 'title');
+        $summary = $this->stringValue($config, 'summary');
+        $enabled = !empty($config['enabled']);
+        $enabledBadgeLabel = $this->stringValue($config, 'enabled_badge_label');
+        $enabledBadgeClass = trim($this->stringValue($config, 'enabled_badge_class'));
+        $disabledBadgeLabel = $this->stringValue($config, 'disabled_badge_label', __('Workflow Off', 'tasty-fonts'));
+        $disabledBadgeClass = trim($this->stringValue($config, 'disabled_badge_class'));
+        $cardClass = trim($this->stringValue($config, 'card_class'));
+        $rowClass = trim($this->stringValue($config, 'row_class'));
+        $enabledActions = $config['enabled_actions'] ?? null;
+        $body = $config['body'] ?? null;
+
+        $sectionClass = 'tasty-fonts-source-card tasty-fonts-source-card--status';
+
+        if ($cardClass !== '') {
+            $sectionClass .= ' ' . $cardClass;
+        }
+
+        $statusRowClass = 'tasty-fonts-source-status-row';
+
+        if ($rowClass !== '') {
+            $statusRowClass .= ' ' . $rowClass;
+        }
+
+        $badgeLabel = $enabled ? $enabledBadgeLabel : $disabledBadgeLabel;
+        $badgeClass = $enabled ? $enabledBadgeClass : $disabledBadgeClass;
+        ?>
+        <section class="<?php echo esc_attr($sectionClass); ?>">
+            <div class="<?php echo esc_attr($statusRowClass); ?>">
+                <?php $this->renderSourceSetupCopy($title, $summary); ?>
+                <div class="tasty-fonts-source-status-actions">
+                    <span class="tasty-fonts-badge<?php echo $badgeClass !== '' ? ' ' . esc_attr($badgeClass) : ''; ?>"><?php echo esc_html($badgeLabel); ?></span>
+                    <?php if ($enabled && is_callable($enabledActions)): ?>
+                        <?php $enabledActions(); ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <?php if (is_callable($body)): ?>
+                <?php $body($enabled); ?>
+            <?php endif; ?>
+        </section>
         <?php
     }
 
@@ -835,14 +933,14 @@ trait SharedRenderHelpers
         $fallbackInputId = 'tasty_fonts_' . $roleKey . '_fallback';
         $fallbackValue = $this->scalarStringValue($roles[$roleKey . '_fallback'] ?? '', $this->defaultRoleFallback($roleKey));
         ?>
-        <section class="tasty-fonts-studio-card tasty-fonts-role-box">
+        <section class="tasty-fonts-studio-card tasty-fonts-role-box" data-role-box="<?php echo esc_attr($roleKey); ?>">
             <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
                 <div class="tasty-fonts-panel-head tasty-fonts-panel-head--workflow">
+                    <span class="tasty-fonts-role-box-icon" data-role-card-icon="<?php echo esc_attr($roleKey); ?>" aria-hidden="true"></span>
                     <span class="tasty-fonts-panel-kicker"><?php echo esc_html($this->stringValue($config, 'kicker')); ?></span>
                     <h3><?php echo esc_html($this->stringValue($config, 'title')); ?></h3>
                 </div>
                 <div class="tasty-fonts-role-box-meta">
-                    <span class="tasty-fonts-role-box-meta-label"><?php esc_html_e('Current Stack', 'tasty-fonts'); ?></span>
                     <button
                         type="button"
                         class="tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy tasty-fonts-role-box-copy"
@@ -885,24 +983,21 @@ trait SharedRenderHelpers
                     );
                     ?>
                 </label>
-            </div>
-            <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="<?php echo esc_attr($roleKey); ?>" hidden>
-                <div class="tasty-fonts-role-axis-head">
-                    <span class="tasty-fonts-field-label-text"><?php esc_html_e('Role Weight', 'tasty-fonts'); ?></span>
-                    <span class="tasty-fonts-muted" data-role-weight-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Choose a saved static weight when the selected family offers more than one.', 'tasty-fonts'); ?></span>
+                <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="<?php echo esc_attr($roleKey); ?>" hidden>
+                    <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
+                        <?php $this->renderFieldLabel(__('Role Weight', 'tasty-fonts')); ?>
+                        <span class="screen-reader-text" data-role-weight-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Choose a saved static weight when the selected family offers more than one.', 'tasty-fonts'); ?></span>
+                        <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
+                            <select
+                                name="<?php echo esc_attr($this->stringValue($config, 'weight_input_name')); ?>"
+                                id="<?php echo esc_attr($this->stringValue($config, 'weight_select_id')); ?>"
+                                data-role-weight-select="<?php echo esc_attr($roleKey); ?>"
+                                form="<?php echo esc_attr($roleFormId); ?>"
+                            ></select>
+                            <?php $this->renderClearSelectButton($this->stringValue($config, 'clear_weight_label'), $this->stringValue($config, 'weight_select_id')); ?>
+                        </span>
+                    </label>
                 </div>
-                <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
-                    <span class="screen-reader-text"><?php echo esc_html($this->stringValue($config, 'weight_screen_reader_label')); ?></span>
-                    <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                        <select
-                            name="<?php echo esc_attr($this->stringValue($config, 'weight_input_name')); ?>"
-                            id="<?php echo esc_attr($this->stringValue($config, 'weight_select_id')); ?>"
-                            data-role-weight-select="<?php echo esc_attr($roleKey); ?>"
-                            form="<?php echo esc_attr($roleFormId); ?>"
-                        ></select>
-                        <?php $this->renderClearSelectButton($this->stringValue($config, 'clear_weight_label'), $this->stringValue($config, 'weight_select_id')); ?>
-                    </span>
-                </label>
             </div>
             <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="<?php echo esc_attr($roleKey); ?>" hidden>
                 <div class="tasty-fonts-role-axis-head">

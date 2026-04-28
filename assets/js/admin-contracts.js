@@ -79,6 +79,16 @@
             : { role: 'status', live: 'polite' };
     }
 
+    function resolveSitewideDeliveryButtonStates({ applyEverywhere = false, isSaving = false } = {}) {
+        const enabled = !!applyEverywhere;
+        const saving = !!isSaving;
+
+        return {
+            enableDisabled: saving || enabled,
+            disableDisabled: saving || !enabled,
+        };
+    }
+
     function tokenizeAttributeValue(value) {
         return String(value || '').split(/\s+/).filter(Boolean);
     }
@@ -552,6 +562,57 @@
         return JSON.stringify(left || {}) === JSON.stringify(right || {});
     }
 
+    function changedSettingsKeys(initialState = {}, currentState = {}) {
+        const keys = new Set([
+            ...Object.keys(initialState || {}),
+            ...Object.keys(currentState || {}),
+        ]);
+
+        return Array.from(keys)
+            .filter((key) => JSON.stringify((initialState || {})[key]) !== JSON.stringify((currentState || {})[key]))
+            .sort();
+    }
+
+    function buildSettingsDirtyState(initialState = {}, currentState = {}, rowFields = {}) {
+        const changedKeys = changedSettingsKeys(initialState, currentState);
+        const changedKeySet = new Set(changedKeys);
+        const changedRows = Object.entries(rowFields || {})
+            .filter(([, fields]) => Array.isArray(fields) && fields.some((field) => changedKeySet.has(String(field || ''))))
+            .map(([rowKey]) => rowKey)
+            .sort();
+
+        return {
+            isDirty: changedKeys.length > 0,
+            changedKeys,
+            changedRows,
+        };
+    }
+
+    function resolveSettingsSaveShellState(options = {}) {
+        const isTransferTab = !!options.isTransferTab;
+        const hasUnsavedSettings = !!options.hasUnsavedSettings;
+        const isSubmitting = !!options.isSubmitting;
+        const hasStagedBundle = !!options.hasStagedBundle;
+
+        if (!isTransferTab) {
+            return {
+                visible: true,
+                showClear: true,
+                clearDisabled: !hasUnsavedSettings,
+                saveDisabled: !hasUnsavedSettings,
+                saveTone: 'default',
+            };
+        }
+
+        return {
+            visible: true,
+            showClear: false,
+            clearDisabled: true,
+            saveDisabled: isSubmitting || !hasStagedBundle,
+            saveTone: 'danger',
+        };
+    }
+
     function parsePhpIniSizeToBytes(value = '') {
         const normalized = String(value || '').trim().toLowerCase();
 
@@ -908,8 +969,10 @@
         buildCustomCssDryRunRequest,
         buildCustomCssFinalImportRequest,
         buildCustomCssImportErrorMessage,
+        buildSettingsDirtyState,
         buildVariationSettings,
         canDisableOutputLayer,
+        changedSettingsKeys,
         cssAxisTag,
         defaultRoleFallback,
         defaultRoleWeight,
@@ -939,6 +1002,8 @@
         resolveAssignedRoleState,
         renderCustomCssDryRunErrorHtml,
         renderCustomCssDryRunReviewHtml,
+        resolveSettingsSaveShellState,
+        resolveSitewideDeliveryButtonStates,
         roleStatesMatch,
         serializeSettingsFormEntries,
         settingsStatesMatch,

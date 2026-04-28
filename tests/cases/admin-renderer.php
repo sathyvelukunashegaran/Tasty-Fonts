@@ -5,6 +5,8 @@ declare(strict_types=1);
 use TastyFonts\Admin\AdminPageRenderer;
 use TastyFonts\Admin\AdminPageViewBuilder;
 use TastyFonts\Admin\Renderer\FamilyCardRenderer;
+use TastyFonts\Admin\Renderer\HealthTriagePresenter;
+use TastyFonts\Admin\Renderer\RuntimeDebugDetailsPresenter;
 use TastyFonts\Admin\Renderer\PreviewSectionRenderer;
 use TastyFonts\Plugin;
 use TastyFonts\Support\Storage;
@@ -90,7 +92,7 @@ $tests['admin_page_renderer_uses_inline_delivery_badge_for_single_delivery_famil
     assertContainsValue('aria-label="Google CDN"', $output, 'The source pill should expose the active delivery label to assistive technology.');
     assertNotContainsValue('tasty-fonts-badges--library-inline', $output, 'Family card headers should not render secondary delivery metadata rows.');
     assertNotContainsValue('tasty-fonts-face-summary-badges', $output, 'Family card headers should not render face summary badge rows.');
-    assertContainsValue('aria-label="Copy font stack for Inter: &quot;Inter&quot;, sans-serif"', $output, 'Copyable font stacks should expose the copied stack value in the accessible name.');
+    assertNotContainsValue('Copy font stack for Inter', $output, 'Family card headers should not duplicate the copyable font stack already exposed in CSS Variables.');
     assertContainsValue('tasty-fonts-detail-group', $output, 'Family details should render as design-system card groups instead of plain WordPress tables.');
     assertNotContainsValue('Available delivery profiles', $output, 'Single-delivery families should not render the verbose available deliveries note.');
     assertNotContainsValue('Live delivery', $output, 'Single-delivery families should not render the verbose live delivery note.');
@@ -159,9 +161,110 @@ $tests['family_card_renderer_summary_rows_omit_heavy_details_until_hydrated'] = 
 
     assertContainsValue('data-family-details-loaded="false"', $output, 'Summary family cards should mark their details containers as not yet hydrated.');
     assertContainsValue('data-family-details-toggle', $output, 'Summary family cards should expose a dedicated details trigger for lazy hydration.');
+	assertContainsValue('data-family-card-primary-action', $output, 'Collapsed summary cards should expose Details as the primary card action.');
     assertContainsValue('data-family-details-status', $output, 'Summary family cards should render a status region for async detail loading.');
+	assertContainsValue('data-role-usage-summary', $output, 'Summary family cards should render a passive current role usage summary for client-side role sync.');
+	assertMatchesPattern('/tasty-fonts-font-title-row[\s\S]*?<h3>Inter<\/h3>[\s\S]*?data-role-usage-summary[\s\S]*?tasty-fonts-font-source-badge/', $output, 'Family card headers should keep the title, role usage pills, and source pill in one row.');
+	assertContainsValue('class="tasty-fonts-badge is-role tasty-fonts-font-usage-chip" data-role-usage-chip="heading"', $output, 'Role usage chips should share badge chrome with other header pills.');
+	assertMatchesPattern('/data-role-usage-chip="heading" data-role-usage-state="live"[^>]*>Heading Live<\/span>/', $output, 'Assigned live heading families should show the passive Heading Live usage chip.');
+	assertMatchesPattern('/data-role-usage-chip="body" data-role-usage-state="live" hidden>Body Live<\/span>/', $output, 'Inactive live role usage chips should remain in the DOM but hidden for client-side role sync.');
+	assertContainsValue('data-family-edit-action="role"', $output, 'Role assignment controls should be marked as edit-state actions.');
+	assertContainsValue('data-family-edit-action="delete-family"', $output, 'Family delete controls should be marked as edit-state actions.');
     assertNotContainsValue('Delivery Profiles', $output, 'Summary family cards should omit heavy delivery markup until hydrated.');
     assertNotContainsValue('Font Faces', $output, 'Summary family cards should omit face detail markup until hydrated.');
+};
+
+$tests['family_card_renderer_marks_usage_from_live_roles_not_draft_roles'] = static function (): void {
+    resetTestState();
+
+    $renderer = new FamilyCardRenderer(new Storage());
+    $family = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'delivery_filter_tokens' => ['published', 'same-origin'],
+        'font_category_tokens' => ['sans-serif'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'local-self-hosted',
+        'active_delivery' => [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'local-self-hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'local',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ],
+        ],
+    ];
+
+    ob_start();
+    try {
+        $renderer->renderFamilySummaryRow(
+            $family,
+            ['heading' => '', 'body' => 'Inter'],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            [],
+            [],
+            false,
+            [],
+            []
+        );
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $draftOnlyOutput = (string) ob_get_clean();
+
+    assertNotContainsValue('tasty-fonts-row tasty-fonts-font-card is-active', $draftOnlyOutput, 'Draft-only role assignments should not mark library cards as live in use.');
+    assertMatchesPattern('/data-role-usage-chip="body" data-role-usage-state="live" hidden>Body Live<\/span>/', $draftOnlyOutput, 'Draft-only role assignments should not expose the live Body usage chip.');
+    assertMatchesPattern('/data-role-usage-chip="body" data-role-usage-state="draft"[^>]*>Body Role<\/span>/', $draftOnlyOutput, 'Draft-only role assignments should expose the neutral Body Role usage chip.');
+
+    ob_start();
+    try {
+        $renderer->renderFamilySummaryRow(
+            $family,
+            ['heading' => '', 'body' => 'Lora'],
+            [],
+            [],
+            [
+                ['value' => 'inherit', 'label' => 'Use plugin default'],
+            ],
+            'The quick brown fox jumps over the lazy dog.',
+            [],
+            [],
+            false,
+            [],
+            ['heading' => '', 'body' => 'Inter']
+        );
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $liveOutput = (string) ob_get_clean();
+
+    assertContainsValue('tasty-fonts-row tasty-fonts-font-card is-active', $liveOutput, 'Live sitewide role assignments should mark library cards as in use.');
+    assertMatchesPattern('/data-role-usage-chip="body" data-role-usage-state="live"[^>]*>Body Live<\/span>/', $liveOutput, 'Live sitewide role assignments should expose the Body Live usage chip.');
+    assertMatchesPattern('/data-role-usage-chip="body" data-role-usage-state="draft" hidden>Body Role<\/span>/', $liveOutput, 'Live sitewide role assignments should hide the draft Body Role chip for the same family.');
 };
 
 $tests['family_card_renderer_summary_rows_omit_header_metadata_pills'] = static function (): void {
@@ -472,8 +575,8 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
             'remote_connection_hints' => true,
             'block_editor_font_library_sync_enabled' => false,
             'training_wheels_off' => false,
-            'monospace_role_enabled' => true,
-            'delete_uploaded_files_on_uninstall' => false,
+            'monospace_role_enabled' => false,
+            'delete_uploaded_files_on_uninstall' => true,
             'diagnostic_items' => [],
             'overview_metrics' => [],
             'output_panels' => [
@@ -531,6 +634,17 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
     assertSameValue(1, substr_count($output, 'data-settings-clear-button'), 'The shared Settings clear control should render once in the header.');
     assertContainsValue('>Save changes<', $output, 'Settings sections should expose an explicit Save changes action.');
     assertContainsValue('>Clear changes<', $output, 'Settings sections should expose an explicit way to discard unsaved settings changes.');
+    assertNotContainsValue('Help Density', $output, 'Settings should not expose the former Help Density control.');
+    assertContainsValue('Compact Mode', $output, 'Advanced Tools should expose Compact Mode.');
+    assertContainsValue('name="training_wheels_off"', $output, 'Compact Mode should keep the existing stored setting name for backward compatibility.');
+    assertSameValue(0, preg_match('/Font Capabilities[\s\S]*Compact Mode[\s\S]*Enable Monospace Role/', $output), 'Compact Mode should not render inside Font Capabilities.');
+    assertContainsValue('is-disabled-by-dependency', $output, 'Settings dependency-disabled rows should expose a semantic dependency-disabled class.');
+    assertContainsValue('aria-describedby="tasty-fonts-class-output-role-monospace-dependency"', $output, 'Dependency-disabled Settings controls should keep an accessible explanation.');
+    assertContainsValue('Enable the monospace role in Settings &gt; Behavior to use this control.', $output, 'Dependency-disabled rows should explain what enables the control.');
+    assertContainsValue('is-risky', $output, 'Settings rows with destructive persistence consequences should expose a risky row state.');
+    assertContainsValue('Review before turning this off. When disabled, uninstall removes plugin-managed uploaded font files.', $output, 'Risky Settings rows should explain the review-worthy consequence.');
+	assertNotContainsValue('has-unsaved-changes', $output, 'Routine Settings rows should not render persistent changed markers before the user edits the form.');
+	assertNotContainsValue('data-settings-row-changed', $output, 'Settings changed row markers should be applied by JS only after a tracked value changes.');
     assertContainsValue('>Font Library<', $output, 'The unified admin page should still include the library section inside its own tab panel.');
     assertContainsValue('Show Activity Log', $output, 'The Behavior panel should expose an activity log visibility setting.');
     assertContainsValue('Events are still recorded when hidden.', $output, 'The activity log visibility setting should explain that logging continues while hidden.');
@@ -588,8 +702,13 @@ $tests['admin_page_renderer_renders_single_page_library_tab_for_empty_and_popula
 	assertContainsValue('<option value="url-import">URL Import</option>', $emptyOutput, 'The library source filter should let users isolate fonts imported from URL CSS.');
 	assertContainsValue('id="tasty-fonts-add-font-tab-url"', $emptyOutput, 'The Add Fonts panel should still expose a From URL entry point.');
 	assertContainsValue('Workflow Off', $emptyOutput, 'The From URL panel should show the font import workflow state when URL imports are off.');
+	assertContainsValue('Connect Adobe Fonts Project', $emptyOutput, 'The Adobe workflow-off panel should use the same task framing as the other disabled Add Fonts workflows.');
+	assertSameValue(5, substr_count($emptyOutput, 'class="tasty-fonts-empty tasty-fonts-empty--panel tasty-fonts-empty--workflow-disabled" role="note"'), 'All disabled Add Fonts workflows should use the shared empty-panel notice structure.');
+	assertSameValue(5, substr_count($emptyOutput, '>Open Behavior Settings<'), 'All disabled Add Fonts workflows should link to Behavior settings.');
 	assertContainsValue('Enable URL Imports is turned on in Settings &gt; Behavior', $emptyOutput, 'The From URL panel should explain where to enable the workflow.');
 	assertNotContainsValue('id="tasty-fonts-url-dry-run-form"', $emptyOutput, 'The From URL panel should not render the dry-run form while the developer gate is off.');
+	assertSameValue(1, preg_match('/id="tasty-fonts-add-font-panel-upload"[\s\S]*?tasty-fonts-source-status-actions[\s\S]*?>Workflow Off<\/span>/', $emptyOutput), 'Upload disabled state should render Workflow Off in the shared source status actions badge area.');
+	assertNotContainsValue('Custom upload imports are disabled in Settings &gt; Behavior.', $emptyOutput, 'Upload disabled state should not repeat workflow-disabled copy in the source status guidance.');
 
     ob_start();
     try {
@@ -703,8 +822,9 @@ $tests['admin_page_renderer_only_shows_upload_variable_controls_when_variable_fo
         'remote_connection_hints' => true,
         'block_editor_font_library_sync_enabled' => false,
         'training_wheels_off' => false,
+        'local_font_uploads_enabled' => true,
         'delete_uploaded_files_on_uninstall' => false,
-        'diagnostic_items' => [],
+		'diagnostic_items' => [],
         'overview_metrics' => [],
         'output_panels' => [],
         'generated_css_panel' => [],
@@ -738,6 +858,7 @@ $tests['admin_page_renderer_only_shows_upload_variable_controls_when_variable_fo
 
     assertNotContainsValue('tasty-fonts-upload-face-shell--static-only', $enabledOutput, 'The upload builder should keep the full upload grid when variable font support is on.');
     assertContainsValue('data-upload-field="is-variable"', $enabledOutput, 'The upload builder should render variable upload toggles when variable font support is on.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-add-font-panel-upload"[\s\S]*?tasty-fonts-source-status-actions[\s\S]*?>Auto-detect<\/span>/', $enabledOutput), 'Upload enabled state should render Auto-detect in the shared source status actions badge area.');
     assertContainsValue('id="tasty-fonts-url-dry-run-form"', $enabledOutput, 'The From URL panel should render the dry-run form when the custom CSS URL import gate is on.');
     assertContainsValue('The dry run reads CSS and shows supported WOFF or WOFF2 faces.', $enabledOutput, 'The enabled From URL panel should explain the dry-run review scope.');
 };
@@ -2228,7 +2349,7 @@ $tests['admin_page_renderer_uses_category_aware_family_preview_fallbacks'] = sta
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('data-copy-text="&quot;JetBrains Mono&quot;, monospace"', $output, 'Family preview stacks should default monospace catalog families to the monospace generic fallback.');
+    assertContainsValue('style="font-family:&quot;JetBrains Mono&quot;, monospace;"', $output, 'Family previews should default monospace catalog families to the monospace generic fallback.');
 };
 
 $tests['admin_page_renderer_translates_stored_delivery_profile_labels_at_output'] = static function (): void {
@@ -2600,7 +2721,7 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
 	            'show_activity_log' => true,
 	            'training_wheels_off' => true,
 	            'variable_fonts_enabled' => true,
-	            'delete_uploaded_files_on_uninstall' => false,
+	'delete_uploaded_files_on_uninstall' => true,
 	            'diagnostic_items' => [],
 	            'overview_metrics' => [],
 	            'site_transfer' => [
@@ -2664,9 +2785,10 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Integrations tab should no longer render a duplicate Gutenberg sync row title.');
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Integrations tab should no longer render a duplicate Automatic.css sync row title.');
 	assertNotContainsValue('Configure onboarding hints, import workflows, activity visibility, font capabilities, and admin access.', $output, 'The Behavior tab should no longer describe Advanced Tools guidance or activity visibility settings.');
-    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-panel-maintenance"[\s\S]*Show Onboarding Hints[\s\S]*Show Activity Log/', $output), 'The Advanced Tools Developer tab should expose onboarding and activity visibility settings together.');
-    assertNotContainsValue('Hide Onboarding Hints', $output, 'The onboarding hints setting should not be framed as a hide setting.');
-    assertSameValue(1, preg_match('/name="training_wheels_off" value="1"[\s\S]*name="training_wheels_off" value="0"/', $output), 'The positive onboarding hints toggle should still submit the stored inverse setting correctly.');
+    assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-panel-maintenance"[\s\S]*Compact Mode[\s\S]*Show Activity Log/', $output), 'The Advanced Tools Developer tab should expose Compact Mode and activity visibility settings together.');
+    assertNotContainsValue('Show Onboarding Hints', $output, 'The admin experience setting should be framed as Compact Mode.');
+    assertNotContainsValue('Help Density', $output, 'The Behavior tab should not expose the former Help Density control.');
+    assertSameValue(1, preg_match('/name="training_wheels_off"[\s\S]{0,300}value="1"[\s\S]{0,300}checked="checked"/', $output), 'Compact Mode should submit the stored setting directly when enabled.');
     assertSameValue(1, preg_match('/name="show_activity_log" value="0"[\s\S]*name="show_activity_log" value="1"/', $output), 'The activity log toggle should submit an explicit off value from Advanced Tools.');
     assertNotContainsValue('Advanced Import Gates', $output, 'The Advanced Tools Developer tab should no longer host font import workflow toggles.');
     assertContainsValue('Font Import Workflows', $output, 'The Behavior tab should group font import workflow toggles.');
@@ -2674,9 +2796,9 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Enable Bunny Fonts Imports', $output, 'The Behavior tab should expose the Bunny Fonts import workflow toggle.');
     assertContainsValue('Enable Adobe Fonts Imports', $output, 'The Behavior tab should expose the Adobe Fonts import workflow toggle.');
     assertContainsValue('Enable Custom Uploads', $output, 'The Behavior tab should expose the custom upload workflow toggle.');
-	assertSameValue(1, preg_match('/name="google_font_imports_enabled" value="1" checked="checked"/', $output), 'Google Fonts imports should render on by default.');
-	assertSameValue(1, preg_match('/name="bunny_font_imports_enabled" value="1" checked="checked"/', $output), 'Bunny Fonts imports should render on by default.');
-	assertSameValue(1, preg_match('/name="local_font_uploads_enabled" value="1" checked="checked"/', $output), 'Custom uploads should render on by default.');
+	assertSameValue(1, preg_match('/name="google_font_imports_enabled" value="1"(?! checked="checked")/', $output), 'Google Fonts imports should render off by default.');
+	assertSameValue(1, preg_match('/name="bunny_font_imports_enabled" value="1"(?! checked="checked")/', $output), 'Bunny Fonts imports should render off by default.');
+	assertSameValue(1, preg_match('/name="local_font_uploads_enabled" value="1"(?! checked="checked")/', $output), 'Custom uploads should render off by default.');
 	assertSameValue(1, preg_match('/name="adobe_font_imports_enabled" value="1"(?! checked="checked")/', $output), 'Adobe Fonts imports should render off by default.');
     assertContainsValue('name="custom_css_url_imports_enabled" value="0"', $output, 'The URL import workflow toggle should submit an explicit off value.');
 	assertSameValue(1, preg_match('/name="custom_css_url_imports_enabled" value="1"(?! checked="checked")/', $output), 'URL imports should render off by default.');
@@ -2706,7 +2828,7 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertContainsValue('Keep Uploaded Fonts on Uninstall', $output, 'The Behavior panel should render the uninstall retention toggle with positive wording.');
     assertNotContainsValue('Configure onboarding hints, import workflows, activity visibility, font capabilities, and admin access.', $output, 'The old Behavior tab summary should not mention moved Advanced Tools settings.');
     assertNotContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should not frame uploaded font retention as a delete setting.');
-    assertSameValue(1, preg_match('/name="delete_uploaded_files_on_uninstall" value="1"[\s\S]*name="delete_uploaded_files_on_uninstall" value="0"/', $output), 'The positive uninstall retention toggle should still submit the stored inverse setting correctly.');
+	assertSameValue(1, preg_match('/name="delete_uploaded_files_on_uninstall" value="1"[\s\S]*name="delete_uploaded_files_on_uninstall" value="0"(?! checked="checked")/', $output), 'The positive uninstall retention toggle should render off by default while submitting the stored inverse setting correctly.');
     assertContainsValue('Enable Additional Access Rules', $output, 'The admin-access panel should expose the master toggle for fine-grained access with positive wording.');
     assertNotContainsValue('Grant Tasty Fonts access to extra roles and users. Administrators always keep access.', $output, 'Show Onboarding Hints should omit admin-access toggle helper copy when turned off.');
     assertNotContainsValue('Turn custom access on to grant additional roles or users.', $output, 'Show Onboarding Hints should omit admin-access summary helper copy when turned off.');
@@ -2974,17 +3096,17 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
             'preview_panels' => [],
             'local_environment_notice' => [],
             'toasts' => [],
-            'apply_everywhere' => false,
+            'apply_everywhere' => true,
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
                 'description' => 'Sync imported families into the WordPress Font Library.',
-                'status_label' => 'On',
+                'status_label' => 'Configured',
                 'enabled' => true,
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Sync Automatic.css font settings with Tasty role variables.',
-                'status_label' => 'Synced',
+                'description' => 'Automatic.css role variables are live through Sitewide delivery.',
+                'status_label' => 'Live',
                 'available' => true,
                 'enabled' => true,
                 'current' => [
@@ -3016,6 +3138,7 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     assertContainsValue('Builders', $output, 'The Integrations tab should group Etch, Bricks, and Oxygen under builder integrations.');
     assertContainsValue('Canvas + Theme Controls', $output, 'The builder group should describe both Etch canvas loading and builder theme controls.');
     assertContainsValue('Etch Canvas Bridge', $output, 'The Etch bridge should render inside the builder integrations group.');
+	assertContainsValue('name="etch_integration_enabled"', $output, 'The Etch integration should render as a persisted toggle field.');
 	assertSameValue(
 		1,
 		preg_match('/<h4>Builders<\/h4>[\s\S]*?<div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">\s*<div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">[\s\S]*?name="bricks_integration_enabled"/', $output),
@@ -3028,11 +3151,11 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     assertNotContainsValue('Builder Sync', $output, 'The Integrations tab should not keep a separate builder sync category after Etch is grouped with builders.');
     assertNotContainsValue('Framework Tokens', $output, 'The Integrations tab should use the cleaner Frameworks category label.');
     assertContainsValue('Sync imported families into the WordPress Font Library.', $output, 'The Gutenberg integration summary should render within the main toggle copy.');
-    assertContainsValue('On', $output, 'The Gutenberg integration row should still surface its current status.');
+    assertContainsValue('Configured', $output, 'The Gutenberg integration row should surface configured setup without claiming live role delivery.');
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Gutenberg integration should no longer render a second row title.');
     assertSameValue(1, substr_count($output, 'Gutenberg Font Library'), 'The Gutenberg integration should render a single main title.');
-    assertContainsValue('Sync Automatic.css font settings with Tasty role variables.', $output, 'The Automatic.css integration summary should render within the main toggle copy.');
-    assertContainsValue('Synced', $output, 'The Automatic.css integration row should still surface its current status.');
+    assertContainsValue('Automatic.css role variables are live through Sitewide delivery.', $output, 'The Automatic.css integration summary should render within the main toggle copy.');
+    assertContainsValue('Live', $output, 'The Automatic.css integration row should surface live role delivery only when Sitewide delivery is on.');
     assertContainsValue('tasty-fonts-integration-mapping tasty-fonts-acss-mapping', $output, 'The Automatic.css managed mapping should render as the shared settings mapping table.');
     assertContainsValue('Font mapping', $output, 'The Automatic.css managed mapping should use a compact table label.');
     assertContainsValue('Tasty role variable', $output, 'The Automatic.css managed mapping should label the destination variable clearly.');
@@ -3046,6 +3169,123 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Automatic.css integration should no longer render a second row title.');
     assertNotContainsValue('Managed Mapping', $output, 'The Automatic.css integration should now use the quieter Font mapping disclosure instead of a loud subsection heading.');
     assertNotContainsValue('Sets ACSS `heading-font-family` to `var(--font-heading)` and `text-font-family` to `var(--font-body)` while the integration is enabled.', $output, 'The Automatic.css integration should no longer render a second explanatory line.');
+};
+
+$tests['admin_page_renderer_disables_integrations_until_sitewide_delivery_is_on'] = static function (): void {
+	resetTestState();
+
+	add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+	add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+	add_filter('tasty_fonts_bricks_integration_available', static fn (): bool => true);
+	add_filter('tasty_fonts_oxygen_integration_available', static fn (): bool => true);
+
+	$services = makeServiceGraph();
+	$services['settings']->saveAcssFontRoleSyncState(true, false, '', '');
+
+	$builder = new \TastyFonts\Admin\AdminPageContextBuilder(
+		$services['storage'],
+		$services['settings'],
+		$services['log'],
+		$services['catalog'],
+		$services['assets'],
+		new \TastyFonts\Fonts\CssBuilder(),
+		$services['adobe'],
+		$services['google'],
+		$services['acss_integration'],
+		$services['bricks_integration'],
+		$services['oxygen_integration']
+	);
+
+	$renderer = new \TastyFonts\Admin\Renderer\SettingsSectionRenderer(new Storage());
+	$view = (new AdminPageViewBuilder($services['storage']))->build($builder->build());
+
+	ob_start();
+	try {
+		$renderer->render($view);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('Turn on Sitewide Delivery before Etch Canvas Bridge can load Tasty fonts.', $output, 'The Etch row should explain the Sitewide Delivery dependency.');
+	assertContainsValue('Turn on Sitewide Delivery before Bricks can receive Tasty typography.', $output, 'The Bricks row should explain the Sitewide Delivery dependency.');
+	assertContainsValue('Turn on Sitewide Delivery before Oxygen can receive Tasty fonts.', $output, 'The Oxygen row should explain the Sitewide Delivery dependency.');
+	assertContainsValue('Turn on Sitewide Delivery before Gutenberg Font Library sync can publish Tasty fonts.', $output, 'The Gutenberg row should explain the Sitewide Delivery dependency.');
+	assertContainsValue('Turn on Sitewide Delivery before Automatic.css can sync Tasty role variables.', $output, 'The Automatic.css row should explain why the control is unavailable.');
+	assertContainsValue('data-settings-help-tooltip="Needs Sitewide Delivery. Turn on Sitewide Delivery before Etch Canvas Bridge can load Tasty fonts.', $output, 'The Etch row help icon should mention the Sitewide Delivery dependency.');
+	assertContainsValue('data-settings-help-tooltip="Needs Sitewide Delivery. Turn on Sitewide Delivery before Bricks can receive Tasty typography.', $output, 'The Bricks row help icon should mention the Sitewide Delivery dependency.');
+	assertContainsValue('data-settings-help-tooltip="Needs Sitewide Delivery. Turn on Sitewide Delivery before Oxygen can receive Tasty fonts.', $output, 'The Oxygen row help icon should mention the Sitewide Delivery dependency.');
+	assertContainsValue('data-settings-help-tooltip="Needs Sitewide Delivery. Turn on Sitewide Delivery before Gutenberg Font Library sync can publish Tasty fonts.', $output, 'The Gutenberg row help icon should mention the Sitewide Delivery dependency.');
+	assertContainsValue('data-settings-help-tooltip="Needs Sitewide Delivery. Turn on Sitewide Delivery before Automatic.css receives role output.', $output, 'The Automatic.css row help icon should mention the Sitewide Delivery dependency.');
+	assertTrueValue(substr_count($output, 'Needs Sitewide Delivery') >= 5, 'Every integration row should name the shared Sitewide Delivery dependency.');
+	assertContainsValue('is-disabled-by-dependency', $output, 'Integration rows should expose a dependency-disabled state.');
+
+	foreach ([
+		'etch_integration_enabled',
+		'bricks_integration_enabled',
+		'oxygen_integration_enabled',
+		'block_editor_font_library_sync_enabled',
+		'acss_font_role_sync_enabled',
+	] as $fieldName) {
+		assertSameValue(1, preg_match('/<input[^>]*type="checkbox"[^>]*name="' . preg_quote($fieldName, '/') . '"[^>]*disabled/', $output), $fieldName . ' should be disabled until Sitewide Delivery is on.');
+		assertSameValue(0, preg_match('/<input[^>]*type="checkbox"[^>]*name="' . preg_quote($fieldName, '/') . '"[^>]*checked/', $output), $fieldName . ' should not visually appear on while dependency-disabled.');
+	}
+
+	assertContainsValue('aria-describedby="tasty-fonts-etch-sitewide-dependency"', $output, 'The disabled Etch control should keep an accessible dependency explanation.');
+	assertContainsValue('aria-describedby="tasty-fonts-bricks-sitewide-dependency"', $output, 'The disabled Bricks control should keep an accessible dependency explanation.');
+	assertContainsValue('aria-describedby="tasty-fonts-oxygen-sitewide-dependency"', $output, 'The disabled Oxygen control should keep an accessible dependency explanation.');
+	assertContainsValue('aria-describedby="tasty-fonts-gutenberg-sitewide-dependency"', $output, 'The disabled Gutenberg control should keep an accessible dependency explanation.');
+	assertContainsValue('aria-describedby="tasty-fonts-acss-sitewide-dependency"', $output, 'The disabled Automatic.css control should keep an accessible dependency explanation.');
+	assertSameValue(1, preg_match('/<input[^>]*type="hidden"[^>]*name="acss_font_role_sync_enabled"[^>]*value="1"/', $output), 'The disabled dependency state should preserve the saved Automatic.css opt-in when other settings are saved.');
+	assertNotContainsValue('tasty-fonts-integration-mapping tasty-fonts-acss-mapping', $output, 'Automatic.css mapping details should stay hidden while Sitewide Delivery disables the integration.');
+};
+
+$tests['admin_page_renderer_integration_scan_summary_uses_effective_sitewide_state'] = static function (): void {
+	resetTestState();
+
+	add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+	add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+	add_filter('tasty_fonts_bricks_integration_available', static fn (): bool => true);
+	add_filter('tasty_fonts_oxygen_integration_available', static fn (): bool => true);
+
+	$services = makeServiceGraph();
+	$services['settings']->setAutoApplyRoles(false);
+	$services['settings']->saveSettings([
+		'block_editor_font_library_sync_enabled' => '1',
+		'etch_integration_enabled' => '1',
+		'bricks_integration_enabled' => '1',
+		'oxygen_integration_enabled' => '1',
+	]);
+	$services['settings']->saveAcssFontRoleSyncState(true, false, '', '');
+
+	$builder = new \TastyFonts\Admin\AdminPageContextBuilder(
+		$services['storage'],
+		$services['settings'],
+		$services['log'],
+		$services['catalog'],
+		$services['assets'],
+		new \TastyFonts\Fonts\CssBuilder(),
+		$services['adobe'],
+		$services['google'],
+		$services['acss_integration'],
+		$services['bricks_integration'],
+		$services['oxygen_integration']
+	);
+	$renderer = new AdminPageRenderer($services['storage']);
+
+	ob_start();
+	try {
+		$renderer->renderPage($builder->build());
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('Detected integrations:', $output, 'The integration scan summary should still distinguish detected integrations.');
+	assertContainsValue('Enabled integrations: None on.', $output, 'The integration scan summary should report no effective integrations on while Sitewide Delivery disables them.');
+	assertMatchesPattern('/tasty-fonts-developer-tool-meta-enabled[\s\S]{0,600}<span>None<\/span>/', $output, 'The visible On pill should show None when every integration is dependency-disabled by Sitewide Delivery.');
 };
 
 $tests['admin_page_renderer_keeps_dashboard_titles_and_buttons_in_title_case'] = static function (): void {
@@ -3126,7 +3366,7 @@ $tests['admin_page_renderer_keeps_dashboard_titles_and_buttons_in_title_case'] =
 
     foreach ([
         'Select Roles, Review, Publish.',
-        'Turn Off Sitewide',
+		'Disable',
         'Save or Publish',
         'Preview and Snippets',
         'Choose Families and Fallbacks.',
@@ -3218,7 +3458,7 @@ $tests['admin_page_renderer_hides_acss_managed_mapping_when_sync_is_not_enabled'
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
                 'description' => 'Sync imported families into the WordPress Font Library.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
             ],
             'acss_integration' => [
@@ -3307,9 +3547,16 @@ $tests['admin_page_renderer_disables_unavailable_plugin_integrations'] = static 
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
                 'description' => 'Sync imported families into the WordPress Font Library.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
             ],
+			'etch_integration' => [
+				'title' => 'Etch Canvas Bridge',
+				'description' => 'Available automatically when Etch is active.',
+				'status_label' => 'Not Active',
+				'enabled' => false,
+				'available' => false,
+			],
             'acss_integration' => [
                 'title' => 'Automatic.css',
                 'description' => 'Sync Automatic.css font settings with Tasty role variables when Automatic.css is active.',
@@ -3338,12 +3585,15 @@ $tests['admin_page_renderer_disables_unavailable_plugin_integrations'] = static 
     }
     $output = (string) ob_get_clean();
 
+	assertContainsValue('name="etch_integration_enabled"', $output, 'The Etch integration toggle should still render when the plugin is unavailable.');
     assertContainsValue('name="bricks_integration_enabled"', $output, 'The Bricks integration toggle should still render when the plugin is unavailable.');
     assertContainsValue('name="oxygen_integration_enabled"', $output, 'The Oxygen integration toggle should still render when the plugin is unavailable.');
     assertContainsValue('name="acss_font_role_sync_enabled"', $output, 'The Automatic.css integration toggle should still render when the plugin is unavailable.');
+	assertSameValue(1, preg_match('/name="etch_integration_enabled"[^>]*disabled/', $output), 'The Etch integration toggle should be disabled when Etch is unavailable.');
     assertSameValue(1, preg_match('/name="bricks_integration_enabled"[^>]*disabled/', $output), 'The Bricks integration toggle should be disabled when Bricks is unavailable.');
     assertSameValue(1, preg_match('/name="oxygen_integration_enabled"[^>]*disabled/', $output), 'The Oxygen integration toggle should be disabled when Oxygen is unavailable.');
     assertSameValue(1, preg_match('/name="acss_font_role_sync_enabled"[^>]*disabled/', $output), 'The Automatic.css integration toggle should be disabled when Automatic.css is unavailable.');
+	assertSameValue(0, preg_match('/name="etch_integration_enabled"[^>]*checked/', $output), 'The Etch integration toggle should render unchecked when Etch is unavailable.');
     assertSameValue(0, preg_match('/name="bricks_integration_enabled"[^>]*checked/', $output), 'The Bricks integration toggle should render unchecked when Bricks is unavailable.');
     assertSameValue(0, preg_match('/name="oxygen_integration_enabled"[^>]*checked/', $output), 'The Oxygen integration toggle should render unchecked when Oxygen is unavailable.');
     assertSameValue(0, preg_match('/name="acss_font_role_sync_enabled"[^>]*checked/', $output), 'The Automatic.css integration toggle should render unchecked when Automatic.css is unavailable.');
@@ -3387,7 +3637,7 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
             'bricks_integration' => [
                 'title' => 'Bricks Builder',
                 'description' => 'Manage Bricks typography with Tasty. Selectors and previews stay automatic.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
                 'available' => true,
                 'feature_descriptions' => [
@@ -3442,7 +3692,7 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
                 'description' => 'Sync imported families into the WordPress Font Library.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
             ],
             'acss_integration' => [
@@ -3494,8 +3744,9 @@ $tests['admin_page_renderer_renders_staged_bricks_integration_controls'] = stati
     assertContainsValue('Font mapping', $output, 'The Bricks integration card should present the state comparison under a clearer details label.');
     assertContainsValue('Maintenance', $output, 'The Bricks integration card should group destructive actions into a quieter maintenance area.');
     assertNotContainsValue('Bricks Controls', $output, 'The Bricks integration card should remove the redundant internal Bricks heading.');
-    assertContainsValue('data-help-tooltip="Bricks Theme Style sync is active."', $output, 'The Bricks Theme Style status badge should explain the synced state on hover.');
-    assertContainsValue('data-help-tooltip="Bricks pickers are focused on Tasty Fonts."', $output, 'The Bricks picker status badge should explain the synced state on hover.');
+    assertContainsValue('data-help-tooltip="Live. Sitewide delivery is distributing Tasty role output to Bricks Theme Styles."', $output, 'The Bricks Theme Style status badge should explain the Sitewide delivery path on hover.');
+    assertContainsValue('>Live</span>', $output, 'The Bricks Theme Style status badge should render Live when role output is distributed through Sitewide delivery.');
+    assertContainsValue('data-help-tooltip="Configured. Bricks pickers are focused on Tasty Fonts."', $output, 'The Bricks picker status badge should explain the configured picker state on hover.');
     assertContainsValue('Updating &quot;Sitewide Primary&quot;.', $output, 'The Bricks integration card should explain which existing Theme Style Tasty is updating.');
     assertContainsValue('Managed Tasty style', $output, 'The Bricks integration card should render the managed Theme Style radio label.');
     assertContainsValue('One existing style', $output, 'The Bricks integration card should render the single-style target radio label.');
@@ -3542,7 +3793,7 @@ $tests['admin_page_renderer_exposes_bricks_waiting_badge_help'] = static functio
             'bricks_integration' => [
                 'title' => 'Bricks Builder',
                 'description' => 'Manage Bricks typography with Tasty. Selectors and previews stay automatic.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
                 'available' => true,
                 'feature_descriptions' => [
@@ -3597,7 +3848,7 @@ $tests['admin_page_renderer_exposes_bricks_waiting_badge_help'] = static functio
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
                 'description' => 'Sync imported families into the WordPress Font Library.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
             ],
             'acss_integration' => [
@@ -3628,8 +3879,8 @@ $tests['admin_page_renderer_exposes_bricks_waiting_badge_help'] = static functio
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('data-help-tooltip="Turn on sitewide roles to apply Theme Style sync."', $output, 'The Bricks waiting badge should explain that sitewide role delivery must be enabled first.');
-    assertSameValue(1, preg_match('/data-help-tooltip="Turn on sitewide roles to apply Theme Style sync\\."[\s\S]*?>\s*Waiting\s*<\/span>/', $output), 'The Bricks Theme Style badge should still render the Waiting label.');
+    assertContainsValue('data-help-tooltip="Waiting for Sitewide Delivery. Enable Sitewide Delivery before Bricks receives role output."', $output, 'The Bricks waiting badge should explain that Sitewide delivery must be enabled first.');
+    assertSameValue(1, preg_match('/data-help-tooltip="Waiting for Sitewide Delivery\. Enable Sitewide Delivery before Bricks receives role output\."[\s\S]*?>\s*Waiting for Sitewide Delivery\s*<\/span>/', $output), 'The Bricks Theme Style badge should render the full Waiting for Sitewide Delivery label.');
 };
 
 $tests['admin_page_renderer_offers_to_create_a_bricks_theme_style_when_none_exist'] = static function (): void {
@@ -3670,7 +3921,7 @@ $tests['admin_page_renderer_offers_to_create_a_bricks_theme_style_when_none_exis
             'bricks_integration' => [
                 'title' => 'Bricks Builder',
                 'description' => 'Manage Bricks typography with Tasty. Selectors and previews stay automatic.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
                 'available' => true,
                 'feature_descriptions' => [
@@ -3725,7 +3976,7 @@ $tests['admin_page_renderer_offers_to_create_a_bricks_theme_style_when_none_exis
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
                 'description' => 'Sync imported families into the WordPress Font Library.',
-                'status_label' => 'On',
+				'status_label' => 'Configured',
                 'enabled' => true,
             ],
             'acss_integration' => [
@@ -3824,6 +4075,12 @@ $tests['admin_page_renderer_restructures_role_toolbar_with_explicit_actions'] = 
                 'heading_fallback' => 'sans-serif',
                 'body_fallback' => 'sans-serif',
             ],
+			'applied_roles' => [
+				'heading' => 'Inter',
+				'body' => 'Inter',
+				'heading_fallback' => 'sans-serif',
+				'body_fallback' => 'sans-serif',
+			],
             'logs' => [],
             'activity_actor_options' => [],
             'family_fallbacks' => [],
@@ -3861,12 +4118,12 @@ $tests['admin_page_renderer_restructures_role_toolbar_with_explicit_actions'] = 
     $output = (string) ob_get_clean();
     $deploymentPosition = strpos($output, 'Workflow');
     $selectionPosition = strpos($output, 'Choose Families and Fallbacks.');
-    $sectionStatusPosition = strpos($output, 'Sitewide on');
+    $sectionStatusPosition = strpos($output, 'Sitewide delivery');
     $headingVariablePosition = strpos($output, 'data-role-variable-copy="heading"');
     $bodyVariablePosition = strpos($output, 'data-role-variable-copy="body"');
 
-    assertContainsValue('Turn On Sitewide', $output, 'The Font Roles form should expose an explicit apply sitewide action.');
-    assertContainsValue('Turn Off Sitewide', $output, 'The Font Roles form should expose an explicit switch-off sitewide action.');
+    assertContainsValue('tasty-fonts-scope-button-title">Enable</span>', $output, 'The Font Roles form should expose a concise sitewide delivery enable action.');
+    assertContainsValue('tasty-fonts-scope-button-title">Disable</span>', $output, 'The Font Roles form should expose a concise sitewide delivery disable action.');
     assertContainsValue('Publish Roles', $output, 'The Font Roles form should keep a direct publish action in the role actions card.');
     assertContainsValue('data-disclosure-toggle="tasty-fonts-role-preview-panel"', $output, 'The utilities card should expose a dedicated preview disclosure button.');
     assertContainsValue('data-disclosure-toggle="tasty-fonts-role-snippets-panel"', $output, 'The utilities card should expose a dedicated snippets disclosure button.');
@@ -3874,8 +4131,11 @@ $tests['admin_page_renderer_restructures_role_toolbar_with_explicit_actions'] = 
     assertContainsValue('tasty-fonts-studio-section tasty-fonts-role-command-deck', $output, 'Deployment controls should use the shared studio section pattern.');
     assertContainsValue('tasty-fonts-studio-section tasty-fonts-role-selection', $output, 'Role selection should use the same shared studio section pattern as deployment controls.');
     assertContainsValue('tasty-fonts-studio-card tasty-fonts-role-box', $output, 'Role selection cards should use the shared studio card pattern.');
-    assertContainsValue('tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-command-status is-live', $output, 'The sitewide deployment state should use the shared help pill pattern.');
-    assertContainsValue('tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-status-pill', $output, 'The deployment status badge should use the shared help pill pattern.');
+    assertContainsValue('tasty-fonts-sitewide-status is-live', $output, 'The sitewide delivery state should render as one composed header status.');
+    assertContainsValue('tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-command-status tasty-fonts-role-status-pill is-live', $output, 'The sitewide delivery status badge should use the shared help pill pattern.');
+    assertContainsValue('Role assignments are served to visitors, editors, and integrations.', $output, 'The live Sitewide delivery detail should mention visitors, editors, and integrations.');
+    assertNotContainsValue('Sitewide on', $output, 'The header should not render the retired Sitewide on peer status.');
+    assertNotContainsValue('<span class="tasty-fonts-role-stack-label">Status</span>', $output, 'The header should not render Status as a peer label beside Sitewide delivery.');
     assertContainsValue('tasty-fonts-pill tasty-fonts-pill--code tasty-fonts-pill--interactive tasty-fonts-pill--copy tasty-fonts-kbd tasty-fonts-role-stack-copy', $output, 'Role variable copy pills should use the shared copy pill pattern.');
     assertContainsValue('Roles', $output, 'The Font Roles form should expose a dedicated role selection section after the deployment controls.');
     assertNotContainsValue('Current Output', $output, 'The Font Roles form should no longer render the obsolete current output summary.');
@@ -3884,6 +4144,94 @@ $tests['admin_page_renderer_restructures_role_toolbar_with_explicit_actions'] = 
     assertSameValue(true, $sectionStatusPosition !== false && $selectionPosition !== false && $sectionStatusPosition < $selectionPosition, 'The section status pill should stay in the deployment summary before role selection.');
     assertSameValue(true, $headingVariablePosition !== false && $selectionPosition !== false && $headingVariablePosition > $selectionPosition, 'The heading variable pill should live in the role selection summary.');
     assertSameValue(true, $bodyVariablePosition !== false && $selectionPosition !== false && $bodyVariablePosition > $selectionPosition, 'The body variable pill should live in the role selection summary.');
+};
+
+$tests['admin_page_renderer_composes_sitewide_delivery_status_states'] = static function (): void {
+	resetTestState();
+
+	$render = static function (bool $applyEverywhere, array $roles, array $appliedRoles): string {
+		$renderer = new AdminPageRenderer(new Storage());
+
+		ob_start();
+		try {
+			$renderer->renderPage([
+				'storage' => ['root' => '/tmp/uploads/fonts'],
+				'catalog' => [],
+				'available_families' => ['Inter', 'Lora'],
+				'roles' => $roles,
+				'applied_roles' => $appliedRoles,
+				'logs' => [],
+				'activity_actor_options' => [],
+				'family_fallbacks' => [],
+				'family_font_displays' => [],
+				'family_font_display_options' => [],
+				'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+				'preview_size' => 32,
+				'font_display' => 'optional',
+				'font_display_options' => [],
+				'minify_css_output' => true,
+				'preload_primary_fonts' => true,
+				'remote_connection_hints' => true,
+				'training_wheels_off' => false,
+				'delete_uploaded_files_on_uninstall' => false,
+				'diagnostic_items' => [],
+				'overview_metrics' => [],
+				'output_panels' => [],
+				'generated_css_panel' => [],
+				'preview_panels' => [],
+				'toasts' => [],
+				'apply_everywhere' => $applyEverywhere,
+				'role_deployment' => [],
+			]);
+		} catch (\Throwable $e) {
+			ob_end_clean();
+			throw $e;
+		}
+
+		return (string) ob_get_clean();
+	};
+
+	$draftRoles = [
+		'heading' => 'Inter',
+		'body' => 'Lora',
+		'heading_fallback' => 'sans-serif',
+		'body_fallback' => 'serif',
+	];
+	$liveRoles = [
+		'heading' => 'Inter',
+		'body' => 'Inter',
+		'heading_fallback' => 'sans-serif',
+		'body_fallback' => 'sans-serif',
+	];
+
+	$offOutput = $render(false, $draftRoles, $liveRoles);
+	assertContainsValue('Sitewide delivery', $offOutput, 'The Deploy Fonts header should label the composed parent status.');
+	assertContainsValue('>Off<', $offOutput, 'The composed Sitewide delivery status should expose the Off state.');
+	assertContainsValue('tasty-fonts-role-status-pill is-warning', $offOutput, 'The Off state should use the warning-colored sitewide status pill.');
+	assertContainsValue('Role assignments are saved as draft only and are not served sitewide.', $offOutput, 'The Off detail should explain draft-only role assignments are not served sitewide.');
+	assertContainsValue('Sitewide delivery is off. Enable Sitewide Delivery before publishing role changes.', $offOutput, 'Disabled Publish Roles should explain the Sitewide delivery dependency.');
+	assertMatchesPattern('/data-role-sitewide-enable[^>]*aria-disabled="false"(?![^>]*disabled)/', $offOutput, 'Off state should keep the Sitewide Enable action available.');
+	assertMatchesPattern('/data-role-sitewide-disable[^>]*aria-disabled="true"[^>]*disabled/', $offOutput, 'Off state should disable the Sitewide Disable action.');
+	assertNotContainsValue('Sitewide on', $offOutput, 'The retired Sitewide on peer status should not render in Off state.');
+	assertNotContainsValue('<span class="tasty-fonts-role-stack-label">Status</span>', $offOutput, 'The retired Status peer label should not render in Off state.');
+
+	$liveOutput = $render(true, $draftRoles, $draftRoles);
+	assertContainsValue('>Live<', $liveOutput, 'The composed Sitewide delivery status should expose the Live state.');
+	assertContainsValue('Sitewide delivery: Live', $liveOutput, 'The Live status tooltip should expose the parent status title.');
+	assertContainsValue('Role assignments are served to visitors, editors, and integrations.', $liveOutput, 'The Live detail should mention visitors, editors, and integrations.');
+	assertMatchesPattern('/data-role-sitewide-enable[^>]*aria-disabled="true"[^>]*disabled/', $liveOutput, 'Live state should disable the Sitewide Enable action.');
+	assertMatchesPattern('/data-role-sitewide-disable[^>]*aria-disabled="false"(?![^>]*disabled)/', $liveOutput, 'Live state should keep the Sitewide Disable action enabled.');
+	assertNotContainsValue('Status</span>', $liveOutput, 'The retired duplicate Status label should not return in Live state.');
+
+	$pendingOutput = $render(true, $draftRoles, $liveRoles);
+	assertContainsValue('>Pending publish<', $pendingOutput, 'The composed Sitewide delivery status should expose the Pending publish state.');
+	assertContainsValue('Saved assignments differ from what is currently served. Publish Roles to update sitewide delivery.', $pendingOutput, 'The Pending publish detail should explain saved assignments differ from served assignments.');
+	assertContainsValue('button button-primary is-pending-live-change tasty-fonts-scope-button tasty-fonts-scope-button--apply', $pendingOutput, 'Publish Roles should remain the primary action for Pending publish.');
+	assertMatchesPattern('/data-role-sitewide-enable[^>]*aria-disabled="true"[^>]*disabled/', $pendingOutput, 'Pending publish should keep the Sitewide Enable action disabled.');
+	assertMatchesPattern('/data-role-sitewide-disable[^>]*aria-disabled="false"(?![^>]*disabled)/', $pendingOutput, 'Pending publish should keep the Sitewide Disable action enabled.');
+	assertContainsValue('tasty-fonts-scope-button-title">Enable</span>', $pendingOutput, 'The sitewide availability action should use the concise enable label.');
+	assertContainsValue('tasty-fonts-scope-button-title">Disable</span>', $pendingOutput, 'The sitewide availability action should use the concise disable label.');
+	assertNotContainsValue('Sitewide on', $pendingOutput, 'The retired Sitewide on peer status should not render in Pending publish state.');
 };
 
 $tests['admin_page_renderer_only_highlights_publish_roles_when_changes_are_pending'] = static function (): void {
@@ -4586,6 +4934,61 @@ $tests['admin_page_renderer_generated_css_defaults_to_readable_output_with_minif
     assertContainsValue('data-copy-text=":root{--font-heading:&quot;Inter&quot;,serif}body{font-family:var(--font-heading)}"', $output, 'Generated CSS copy payloads should stay on the true minified output.');
 };
 
+$tests['admin_page_renderer_generated_css_empty_state_uses_default_rich_empty_state'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+
+    ob_start();
+    try {
+        $renderer->renderPage([
+            'storage' => ['root' => '/tmp/uploads/fonts'],
+            'catalog' => [],
+            'available_families' => [],
+            'roles' => [],
+            'logs' => [],
+            'activity_actor_options' => [],
+            'family_fallbacks' => [],
+            'family_font_displays' => [],
+            'family_font_display_options' => [],
+            'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+            'preview_size' => 32,
+            'font_display' => 'optional',
+            'font_display_options' => [],
+            'minify_css_output' => true,
+            'preload_primary_fonts' => true,
+            'remote_connection_hints' => true,
+            'training_wheels_off' => false,
+            'delete_uploaded_files_on_uninstall' => false,
+            'diagnostic_items' => [],
+            'overview_metrics' => [],
+            'output_panels' => [],
+            'generated_css_panel' => [
+                'key' => 'generated',
+                'label' => 'Generated CSS',
+                'target' => 'tasty-fonts-output-generated',
+                'value' => 'Not generated while sitewide delivery is off.',
+                'is_empty' => true,
+            ],
+            'preview_panels' => [],
+            'toasts' => [],
+            'apply_everywhere' => false,
+            'role_deployment' => [],
+        ]);
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('tasty-fonts-empty-state tasty-fonts-empty-state--rich tasty-fonts-empty-state--generated-css', $output, 'Generated CSS should use the shared rich empty-state treatment.');
+    assertContainsValue('No Generated CSS Yet', $output, 'Generated CSS should explain the missing runtime stylesheet with an empty-state title.');
+    assertContainsValue('Publish sitewide roles to generate the runtime stylesheet Tasty Fonts serves to visitors, editors, and integrations.', $output, 'Generated CSS should teach how the empty state is resolved.');
+    assertContainsValue('>Deploy Fonts</a>', $output, 'Generated CSS should link users back to the role deployment workflow.');
+    assertNotContainsValue('data-copy-text="Not generated while sitewide delivery is off."', $output, 'Generated CSS should not offer to copy an empty-state explanation as code.');
+    assertNotContainsValue('<pre class="tasty-fonts-output" data-snippet-view="raw" aria-labelledby="tasty-fonts-output-generated-label">', $output, 'Generated CSS should not render a code block for empty output.');
+};
+
 $tests['admin_page_renderer_generated_css_omits_readable_toggle_when_output_is_already_unminified'] = static function (): void {
     resetTestState();
 
@@ -4678,7 +5081,7 @@ $tests['admin_page_renderer_makes_copyable_diagnostic_values_click_to_copy'] = s
                 ],
                 [
                     'label' => 'Stylesheet Size',
-                    'value' => '4 KB',
+					'value' => '4.0 KB',
                     'code' => false,
                     'copyable' => false,
                 ],
@@ -4697,12 +5100,139 @@ $tests['admin_page_renderer_makes_copyable_diagnostic_values_click_to_copy'] = s
     }
     $output = (string) ob_get_clean();
 
+	assertContainsValue('tasty-fonts-debug-details', $output, 'Copyable diagnostic values should live inside the dedicated Debug Details reference table.');
+	assertContainsValue('No runtime families yet.', $output, 'Debug Details should explain the empty runtime-family state clearly.');
     assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--reference"', $output, 'Copyable diagnostic values should render inside the shared reference-row pattern.');
     assertContainsValue('class="button tasty-fonts-output-copy-button tasty-fonts-diagnostic-copy-button"', $output, 'Copyable diagnostic values should render an icon-only copy button in the reference row.');
     assertContainsValue('data-copy-text="https://example.test/wp-content/uploads/fonts/tasty-fonts.css"', $output, 'Copyable diagnostic values should expose their full value for the shared clipboard handler.');
     assertContainsValue('data-copy-success="CSS Request URL copied."', $output, 'Copyable diagnostic values should report which field was copied in the shared toast message.');
     assertContainsValue('<span class="tasty-fonts-code">', $output, 'Diagnostic values should remain plain readable text instead of turning the whole field into a button.');
-    assertNotContainsValue('data-copy-text="4 KB"', $output, 'Plain diagnostic values should not become copy controls.');
+	assertNotContainsValue('data-copy-text="4.0 KB"', $output, 'Plain diagnostic values should not become copy controls.');
+};
+
+$tests['health_triage_presenter_maps_severities_to_user_buckets_and_defaults'] = static function (): void {
+	$presenter = new HealthTriagePresenter();
+
+	$groups = $presenter->groups([
+		['slug' => 'storage_root', 'severity' => 'critical', 'title' => 'Storage Root'],
+		['slug' => 'block_editor_sync', 'severity' => 'warning', 'title' => 'Block Editor Sync'],
+		['slug' => 'font_preload', 'severity' => 'info', 'title' => 'Primary Font Preload'],
+		['slug' => 'generated_css', 'severity' => 'ok', 'title' => 'Generated CSS'],
+	]);
+
+	assertSameValue('action-needed', (string) ($groups[0]['slug'] ?? ''), 'Critical and warning checks should map to the Action needed bucket.');
+	assertSameValue(2, count($groups[0]['checks'] ?? []), 'Action needed should include critical and warning checks together.');
+	assertSameValue(true, (bool) ($groups[0]['expanded'] ?? false), 'Action needed should open by default when it has checks.');
+	assertSameValue('worth-reviewing', (string) ($groups[1]['slug'] ?? ''), 'Info checks should map to the Worth reviewing bucket.');
+	assertSameValue(1, count($groups[1]['checks'] ?? []), 'Worth reviewing should include informational checks.');
+	assertSameValue(false, (bool) ($groups[1]['expanded'] ?? true), 'Worth reviewing should collapse when action is needed.');
+	assertSameValue('checks-passed', (string) ($groups[2]['slug'] ?? ''), 'OK checks should map to the Checks passed bucket.');
+	assertSameValue(false, (bool) ($groups[2]['expanded'] ?? true), 'Checks passed should stay summarized by default.');
+
+	$infoOnlyGroups = $presenter->groups([
+		['slug' => 'font_preload', 'severity' => 'info', 'title' => 'Primary Font Preload'],
+		['slug' => 'generated_css', 'severity' => 'ok', 'title' => 'Generated CSS'],
+	]);
+
+	assertSameValue(false, (bool) ($infoOnlyGroups[0]['expanded'] ?? true), 'Empty Action needed stays collapsed.');
+	assertSameValue(true, (bool) ($infoOnlyGroups[1]['expanded'] ?? false), 'Worth reviewing may open by default when no action is needed.');
+	assertSameValue(false, (bool) ($infoOnlyGroups[2]['expanded'] ?? true), 'Checks passed remains collapsed when no action is needed.');
+};
+
+$tests['health_triage_presenter_keeps_detected_but_disabled_integrations_out_of_action_needed'] = static function (): void {
+	$presenter = new HealthTriagePresenter();
+
+	$groups = $presenter->groups([
+		[
+			'slug' => 'bricks_integration_detected_disabled',
+			'group' => 'integration',
+			'severity' => 'info',
+			'title' => 'Bricks Builder',
+			'message' => 'Bricks is detected but the integration is off.',
+		],
+		[
+			'slug' => 'oxygen_integration_detected_disabled',
+			'group' => 'integration',
+			'severity' => 'info',
+			'title' => 'Oxygen Builder',
+			'message' => 'Oxygen is detected but the integration is off.',
+		],
+	]);
+
+	$actionNeeded = is_array($groups[0] ?? null) ? $groups[0] : [];
+	$worthReviewing = is_array($groups[1] ?? null) ? $groups[1] : [];
+	$actionSlugs = array_map(static fn (array $check): string => (string) ($check['slug'] ?? ''), is_array($actionNeeded['checks'] ?? null) ? $actionNeeded['checks'] : []);
+	$worthReviewingSlugs = array_map(static fn (array $check): string => (string) ($check['slug'] ?? ''), is_array($worthReviewing['checks'] ?? null) ? $worthReviewing['checks'] : []);
+
+	assertSameValue('action-needed', (string) ($actionNeeded['slug'] ?? ''), 'Action needed should remain the first triage bucket.');
+	assertSameValue(0, count(is_array($actionNeeded['checks'] ?? null) ? $actionNeeded['checks'] : []), 'Detected-but-disabled integrations should not create action-needed checks.');
+	assertSameValue('worth-reviewing', (string) ($worthReviewing['slug'] ?? ''), 'Worth reviewing should collect integration advisories.');
+	assertSameValue(true, in_array('bricks_integration_detected_disabled', $worthReviewingSlugs, true), 'Bricks detected-but-disabled should remain informational.');
+	assertSameValue(true, in_array('oxygen_integration_detected_disabled', $worthReviewingSlugs, true), 'Oxygen detected-but-disabled should remain informational.');
+	assertSameValue(false, in_array('bricks_integration_detected_disabled', $actionSlugs, true), 'Bricks detected-but-disabled should not appear under action needed.');
+	assertSameValue(false, in_array('oxygen_integration_detected_disabled', $actionSlugs, true), 'Oxygen detected-but-disabled should not appear under action needed.');
+	assertSameValue(true, (bool) ($worthReviewing['expanded'] ?? false), 'Worth reviewing should open when no action-needed checks exist.');
+};
+
+$tests['runtime_debug_details_presenter_prepares_reference_facts_and_copy_groups'] = static function (): void {
+	$presenter = new RuntimeDebugDetailsPresenter();
+
+	$details = $presenter->details(
+		[
+			'runtime_manifest' => [
+				'delivery' => ['css_delivery_mode' => 'file'],
+				'generated_css' => [
+					'path' => '/var/www/html/wp-content/uploads/tasty-fonts/.generated/tasty-fonts.css',
+					'url' => 'https://example.test/wp-content/uploads/tasty-fonts/.generated/tasty-fonts.css',
+					'exists' => true,
+					'is_current' => true,
+					'size' => 4096,
+					'expected_version' => 'abc123',
+				],
+				'families' => [
+					[
+						'family' => 'Inter',
+						'provider' => 'local',
+						'type' => 'self_hosted',
+						'faces' => 2,
+						'variants' => ['400', '700'],
+					],
+				],
+			],
+		],
+		[
+			[
+				'label' => 'CSS Request URL',
+				'value' => 'https://example.test/wp-content/uploads/tasty-fonts/.generated/tasty-fonts.css',
+				'copyable' => true,
+			],
+			[
+				'label' => 'Generated CSS File',
+				'value' => '/var/www/html/wp-content/uploads/tasty-fonts/.generated/tasty-fonts.css',
+				'copyable' => true,
+			],
+			[
+				'label' => 'Storage Root',
+				'value' => '/var/www/html/wp-content/uploads/tasty-fonts',
+				'copyable' => true,
+			],
+			[
+				'label' => 'Stylesheet Size',
+				'value' => '4.0 KB',
+				'copyable' => false,
+			],
+		]
+	);
+
+	assertSameValue('Debug Details', (string) ($details['title'] ?? ''), 'Runtime debug details should expose a dedicated table title.');
+	assertSameValue(false, isset($details['summary_items']), 'Runtime debug details should not build a redundant collapsed summary.');
+	assertContainsValue('Shows how Tasty Fonts serves runtime CSS on the frontend', (string) ($details['generated_facts'][0]['help'] ?? ''), 'Generated CSS fact rows should expose help text.');
+	assertSameValue(1, count($details['runtime_families'] ?? []), 'Expanded debug details should include runtime families.');
+	assertSameValue(3, (int) ($details['copyable_count'] ?? 0), 'Debug details should count final de-duplicated copyable support values.');
+	assertSameValue('Public and Request URLs', (string) ($details['copy_groups'][0]['title'] ?? ''), 'Copyable request URLs should be grouped as support URLs.');
+	assertSameValue('Filesystem Paths', (string) ($details['copy_groups'][1]['title'] ?? ''), 'Copyable filesystem paths should be grouped separately.');
+	assertSameValue(2, count($details['copy_groups'][1]['items'] ?? []), 'Path-shaped support values should be grouped as filesystem paths even when the label omits path wording.');
+	assertContainsValue('Copy this URL exactly', (string) ($details['copy_groups'][0]['items'][0]['help'] ?? ''), 'Copyable debug rows should explain what the support value is for.');
 };
 
 $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = static function (): void {
@@ -4743,8 +5273,20 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                     'copyable' => true,
                 ],
                 [
+					'label' => 'Generated CSS File',
+					'value' => '/var/www/html/wp-content/uploads/fonts/tasty-fonts.css',
+					'code' => true,
+					'copyable' => true,
+				],
+				[
+					'label' => 'Fonts Public URL',
+					'value' => 'https://example.test/wp-content/uploads/fonts/',
+					'code' => true,
+					'copyable' => true,
+				],
+				[
                     'label' => 'Stylesheet Size',
-                    'value' => '4 KB',
+					'value' => '4.0 KB',
                     'code' => false,
                     'copyable' => false,
                 ],
@@ -4850,6 +5392,15 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                         'help_label' => 'Open knowledge base',
                     ],
                     [
+						'slug' => 'storage_root',
+						'title' => 'Storage Root',
+						'severity' => 'critical',
+						'message' => 'Storage could not be prepared for managed font files.',
+						'guidance' => 'Repair storage before importing or serving local font files.',
+						'help_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Advanced-Tools',
+						'help_label' => 'Open knowledge base',
+					],
+					[
                         'slug' => 'block_editor_sync',
                         'title' => 'Block Editor Sync',
                         'severity' => 'warning',
@@ -4873,7 +5424,25 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                     ],
                 ],
                 'runtime_manifest' => [
-                    'families' => [],
+					'delivery' => [
+						'css_delivery_mode' => 'file',
+					],
+					'generated_css' => [
+						'path' => '/var/www/html/wp-content/uploads/fonts/tasty-fonts.css',
+						'url' => 'https://example.test/wp-content/uploads/fonts/tasty-fonts.css',
+						'exists' => true,
+						'is_current' => true,
+						'size' => 4096,
+					],
+					'families' => [
+						[
+							'family' => 'Inter',
+							'provider' => 'local',
+							'type' => 'self_hosted',
+							'faces' => 2,
+							'variants' => ['400', '700'],
+						],
+					],
                     'preload_urls' => [],
                     'preconnect_origins' => [],
                     'external_stylesheets' => [],
@@ -4889,6 +5458,18 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
         throw $e;
     }
     $output = (string) ob_get_clean();
+
+	$extractHealthGroup = static function (string $groupClass) use ($output): string {
+		$start = strpos($output, $groupClass);
+		assertSameValue(true, $start !== false, sprintf('Expected health group %s to render.', $groupClass));
+		$end = strpos($output, '</details>', (int) $start);
+		assertSameValue(true, $end !== false, sprintf('Expected health group %s to render as a disclosure.', $groupClass));
+
+		return substr($output, (int) $start, ((int) $end) - ((int) $start));
+	};
+	$actionNeededHealthGroup = $extractHealthGroup('tasty-fonts-health-group--action-needed');
+	$worthReviewingHealthGroup = $extractHealthGroup('tasty-fonts-health-group--worth-reviewing');
+	$checksPassedHealthGroup = $extractHealthGroup('tasty-fonts-health-group--checks-passed');
 
 	    assertContainsValue('id="tasty-fonts-diagnostics-tab-overview"', $output, 'Advanced Tools should render the command center overview tab.');
 	    assertNotContainsValue('id="tasty-fonts-diagnostics-tab-system"', $output, 'Advanced Tools should fold system details into Overview instead of rendering a redundant tab.');
@@ -4910,40 +5491,68 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('Review Sync Settings', $output, 'Health rows should send Block Editor Sync warnings to the settings panel that controls them.');
     assertNotContainsValue('Review Health', $output, 'Overview should not render a vague anchor button for the health section.');
     assertNotContainsValue('tasty-fonts-overview-suggested-action', $output, 'Overview should not render a separate suggested action outside the health rows.');
-    assertContainsValue('tasty-fonts-health-row-primary-action', $output, 'Needs-attention and advisory health rows should include a direct action button.');
+    assertContainsValue('tasty-fonts-health-row-primary-action', $output, 'Action-needed and worth-reviewing health rows should include a direct action button.');
     assertContainsValue('tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--navigate tasty-fonts-health-row-primary-action', $output, 'Overview health row actions should use the shared Advanced Tools row action contract.');
     assertContainsValue('tf_studio=integrations', $output, 'Block Editor Sync health rows should link directly to Integration settings.');
     assertContainsValue('Review Output Settings', $output, 'Preload advisories should expose a direct action to the Output Settings panel.');
-    assertContainsValue('tf_studio=output-settings', $output, 'Preload advisory actions should link directly to Output Settings.');
+    assertContainsValue('tf_studio=output-settings', $output, 'Preload review actions should link directly to Output Settings.');
     assertNotContainsValue('class="tasty-fonts-health-board tasty-fonts-overview-next-step-board"', $output, 'Overview should not render a separate recommendation board before health.');
-    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--warning"', $output, 'Overview should tone health rows from their health state.');
-    assertContainsValue('class="tasty-fonts-health-board"', $output, 'Overview should present health checks in one consistent board.');
-    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--info"', $output, 'Overview should render advisory checks with the same row pattern as other health checks.');
-    assertContainsValue('class="tasty-fonts-health-group tasty-fonts-health-group--ok"', $output, 'Overview should group checks that are working fine without calling them verified.');
-    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--ok"', $output, 'Overview should render okay checks with the same row pattern as other health checks.');
-    assertContainsValue('Working Fine', $output, 'Overview should label passing checks as working fine instead of verified.');
-    assertContainsValue('OKAY', $output, 'Overview should label passing check pills as okay.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--critical"', $actionNeededHealthGroup, 'Critical health rows should render under Action needed.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--warning"', $actionNeededHealthGroup, 'Warning health rows should render under Action needed.');
+    assertNotContainsValue('Primary Font Preload', $actionNeededHealthGroup, 'Informational checks should not render under Action needed.');
+	assertContainsValue('class="tasty-fonts-health-board tasty-fonts-health-board--overview"', $output, 'Overview should present health checks in one consistent board.');
+    assertContainsValue('Action needed', $actionNeededHealthGroup, 'Overview should lead health triage with action needed.');
+    assertContainsValue('Worth reviewing', $worthReviewingHealthGroup, 'Overview should include a Worth reviewing triage bucket.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--info"', $worthReviewingHealthGroup, 'Info checks should render under Worth reviewing.');
+    assertContainsValue('Checks passed', $checksPassedHealthGroup, 'Overview should include a Checks passed triage bucket.');
+    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--ok"', $checksPassedHealthGroup, 'OK checks should render under Checks passed.');
+    assertSameValue(1, preg_match('/<details class="[^"]*tasty-fonts-health-group--action-needed[^"]*"[^>]* open/', $output), 'Action needed should expand by default when it has checks.');
+    assertSameValue(0, preg_match('/<details class="[^"]*tasty-fonts-health-group--worth-reviewing[^"]*"[^>]* open/', $output), 'Worth reviewing should collapse to a summary when action is needed.');
+    assertSameValue(0, preg_match('/<details class="[^"]*tasty-fonts-health-group--checks-passed[^"]*"[^>]* open/', $output), 'Checks passed should stay summarized by default.');
+    assertNotContainsValue('Needs Attention', $output, 'Overview should retire the raw attention bucket label.');
+    assertNotContainsValue('Working Fine', $output, 'Overview should retire the old passing bucket label.');
+    assertNotContainsValue('Advisory', $output, 'Overview should retire the advisory primary label.');
     assertNotContainsValue('Verified', $output, 'Overview should not call passing health checks verified.');
     assertNotContainsValue('Passing', $output, 'Overview should not describe okay health checks as passing.');
     assertContainsValue('The front-end stylesheet exists and can be served from the selected delivery mode.', $output, 'Passing checks should include a short explanation of what passed.');
     assertContainsValue('Regenerate CSS after changing roles, delivery profiles, or output settings so the runtime file stays aligned with saved settings.', $output, 'Passing checks should include practical guidance, not just a status label.');
+    assertSameValue(1, preg_match('/tasty-fonts-health-row-primary-action[\s\S]*tasty-fonts-health-help-trigger/', $actionNeededHealthGroup), 'Health rows should keep direct recovery actions before knowledge-base links.');
     assertContainsValue('href="https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Advanced-Tools"', $output, 'Health checks should expose a knowledge-base link.');
     assertContainsValue('On local HTTPS sites, WordPress may reject REST font uploads if the certificate is not trusted.', $output, 'Warnings should explain the risk in plain language.');
     assertContainsValue('Preload only applies to local WOFF2 files used by published sitewide roles.', $output, 'Advisories should explain why the result appears.');
-    assertNotContainsValue('tasty-fonts-overview-pass-strip', $output, 'Overview should not render the old unexplained passing-pill strip.');
-    assertContainsValue('Runtime Details', $output, 'Overview should group runtime output under a clear debugging detail section.');
-    assertContainsValue('Fonts in Frontend CSS', $output, 'Overview should label runtime facts as frontend CSS output details.');
-    assertContainsValue('class="tasty-fonts-health-board tasty-fonts-overview-reference-board"', $output, 'Runtime details should use the same board pattern as health.');
-    assertContainsValue('No families in frontend CSS yet.', $output, 'Runtime details should explain when no managed families are being served by CSS.');
-    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--info"', $output, 'Runtime idle should render as an actionable non-passing state.');
-    assertContainsValue('tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--navigate tasty-fonts-runtime-empty-action', $output, 'Runtime idle should link to the place where sitewide roles are published.');
-    assertSameValue(1, preg_match('/tasty-fonts-runtime-empty-action[\s\S]*?>\s*Deploy Fonts\s*<\/a>/', $output), 'Runtime idle should expose a clear Deploy Fonts action.');
-    assertContainsValue('class="tasty-fonts-health-row tasty-fonts-health-row--reference"', $output, 'Runtime reference details should keep neutral reference rows.');
-    assertContainsValue('Copyable Paths', $output, 'Overview should keep exact debug paths without repeating status details.');
+	assertNotContainsValue('tasty-fonts-overview-pass-strip', $output, 'Overview should not render the old unexplained passing-pill strip.');
+	assertContainsValue('tasty-fonts-debug-details', $output, 'Overview should render one dedicated Debug Details reference table.');
+	assertNotContainsValue('<details class="tasty-fonts-overview-surface tasty-fonts-runtime-inspector-panel tasty-fonts-overview-debug-panel tasty-fonts-debug-details"', $output, 'Debug Details should not hide the reference table behind a collapsed summary.');
+	assertContainsValue('<section class="tasty-fonts-overview-surface tasty-fonts-runtime-inspector-panel tasty-fonts-overview-debug-panel tasty-fonts-debug-details"', $output, 'Debug Details should render the full reference table directly in Overview.');
+	assertContainsValue('Debug Details', $output, 'Overview should label runtime support facts as Debug Details.');
+	assertNotContainsValue('Debug details summary', $output, 'Overview should not render redundant Debug Details summary cards.');
+	assertNotContainsValue('tasty-fonts-debug-summary-item', $output, 'Overview should remove the redundant Debug Details metric strip.');
+	assertContainsValue('Generated CSS Facts', $output, 'Expanded Debug Details should include generated CSS facts.');
+	assertContainsValue('Runtime Families', $output, 'Expanded Debug Details should include runtime families.');
+	assertContainsValue('Inter', $output, 'Expanded Debug Details should list runtime families when available.');
+	assertContainsValue('Variants: 400, 700', $output, 'Expanded Debug Details should include runtime family variants.');
+	assertContainsValue('Public and Request URLs', $output, 'Expanded Debug Details should group public and request URLs.');
+	assertContainsValue('Filesystem Paths', $output, 'Expanded Debug Details should group filesystem paths.');
+	assertContainsValue('class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-help-trigger tasty-fonts-health-help-trigger"', $output, 'Debug Details rows should include the canonical compact help controls.');
+	assertNotContainsValue('tasty-fonts-debug-help-trigger', $output, 'Debug Details should not use a separate large help icon variant.');
+	preg_match_all('/class="([^"]*tasty-fonts-health-help-trigger[^"]*)"/', $output, $healthHelpClassMatches);
+	$nonCanonicalHealthHelpClasses = array_values(array_filter(
+		$healthHelpClassMatches[1],
+		static fn (string $class): bool => strpos($class, 'tasty-fonts-help-trigger') === false
+	));
+	assertSameValue([], $nonCanonicalHealthHelpClasses, 'Every diagnostics help trigger should include the canonical compact help trigger class.');
+	assertContainsValue('data-help-tooltip="Shows how Tasty Fonts serves runtime CSS on the frontend, either as a generated file or inline output."', $output, 'Generated fact rows should explain what the value means.');
+	assertContainsValue('data-help-tooltip="This family is included in the frontend runtime plan. The row shows provider, source type, face count, and the first variants Tasty Fonts will serve."', $output, 'Runtime family rows should explain what the family line means.');
+	assertContainsValue('data-help-tooltip="Copy this URL exactly when checking browser requests, public asset access, or support diagnostics."', $output, 'Copyable support rows should explain what the value is for.');
     assertContainsValue('CSS Request URL', $output, 'Overview should include copyable runtime URLs for debugging.');
+	assertContainsValue('Fonts Public URL', $output, 'Overview should include copyable public URLs for support.');
+	assertContainsValue('Generated CSS File', $output, 'Overview should include copyable filesystem paths for support.');
+	assertContainsValue('data-copy-text="/var/www/html/wp-content/uploads/fonts/tasty-fonts.css"', $output, 'Filesystem paths should remain copyable from Debug Details.');
     assertNotContainsValue('System Details', $output, 'Overview should avoid the old redundant system-details block.');
     assertNotContainsValue('Runtime Inspector', $output, 'Overview should avoid the old redundant runtime-inspector block.');
-    assertNotContainsValue('Stylesheet Size', $output, 'Overview should leave non-copyable status facts out of Copyable Paths.');
+	assertNotContainsValue('Runtime Details', $output, 'Overview should retire the old runtime details heading.');
+	assertNotContainsValue('Fonts in Frontend CSS', $output, 'Runtime families should no longer render as a health-style frontend CSS group.');
+	assertNotContainsValue('Stylesheet Size', $output, 'Overview should leave non-copyable status facts out of copyable support rows.');
     assertNotContainsValue('class="tasty-fonts-generated-css-toolbar"', $output, 'Generated CSS should use the shared contextual header instead of a detached panel title.');
     assertSameValue(1, preg_match('/id="tasty-fonts-diagnostics-panel-generated"[\s\S]*?Download Generated CSS/', $output), 'The generated CSS download action should live inside the generated CSS tab panel.');
     assertContainsValue('class="button tasty-fonts-output-download-button"', $output, 'Generated CSS should render the download action as an icon-only code panel control.');
@@ -4978,6 +5587,150 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('data-site-transfer-form', $output, 'The transfer tab should keep the JS contract for dry-run imports.');
     assertNotContainsValue('tasty-fonts-site-transfer-headline', $output, 'Transfer should use the shared contextual header instead of a separate panel headline.');
     assertContainsValue('id="tasty-fonts-diagnostics-panel-activity"', $output, 'The activity log should now live inside the Advanced Tools command center.');
+};
+
+$tests['admin_page_renderer_polishes_advanced_tools_overview_recovery_hierarchy'] = static function (): void {
+	$renderOverview = static function (array $healthChecks): string {
+		resetTestState();
+
+		$renderer = new AdminPageRenderer(new Storage());
+
+		ob_start();
+		try {
+			$renderer->renderPage([
+				'storage' => ['root' => '/tmp/uploads/fonts'],
+				'catalog' => [],
+				'available_families' => [],
+				'roles' => [],
+				'logs' => [],
+				'activity_actor_options' => [],
+				'family_fallbacks' => [],
+				'family_font_displays' => [],
+				'family_font_display_options' => [],
+				'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+				'preview_size' => 32,
+				'font_display' => 'swap',
+				'font_display_options' => [],
+				'minify_css_output' => true,
+				'preload_primary_fonts' => true,
+				'remote_connection_hints' => true,
+				'block_editor_font_library_sync_enabled' => false,
+				'training_wheels_off' => false,
+				'show_activity_log' => true,
+				'delete_uploaded_files_on_uninstall' => false,
+				'diagnostic_items' => [],
+				'overview_metrics' => [],
+				'output_panels' => [],
+				'generated_css_panel' => [],
+				'advanced_tools' => [
+					'health_checks' => $healthChecks,
+					'runtime_manifest' => [],
+				],
+				'preview_panels' => [],
+				'toasts' => [],
+				'apply_everywhere' => false,
+				'role_deployment' => [],
+			]);
+		} catch (\Throwable $e) {
+			ob_end_clean();
+			throw $e;
+		}
+
+		return (string) ob_get_clean();
+	};
+
+	$warningOutput = $renderOverview([
+		[
+			'slug' => 'block_editor_sync',
+			'title' => 'Block Editor Sync',
+			'severity' => 'warning',
+			'message' => 'Block Editor Font Library sync is on while this site looks local or self-signed.',
+			'guidance' => 'Disable sync locally or trust the certificate.',
+			'help_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Settings',
+		],
+		[
+			'slug' => 'generated_css',
+			'title' => 'Generated CSS',
+			'severity' => 'ok',
+			'message' => 'The front-end stylesheet exists.',
+			'guidance' => 'Regenerate CSS after changes.',
+		],
+	]);
+
+	$warningActionPosition = strpos($warningOutput, 'tasty-fonts-health-group--action-needed');
+	$warningDebugPosition = strpos($warningOutput, 'tasty-fonts-debug-details');
+	assertSameValue(true, $warningActionPosition !== false && $warningDebugPosition !== false && $warningActionPosition < $warningDebugPosition, 'Advanced Tools overview should ask whether action is needed before debug details.');
+	assertContainsValue('tasty-fonts-health-group--action-needed has-checks', $warningOutput, 'Action-needed warnings should render in the first triage bucket.');
+	assertContainsValue('class="button button-primary tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--navigate tasty-fonts-health-row-primary-action"', $warningOutput, 'Warning recovery actions should have primary visual priority.');
+	assertSameValue(1, preg_match('/tasty-fonts-health-row-primary-action[\s\S]*tasty-fonts-health-help-trigger/', $warningOutput), 'Recovery actions should render before knowledge-base links.');
+	assertContainsValue('tasty-fonts-health-row-marker', $warningOutput, 'Action-needed rows should retain a non-rail marker for scanning.');
+
+	$unmappedWarningOutput = $renderOverview([
+		[
+			'slug' => 'provider_token',
+			'title' => 'Provider Token',
+			'severity' => 'warning',
+			'message' => 'Provider credentials need review.',
+			'guidance' => 'Use the support article if the provider still fails.',
+			'help_url' => 'https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/wiki/Provider-Google-Fonts',
+		],
+	]);
+	assertNotContainsValue('>Open Knowledge Base<', $unmappedWarningOutput, 'Unmapped warnings should not promote knowledge-base links into primary recovery buttons.');
+	assertNotContainsValue('tasty-fonts-health-row-primary-action', $unmappedWarningOutput, 'Unmapped warnings without a concrete recovery route should not render a fake primary action.');
+	assertContainsValue('aria-label="Open knowledge base for Provider Token"', $unmappedWarningOutput, 'Unmapped warnings should keep the secondary knowledge-base link reachable.');
+
+	$infoOutput = $renderOverview([
+		[
+			'slug' => 'font_preload',
+			'title' => 'Primary Font Preload',
+			'severity' => 'info',
+			'message' => 'Preloading is on, but no active same-origin WOFF2 font can be safely preloaded.',
+			'guidance' => 'Remote CSS and inactive families are skipped on purpose.',
+		],
+	]);
+
+	$infoActionPosition = strpos($infoOutput, 'tasty-fonts-health-group--action-needed');
+	$infoReviewPosition = strpos($infoOutput, 'tasty-fonts-health-group--worth-reviewing');
+	assertSameValue(true, $infoActionPosition !== false && $infoReviewPosition !== false && $infoActionPosition < $infoReviewPosition, 'Info-only overviews should still lead with the action-needed question.');
+	assertContainsValue('tasty-fonts-health-group--action-needed is-empty', $infoOutput, 'Info-only overviews should render the empty action-needed state.');
+	assertContainsValue('No action needed', $infoOutput, 'Empty action-needed state should be explicit.');
+	assertSameValue(1, preg_match('/<details class="[^"]*tasty-fonts-health-group--worth-reviewing[^"]*"[^>]* open/', $infoOutput), 'Worth-reviewing summaries should remain reachable in info-only scenarios.');
+
+	$integrationInfoOutput = $renderOverview([
+		[
+			'slug' => 'integration_etch',
+			'title' => 'Etch Canvas Bridge',
+			'severity' => 'info',
+			'message' => 'Waiting for Sitewide Delivery. Turn on Sitewide Delivery before Etch Canvas Bridge can load Tasty fonts.',
+			'guidance' => 'Review Integration settings if this connected tool should receive Tasty Fonts output.',
+			'action' => ['slug' => 'review_integrations', 'label' => 'Review Integrations'],
+		],
+	]);
+	assertContainsValue('Etch Canvas Bridge', $integrationInfoOutput, 'Integration advisories should render in Overview health.');
+	assertContainsValue('Review Integrations', $integrationInfoOutput, 'Integration advisories should expose a direct Integrations action.');
+	assertContainsValue('tf_studio=integrations', $integrationInfoOutput, 'Integration advisory actions should link to the Integrations settings tab.');
+	assertNotContainsValue('tasty-fonts-health-row--warning', $integrationInfoOutput, 'Integration advisories should remain Worth reviewing, not Action needed warnings.');
+
+	$allPassOutput = $renderOverview([
+		[
+			'slug' => 'generated_css',
+			'title' => 'Generated CSS',
+			'severity' => 'ok',
+			'message' => 'The front-end stylesheet exists.',
+			'guidance' => 'Regenerate CSS after changes.',
+		],
+	]);
+
+	$allPassActionPosition = strpos($allPassOutput, 'tasty-fonts-health-group--action-needed');
+	$allPassPassedPosition = strpos($allPassOutput, 'tasty-fonts-health-group--checks-passed');
+	assertSameValue(true, $allPassActionPosition !== false && $allPassPassedPosition !== false && $allPassActionPosition < $allPassPassedPosition, 'All-pass overviews should show no action needed before passed checks.');
+	assertContainsValue('No action needed', $allPassOutput, 'All-pass overviews should still state that no immediate recovery is needed.');
+	assertContainsValue('Checks passed', $allPassOutput, 'All-pass overviews should keep healthy summaries reachable.');
+
+	$emptyOutput = $renderOverview([]);
+	assertContainsValue('tasty-fonts-health-board--overview', $emptyOutput, 'Empty health overviews should still render the overview board.');
+	assertContainsValue('No action needed', $emptyOutput, 'Empty health overviews should render a clear no-action-needed state.');
+	assertContainsValue('tasty-fonts-debug-details', $emptyOutput, 'Empty health overviews should keep Debug Details reachable.');
 };
 
 $tests['admin_page_renderer_renders_transfer_activity_hidden_state_when_activity_log_is_hidden'] = static function (): void {
@@ -5326,6 +6079,9 @@ $tests['admin_page_renderer_keeps_hosted_import_and_upload_builder_ids_after_ded
             'training_wheels_off' => false,
             'monospace_role_enabled' => true,
             'variable_fonts_enabled' => true,
+            'google_font_imports_enabled' => true,
+            'bunny_font_imports_enabled' => true,
+            'local_font_uploads_enabled' => true,
             'delete_uploaded_files_on_uninstall' => false,
             'diagnostic_items' => [],
             'overview_metrics' => [],
@@ -5683,6 +6439,7 @@ $tests['admin_page_renderer_uses_a_dedicated_code_preview_scene'] = static funct
                 ['key' => 'interface', 'label' => 'Interface', 'active' => false],
                 ['key' => 'marketing', 'label' => 'Marketing', 'active' => false],
                 ['key' => 'code', 'label' => 'Code', 'active' => true],
+                ['key' => 'snippet', 'label' => 'Snippet', 'active' => false],
             ],
             'toasts' => [],
             'apply_everywhere' => false,
@@ -5696,8 +6453,15 @@ $tests['admin_page_renderer_uses_a_dedicated_code_preview_scene'] = static funct
     assertContainsValue('tasty-fonts-preview-scene--code', $output, 'The preview renderer should expose a dedicated Code scene.');
     assertContainsValue('data-tab-target="marketing"', $output, 'The preview tabs should include the new Marketing tab.');
     assertContainsValue('data-tab-target="code"', $output, 'The preview tabs should include the new Code tab.');
+    assertContainsValue('data-tab-target="snippet"', $output, 'The preview tabs should include the preview Snippet tab.');
     assertSameValue(1, preg_match('/data-tab-target="interface"[\s\S]*data-tab-target="marketing"[\s\S]*data-tab-target="code"/', $output), 'The Marketing tab should render after Interface and before Code.');
+    assertSameValue(1, preg_match('/data-tab-target="code"[\s\S]*data-tab-target="snippet"/', $output), 'The Snippet tab should render after Code as the final preview handoff.');
     assertContainsValue('tasty-fonts-preview-scene--marketing', $output, 'The preview renderer should expose a dedicated Marketing scene.');
+    assertContainsValue('tasty-fonts-preview-scene--snippet', $output, 'The preview renderer should expose a dedicated Snippet scene.');
+    assertContainsValue('Copy the exact pairing you are previewing.', $output, 'The Snippet scene should explain that the CSS matches the current preview pairing.');
+    assertContainsValue('data-preview-snippet-copy', $output, 'The Snippet scene should provide its own copy control.');
+    assertContainsValue('data-preview-snippet-code', $output, 'The Snippet scene should render a copyable preview CSS code block.');
+    assertNotContainsValue('data-preview-copy-css', $output, 'The preview roles tray should not render the retired copy CSS control.');
     assertContainsValue('CTA section', $output, 'The Marketing scene should render a CTA snippet sample.');
     assertContainsValue('Email signup', $output, 'The Marketing scene should render an email signup sample.');
     assertContainsValue('Buy now', $output, 'The Marketing scene should render a buy-now sample.');

@@ -15,8 +15,23 @@
                                 <div class="tasty-fonts-font-identity-top">
                                     <div class="tasty-fonts-font-title-row">
                                         <h3><?php echo esc_html($familyName); ?></h3>
+                                        <div
+                                            class="tasty-fonts-font-usage"
+                                            data-role-usage-summary
+                                            aria-label="<?php echo esc_attr__('Font role usage', 'tasty-fonts'); ?>"
+                                            <?php echo ($assignedRoleKeys === [] && $liveRoleKeys === []) ? 'hidden' : ''; ?>
+                                        >
+                                            <span class="tasty-fonts-badge is-role tasty-fonts-font-usage-chip" data-role-usage-chip="heading" data-role-usage-state="live" <?php echo $isLiveHeading ? '' : 'hidden'; ?>><?php esc_html_e('Heading Live', 'tasty-fonts'); ?></span>
+                                            <span class="tasty-fonts-badge tasty-fonts-font-usage-chip" data-role-usage-chip="heading" data-role-usage-state="draft" <?php echo ($isHeading && !$isLiveHeading) ? '' : 'hidden'; ?>><?php esc_html_e('Heading Role', 'tasty-fonts'); ?></span>
+                                            <span class="tasty-fonts-badge is-role tasty-fonts-font-usage-chip" data-role-usage-chip="body" data-role-usage-state="live" <?php echo $isLiveBody ? '' : 'hidden'; ?>><?php esc_html_e('Body Live', 'tasty-fonts'); ?></span>
+                                            <span class="tasty-fonts-badge tasty-fonts-font-usage-chip" data-role-usage-chip="body" data-role-usage-state="draft" <?php echo ($isBody && !$isLiveBody) ? '' : 'hidden'; ?>><?php esc_html_e('Body Role', 'tasty-fonts'); ?></span>
+                                            <?php if ($monospaceRoleEnabled): ?>
+                                                <span class="tasty-fonts-badge is-role tasty-fonts-font-usage-chip" data-role-usage-chip="monospace" data-role-usage-state="live" <?php echo $isLiveMonospace ? '' : 'hidden'; ?>><?php esc_html_e('Monospace Live', 'tasty-fonts'); ?></span>
+                                                <span class="tasty-fonts-badge tasty-fonts-font-usage-chip" data-role-usage-chip="monospace" data-role-usage-state="draft" <?php echo ($isMonospace && !$isLiveMonospace) ? '' : 'hidden'; ?>><?php esc_html_e('Monospace Role', 'tasty-fonts'); ?></span>
+                                            <?php endif; ?>
+                                        </div>
                                         <span
-                                            class="tasty-fonts-badge tasty-fonts-font-source-badge"
+                                            class="tasty-fonts-badge tasty-fonts-badge--help tasty-fonts-font-source-badge"
                                             data-help-tooltip="<?php echo esc_attr($activeDeliveryLabel); ?>"
                                             data-help-passive="1"
                                             data-help-persistent="1"
@@ -24,17 +39,6 @@
                                             tabindex="0"
                                             aria-label="<?php echo esc_attr($activeDeliveryLabel); ?>"
                                         ><?php echo esc_html($activeDeliveryLabel); ?></span>
-                                        <button
-                                            type="button"
-                                            class="tasty-fonts-stack-copy tasty-fonts-pill--interactive tasty-fonts-pill--copy"
-                                            data-copy-text="<?php echo esc_attr($defaultStack); ?>"
-                                            data-copy-success="<?php esc_attr_e('Font stack copied.', 'tasty-fonts'); ?>"
-                                            data-copy-static-label="1"
-                                            aria-label="<?php echo esc_attr(sprintf(__('Copy font stack for %1$s: %2$s', 'tasty-fonts'), $familyName, $defaultStack)); ?>"
-                                            title="<?php echo esc_attr($defaultStack); ?>"
-                                        >
-                                            <?php echo esc_html($defaultStack); ?>
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -64,6 +68,7 @@
                                     type="button"
                                     class="button tasty-fonts-role-assign-button tasty-fonts-role-assign-button--icon-only tasty-fonts-font-action-button--icon <?php echo $isHeading ? 'is-current' : ''; ?>"
                                     data-role-assign="heading"
+                                    data-family-edit-action="role"
                                     data-font-family="<?php echo esc_attr($familyName); ?>"
                                     data-active-label="<?php echo esc_attr__('Heading selected', 'tasty-fonts'); ?>"
                                     data-idle-label="<?php echo esc_attr__('Select heading', 'tasty-fonts'); ?>"
@@ -79,6 +84,7 @@
                                     type="button"
                                     class="button tasty-fonts-role-assign-button tasty-fonts-role-assign-button--icon-only tasty-fonts-font-action-button--icon <?php echo $isBody ? 'is-current' : ''; ?>"
                                     data-role-assign="body"
+                                    data-family-edit-action="role"
                                     data-font-family="<?php echo esc_attr($familyName); ?>"
                                     data-active-label="<?php echo esc_attr__('Body selected', 'tasty-fonts'); ?>"
                                     data-idle-label="<?php echo esc_attr__('Select body', 'tasty-fonts'); ?>"
@@ -95,6 +101,7 @@
                                         type="button"
                                         class="button tasty-fonts-role-assign-button tasty-fonts-role-assign-button--icon-only tasty-fonts-font-action-button--icon <?php echo $isMonospace ? 'is-current' : ''; ?>"
                                         data-role-assign="monospace"
+                                        data-family-edit-action="role"
                                         data-font-family="<?php echo esc_attr($familyName); ?>"
                                         data-active-label="<?php echo esc_attr__('Monospace selected', 'tasty-fonts'); ?>"
                                         data-idle-label="<?php echo esc_attr__('Select monospace', 'tasty-fonts'); ?>"
@@ -112,6 +119,7 @@
                                     class="button tasty-fonts-disclosure-button tasty-fonts-disclosure-button--card tasty-fonts-font-action-button--details"
                                     data-disclosure-toggle="<?php echo esc_attr($detailsId); ?>"
                                     data-family-details-toggle
+                                    data-family-card-primary-action
                                     data-family-slug="<?php echo esc_attr($familySlug); ?>"
                                     data-expanded-label="<?php echo esc_attr__('Details', 'tasty-fonts'); ?>"
                                     data-collapsed-label="<?php echo esc_attr__('Details', 'tasty-fonts'); ?>"
@@ -121,13 +129,13 @@
                                 >
                                     <?php esc_html_e('Details', 'tasty-fonts'); ?>
                                 </button>
-                                <form method="post" class="tasty-fonts-delete-form">
+                                <form method="post" class="tasty-fonts-delete-form" data-family-edit-action="delete-family">
                                     <?php wp_nonce_field('tasty_fonts_delete_family'); ?>
                                     <input type="hidden" name="tasty_fonts_delete_family" value="1">
                                     <input type="hidden" name="tasty_fonts_family_slug" value="<?php echo esc_attr($familySlug); ?>">
                                     <button
                                         type="submit"
-                                        class="button tasty-fonts-button-danger tasty-fonts-font-action-button--icon <?php echo $isRoleFamily ? 'is-disabled' : ''; ?>"
+                                        class="button tasty-fonts-button-danger tasty-fonts-font-action-button--icon <?php echo $isDraftRoleFamily ? 'is-disabled' : ''; ?>"
                                         data-delete-family="<?php echo esc_attr($familyName); ?>"
                                         data-delete-ready-title="<?php echo esc_attr(__('Delete this family and its managed files.', 'tasty-fonts')); ?>"
                                         <?php foreach ($deleteBlockedMessages as $key => $message): ?>

@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use TastyFonts\Admin\AdminPageContextBuilder;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Fonts\AssetService;
+use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
@@ -442,6 +444,66 @@ $tests['github_updater_uses_beta_releases_when_the_beta_channel_is_selected'] = 
 
     assertSameValue($betaVersion, $update->new_version ?? '', 'The beta channel should select the newest stable-or-beta release.');
     assertSameValue('https://example.test/' . $betaVersion . '.zip', $update->package ?? '', 'The beta channel should expose the beta package URL.');
+};
+
+$tests['admin_context_builder_labels_update_channel_options_with_available_versions'] = static function () use ($nextPatchVersion, $secondNextPatchVersion, $releaseAssets): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $optionStore;
+
+    $stableVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
+    $betaVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION) . '-beta.2';
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
+    ];
+
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [
+                [
+                    'tag_name' => $betaVersion,
+                    'draft' => false,
+                    'prerelease' => true,
+                    'body' => 'Beta release notes.',
+                    'published_at' => '2026-04-09T00:00:00Z',
+                    'assets' => $releaseAssets($betaVersion, 'https://example.test/' . $betaVersion . '.zip'),
+                ],
+                [
+                    'tag_name' => $stableVersion,
+                    'draft' => false,
+                    'prerelease' => false,
+                    'body' => 'Stable release notes.',
+                    'published_at' => '2026-04-08T00:00:00Z',
+                    'assets' => $releaseAssets($stableVersion, 'https://example.test/' . $stableVersion . '.zip'),
+                ],
+            ]
+        ),
+    ];
+
+    $services = makeServiceGraph();
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration'],
+        $services['updater'],
+        $services['planner']
+    );
+
+    $options = $builder->buildUpdateChannelOptions();
+
+    assertSameValue('Stable (' . $stableVersion . ')', (string) ($options[0]['label'] ?? ''), 'Stable rail option should include the latest stable version.');
+    assertSameValue('Beta (' . $secondNextPatchVersion(TASTY_FONTS_VERSION) . ' beta 2)', (string) ($options[1]['label'] ?? ''), 'Beta rail option should include the latest beta version in readable form.');
+    assertSameValue('Nightly (' . $secondNextPatchVersion(TASTY_FONTS_VERSION) . ' beta 2)', (string) ($options[2]['label'] ?? ''), 'Nightly rail option should show the newest installable package for that rail, even when it is currently a beta build.');
 };
 
 $tests['github_updater_uses_nightly_releases_when_the_nightly_channel_is_selected'] = static function () use ($nextPatchVersion, $secondNextPatchVersion, $releaseAssets): void {
@@ -981,6 +1043,7 @@ $tests['block_editor_font_library_sync_registers_managed_font_families_after_imp
 
     $services = makeServiceGraph();
     $services['settings']->saveSettings(['block_editor_font_library_sync_enabled' => '1']);
+    $services['settings']->setAutoApplyRoles(true);
     $services['settings']->saveFamilyFontDisplay('Inter', 'swap');
     $family = $services['imports']->saveProfile(
         'Inter',
@@ -1051,6 +1114,49 @@ $tests['block_editor_font_library_sync_registers_managed_font_families_after_imp
     );
 };
 
+$tests['block_editor_font_library_sync_waits_for_sitewide_delivery'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteRequestCalls;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['block_editor_font_library_sync_enabled' => '1']);
+    $family = $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self-hosted',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'google',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'google/inter/inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $services['block_editor_font_library']->syncImportedFamily(
+        [
+            'status' => 'imported',
+            'family' => 'Inter',
+            'delivery_id' => 'google-self-hosted',
+            'family_record' => $family,
+        ],
+        'google'
+    );
+
+    assertSameValue([], $remoteGetCalls, 'Block Editor Font Library sync should not look up core font families while Sitewide Delivery is off.');
+    assertSameValue([], $remoteRequestCalls, 'Block Editor Font Library sync should not write core font families while Sitewide Delivery is off.');
+};
+
 $tests['block_editor_font_library_sync_is_enabled_by_default_on_local_hosts'] = static function (): void {
     resetTestState();
 
@@ -1060,6 +1166,7 @@ $tests['block_editor_font_library_sync_is_enabled_by_default_on_local_hosts'] = 
     global $remoteRequestResponses;
 
     $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
     $family = $services['imports']->saveProfile(
         'Inter',
         'inter',
@@ -1107,9 +1214,9 @@ $tests['block_editor_font_library_sync_is_enabled_by_default_on_local_hosts'] = 
     assertSameValue(
         'https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit',
         (string) ($remoteGetCalls[0]['url'] ?? ''),
-        'Local installs should now attempt Gutenberg Font Library sync immediately because the default is on.'
+        'Local installs should attempt Gutenberg Font Library sync once the default-on preference has active Sitewide Delivery.'
     );
-    assertSameValue(2, count($remoteRequestCalls), 'With the default on, local installs should create one family and one face in the core Font Library when loopback requests succeed.');
+    assertSameValue(2, count($remoteRequestCalls), 'With the default preference and Sitewide Delivery on, local installs should create one family and one face in the core Font Library when loopback requests succeed.');
 };
 
 $tests['block_editor_font_library_sync_resolves_unicode_range_output_modes'] = static function (): void {
@@ -1125,6 +1232,7 @@ $tests['block_editor_font_library_sync_resolves_unicode_range_output_modes'] = s
         'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_CUSTOM,
         'unicode_range_custom_value' => 'U+0000-00FF,U+0100-024F',
     ]);
+    $services['settings']->setAutoApplyRoles(true);
     $family = $services['imports']->saveProfile(
         'Inter',
         'inter',
@@ -1204,6 +1312,7 @@ $tests['block_editor_font_library_sync_respects_opt_out_filter'] = static functi
 
     $services = makeServiceGraph();
     $services['settings']->saveSettings(['block_editor_font_library_sync_enabled' => '1']);
+    $services['settings']->setAutoApplyRoles(true);
     $family = $services['imports']->saveProfile(
         'Inter',
         'inter',
@@ -1247,6 +1356,7 @@ $tests['block_editor_font_library_sync_logs_actionable_certificate_failures'] = 
 
     $services = makeServiceGraph();
     $services['settings']->saveSettings(['block_editor_font_library_sync_enabled' => '1']);
+    $services['settings']->setAutoApplyRoles(true);
     $family = $services['imports']->saveProfile(
         'Inter',
         'inter',
@@ -1307,6 +1417,7 @@ $tests['block_editor_font_library_sync_skips_when_core_font_post_types_are_unava
 
     $services = makeServiceGraph();
     $services['settings']->saveSettings(['block_editor_font_library_sync_enabled' => '1']);
+    $services['settings']->setAutoApplyRoles(true);
     $family = $services['imports']->saveProfile(
         'Inter',
         'inter',
@@ -1352,6 +1463,7 @@ $tests['block_editor_font_library_sync_removes_managed_family_records_on_delete'
 
     $services = makeServiceGraph();
     $services['settings']->saveSettings(['block_editor_font_library_sync_enabled' => '1']);
+    $services['settings']->setAutoApplyRoles(true);
     $remoteGetResponses['https://example.test/wp-json/wp/v2/font-families?slug=tasty-fonts-inter&context=edit'] = [
         'response' => ['code' => 200],
         'body' => json_encode([['id' => 321]]),

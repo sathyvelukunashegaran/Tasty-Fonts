@@ -14,31 +14,23 @@
                                             <h2 class="tasty-fonts-studio-section-title"><?php esc_html_e('Select Roles, Review, Publish.', 'tasty-fonts'); ?></h2>
                                         </div>
                                         <div class="tasty-fonts-role-command-summary-meta">
-                                            <button
-                                                type="button"
-                                                class="tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-command-status<?php echo $applyEverywhere ? ' is-live' : ''; ?>"
-                                                <?php $this->renderPassiveHelpAttributes($sitewideStatusTooltip); ?>
-                                                aria-label="<?php esc_attr_e('Sitewide delivery status', 'tasty-fonts'); ?>"
-                                            >
-                                                <?php echo esc_html($applyEverywhere ? __('Sitewide on', 'tasty-fonts') : __('Draft only', 'tasty-fonts')); ?>
-                                            </button>
-                                            <?php if ($roleDeployment !== []): ?>
+                                            <div class="tasty-fonts-sitewide-status <?php echo esc_attr($roleDeploymentBadgeClass); ?>" data-role-deployment aria-live="polite" aria-atomic="true">
                                                 <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--summary">
-                                                    <span class="tasty-fonts-role-stack tasty-fonts-role-deployment <?php echo esc_attr($roleDeploymentBadgeClass); ?>" data-role-deployment aria-live="polite" aria-atomic="true">
-                                                        <span class="tasty-fonts-role-stack-label"><?php esc_html_e('Status', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-role-stack tasty-fonts-role-deployment <?php echo esc_attr($roleDeploymentBadgeClass); ?>">
+                                                        <span class="tasty-fonts-role-stack-label"><?php esc_html_e('Sitewide delivery', 'tasty-fonts'); ?></span>
                                                         <button
                                                             type="button"
-                                                            class="tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-status-pill <?php echo esc_attr($roleDeploymentBadgeClass); ?>"
+                                                            class="tasty-fonts-pill tasty-fonts-pill--status tasty-fonts-pill--interactive tasty-fonts-pill--help tasty-fonts-role-command-status tasty-fonts-role-status-pill <?php echo esc_attr($roleDeploymentBadgeClass); ?>"
                                                             data-role-deployment-pill
                                                             <?php $this->renderPassiveHelpAttributes($roleDeploymentTooltip, $roleDeploymentAnnouncementId . ' tasty-fonts-help-tooltip-layer'); ?>
-                                                            aria-label="<?php esc_attr_e('Role deployment status', 'tasty-fonts'); ?>"
+                                                            aria-label="<?php esc_attr_e('Sitewide delivery status', 'tasty-fonts'); ?>"
                                                         >
                                                             <span data-role-deployment-badge><?php echo esc_html($roleDeploymentBadge); ?></span>
                                                         </button>
-                                                        <span id="<?php echo esc_attr($roleDeploymentAnnouncementId); ?>" class="screen-reader-text" data-role-deployment-announcement><?php echo esc_html($roleDeploymentTooltip); ?></span>
                                                     </span>
                                                 </div>
-                                            <?php endif; ?>
+                                                <span id="<?php echo esc_attr($roleDeploymentAnnouncementId); ?>" class="screen-reader-text" data-role-deployment-announcement><?php echo esc_html($roleDeploymentTooltip); ?></span>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -66,9 +58,11 @@
                                                     name="tasty_fonts_action_type"
                                                     value="apply"
                                                     form="<?php echo esc_attr($roleFormId); ?>"
+                                                    data-role-sitewide-enable
+                                                    aria-disabled="<?php echo $applyEverywhere ? 'true' : 'false'; ?>"
                                                     <?php disabled($applyEverywhere); ?>
                                                 >
-                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Turn On Sitewide', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Enable', 'tasty-fonts'); ?></span>
                                                 </button>
                                                 <button
                                                     type="submit"
@@ -76,9 +70,11 @@
                                                     name="tasty_fonts_action_type"
                                                     value="disable"
                                                     form="<?php echo esc_attr($roleFormId); ?>"
+                                                    data-role-sitewide-disable
+                                                    aria-disabled="<?php echo $applyEverywhere ? 'false' : 'true'; ?>"
                                                     <?php disabled(!$applyEverywhere); ?>
                                                 >
-                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Turn Off Sitewide', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-scope-button-title"><?php esc_html_e('Disable', 'tasty-fonts'); ?></span>
                                                 </button>
                                             </div>
                                         </div>

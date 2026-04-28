@@ -941,6 +941,14 @@ msgstr ""
 msgid "Not generated while sitewide delivery is off."
 msgstr ""
 
+#: includes/Admin/Renderer/templates/diagnostics-section.php:970
+msgid "No Generated CSS Yet"
+msgstr ""
+
+#: includes/Admin/Renderer/templates/diagnostics-section.php:971
+msgid "Publish sitewide roles to generate the runtime stylesheet Tasty Fonts serves to visitors, editors, and integrations."
+msgstr ""
+
 #: includes/Admin/AdminPageContextBuilder.php:472
 msgid "Specimen"
 msgstr ""
@@ -2669,14 +2677,6 @@ msgstr ""
 
 #: includes/Admin/Renderer/templates/library-section.php:314
 msgid "No Key Needed"
-msgstr ""
-
-#: includes/Admin/Renderer/templates/library-section.php:322
-msgid "Browse the catalog"
-msgstr ""
-
-#: includes/Admin/Renderer/templates/library-section.php:323
-msgid "Open Bunny Fonts Catalog"
 msgstr ""
 
 #: includes/Admin/Renderer/templates/library-section.php:338

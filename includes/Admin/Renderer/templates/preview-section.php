@@ -81,18 +81,6 @@
                                             <div class="tasty-fonts-preview-tray-actions">
                                                 <button
                                                     type="button"
-                                                    class="button tasty-fonts-preview-copy-css-button"
-                                                    data-preview-copy-css
-                                                    data-copy-text=""
-                                                    data-copy-success="<?php esc_attr_e('Preview CSS copied.', 'tasty-fonts'); ?>"
-                                                    data-copy-static-label="1"
-                                                    <?php $this->renderPassiveHelpAttributes(__('Copy custom CSS for the current preview selection.', 'tasty-fonts')); ?>
-                                                    aria-label="<?php esc_attr_e('Copy custom CSS for the current preview selection', 'tasty-fonts'); ?>"
-                                                >
-                                                    <span class="screen-reader-text"><?php esc_html_e('Copy CSS', 'tasty-fonts'); ?></span>
-                                                </button>
-                                                <button
-                                                    type="button"
                                                     class="button"
                                                     data-preview-save-draft
                                                     aria-disabled="<?php echo $previewHasDraftRoleChanges ? 'false' : 'true'; ?>"

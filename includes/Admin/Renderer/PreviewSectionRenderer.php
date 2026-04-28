@@ -352,6 +352,10 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 $this->renderCodePreviewScene($previewText, $roles, $monospaceRoleEnabled, $familyLabels);
                 return;
 
+            case 'snippet':
+                $this->renderSnippetPreviewScene($roles, $monospaceRoleEnabled, $familyLabels);
+                return;
+
             case 'interface':
             default:
                 ?>
@@ -557,6 +561,77 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
      * @param RoleSet $roles
      * @param FamilyLabelMap $familyLabels
      */
+    public function renderSnippetPreviewScene(array $roles, bool $monospaceRoleEnabled, array $familyLabels = []): void
+    {
+        $snippet = $this->buildPreviewSnippetCss($roles, $monospaceRoleEnabled);
+        $lineCount = substr_count($snippet, "\n") + 1;
+        ?>
+        <div class="tasty-fonts-preview-snippet-workspace">
+            <section class="tasty-fonts-preview-snippet-brief" aria-label="<?php esc_attr_e('Preview snippet explanation', 'tasty-fonts'); ?>">
+                <span class="tasty-fonts-preview-card-label" data-role-preview="body"><?php esc_html_e('Preview Snippet', 'tasty-fonts'); ?></span>
+                <h3 class="tasty-fonts-preview-snippet-title" data-role-preview="heading"><?php esc_html_e('Copy the exact pairing you are previewing.', 'tasty-fonts'); ?></h3>
+                <p class="tasty-fonts-preview-snippet-copy" data-role-preview="body"><?php esc_html_e('This CSS is generated from the current Preview Workspace selection, including draft changes that are not published yet. Use it when you want this same font combo in custom CSS, a child theme, or a builder field.', 'tasty-fonts'); ?></p>
+
+                <dl class="tasty-fonts-preview-snippet-role-list">
+                    <div class="tasty-fonts-preview-snippet-role">
+                        <dt><?php esc_html_e('Heading', 'tasty-fonts'); ?></dt>
+                        <dd data-role-preview="heading" data-role-preview-name="heading"><?php echo esc_html($this->previewRoleName('heading', $roles, $familyLabels)); ?></dd>
+                    </div>
+                    <div class="tasty-fonts-preview-snippet-role">
+                        <dt><?php esc_html_e('Body', 'tasty-fonts'); ?></dt>
+                        <dd data-role-preview="body" data-role-preview-name="body"><?php echo esc_html($this->previewRoleName('body', $roles, $familyLabels)); ?></dd>
+                    </div>
+                    <?php if ($monospaceRoleEnabled): ?>
+                        <div class="tasty-fonts-preview-snippet-role">
+                            <dt><?php esc_html_e('Monospace', 'tasty-fonts'); ?></dt>
+                            <dd data-role-preview="monospace" data-role-preview-name="monospace"><?php echo esc_html($this->previewRoleName('monospace', $roles, $familyLabels)); ?></dd>
+                        </div>
+                    <?php endif; ?>
+                </dl>
+
+                <div class="tasty-fonts-preview-snippet-note" data-role-preview="body">
+                    <span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+                    <span><?php esc_html_e('The Snippets workspace still has the full variable, class, stack, and name outputs. This tab is only for the preview pairing shown here.', 'tasty-fonts'); ?></span>
+                </div>
+            </section>
+
+            <section class="tasty-fonts-preview-snippet-card" aria-labelledby="tasty-fonts-preview-snippet-heading">
+                <div class="tasty-fonts-preview-snippet-card-head">
+                    <div class="tasty-fonts-preview-snippet-card-copy">
+                        <span class="tasty-fonts-preview-card-label" data-role-preview="body"><?php esc_html_e('Ready CSS', 'tasty-fonts'); ?></span>
+                        <h4 id="tasty-fonts-preview-snippet-heading" class="tasty-fonts-preview-snippet-card-title" data-role-preview="heading"><?php esc_html_e('Preview pairing CSS', 'tasty-fonts'); ?></h4>
+                    </div>
+                    <div class="tasty-fonts-preview-snippet-card-actions">
+                        <span class="tasty-fonts-preview-code-badge" data-preview-snippet-line-count><?php echo esc_html(sprintf(_n('%d line', '%d lines', $lineCount, 'tasty-fonts'), $lineCount)); ?></span>
+                        <button
+                            type="button"
+                            class="button tasty-fonts-preview-copy-css-button"
+                            data-preview-snippet-copy
+                            data-copy-text="<?php echo esc_attr($snippet); ?>"
+                            data-copy-success="<?php esc_attr_e('Preview snippet copied.', 'tasty-fonts'); ?>"
+                            data-copy-static-label="1"
+                            <?php $this->renderPassiveHelpAttributes(__('Copy the CSS for the current preview pairing.', 'tasty-fonts')); ?>
+                            aria-label="<?php esc_attr_e('Copy the CSS for the current preview pairing', 'tasty-fonts'); ?>"
+                        >
+                            <span class="screen-reader-text"><?php esc_html_e('Copy preview snippet', 'tasty-fonts'); ?></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tasty-fonts-preview-code-panel tasty-fonts-preview-code-panel--block tasty-fonts-preview-snippet-code-panel">
+                    <pre class="tasty-fonts-output tasty-fonts-preview-snippet-output" aria-labelledby="tasty-fonts-preview-snippet-heading"><code id="tasty-fonts-preview-snippet-code" class="tasty-fonts-output-code" data-preview-snippet-code><?php echo esc_html($snippet); ?></code></pre>
+                </div>
+
+                <p class="tasty-fonts-preview-code-caption" data-role-preview="body"><?php esc_html_e('Copying this does not publish anything. It simply gives you the CSS for the current preview state.', 'tasty-fonts'); ?></p>
+            </section>
+        </div>
+        <?php
+    }
+
+    /**
+     * @param RoleSet $roles
+     * @param FamilyLabelMap $familyLabels
+     */
     public function renderCodePreviewScene(string $previewText, array $roles, bool $monospaceRoleEnabled, array $familyLabels = []): void
     {
         $editorPreviewHeadingId = 'tasty-fonts-preview-code-editor-heading';
@@ -735,5 +810,63 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         }
 
         return $roleKey === 'monospace' ? 'monospace' : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
+    }
+
+    /**
+     * @param RoleSet $roles
+     */
+    private function buildPreviewSnippetCss(array $roles, bool $includeMonospace): string
+    {
+        $lines = [':root {'];
+
+        $this->appendRolePreviewSnippetVariables($lines, $roles, 'heading');
+        $this->appendRolePreviewSnippetVariables($lines, $roles, 'body');
+
+        if ($includeMonospace) {
+            $this->appendRolePreviewSnippetVariables($lines, $roles, 'monospace');
+        }
+
+        $lines[] = '}';
+        $lines[] = '';
+        $lines[] = 'body {';
+        $lines[] = '  font-family: var(--font-body);';
+        $lines[] = '  font-variation-settings: var(--font-body-settings);';
+        $lines[] = '}';
+        $lines[] = '';
+        $lines[] = 'h1, h2, h3, h4, h5, h6 {';
+        $lines[] = '  font-family: var(--font-heading);';
+        $lines[] = '  font-variation-settings: var(--font-heading-settings);';
+        $lines[] = '}';
+
+        if ($includeMonospace) {
+            $lines[] = '';
+            $lines[] = 'code, pre, kbd, samp {';
+            $lines[] = '  font-family: var(--font-monospace);';
+            $lines[] = '  font-variation-settings: var(--font-monospace-settings);';
+            $lines[] = '}';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param RoleSet $roles
+     */
+    private function appendRolePreviewSnippetVariables(array &$lines, array $roles, string $roleKey): void
+    {
+        $family = trim($this->roleStringValue($roles, $roleKey));
+        $fallback = $this->roleFallbackValue($roles, $roleKey);
+        $stack = FontUtils::buildFontStack($family, $fallback);
+
+        if ($family !== '') {
+            $slug = FontUtils::slugify($family);
+            $lines[] = sprintf('  --font-%s: %s;', $slug, $stack);
+            $lines[] = sprintf('  --font-%s: var(--font-%s);', $roleKey, $slug);
+        } else {
+            $lines[] = sprintf('  --font-%s: %s;', $roleKey, $stack);
+        }
+
+        $lines[] = sprintf('  --font-%s-settings: normal;', $roleKey);
     }
 }

@@ -622,7 +622,7 @@ $tests['admin_controller_builds_specific_settings_saved_message'] = static funct
     assertContainsValue('primary font preloads enabled', $message, 'Settings save messages should explain preload setting changes.');
     assertContainsValue('Block Editor Font Library sync enabled', $message, 'Settings save messages should explain editor sync changes.');
     assertContainsValue('activity log shown', $message, 'Settings save messages should explain activity log visibility changes.');
-    assertContainsValue('onboarding hints turned off', $message, 'Settings save messages should explain plugin behavior changes with the positive setting label.');
+    assertContainsValue('help density set to Compact', $message, 'Settings save messages should explain help density changes with the user-facing setting label.');
     assertContainsValue('preview text updated', $message, 'Settings save messages should explain preview text changes.');
     assertContainsValue('Reload the page to apply this change.', $message, 'Settings save messages should mention reload-only behavior changes.');
 };
@@ -1352,7 +1352,7 @@ $tests['admin_controller_builds_variant_variable_output_panel_content'] = static
     assertNotContainsValue(':root', $panelValues['variables'] ?? '', 'The CSS Variables panel should expose declarations only, without the root selector wrapper.');
 };
 
-$tests['admin_controller_builds_six_preview_panels_including_marketing_and_code'] = static function (): void {
+$tests['admin_controller_builds_preview_panels_including_marketing_code_and_snippet'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
@@ -1363,9 +1363,9 @@ $tests['admin_controller_builds_six_preview_panels_including_marketing_and_code'
     );
 
     assertSameValue(
-        ['editorial', 'card', 'reading', 'interface', 'marketing', 'code'],
+        ['editorial', 'card', 'reading', 'interface', 'marketing', 'code', 'snippet'],
         $keys,
-        'Preview panels should include Marketing after Interface and before the dedicated Code tab.'
+        'Preview panels should include Marketing after Interface, Code after Marketing, and Snippet as the final copy handoff.'
     );
 };
 
@@ -1483,6 +1483,7 @@ $tests['admin_controller_exposes_generated_css_as_a_top_level_panel'] = static f
 
     assertSameValue('generated', (string) ($panel['key'] ?? ''), 'Generated CSS should be exposed through a dedicated top-level panel key.');
     assertContainsValue('@font-face', (string) ($panel['value'] ?? ''), 'The top-level Generated CSS panel should include the current stylesheet output.');
+    assertFalseValue(!empty($panel['is_empty']), 'The top-level Generated CSS panel should not be marked empty when stylesheet output is available.');
 };
 
 $tests['admin_controller_marks_top_level_generated_css_panel_unavailable_when_sitewide_is_off'] = static function (): void {
@@ -1500,6 +1501,7 @@ $tests['admin_controller_marks_top_level_generated_css_panel_unavailable_when_si
         (string) ($panel['value'] ?? ''),
         'The top-level Generated CSS panel should explain that there is no live sitewide output while sitewide delivery is off.'
     );
+    assertTrueValue(!empty($panel['is_empty']), 'The top-level Generated CSS panel should mark unavailable output as an empty state.');
 };
 
 $tests['admin_controller_adds_classes_only_generated_css_note_to_readable_preview_only'] = static function (): void {
@@ -3185,7 +3187,9 @@ $tests['rest_controller_roles_draft_accepts_and_returns_monospace_fields'] = sta
     assertSameValue(true, $response instanceof WP_REST_Response, 'The roles/draft route should return a native REST response.');
     assertSameValue('', (string) ($data['roles']['monospace'] ?? ''), 'The roles/draft route should preserve fallback-only monospace selections.');
     assertSameValue('monospace', (string) ($data['roles']['monospace_fallback'] ?? ''), 'The roles/draft route should normalize blank monospace fallbacks back to the generic monospace stack.');
-    assertContainsValue('Monospace: fallback only (monospace).', (string) ($data['role_deployment']['copy'] ?? ''), 'Role deployment payloads should include monospace copy when the feature is enabled.');
+    assertSameValue('off', (string) ($data['role_deployment']['state'] ?? ''), 'Role deployment payloads should expose the Sitewide delivery Off state.');
+    assertContainsValue('Role assignments are saved as draft only and are not served sitewide.', (string) ($data['role_deployment']['copy'] ?? ''), 'Role deployment payloads should include the composed Sitewide delivery detail copy.');
+    assertContainsValue('Monospace: fallback only (monospace).', (string) ($data['role_deployment']['summary'] ?? ''), 'Role deployment payloads should preserve monospace role summaries when the feature is enabled.');
 };
 
 $tests['rest_controller_roles_draft_accepts_variable_axis_maps_when_the_feature_flag_is_enabled'] = static function (): void {
@@ -3384,49 +3388,21 @@ $tests['rest_controller_roles_draft_accepts_saved_static_role_weights'] = static
     assertSameValue(false, array_key_exists('monospace_delivery_id', (array) ($data['roles'] ?? [])), 'The roles/draft route should not return retired role delivery override fields.');
 };
 
-$tests['rest_controller_roles_draft_returns_current_applied_roles_for_client_resync'] = static function (): void {
+$tests['rest_controller_roles_draft_response_keeps_sitewide_enabled_and_marks_pending_publish'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
-    $services['imports']->saveProfile(
-        'Inter',
-        'inter',
-        [
-            'id' => 'local-self_hosted',
-            'label' => 'Self-hosted',
-            'provider' => 'local',
-            'type' => 'self_hosted',
-            'format' => 'static',
-            'variants' => ['regular'],
-            'faces' => [
-                ['family' => 'Inter', 'slug' => 'inter', 'source' => 'local', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'inter/Inter-400.woff2'], 'paths' => []],
-            ],
-        ],
-        'published',
-        true
-    );
-    $services['imports']->saveProfile(
-        'Raleway',
-        'raleway',
-        [
-            'id' => 'local-self_hosted-heading',
-            'label' => 'Self-hosted',
-            'provider' => 'local',
-            'type' => 'self_hosted',
-            'format' => 'static',
-            'variants' => ['regular'],
-            'faces' => [
-                ['family' => 'Raleway', 'slug' => 'raleway', 'source' => 'local', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'raleway/Raleway-400.woff2'], 'paths' => []],
-            ],
-        ],
-        'published',
-        true
-    );
 
     $catalog = $services['catalog']->getCatalog();
     $availableFamilies = array_values($catalog);
+    $services['settings']->saveRoles([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ], $availableFamilies);
     $services['settings']->saveAppliedRoles([
-        'heading' => 'Raleway',
+        'heading' => 'Inter',
         'body' => 'Inter',
         'heading_fallback' => 'sans-serif',
         'body_fallback' => 'sans-serif',
@@ -3436,28 +3412,35 @@ $tests['rest_controller_roles_draft_returns_current_applied_roles_for_client_res
     $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/roles/draft');
     $request->set_body_params([
         'heading' => 'Inter',
-        'body' => 'Inter',
+        'body' => 'Lora',
         'heading_fallback' => 'sans-serif',
-        'body_fallback' => 'sans-serif',
+        'body_fallback' => 'serif',
     ]);
 
     $response = $services['rest']->saveRoleDraft($request);
     $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'The roles/draft route should return a native REST response when applied roles are active.');
-    assertSameValue('Raleway', (string) ($data['applied_roles']['heading'] ?? ''), 'The roles/draft route should include the current live heading role for client-side resync.');
+    assertSameValue(true, !empty($services['settings']->getSettings()['auto_apply_roles']), 'Draft role saves should not disable Sitewide delivery when it is already enabled.');
+    assertSameValue(true, !empty($data['apply_everywhere']), 'The roles/draft route should return the current Sitewide delivery setting for client reconciliation.');
+    assertSameValue('Inter', (string) ($data['applied_roles']['heading'] ?? ''), 'The roles/draft route should include the current live heading role for client-side resync.');
     assertSameValue('Inter', (string) ($data['applied_roles']['body'] ?? ''), 'The roles/draft route should include the current live body role for client-side resync.');
+    assertSameValue('Lora', (string) ($data['roles']['body'] ?? ''), 'The roles/draft route should return the updated draft body role.');
+    assertSameValue('pending_publish', (string) ($data['role_deployment']['state'] ?? ''), 'Draft role saves should mark Sitewide delivery as pending publish when live roles differ.');
+    assertContainsValue('Publish Roles', (string) ($data['role_deployment']['copy'] ?? ''), 'Pending publish copy should tell users to publish roles.');
+    assertSameValue('live_sitewide', (string) ($data['preview_baseline_source'] ?? ''), 'Draft role saves while Sitewide is enabled should preserve a live-sitewide preview baseline source.');
+    assertSameValue('Live sitewide', (string) ($data['preview_baseline_label'] ?? ''), 'Draft role saves while Sitewide is enabled should preserve the Live sitewide preview baseline label.');
 };
 
-$tests['settings_repository_defaults_font_import_workflows_for_existing_behavior'] = static function (): void {
+$tests['settings_repository_defaults_font_import_workflows_off_by_default'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
     $settings = $services['settings']->getSettings();
 
-    assertSameValue(true, !empty($settings['google_font_imports_enabled']), 'Google Fonts imports should default on for the standard provider workflow.');
-    assertSameValue(true, !empty($settings['bunny_font_imports_enabled']), 'Bunny Fonts imports should default on for the standard provider workflow.');
-    assertSameValue(true, !empty($settings['local_font_uploads_enabled']), 'Custom uploads should default on for local font workflows.');
+    assertSameValue(false, !empty($settings['google_font_imports_enabled']), 'Google Fonts imports should default off until explicitly enabled.');
+    assertSameValue(false, !empty($settings['bunny_font_imports_enabled']), 'Bunny Fonts imports should default off until explicitly enabled.');
+    assertSameValue(false, !empty($settings['local_font_uploads_enabled']), 'Custom uploads should default off until explicitly enabled.');
     assertSameValue(false, !empty($settings['adobe_font_imports_enabled']), 'Adobe Fonts imports should default off until explicitly enabled.');
     assertSameValue(false, !empty($settings['custom_css_url_imports_enabled']), 'URL imports should default off until explicitly enabled.');
 };
@@ -3529,6 +3512,7 @@ $tests['rest_controller_wraps_missing_family_errors_with_http_status'] = static 
     resetTestState();
 
     $services = makeServiceGraph();
+    $services['settings']->saveSettings(['bunny_font_imports_enabled' => '1']);
     $request = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/bunny/family');
     $request->set_query_params(['family' => 'Missing Bunny Family']);
 
@@ -3572,6 +3556,7 @@ $tests['rest_controller_upload_route_returns_native_payloads'] = static function
     global $uploadedFilePaths;
 
     $services = makeServiceGraph();
+    $services['settings']->saveSettings(['local_font_uploads_enabled' => '1']);
     $tmpName = uniqueTestDirectory('tmp-rest-upload-valid') . '/inter-400-italic.woff2';
     mkdir(dirname($tmpName), FS_CHMOD_DIR, true);
     file_put_contents($tmpName, "wOF2test-font");
@@ -3608,6 +3593,7 @@ $tests['rest_controller_upload_route_returns_429_when_rate_limited'] = static fu
     global $uploadedFilePaths;
 
     $services = makeServiceGraph();
+    $services['settings']->saveSettings(['local_font_uploads_enabled' => '1']);
     $tmpName = uniqueTestDirectory('tmp-rest-upload-throttled') . '/inter-400-italic.woff2';
     mkdir(dirname($tmpName), FS_CHMOD_DIR, true);
     file_put_contents($tmpName, "wOF2test-font");
@@ -3646,7 +3632,10 @@ $tests['google_search_cooldown_cache_is_shared_between_repeated_rest_requests'] 
 
     $currentUserId = 42;
     $services = makeServiceGraph();
-    $services['settings']->saveSettings(['google_api_key' => 'live-key']);
+    $services['settings']->saveSettings([
+        'google_font_imports_enabled' => '1',
+        'google_api_key' => 'live-key',
+    ]);
     $services['settings']->saveGoogleApiKeyStatus('valid');
     set_transient(
         TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG),
@@ -4401,38 +4390,215 @@ $tests['admin_controller_resets_suppressed_notices_and_logs_the_action'] = stati
     );
 };
 
-$tests['admin_controller_resolves_sitewide_toggle_submissions_into_role_actions'] = static function (): void {
+$tests['admin_controller_only_allows_explicit_role_actions_to_toggle_sitewide_delivery'] = static function (): void {
     resetTestState();
 
-    $_POST['tasty_fonts_sitewide_enabled'] = '1';
+    $_POST['tasty_fonts_sitewide_enabled'] = '0';
     $controller = makeAdminControllerTestInstance();
 
     assertSameValue(
-        'apply',
-        invokePrivateMethod($controller, 'resolveRoleFormActionType', ['save', false]),
-        'Turning the sitewide toggle on should resolve a roles form submission into an apply action.'
-    );
-
-    $_POST['tasty_fonts_sitewide_enabled'] = '0';
-
-    assertSameValue(
-        'disable',
+        'save',
         invokePrivateMethod($controller, 'resolveRoleFormActionType', ['save', true]),
-        'Turning the sitewide toggle off should resolve a roles form submission into a disable action.'
+        'Draft role saves must stay save-only even when stale sitewide-off form values are posted.'
     );
 
     $_POST['tasty_fonts_sitewide_enabled'] = '1';
 
     assertSameValue(
         'save',
-        invokePrivateMethod($controller, 'resolveRoleFormActionType', ['save', true]),
-        'Leaving the toggle on should keep draft saves as save-only submissions when sitewide delivery is already enabled.'
+        invokePrivateMethod($controller, 'resolveRoleFormActionType', ['save', false]),
+        'Draft role saves must stay save-only even when stale sitewide-on form values are posted.'
+    );
+
+    assertSameValue(
+        'apply',
+        invokePrivateMethod($controller, 'resolveRoleFormActionType', ['apply', false]),
+        'Explicit apply submissions should still resolve to apply.'
+    );
+
+    assertSameValue(
+        'disable',
+        invokePrivateMethod($controller, 'resolveRoleFormActionType', ['disable', true]),
+        'Explicit disable submissions should still resolve to disable.'
     );
 };
 
 // ---------------------------------------------------------------------------
 // AdminController::handleAdminActions() – gate logic
 // ---------------------------------------------------------------------------
+
+$tests['handle_save_roles_action_keeps_sitewide_enabled_for_save_submissions_with_stale_toggle_values'] = static function (): void {
+    resetTestState();
+
+    global $isAdminRequest;
+
+    $isAdminRequest = true;
+
+    $services = makeServiceGraph();
+    $catalog = $services['catalog']->getCatalog();
+    $availableFamilies = array_values($catalog);
+
+    $services['settings']->saveRoles([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ], $availableFamilies);
+    $services['settings']->saveAppliedRoles([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ], $availableFamilies);
+    $services['settings']->setAutoApplyRoles(true);
+
+    $_POST['tasty_fonts_save_roles'] = '1';
+    $_POST['tasty_fonts_action_type'] = 'save';
+    $_POST['tasty_fonts_sitewide_enabled'] = '0';
+    $_POST['tasty_fonts_heading_font'] = 'Inter';
+    $_POST['tasty_fonts_body_font'] = 'Lora';
+    $_POST['tasty_fonts_heading_fallback'] = 'sans-serif';
+    $_POST['tasty_fonts_body_fallback'] = 'serif';
+
+    add_action(
+        'tasty_fonts_before_admin_redirect_exit',
+        static function (): void {
+            throw new WpDieException('redirect');
+        }
+    );
+
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected redirect after POST handling.
+    }
+
+    $settings = $services['settings']->getSettings();
+    $savedRoles = $services['settings']->getRoles($catalog);
+    $appliedRoles = $services['settings']->getAppliedRoles($availableFamilies);
+    $roleDeployment = invokePrivateMethod(
+        $services['controller'],
+        'buildRoleDeploymentContext',
+        [$savedRoles, $appliedRoles, !empty($settings['auto_apply_roles']), $settings]
+    );
+
+    assertSameValue(true, !empty($settings['auto_apply_roles']), 'Save-role POST submissions should not disable Sitewide delivery when stale toggle values are posted.');
+    assertSameValue('Lora', (string) ($savedRoles['body'] ?? ''), 'Save-role POST submissions should persist the updated draft body role.');
+    assertSameValue('Inter', (string) ($appliedRoles['body'] ?? ''), 'Save-role POST submissions should keep live applied roles unchanged until Publish Roles.');
+    assertSameValue('pending_publish', (string) ($roleDeployment['state'] ?? ''), 'Save-role POST submissions should leave Sitewide delivery in pending publish when draft roles differ from live roles.');
+};
+
+
+$tests['admin_controller_first_sitewide_publish_auto_enables_detected_integrations'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+    global $isAdminRequest;
+
+    $isAdminRequest = true;
+
+    if (!class_exists('Automatic_CSS\API')) {
+        eval(<<<'PHP'
+namespace Automatic_CSS;
+
+class API
+{
+    public static function get_setting($setting_key)
+    {
+        global $automaticCssSettings;
+
+        return is_array($automaticCssSettings) ? ($automaticCssSettings[$setting_key] ?? '') : '';
+    }
+
+    public static function update_settings($new_vars, $options = array(), $settings = null)
+    {
+        global $automaticCssSettings;
+
+        $automaticCssSettings = is_array($automaticCssSettings) ? $automaticCssSettings : array();
+
+        foreach ((array) $new_vars as $key => $value) {
+            $automaticCssSettings[$key] = $value;
+        }
+
+        return $automaticCssSettings;
+    }
+}
+PHP);
+    }
+
+    $automaticCssSettings = [
+        'heading-font-family' => 'Inter, sans-serif',
+        'text-font-family' => 'System UI, sans-serif',
+        'heading-weight' => '700',
+        'text-font-weight' => '400',
+    ];
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_bricks_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_oxygen_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $controller = $services['controller'];
+    $transientKey = invokePrivateMethod($controller, 'getPendingNoticeTransientKey');
+
+    $_POST['tasty_fonts_save_roles'] = '1';
+    $_POST['tasty_fonts_action_type'] = 'apply';
+    $_POST['tasty_fonts_heading_font'] = 'Inter';
+    $_POST['tasty_fonts_body_font'] = 'Inter';
+    $_POST['tasty_fonts_heading_fallback'] = 'sans-serif';
+    $_POST['tasty_fonts_body_fallback'] = 'sans-serif';
+
+    add_action(
+        'tasty_fonts_before_admin_redirect_exit',
+        static function (): void {
+            throw new WpDieException('redirect');
+        }
+    );
+
+    try {
+        $controller->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected redirect after POST handling.
+    }
+
+    $settings = $services['settings']->getSettings();
+    $toasts = get_transient($transientKey);
+    $toastMessage = is_array($toasts) ? (string) ($toasts[0]['message'] ?? '') : '';
+
+    assertSameValue(true, !empty($settings['auto_apply_roles']), 'First Sitewide publish should enable Sitewide Delivery.');
+    assertSameValue(true, $settings['etch_integration_enabled'], 'First Sitewide publish should enable detected Etch integration.');
+    assertSameValue(true, $settings['bricks_integration_enabled'], 'First Sitewide publish should enable detected Bricks integration.');
+    assertSameValue(true, $settings['oxygen_integration_enabled'], 'First Sitewide publish should enable detected Oxygen integration.');
+    assertSameValue(true, $settings['acss_font_role_sync_enabled'], 'First Sitewide publish should enable detected Automatic.css integration.');
+    assertSameValue(true, $settings['acss_font_role_sync_applied'], 'First Sitewide publish should apply Automatic.css sync once Sitewide Delivery is live.');
+    assertContainsValue('Roles applied sitewide.', $toastMessage, 'Publish toast should still confirm Sitewide role publishing.');
+    assertContainsValue('Detected Etch Canvas Bridge, Bricks Builder, Oxygen Builder, Automatic.css and enabled their integrations for Sitewide Delivery.', $toastMessage, 'Publish toast should name the integrations that were enabled automatically.');
+    assertSameValue(1, is_array($toasts) ? count($toasts) : 0, 'First Sitewide publish should summarize auto-enabled integrations in the publish toast instead of stacking duplicate detection toasts.');
+};
+
+$tests['admin_controller_detected_integrations_wait_until_sitewide_delivery_is_live'] = static function (): void {
+    resetTestState();
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_bricks_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_oxygen_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $controller = $services['controller'];
+    $transientKey = invokePrivateMethod($controller, 'getPendingNoticeTransientKey');
+
+    $detected = invokePrivateMethod($controller, 'initializeDetectedIntegrations');
+    $settings = $services['settings']->getSettings();
+
+    assertSameValue([], $detected, 'Integration auto-detection should wait until Sitewide Delivery is on.');
+    assertSameValue(null, $settings['etch_integration_enabled'], 'Etch detection should remain unconfigured before Sitewide Delivery is enabled.');
+    assertSameValue(null, $settings['bricks_integration_enabled'], 'Bricks detection should remain unconfigured before Sitewide Delivery is enabled.');
+    assertSameValue(null, $settings['oxygen_integration_enabled'], 'Oxygen detection should remain unconfigured before Sitewide Delivery is enabled.');
+    assertSameValue(null, $settings['acss_font_role_sync_enabled'], 'Automatic.css detection should remain unconfigured before Sitewide Delivery is enabled.');
+    assertSameValue(false, get_transient($transientKey), 'No integration-detection toast should be queued before Sitewide Delivery is enabled.');
+};
 
 $tests['handle_admin_actions_is_a_no_op_for_non_admin_requests'] = static function (): void {
     resetTestState();

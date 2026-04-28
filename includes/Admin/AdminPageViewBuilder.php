@@ -98,7 +98,6 @@ final class AdminPageViewBuilder
         $adobeAccessCopy = $this->stringValue($context, 'adobe_access_copy');
         $adobeProjectLink = $this->stringValue($context, 'adobe_project_link', 'https://fonts.adobe.com/');
         $adobeDetectedFamilies = $this->stringListValue($context, 'adobe_detected_families');
-        $bunnyCatalogLink = 'https://fonts.bunny.net/';
         $googleAccessButtonLabel = $googleApiEnabled ? __('Manage Key', 'tasty-fonts') : __('API Key', 'tasty-fonts');
         $adobeAccessButtonLabel = $adobeProjectSaved ? __('Manage Project', 'tasty-fonts') : __('Connect Project', 'tasty-fonts');
         $cssDeliveryMode = $this->stringValue($context, 'css_delivery_mode', 'file');
@@ -165,10 +164,10 @@ final class AdminPageViewBuilder
         $showActivityLog = !empty($context['show_activity_log']);
         $trainingWheelsOff = $this->trainingWheelsOff;
         $variableFontsEnabled = !empty($context['variable_fonts_enabled']);
-        $googleFontImportsEnabled = !array_key_exists('google_font_imports_enabled', $context) || !empty($context['google_font_imports_enabled']);
-        $bunnyFontImportsEnabled = !array_key_exists('bunny_font_imports_enabled', $context) || !empty($context['bunny_font_imports_enabled']);
-        $adobeFontImportsEnabled = array_key_exists('adobe_font_imports_enabled', $context) && !empty($context['adobe_font_imports_enabled']);
-        $localFontUploadsEnabled = !array_key_exists('local_font_uploads_enabled', $context) || !empty($context['local_font_uploads_enabled']);
+        $googleFontImportsEnabled = !empty($context['google_font_imports_enabled']);
+        $bunnyFontImportsEnabled = !empty($context['bunny_font_imports_enabled']);
+        $adobeFontImportsEnabled = !empty($context['adobe_font_imports_enabled']);
+        $localFontUploadsEnabled = !empty($context['local_font_uploads_enabled']);
         $customCssUrlImportsEnabled = !empty($context['custom_css_url_imports_enabled']);
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
         $advancedTools = $this->mapValue($context, 'advanced_tools');
@@ -195,8 +194,10 @@ final class AdminPageViewBuilder
             ? $appliedRoles
             : $roles;
         $hasPendingLiveRoleChanges = $applyEverywhere && !$this->roleSetsMatch($roles, $appliedRoles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled, $familyFallbacks);
+        $roleDeployment = $this->buildSitewideDeliveryStatusView($roleDeployment, $applyEverywhere, $hasPendingLiveRoleChanges);
         $previewHasDraftRoleChanges = !$this->roleSetsMatch($previewRoles, $roles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled, $familyFallbacks);
         $previewHasPendingLiveRoleChanges = $applyEverywhere && !$this->roleSetsMatch($previewRoles, $appliedRoles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled, $familyFallbacks);
+        $libraryRoleUsageRoles = $applyEverywhere ? $appliedRoles : [];
         $previewHeadingFallback = $this->resolveEffectiveRoleFallback('heading', $previewRoles, $catalog, $familyFallbacks);
         $previewBodyFallback = $this->resolveEffectiveRoleFallback('body', $previewRoles, $catalog, $familyFallbacks);
         $previewMonospaceFallback = $this->resolveEffectiveRoleFallback('monospace', $previewRoles, $catalog, $familyFallbacks);
@@ -214,7 +215,7 @@ final class AdminPageViewBuilder
         );
         $saveDraftDisabledCopy = __('No draft changes to save.', 'tasty-fonts');
         $applyLiveDisabledCopy = !$applyEverywhere
-            ? __('Turn on sitewide delivery before publishing roles.', 'tasty-fonts')
+            ? __('Sitewide delivery is off. Enable Sitewide Delivery before publishing role changes.', 'tasty-fonts')
             : __('No role changes to publish.', 'tasty-fonts');
         $headingFamily = $this->stringValue($roles, 'heading');
         $bodyFamily = $this->stringValue($roles, 'body');
@@ -258,9 +259,6 @@ final class AdminPageViewBuilder
         $roleDeploymentTooltip = trim(
             $roleDeploymentTitle . ($roleDeploymentTitle !== '' && $roleDeploymentCopy !== '' ? '. ' : '') . $roleDeploymentCopy
         );
-        $sitewideStatusTooltip = $applyEverywhere
-            ? __('Live roles are active across the site, editors, and Etch.', 'tasty-fonts')
-            : __('Role changes stay in draft until sitewide delivery is enabled.', 'tasty-fonts');
         $roleDeploymentAnnouncementId = 'tasty-fonts-role-deployment-announcement';
         $storageErrorMessage = trim($this->storage->getLastFilesystemErrorMessage());
         $categoryAliasOwners = $this->buildCategoryAliasOwners($catalog, $roles, $monospaceRoleEnabled);
@@ -310,6 +308,45 @@ final class AdminPageViewBuilder
     }
 
     /**
+     * @param array<string, mixed> $status
+     * @return array<string, mixed>
+     */
+    private function buildSitewideDeliveryStatusView(array $status, bool $applyEverywhere, bool $hasPendingLiveRoleChanges): array
+    {
+        $state = $this->stringValue($status, 'state');
+
+        if ($state === '' || $this->stringValue($status, 'badge') === '' || $this->stringValue($status, 'copy') === '') {
+            if (!$applyEverywhere) {
+                $status = [
+                    'state' => 'off',
+                    'badge' => __('Off', 'tasty-fonts'),
+                    'badge_class' => 'is-warning',
+                    'title' => __('Sitewide delivery: Off', 'tasty-fonts'),
+                    'copy' => __('Role assignments are saved as draft only and are not served sitewide.', 'tasty-fonts'),
+                ] + $status;
+            } elseif ($hasPendingLiveRoleChanges) {
+                $status = [
+                    'state' => 'pending_publish',
+                    'badge' => __('Pending publish', 'tasty-fonts'),
+                    'badge_class' => 'is-warning',
+                    'title' => __('Sitewide delivery: Pending publish', 'tasty-fonts'),
+                    'copy' => __('Saved assignments differ from what is currently served. Publish Roles to update sitewide delivery.', 'tasty-fonts'),
+                ] + $status;
+            } else {
+                $status = [
+                    'state' => 'live',
+                    'badge' => __('Live', 'tasty-fonts'),
+                    'badge_class' => 'is-live',
+                    'title' => __('Sitewide delivery: Live', 'tasty-fonts'),
+                    'copy' => __('Role assignments are served to visitors, editors, and integrations.', 'tasty-fonts'),
+                ] + $status;
+            }
+        }
+
+        return $status;
+    }
+
+    /**
      * @param array<string, mixed> $integration
      * @return array<string, mixed>
      */
@@ -352,7 +389,7 @@ final class AdminPageViewBuilder
 
         $featureState['description'] = $description;
         $featureState['ui'] = [
-            'status_label' => $this->buildBricksFeatureStatusLabel($status),
+            'status_label' => $this->buildBricksFeatureStatusLabel($featureKey, $status),
             'status_badge_class' => 'tasty-fonts-badge' . $this->buildBricksFeatureStatusBadgeClass($status),
             'status_help' => $this->buildBricksFeatureStatusHelp($featureKey, $status),
         ];
@@ -546,13 +583,21 @@ final class AdminPageViewBuilder
         ];
     }
 
-    private function buildBricksFeatureStatusLabel(string $status): string
+    private function buildBricksFeatureStatusLabel(string $featureKey, string $status): string
     {
+        if ($featureKey === 'bricks_theme_styles_sync_enabled') {
+            return match ($status) {
+                'synced' => __('Live', 'tasty-fonts'),
+                'out_of_sync' => __('Needs reapply', 'tasty-fonts'),
+                'waiting_for_sitewide_roles' => __('Waiting for Sitewide Delivery', 'tasty-fonts'),
+                'ready' => __('Configured', 'tasty-fonts'),
+                'unavailable' => __('Not Active', 'tasty-fonts'),
+                default => __('Off', 'tasty-fonts'),
+            };
+        }
+
         return match ($status) {
-            'synced' => __('Synced', 'tasty-fonts'),
-            'active' => __('On', 'tasty-fonts'),
-            'waiting_for_sitewide_roles' => __('Waiting', 'tasty-fonts'),
-            'ready' => __('Ready', 'tasty-fonts'),
+            'synced', 'active', 'ready' => __('Configured', 'tasty-fonts'),
             'unavailable' => __('Not Active', 'tasty-fonts'),
             default => __('Off', 'tasty-fonts'),
         };
@@ -563,7 +608,7 @@ final class AdminPageViewBuilder
         return match ($status) {
             'synced', 'active' => ' is-success',
             'ready' => ' is-role',
-            'waiting_for_sitewide_roles' => ' is-warning',
+            'out_of_sync', 'waiting_for_sitewide_roles' => ' is-warning',
             'unavailable' => ' is-danger',
             default => '',
         };
@@ -573,15 +618,16 @@ final class AdminPageViewBuilder
     {
         return match ($featureKey) {
             'bricks_theme_styles_sync_enabled' => match ($status) {
-                'synced' => __('Bricks Theme Style sync is active.', 'tasty-fonts'),
-                'waiting_for_sitewide_roles' => __('Turn on sitewide roles to apply Theme Style sync.', 'tasty-fonts'),
-                'ready' => __('Save settings to apply the selected Theme Style mapping.', 'tasty-fonts'),
+                'synced' => __('Live. Sitewide delivery is distributing Tasty role output to Bricks Theme Styles.', 'tasty-fonts'),
+                'out_of_sync' => __('Needs reapply. The saved Tasty mapping no longer matches the Bricks Theme Style output.', 'tasty-fonts'),
+                'waiting_for_sitewide_roles' => __('Waiting for Sitewide Delivery. Enable Sitewide Delivery before Bricks receives role output.', 'tasty-fonts'),
+                'ready' => __('Configured. Save settings to apply the selected Theme Style mapping before it goes live.', 'tasty-fonts'),
                 'unavailable' => __('Bricks is not active, so Theme Styles cannot sync.', 'tasty-fonts'),
                 default => __('Tasty is not managing Bricks Theme Styles right now.', 'tasty-fonts'),
             },
             'bricks_disable_google_fonts_enabled' => match ($status) {
-                'synced' => __('Bricks pickers are focused on Tasty Fonts.', 'tasty-fonts'),
-                'ready' => __('Save settings to update Bricks picker focus.', 'tasty-fonts'),
+                'synced' => __('Configured. Bricks pickers are focused on Tasty Fonts.', 'tasty-fonts'),
+                'ready' => __('Configured. Save settings to update Bricks picker focus.', 'tasty-fonts'),
                 'unavailable' => __('Bricks is not active, so font settings cannot sync.', 'tasty-fonts'),
                 default => __('Tasty is not managing Bricks picker focus right now.', 'tasty-fonts'),
             },

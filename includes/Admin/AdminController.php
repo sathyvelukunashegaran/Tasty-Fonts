@@ -888,6 +888,11 @@ final class AdminController
             'message' => $message,
             'roles' => $roles,
             'applied_roles' => $appliedRoles,
+            'apply_everywhere' => $applyEverywhere,
+            'preview_baseline_source' => $applyEverywhere ? 'live_sitewide' : 'draft',
+            'preview_baseline_label' => $applyEverywhere
+                ? __('Live sitewide', 'tasty-fonts')
+                : __('Current draft', 'tasty-fonts'),
             'role_deployment' => $this->buildRoleDeploymentContext($roles, $appliedRoles, $applyEverywhere, $settings),
         ];
     }
@@ -2365,9 +2370,21 @@ final class AdminController
         $settings = $this->settings->getSettings();
         $appliedRoles = $this->settings->getAppliedRoles($availableFamilies);
 
+        $autoEnabledIntegrations = [];
+
         if ($actionType === 'apply') {
             $this->settings->saveAppliedRoles($roles, $availableFamilies);
             $this->settings->setAutoApplyRoles(true);
+
+            if (!$wasAppliedSitewide) {
+                $detectedIntegrations = $this->initializeDetectedIntegrations(false, true);
+
+                if (is_wp_error($detectedIntegrations)) {
+                    $this->redirectWithError($detectedIntegrations->get_error_message());
+                }
+
+                $autoEnabledIntegrations = $detectedIntegrations;
+            }
         } elseif ($actionType === 'disable') {
             $this->settings->setAutoApplyRoles(false);
         }
@@ -2412,6 +2429,12 @@ final class AdminController
             $message .= ' ' . $integrationMessage;
         }
 
+        $autoEnabledIntegrationsMessage = $this->buildAutoEnabledIntegrationsMessage($autoEnabledIntegrations);
+
+        if ($autoEnabledIntegrationsMessage !== '') {
+            $message .= ' ' . $autoEnabledIntegrationsMessage;
+        }
+
         $this->log->add(
             $message,
             $this->buildActivityLogContext(
@@ -2435,16 +2458,6 @@ final class AdminController
     {
         if ($requestedActionType === 'apply' || $requestedActionType === 'disable') {
             return $requestedActionType;
-        }
-
-        $sitewideEnabled = $this->getPostedText('tasty_fonts_sitewide_enabled', $wasAppliedSitewide ? '1' : '0') === '1';
-
-        if ($sitewideEnabled && !$wasAppliedSitewide) {
-            return 'apply';
-        }
-
-        if (!$sitewideEnabled && $wasAppliedSitewide) {
-            return 'disable';
         }
 
         return 'save';
@@ -2943,8 +2956,8 @@ final class AdminController
 
         if (!empty($before['training_wheels_off']) !== !empty($after['training_wheels_off'])) {
             $changes[] = !empty($after['training_wheels_off'])
-                ? __('onboarding hints turned off', 'tasty-fonts')
-                : __('onboarding hints shown', 'tasty-fonts');
+                ? __('help density set to Compact', 'tasty-fonts')
+                : __('help density set to Guided', 'tasty-fonts');
         }
 
         if (!empty($before['show_activity_log']) !== !empty($after['show_activity_log'])) {
@@ -2967,6 +2980,12 @@ final class AdminController
 
         if ($this->fontImportWorkflowSettingsDiffer($before, $after)) {
             $changes[] = __('font import workflows updated', 'tasty-fonts');
+        }
+
+        if (($before['etch_integration_enabled'] ?? null) !== ($after['etch_integration_enabled'] ?? null)) {
+            $changes[] = ($after['etch_integration_enabled'] ?? null) === false
+                ? __('Etch Canvas Bridge disabled', 'tasty-fonts')
+                : __('Etch Canvas Bridge enabled', 'tasty-fonts');
         }
 
         if (($before['acss_font_role_sync_enabled'] ?? null) !== ($after['acss_font_role_sync_enabled'] ?? null)) {
@@ -3034,6 +3053,7 @@ final class AdminController
             || $this->adminAccessSettingsDiffer($before, $after)
             || ($before['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE) !== ($after['update_channel'] ?? SettingsRepository::UPDATE_CHANNEL_STABLE)
             || !empty($before['block_editor_font_library_sync_enabled']) !== !empty($after['block_editor_font_library_sync_enabled'])
+            || ($before['etch_integration_enabled'] ?? null) !== ($after['etch_integration_enabled'] ?? null)
             || ($before['bricks_integration_enabled'] ?? null) !== ($after['bricks_integration_enabled'] ?? null)
             || !empty($before['bricks_theme_styles_sync_enabled']) !== !empty($after['bricks_theme_styles_sync_enabled'])
             || ($before['bricks_theme_style_target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED) !== ($after['bricks_theme_style_target_mode'] ?? BricksIntegrationService::TARGET_MODE_MANAGED)
@@ -4132,6 +4152,10 @@ final class AdminController
             unset($settingsInput['bricks_reset_integration']);
         }
 
+        if (!$this->etchIntegrationAvailable()) {
+            unset($settingsInput['etch_integration_enabled']);
+        }
+
         if (!$this->oxygenIntegration->isAvailable()) {
             unset($settingsInput['oxygen_integration_enabled']);
         }
@@ -4472,31 +4496,67 @@ final class AdminController
         };
     }
 
-    private function initializeDetectedIntegrations(): void
+    /**
+     * @return list<string>|WP_Error
+     */
+    private function initializeDetectedIntegrations(bool $queueToasts = true, bool $returnErrors = false): array|WP_Error
     {
-        $this->initializeDetectedBuilderIntegration(
+        $settings = $this->settings->getSettings();
+
+        if (empty($settings['auto_apply_roles'])) {
+            return [];
+        }
+
+        $enabledIntegrations = [];
+        $etchLabel = $this->initializeDetectedBuilderIntegration(
+            'etch_integration_enabled',
+            $this->etchIntegrationAvailable(),
+            __('Etch detected. Etch Canvas Bridge has been enabled in Integrations.', 'tasty-fonts'),
+            __('Etch Canvas Bridge detected. Enabled automatically.', 'tasty-fonts'),
+            __('Etch Canvas Bridge', 'tasty-fonts'),
+            $queueToasts
+        );
+
+        if ($etchLabel !== null) {
+            $enabledIntegrations[] = $etchLabel;
+        }
+
+        $bricksLabel = $this->initializeDetectedBuilderIntegration(
             'bricks_integration_enabled',
             $this->bricksIntegration->isAvailable(),
             __('Bricks Builder detected. Bricks integration has been enabled in Integrations.', 'tasty-fonts'),
-            __('Bricks integration detected. Enabled automatically.', 'tasty-fonts')
+            __('Bricks integration detected. Enabled automatically.', 'tasty-fonts'),
+            __('Bricks Builder', 'tasty-fonts'),
+            $queueToasts
         );
-        $this->initializeDetectedBuilderIntegration(
+
+        if ($bricksLabel !== null) {
+            $enabledIntegrations[] = $bricksLabel;
+        }
+
+        $oxygenLabel = $this->initializeDetectedBuilderIntegration(
             'oxygen_integration_enabled',
             $this->oxygenIntegration->isAvailable(),
             __('Oxygen Builder detected. Oxygen integration has been enabled in Integrations.', 'tasty-fonts'),
-            __('Oxygen integration detected. Enabled automatically.', 'tasty-fonts')
+            __('Oxygen integration detected. Enabled automatically.', 'tasty-fonts'),
+            __('Oxygen Builder', 'tasty-fonts'),
+            $queueToasts
         );
+
+        if ($oxygenLabel !== null) {
+            $enabledIntegrations[] = $oxygenLabel;
+        }
 
         $settings = $this->settings->getSettings();
 
         if (!$this->acssIntegration->isAvailable()) {
-            return;
+            return $enabledIntegrations;
         }
 
         $current = $this->acssIntegration->getCurrentSettings();
 
         if (($settings['acss_font_role_sync_enabled'] ?? null) !== null) {
-            return;
+            return $enabledIntegrations;
         }
 
         $settings = $this->settings->saveAcssFontRoleSyncState(
@@ -4512,34 +4572,89 @@ final class AdminController
 
         if (is_wp_error($syncMessage)) {
             $message .= ' ' . $syncMessage->get_error_message();
-            $this->queueNoticeToast('error', $message, 'alert');
+
+            if ($queueToasts) {
+                $this->queueNoticeToast('error', $message, 'alert');
+            }
+
             $this->log->add(__('Automatic.css integration was detected, but its font sync could not be completed automatically.', 'tasty-fonts'));
-            return;
+
+            return $returnErrors ? $syncMessage : $enabledIntegrations;
         }
 
         if ($syncMessage !== '') {
             $message .= ' ' . $syncMessage;
         }
 
-        $this->queueNoticeToast('success', $message, 'status');
+        if ($queueToasts) {
+            $this->queueNoticeToast('success', $message, 'status');
+        }
+
         $this->log->add(__('Automatic.css integration detected. Font sync enabled automatically.', 'tasty-fonts'));
+        $enabledIntegrations[] = __('Automatic.css', 'tasty-fonts');
+
+        return $enabledIntegrations;
     }
 
     private function initializeDetectedBuilderIntegration(
         string $settingsKey,
         bool $available,
         string $toastMessage,
-        string $logMessage
-    ): void {
+        string $logMessage,
+        string $integrationLabel,
+        bool $queueToast = true
+    ): ?string {
         $settings = $this->settings->getSettings();
 
         if (($settings[$settingsKey] ?? null) !== null || !$available) {
-            return;
+            return null;
         }
 
         $this->settings->saveSettings([$settingsKey => '1']);
-        $this->queueNoticeToast('success', $toastMessage, 'status');
+
+        if ($queueToast) {
+            $this->queueNoticeToast('success', $toastMessage, 'status');
+        }
+
         $this->log->add($logMessage);
+
+        return $integrationLabel;
+    }
+
+    /**
+     * @param list<string> $integrationLabels
+     */
+    private function buildAutoEnabledIntegrationsMessage(array $integrationLabels): string
+    {
+        $integrationLabels = array_values(array_unique(array_filter(
+            array_map(static fn (string $label): string => trim($label), $integrationLabels),
+            static fn (string $label): bool => $label !== ''
+        )));
+
+        if ($integrationLabels === []) {
+            return '';
+        }
+
+        return sprintf(
+            _n(
+                'Detected %s and enabled its integration for Sitewide Delivery.',
+                'Detected %s and enabled their integrations for Sitewide Delivery.',
+                count($integrationLabels),
+                'tasty-fonts'
+            ),
+            implode(', ', $integrationLabels)
+        );
+    }
+
+    private function etchIntegrationAvailable(): bool
+    {
+        $available = class_exists(\Etch\Services\StylesheetService::class);
+
+        if (function_exists('apply_filters')) {
+            $available = (bool) apply_filters('tasty_fonts_etch_integration_available', $available);
+        }
+
+        return $available;
     }
 
     private function reconcileAcssIntegrationDrift(): void
@@ -5769,7 +5884,7 @@ final class AdminController
         return match ($key) {
             'tf_page' => in_array($value, [self::PAGE_ROLES, self::PAGE_LIBRARY, self::PAGE_SETTINGS, self::PAGE_DIAGNOSTICS], true) ? $value : '',
             'tf_studio' => in_array($value, array_merge(['preview', 'snippets'], self::DIAGNOSTICS_STUDIO_TABS, self::SETTINGS_STUDIO_TABS), true) ? $value : '',
-            'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface', 'marketing', 'code'], true) ? $value : '',
+            'tf_preview' => in_array($value, ['editorial', 'card', 'reading', 'interface', 'marketing', 'code', 'snippet'], true) ? $value : '',
             'tf_output' => in_array($value, ['usage', 'variables', 'stacks', 'names'], true) ? $value : '',
             'tf_source' => in_array($value, ['google', 'bunny', 'adobe', 'upload', 'url'], true) ? $value : '',
             default => '',

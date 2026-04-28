@@ -71,6 +71,7 @@ final class SettingsSaveFields
             ['name' => 'preload_primary_fonts', 'kind' => 'toggle'],
             ['name' => 'remote_connection_hints', 'kind' => 'toggle'],
             ['name' => 'block_editor_font_library_sync_enabled', 'kind' => 'toggle'],
+            ['name' => 'etch_integration_enabled', 'kind' => 'toggle'],
             ['name' => 'bricks_integration_enabled', 'kind' => 'toggle'],
             ['name' => 'bricks_theme_styles_sync_enabled', 'kind' => 'toggle'],
             ['name' => 'bricks_disable_google_fonts_enabled', 'kind' => 'toggle'],

@@ -26,6 +26,7 @@
         'buildCustomCssDryRunRequest',
         'buildCustomCssFinalImportRequest',
         'buildCustomCssImportErrorMessage',
+        'buildSettingsDirtyState',
         'buildVariationSettings',
         'canDisableOutputLayer',
         'cssAxisTag',
@@ -49,9 +50,11 @@
         'renderCustomCssDryRunErrorHtml',
         'renderCustomCssDryRunReviewHtml',
         'resolveAssignedRoleState',
+        'resolveSettingsSaveShellState',
         'resolveLogPagination',
         'resolveRoleWeight',
         'resolveStatusAnnouncement',
+        'resolveSitewideDeliveryButtonStates',
         'roleStatesMatch',
         'rowMatchesLibraryFilters',
         'sanitizeFallback',
@@ -88,6 +91,7 @@
         buildCustomCssDryRunRequest,
         buildCustomCssFinalImportRequest,
         buildCustomCssImportErrorMessage,
+        buildSettingsDirtyState,
         buildVariationSettings: contractBuildVariationSettings,
         canDisableOutputLayer,
         cssAxisTag: contractCssAxisTag,
@@ -111,9 +115,11 @@
         renderCustomCssDryRunErrorHtml,
         renderCustomCssDryRunReviewHtml,
         resolveAssignedRoleState: contractResolveAssignedRoleState,
+        resolveSettingsSaveShellState,
         resolveLogPagination,
         resolveRoleWeight: contractResolveRoleWeight,
         resolveStatusAnnouncement,
+        resolveSitewideDeliveryButtonStates,
         roleStatesMatch: contractRoleStatesMatch,
         rowMatchesLibraryFilters,
         sanitizeFallback,
@@ -140,6 +146,8 @@
     const roleApplyLiveWrap = document.querySelector('[data-role-apply-live-wrap]');
     const roleSaveDraftButton = document.querySelector('[data-role-save-draft]');
     const roleSaveDraftWrap = document.querySelector('[data-role-save-draft-wrap]');
+    const roleSitewideEnableButton = document.querySelector('[data-role-sitewide-enable]');
+    const roleSitewideDisableButton = document.querySelector('[data-role-sitewide-disable]');
     const roleStudio = document.getElementById('tasty-fonts-roles-studio');
     const roleDeployment = document.querySelector('[data-role-deployment]');
     const roleDeploymentBadge = document.querySelector('[data-role-deployment-badge]');
@@ -175,7 +183,9 @@
     const previewTray = document.querySelector('[data-preview-tray]');
     const previewSourceLabel = document.querySelector('[data-preview-source-label]');
     const previewDirtyIndicator = document.querySelector('[data-preview-dirty-indicator]');
-    const previewCopyCssButton = document.querySelector('[data-preview-copy-css]');
+    const previewSnippetCopyButton = document.querySelector('[data-preview-snippet-copy]');
+    const previewSnippetCode = document.querySelector('[data-preview-snippet-code]');
+    const previewSnippetLineCount = document.querySelector('[data-preview-snippet-line-count]');
     const previewResetButton = document.querySelector('[data-preview-reset]');
     const previewSyncDraftButton = document.querySelector('[data-preview-sync-draft]');
     const previewSaveDraftButton = document.querySelector('[data-preview-save-draft]');
@@ -480,7 +490,7 @@
         rolesDraftSaveError: __('The roles could not be saved.', 'tasty-fonts'),
         roleSaveDisabledNoChanges: __('No draft changes to save.', 'tasty-fonts'),
         roleApplyLiveDisabledNoChanges: __('No live role changes to publish.', 'tasty-fonts'),
-        roleApplyLiveDisabledSitewideOff: __('Apply Sitewide is off. Turn it on before publishing role changes.', 'tasty-fonts'),
+        roleApplyLiveDisabledSitewideOff: __('Sitewide delivery is off. Enable Sitewide Delivery before publishing role changes.', 'tasty-fonts'),
         roleFallbackOnly: __('Fallback only (%1$s)', 'tasty-fonts'),
         fallbackSaving: __('Saving fallback…', 'tasty-fonts'),
         fallbackSaved: __('Saved fallback for %1$s.', 'tasty-fonts'),
@@ -542,6 +552,7 @@
         roleWeightDefault: __('Use Role Default (%1$s)', 'tasty-fonts'),
         roleWeightSummary: __('Static weights for %1$s. Choose one to override role weight output.', 'tasty-fonts'),
         settingsUnsaved: __('Unsaved changes', 'tasty-fonts'),
+        settingsChangedGroupLabel: __('Changed', 'tasty-fonts'),
         settingsLeaveWarning: __('You have unsaved settings changes.', 'tasty-fonts'),
         adminAccessRoleMetricSingle: __('%d role', 'tasty-fonts'),
         adminAccessRoleMetricMultiple: __('%d roles', 'tasty-fonts'),
@@ -570,6 +581,19 @@
         'tasty_fonts_save_settings',
         'tasty_fonts_output_quick_mode',
     ];
+    const settingsRowSelector = [
+        '.tasty-fonts-settings-board-list > .tasty-fonts-output-settings-choice',
+        '.tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output',
+        '.tasty-fonts-settings-board-list > .tasty-fonts-output-settings-text-field',
+        '.tasty-fonts-settings-board-list > .tasty-fonts-output-settings-section--advanced > .tasty-fonts-output-settings-choice',
+        '.tasty-fonts-output-settings-advanced-panel > .tasty-fonts-output-settings-detail-group > .tasty-fonts-toggle-field--output',
+        '.tasty-fonts-output-settings-details-body > .tasty-fonts-toggle-field--output',
+        '.tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output',
+        '.tasty-fonts-settings-flat-row--channel',
+        '.tasty-fonts-integrations-panel > .tasty-fonts-settings-board .tasty-fonts-integration-row--readonly',
+        '.tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration',
+        '.tasty-fonts-admin-access-mode-toggle',
+    ].join(', ');
 
     function buildStack(family, fallback, defaultFallback = 'sans-serif') {
         const sanitizedFallback = sanitizeFallback(fallback, defaultFallback);
@@ -766,6 +790,10 @@
             bootstrapConfig.appliedRoles = normalizeRoleState(nextState.appliedRoles);
         }
 
+        if (typeof nextState.applyEverywhere === 'boolean') {
+            config.applyEverywhere = nextState.applyEverywhere;
+        }
+
         if (typeof nextState.baselineSource === 'string') {
             bootstrapConfig.baselineSource = nextState.baselineSource === 'live_sitewide' ? 'live_sitewide' : 'draft';
         }
@@ -791,6 +819,34 @@
         }
 
         return roleKeys;
+    }
+
+    function syncFamilyUsageSummary(row, draftData, liveData = draftData) {
+        if (!row || !draftData || !liveData) {
+            return;
+        }
+
+        const summary = row.querySelector('[data-role-usage-summary]');
+
+        if (!summary) {
+            return;
+        }
+
+        const family = row.getAttribute('data-font-family') || '';
+        const liveRoleKeys = selectedRoleKeysForFamily(family, liveData);
+        const liveRoles = new Set(liveRoleKeys);
+        const draftRoleKeys = selectedRoleKeysForFamily(family, draftData)
+            .filter((roleKey) => !liveRoles.has(roleKey));
+        const draftRoles = new Set(draftRoleKeys);
+
+        row.classList.toggle('is-active', liveRoleKeys.length > 0);
+        summary.hidden = liveRoleKeys.length === 0 && draftRoleKeys.length === 0;
+
+        summary.querySelectorAll('[data-role-usage-chip]').forEach((chip) => {
+            const roleKey = chip.getAttribute('data-role-usage-chip') || '';
+            const state = chip.getAttribute('data-role-usage-state') || 'live';
+            chip.hidden = state === 'draft' ? !draftRoles.has(roleKey) : !liveRoles.has(roleKey);
+        });
     }
 
     function getString(key, fallback) {
@@ -959,6 +1015,76 @@
         });
     }
 
+    function getSettingsRows(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return [];
+        }
+
+        return Array.from(form.querySelectorAll(settingsRowSelector));
+    }
+
+    function settingsFieldNamesForRow(row) {
+        if (!(row instanceof HTMLElement)) {
+            return [];
+        }
+
+        const names = Array.from(row.querySelectorAll('input[name], select[name], textarea[name]'))
+            .map((field) => normalizeSettingsFieldName(field.getAttribute('name') || ''))
+            .filter((name) => name !== '' && !settingsFormIgnoredKeys.includes(name));
+
+        return Array.from(new Set(names));
+    }
+
+    function syncSettingsGroupChangedIndicators(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        Array.from(form.querySelectorAll('.tasty-fonts-health-group')).forEach((group) => {
+            const changedRows = Array.from(group.querySelectorAll(settingsRowSelector))
+                .filter((row) => row.classList.contains('has-unsaved-changes')).length;
+            const count = group.querySelector('.tasty-fonts-health-group-count');
+            group.classList.toggle('has-unsaved-settings', changedRows > 0);
+            group.toggleAttribute('data-settings-group-changed', changedRows > 0);
+
+            if (!(count instanceof HTMLElement)) {
+                return;
+            }
+
+            if (!count.dataset.settingsOriginalLabel) {
+                count.dataset.settingsOriginalLabel = String(count.textContent || '').trim();
+            }
+
+            const originalLabel = count.dataset.settingsOriginalLabel || '';
+            count.textContent = changedRows > 0
+                ? `${getString('settingsChangedGroupLabel', 'Changed')} · ${originalLabel}`
+                : originalLabel;
+        });
+    }
+
+    function syncSettingsChangedRows(form, initialState = {}, currentState = {}) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const rowFields = {};
+        const rows = getSettingsRows(form);
+
+        rows.forEach((row, index) => {
+            rowFields[String(index)] = settingsFieldNamesForRow(row);
+        });
+
+        const dirtyState = buildSettingsDirtyState(initialState, currentState, rowFields);
+
+        rows.forEach((row, index) => {
+            const changed = dirtyState.changedRows.includes(String(index));
+            row.classList.toggle('has-unsaved-changes', changed);
+            row.toggleAttribute('data-settings-row-changed', changed);
+        });
+
+        syncSettingsGroupChangedIndicators(form);
+    }
+
     function getSettingsFormFields(form) {
         if (!(form instanceof HTMLFormElement)) {
             return [];
@@ -990,10 +1116,28 @@
         outputMonoDependentInputs.forEach((input) => {
             input.disabled = !enabled;
 
+            const dependencyDescriptionId = String(input.dataset.settingsDependencyDescription || '').trim();
+
+            if (!enabled && dependencyDescriptionId) {
+                input.setAttribute('aria-describedby', dependencyDescriptionId);
+            } else if (dependencyDescriptionId) {
+                input.removeAttribute('aria-describedby');
+            }
+
             const label = input.closest('.tasty-fonts-toggle-field');
 
             if (label) {
+                const dependencyTooltip = String(label.dataset.settingsDependencyTooltip || '').trim();
+
                 label.classList.toggle('is-disabled', !enabled);
+                label.classList.toggle('is-disabled-by-dependency', !enabled);
+                label.toggleAttribute('data-settings-row-state', !enabled);
+
+                if (!enabled && dependencyTooltip) {
+                    label.dataset.settingsHelpTooltip = dependencyTooltip;
+                } else if (dependencyTooltip && label.dataset.settingsHelpTooltip === dependencyTooltip) {
+                    delete label.dataset.settingsHelpTooltip;
+                }
             }
         });
 
@@ -1037,6 +1181,8 @@
         const currentState = serializeSettingsForm(form);
         const isDirty = !settingsStatesMatch(state.initialState, currentState);
 
+        syncSettingsChangedRows(form, state.initialState, currentState);
+
         state.isDirty = isDirty;
         form.toggleAttribute('data-has-unsaved-changes', isDirty);
         form.classList.toggle('has-unsaved-changes', isDirty);
@@ -1064,6 +1210,7 @@
 
         state.initialState = serializeSettingsForm(form);
         state.isDirty = false;
+        syncSettingsChangedRows(form, state.initialState, state.initialState);
         form.removeAttribute('data-has-unsaved-changes');
         form.classList.remove('has-unsaved-changes');
 
@@ -1341,9 +1488,14 @@
         settingsSaveShell.hidden = false;
 
         if (!isTransferTab || !siteTransferForm) {
+            const shellState = resolveSettingsSaveShellState({
+                hasUnsavedSettings,
+                isTransferTab: false,
+            });
+
             if (settingsClearButton instanceof HTMLButtonElement) {
-                settingsClearButton.hidden = false;
-                settingsClearButton.disabled = !hasUnsavedSettings;
+                settingsClearButton.hidden = !shellState.showClear;
+                settingsClearButton.disabled = shellState.clearDisabled;
             }
 
             if (settingsSaveButtonDefaultFormId !== '') {
@@ -1359,19 +1511,24 @@
                 settingsSaveButtonDefaultLabel || getString('settingsSave', 'Save changes'),
                 settingsSaveButtonDefaultLabel || getString('settingsSave', 'Save changes')
             );
-            settingsSaveButton.disabled = !hasUnsavedSettings;
+            settingsSaveButton.disabled = shellState.saveDisabled;
             return;
-        }
-
-        if (settingsClearButton instanceof HTMLButtonElement) {
-            settingsClearButton.hidden = true;
-            settingsClearButton.disabled = true;
         }
 
         const { stageTokenInput } = getSiteTransferFieldParts(siteTransferForm);
         const transferFormId = String(siteTransferForm.getAttribute('id') || '').trim();
         const isSubmitting = siteTransferForm.dataset.siteTransferSubmitting === '1';
         const hasStagedBundle = !!(stageTokenInput && String(stageTokenInput.value || '').trim() !== '');
+        const shellState = resolveSettingsSaveShellState({
+            isTransferTab: true,
+            isSubmitting,
+            hasStagedBundle,
+        });
+
+        if (settingsClearButton instanceof HTMLButtonElement) {
+            settingsClearButton.hidden = !shellState.showClear;
+            settingsClearButton.disabled = shellState.clearDisabled;
+        }
 
         if (transferFormId !== '') {
             settingsSaveButton.setAttribute('form', transferFormId);
@@ -1384,7 +1541,7 @@
             getString('siteTransferImportIdle', 'Import Bundle'),
             getString('siteTransferImportBusy', 'Importing Bundle…')
         );
-        settingsSaveButton.disabled = isSubmitting || !hasStagedBundle;
+        settingsSaveButton.disabled = shellState.saveDisabled;
     }
 
     function handleSettingsBeforeUnload(event) {
@@ -1451,7 +1608,6 @@
             'acss_font_role_sync_enabled',
             'delete_uploaded_files_on_uninstall',
             'show_activity_log',
-            'training_wheels_off',
             'monospace_role_enabled'
         ].forEach((field) => {
             if (!Object.prototype.hasOwnProperty.call(settings, field)) {
@@ -3287,6 +3443,7 @@
         });
 
         if (!isSaving) {
+            syncSitewideDeliveryActionButtonStates();
             syncRoleActionButtonStates();
             syncPreviewActionButtonStates();
         }
@@ -3315,7 +3472,7 @@
         const badgeClass = deployment.badge_class || '';
         const tooltip = buildRoleDeploymentTooltip(deployment);
 
-        roleDeployment.classList.remove('is-success', 'is-warning', 'is-accent');
+        roleDeployment.classList.remove('is-success', 'is-warning', 'is-accent', 'is-live');
 
         if (badgeClass) {
             roleDeployment.classList.add(badgeClass);
@@ -4647,7 +4804,10 @@
             target.innerHTML = payload.html || '';
             target.setAttribute('data-family-details-loaded', 'true');
             initializeHydratedFamilyDetails(target);
-            setDisclosureState(toggle, true);
+
+            if (toggle.getAttribute('aria-expanded') === 'true') {
+                setDisclosureState(toggle, true);
+            }
 
             return true;
         } catch (error) {
@@ -5373,7 +5533,7 @@
             [__('Sans Alias', 'tasty-fonts'), __('Generates --font-sans as a category alias for the active sans family. This helps external CSS consume category-level typography without hard-coding a family name.', 'tasty-fonts')],
             [__('Serif Alias', 'tasty-fonts'), __('Generates --font-serif as a category alias for the active serif family. This keeps category-level CSS tied to the managed font library instead of fixed stacks.', 'tasty-fonts')],
             [__('Mono Alias', 'tasty-fonts'), __('Generates --font-mono when the monospace role is enabled. Use it for category-level mono styling that should follow the managed role configuration.', 'tasty-fonts')],
-            [__('Etch Canvas Bridge', 'tasty-fonts'), __('Shows whether the Etch Canvas bridge can read the fonts and role tokens managed by Tasty Fonts. This row is informational because the bridge state is detected from the current WordPress environment.', 'tasty-fonts')],
+            [__('Etch Canvas Bridge', 'tasty-fonts'), __('Enables the Etch Canvas Bridge when Etch is active. When enabled, Tasty Fonts loads its runtime stylesheets and role bridge CSS into Etch canvas previews; turning it off prevents those Etch-specific assets from loading.', 'tasty-fonts')],
             [__('Bricks Builder', 'tasty-fonts'), __('Enables Bricks-specific typography integration. When active, the nested controls can map Tasty role variables into Bricks Theme Styles and prevent Bricks from loading its own Google Fonts.', 'tasty-fonts')],
             [__('Sync Bricks Theme Styles', 'tasty-fonts'), __('Writes Tasty Fonts role variables into the selected Bricks Theme Style target. Use this when Bricks typography controls should follow the same heading and body roles used by the rest of the site.', 'tasty-fonts')],
             [__('Use Tasty Fonts in Bricks Pickers', 'tasty-fonts'), __('Keeps Bricks font pickers focused on Tasty-managed fonts. This helps avoid duplicate provider requests and conflicting font sources.', 'tasty-fonts')],
@@ -5383,7 +5543,7 @@
             [__('Update Channel', 'tasty-fonts'), __('Chooses which GitHub release rail this site follows. Stable is recommended for production, Beta previews upcoming releases, and Nightly is intended for development or testing environments.', 'tasty-fonts')],
             [__('Enable Monospace Role', 'tasty-fonts'), __('Adds a dedicated monospace role for code, preformatted text, and mono utility output. Turning it on also unlocks mono class and variable options elsewhere in settings.', 'tasty-fonts')],
             [__('Enable Variable Fonts', 'tasty-fonts'), __('Allows variable font uploads and axis controls throughout the plugin. Keep it enabled when you want to save or output variable-axis settings such as weight, width, or optical size.', 'tasty-fonts')],
-            [__('Show Onboarding Hints', 'tasty-fonts'), __('Shows the short row descriptions and passive help tooltips across the admin UI. Keep it on while learning the workflow, or turn it off for a denser settings screen.', 'tasty-fonts')],
+            [__('Compact Mode', 'tasty-fonts'), __('Hides helper copy and passive tips for a denser admin UI.', 'tasty-fonts')],
             [__('Show Activity Log', 'tasty-fonts'), __('Shows the full activity log in Advanced Tools. Tasty Fonts still records relevant events while this is hidden, so you can turn the log back on later for troubleshooting.', 'tasty-fonts')],
             [__('Keep Uploaded Fonts on Uninstall', 'tasty-fonts'), __('Keeps plugin-managed uploaded font files during uninstall. Leave this on if you might reinstall the plugin or want to preserve font assets after removing the plugin.', 'tasty-fonts')],
             [__('Enable Additional Access Rules', 'tasty-fonts'), __('Grants Tasty Fonts access to non-administrator roles or specific users. Administrators always keep access; turning this on only adds access below.', 'tasty-fonts')],
@@ -5516,7 +5676,7 @@
             const title = settingsRowHelpTitle(row);
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-health-help-trigger tasty-fonts-settings-row-help';
+            button.className = 'tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-help-trigger tasty-fonts-health-help-trigger tasty-fonts-settings-row-help';
             button.textContent = '?';
             button.setAttribute('aria-label', title ? `Explain ${title}` : getString('settingsHelpLabel', 'Explain this setting'));
             setPassiveHelpTooltip(button, copy);
@@ -5536,7 +5696,7 @@
     }
 
     function upgradePillTooltips(scope = document) {
-        const candidates = Array.from(scope.querySelectorAll('.tasty-fonts-pill[title], .tasty-fonts-badge[title], .tasty-fonts-chip[title], .tasty-fonts-face-pill[title], .tasty-fonts-preview-pill[title], .tasty-fonts-kbd[title], .tasty-fonts-stack-copy[title]'));
+        const candidates = Array.from(scope.querySelectorAll('.tasty-fonts-pill[title], .tasty-fonts-badge[title], .tasty-fonts-chip[title], .tasty-fonts-face-pill[title], .tasty-fonts-preview-pill[title], .tasty-fonts-kbd[title]'));
 
         candidates.forEach((button) => {
             if (button.hasAttribute('data-help-tooltip')) {
@@ -5835,6 +5995,26 @@
         return previewBootstrap().appliedRoles;
     }
 
+    function currentLiveUsageRoleData() {
+        const bootstrapData = previewBootstrap();
+
+        if (bootstrapData.baselineSource !== 'live_sitewide') {
+            return {
+                heading: '',
+                body: '',
+                monospace: '',
+                includeMonospace: monospaceRoleEnabled,
+            };
+        }
+
+        return {
+            heading: bootstrapData.appliedRoles.heading || '',
+            body: bootstrapData.appliedRoles.body || '',
+            monospace: monospaceRoleEnabled ? (bootstrapData.appliedRoles.monospace || '') : '',
+            includeMonospace: monospaceRoleEnabled,
+        };
+    }
+
     if (roleForm) {
         renderAllRoleWeightEditors(previewBootstrap().roles);
         renderAllRoleAxisEditors(previewBootstrap().roles);
@@ -5887,6 +6067,25 @@
         }
     }
 
+    function syncSitewideDeliveryActionButtonStates() {
+        const states = resolveSitewideDeliveryButtonStates({
+            applyEverywhere: !!config.applyEverywhere,
+            isSaving: !!roleDraftSaveInFlight,
+        });
+
+        [
+            [roleSitewideEnableButton, states.enableDisabled],
+            [roleSitewideDisableButton, states.disableDisabled],
+        ].forEach(([button, disabled]) => {
+            if (!button) {
+                return;
+            }
+
+            button.disabled = !!disabled;
+            button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        });
+    }
+
     function syncRoleActionButtonStates() {
         const draftChanged = !roleStatesMatch(currentDraftRoleState(), initialDraftRoleState);
         const hasPendingLiveChanges = !!config.applyEverywhere && !roleStatesMatch(currentDraftRoleState(), currentAppliedRoleState());
@@ -5908,7 +6107,7 @@
             !hasPendingLiveChanges,
             config.applyEverywhere
                 ? getString('roleApplyLiveDisabledNoChanges', 'No live role changes to publish.')
-                : getString('roleApplyLiveDisabledSitewideOff', 'Apply Sitewide is off. Turn it on before publishing role changes.')
+                : getString('roleApplyLiveDisabledSitewideOff', 'Sitewide delivery is off. Enable Sitewide Delivery before publishing role changes.')
         );
         syncDisabledRoleActionHelp(
             roleSaveDraftWrap,
@@ -6088,13 +6287,28 @@
         return !!(outputMinimalPresetInput && outputMinimalPresetInput.value === '1');
     }
 
-    function updatePreviewCopyCssButton(data) {
-        if (!previewCopyCssButton) {
+    function updatePreviewSnippetCss(data) {
+        if (!previewSnippetCopyButton && !previewSnippetCode && !previewSnippetLineCount) {
             return;
         }
 
         const previewData = data && typeof data === 'object' ? data : currentPreviewData();
-        previewCopyCssButton.setAttribute('data-copy-text', buildPreviewCustomCss(previewData));
+        const previewCss = buildPreviewCustomCss(previewData);
+
+        if (previewSnippetCopyButton) {
+            previewSnippetCopyButton.setAttribute('data-copy-text', previewCss);
+        }
+
+        if (previewSnippetCode) {
+            previewSnippetCode.innerHTML = renderHighlightedSnippet(previewCss);
+        }
+
+        if (previewSnippetLineCount) {
+            const lineCount = Math.max(1, previewCss.split(/\r\n|\n|\r/).length);
+            previewSnippetLineCount.textContent = lineCount === 1
+                ? getString('previewSnippetLineCountOne', '1 line')
+                : formatMessage(getString('previewSnippetLineCountMany', '%1$s lines'), [lineCount]);
+        }
     }
 
     function updatePreviewDirtyState() {
@@ -6172,7 +6386,7 @@
         });
 
         syncPreviewControlsFromState();
-        updatePreviewCopyCssButton(data);
+        updatePreviewSnippetCss(data);
         setPreviewSourceLabel(sourceLabel);
         updatePreviewDirtyState();
         syncPreviewActionButtonStates();
@@ -6332,6 +6546,7 @@
             button.setAttribute('aria-label', copyTitle);
         });
 
+        syncSitewideDeliveryActionButtonStates();
         syncRoleActionButtonStates();
         syncPreviewActionButtonStates();
 
@@ -6362,18 +6577,30 @@
             }
         });
 
+        const liveUsageData = currentLiveUsageRoleData();
+
+        document.querySelectorAll('[data-font-row]').forEach((row) => {
+            syncFamilyUsageSummary(row, data, liveUsageData);
+        });
+
         deleteFamilyButtons().forEach((button) => {
             const family = button.getAttribute('data-delete-family') || '';
             const blockedRoleKeys = selectedRoleKeysForFamily(family, data);
-            const blockedMessage = blockedRoleKeys.length > 0
-                ? (button.getAttribute(`data-delete-blocked-${buildRoleSelectionKey(blockedRoleKeys)}`) || '')
+            const blocked = blockedRoleKeys.length > 0;
+            const blockedMessage = blocked
+                ? (
+                    button.getAttribute(`data-delete-blocked-${buildRoleSelectionKey(blockedRoleKeys)}`)
+                    || getString('deleteBlockedFamilyInUse', 'This family is currently assigned to a role and cannot be deleted.')
+                )
                 : '';
 
-            button.classList.toggle('is-disabled', blockedMessage !== '');
-            button.setAttribute('aria-disabled', blockedMessage !== '' ? 'true' : 'false');
+            button.disabled = blocked;
+            button.toggleAttribute('disabled', blocked);
+            button.classList.toggle('is-disabled', blocked);
+            button.setAttribute('aria-disabled', blocked ? 'true' : 'false');
             setPassiveHelpTooltip(button, blockedMessage || button.dataset.deleteReadyTitle || '');
 
-            if (blockedMessage !== '') {
+            if (blocked) {
                 button.setAttribute('data-delete-blocked', blockedMessage);
                 const tooltipLayer = getHelpTooltipLayer();
 
@@ -7173,7 +7400,13 @@
             syncPreviewBootstrapState({
                 roles,
                 appliedRoles: payload.applied_roles || {},
+                applyEverywhere: typeof payload.apply_everywhere === 'boolean'
+                    ? payload.apply_everywhere
+                    : config.applyEverywhere,
+                baselineSource: payload.preview_baseline_source || undefined,
+                baselineLabel: payload.preview_baseline_label || undefined,
             });
+            syncSitewideDeliveryActionButtonStates();
             initialDraftRoleState = currentDraftRoleState();
             updateRoleOutputs();
             syncRoleDeploymentState(payload.role_deployment || null);
@@ -10356,6 +10589,8 @@
         }
 
         if (nextExpanded && isFamilyDetailsToggle) {
+            setDisclosureState(disclosureToggle, true);
+
             void hydrateFamilyDetails(disclosureToggle).then((hydrated) => {
                 if (!hydrated) {
                     return;

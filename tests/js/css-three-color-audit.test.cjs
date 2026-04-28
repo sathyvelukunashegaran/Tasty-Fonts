@@ -348,3 +348,16 @@ test('the previous danger-red #c8323a is fully removed from active CSS values', 
 
   assert.deepEqual(violations, [], violations.join('\n'));
 });
+
+test('semantic success and danger tokens resolve through neutral ink, not green or red', () => {
+  const tokens = readCssSources().find(({ file }) => file === 'tokens.css');
+  assert.ok(tokens, 'tokens.css should be available for semantic status token governance.');
+
+  const cleaned = stripExemptions(tokens.source);
+
+  assert.match(cleaned, /--tasty-success-raw:\s*var\(--tasty-ink\);/);
+  assert.match(cleaned, /--tasty-success-rgb:\s*var\(--tasty-ink-rgb\);/);
+  assert.match(cleaned, /--tasty-danger-raw:\s*var\(--tasty-ink\);/);
+  assert.match(cleaned, /--tasty-danger-rgb:\s*var\(--tasty-ink-rgb\);/);
+  assert.match(cleaned, /--tasty-warning-raw:\s*var\(--tasty-warm-amber\);/);
+});

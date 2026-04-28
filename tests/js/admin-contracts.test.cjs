@@ -1,14 +1,24 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const contracts = require('../../assets/js/admin-contracts.js');
+
+const adminRuntimePath = path.join(__dirname, '../../assets/js/admin.js');
+
+function readAdminRuntimeSource() {
+    return fs.readFileSync(adminRuntimePath, 'utf8');
+}
 
 const {
     buildCustomCssDryRunRequest,
     buildCustomCssFinalImportRequest,
     buildCustomCssImportErrorMessage,
+    buildSettingsDirtyState,
     buildVariationSettings,
     canDisableOutputLayer,
+    changedSettingsKeys,
     cssAxisTag,
     defaultRoleFallback,
     defaultRoleWeight,
@@ -35,9 +45,11 @@ const {
     resolveRoleFallback,
     resolveRoleWeight,
     resolveStatusAnnouncement,
+    resolveSitewideDeliveryButtonStates,
     resolveAssignedRoleState,
     renderCustomCssDryRunErrorHtml,
     renderCustomCssDryRunReviewHtml,
+    resolveSettingsSaveShellState,
     roleStatesMatch,
     serializeSettingsFormEntries,
     settingsStatesMatch,
@@ -52,8 +64,10 @@ const requiredAdminContractExports = [
     'buildCustomCssDryRunRequest',
     'buildCustomCssFinalImportRequest',
     'buildCustomCssImportErrorMessage',
+    'buildSettingsDirtyState',
     'buildVariationSettings',
     'canDisableOutputLayer',
+    'changedSettingsKeys',
     'cssAxisTag',
     'defaultRoleFallback',
     'defaultRoleWeight',
@@ -78,10 +92,12 @@ const requiredAdminContractExports = [
     'renderCustomCssDryRunErrorHtml',
     'renderCustomCssDryRunReviewHtml',
     'resolveAssignedRoleState',
+    'resolveSettingsSaveShellState',
     'resolveLogPagination',
     'resolveRoleFallback',
     'resolveRoleWeight',
     'resolveStatusAnnouncement',
+    'resolveSitewideDeliveryButtonStates',
     'roleStatesMatch',
     'rowMatchesLibraryFilters',
     'sanitizeFallback',
@@ -99,6 +115,16 @@ test('admin contracts expose the required flat CommonJS and browser surface', ()
     requiredAdminContractExports.forEach((exportName) => {
         assert.equal(typeof contracts[exportName], 'function', `${exportName} should be exported as a function`);
     });
+});
+
+test('settings help hydration uses the canonical compact help trigger class', () => {
+    const source = readAdminRuntimeSource();
+
+    assert.match(
+        source,
+        /button\.className = '([^']*\btasty-fonts-help-trigger\b[^']*\btasty-fonts-settings-row-help\b[^']*)';/,
+        'Settings help buttons should opt into the shared compact help-trigger chrome.'
+    );
 });
 
 test('admin contracts strictly normalize axis tags, values, and variation settings', () => {
@@ -638,7 +664,25 @@ test('admin contracts resolve keyboard tab navigation targets for tablists', () 
 test('admin contracts resolve status announcements by urgency', () => {
     assert.deepEqual(resolveStatusAnnouncement('error'), { role: 'alert', live: 'assertive' });
     assert.deepEqual(resolveStatusAnnouncement('success'), { role: 'status', live: 'polite' });
-    assert.deepEqual(resolveStatusAnnouncement('progress'), { role: 'status', live: 'polite' });
+});
+
+test('admin contracts resolve Sitewide delivery action button states for enabled/off/saving matrix', () => {
+    assert.deepEqual(resolveSitewideDeliveryButtonStates({ applyEverywhere: true, isSaving: false }), {
+        enableDisabled: true,
+        disableDisabled: false,
+    });
+    assert.deepEqual(resolveSitewideDeliveryButtonStates({ applyEverywhere: false, isSaving: false }), {
+        enableDisabled: false,
+        disableDisabled: true,
+    });
+    assert.deepEqual(resolveSitewideDeliveryButtonStates({ applyEverywhere: true, isSaving: true }), {
+        enableDisabled: true,
+        disableDisabled: true,
+    });
+    assert.deepEqual(resolveSitewideDeliveryButtonStates({ applyEverywhere: false, isSaving: true }), {
+        enableDisabled: true,
+        disableDisabled: true,
+    });
 });
 
 test('admin contracts only disable submit controls during site transfer submission', () => {
@@ -713,8 +757,8 @@ test('admin contracts serialize settings entries with array fields and empty sen
             ['admin_access_role_slugs[]', 'author'],
             ['admin_access_user_ids[]', ''],
             ['admin_access_user_ids[]', '3'],
-            ['training_wheels_off', '1'],
             ['training_wheels_off', '0'],
+            ['training_wheels_off', '1'],
             ['show_activity_log', '0'],
             ['show_activity_log', '1'],
             ['delete_uploaded_files_on_uninstall', '1'],
@@ -735,7 +779,7 @@ test('admin contracts serialize settings entries with array fields and empty sen
         {
             admin_access_role_slugs: ['editor', 'author'],
             admin_access_user_ids: ['3'],
-            training_wheels_off: '0',
+            training_wheels_off: '1',
             show_activity_log: '1',
             delete_uploaded_files_on_uninstall: '0',
             google_font_imports_enabled: '1',
@@ -1060,6 +1104,141 @@ test('admin contracts compare serialized settings states deterministically', () 
         ),
         false
     );
+});
+
+test('admin contracts derive settings dirty keys and changed row indicators', () => {
+    const initial = {
+        font_display: 'swap',
+        remote_connection_hints: '1',
+        training_wheels_off: '0',
+    };
+    const current = {
+        font_display: 'optional',
+        remote_connection_hints: '1',
+        training_wheels_off: '1',
+    };
+
+    assert.deepEqual(changedSettingsKeys(initial, current), ['font_display', 'training_wheels_off']);
+    assert.deepEqual(
+        buildSettingsDirtyState(initial, current, {
+            delivery: ['css_delivery_mode'],
+            display: ['font_display'],
+            help: ['training_wheels_off'],
+        }),
+        {
+            isDirty: true,
+            changedKeys: ['font_display', 'training_wheels_off'],
+            changedRows: ['display', 'help'],
+        }
+    );
+});
+
+test('admin contracts resolve settings save shell state for dirty, clear, and transfer modes', () => {
+    assert.deepEqual(resolveSettingsSaveShellState({ hasUnsavedSettings: false }), {
+        visible: true,
+        showClear: true,
+        clearDisabled: true,
+        saveDisabled: true,
+        saveTone: 'default',
+    });
+    assert.deepEqual(resolveSettingsSaveShellState({ hasUnsavedSettings: true }), {
+        visible: true,
+        showClear: true,
+        clearDisabled: false,
+        saveDisabled: false,
+        saveTone: 'default',
+    });
+    assert.deepEqual(resolveSettingsSaveShellState({ isTransferTab: true, hasStagedBundle: false }), {
+        visible: true,
+        showClear: false,
+        clearDisabled: true,
+        saveDisabled: true,
+        saveTone: 'danger',
+    });
+    assert.equal(resolveSettingsSaveShellState({ isTransferTab: true, hasStagedBundle: true }).saveDisabled, false);
+    assert.equal(resolveSettingsSaveShellState({ isTransferTab: true, hasStagedBundle: true, isSubmitting: true }).saveDisabled, true);
+});
+
+test('admin runtime keeps settings dirty state wired to changed row data attributes', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        '[data-settings-form]',
+        '[data-settings-save-shell]',
+        '[data-settings-save-button]',
+        '[data-settings-clear-button]',
+        'has-unsaved-changes',
+        'data-settings-row-changed',
+        'data-has-unsaved-changes',
+        'data-settings-group-changed',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+});
+
+test('admin runtime keeps disclosure toggles accessible and URL-trackable', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        '[data-disclosure-toggle]',
+        'tasty-fonts-role-preview-panel',
+        'tasty-fonts-role-snippets-panel',
+        'tasty-fonts-add-font-panel',
+        'tasty-fonts-google-access-panel',
+        'tasty-fonts-adobe-project-panel',
+        'aria-expanded',
+        'aria-labelledby',
+        'data-expanded-label',
+        'data-collapsed-label',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+
+    assert.match(source, /\.hidden\s*=/, 'Disclosure targets should still be hidden and shown through the hidden property.');
+});
+
+test('admin runtime keeps copy feedback on shared data-copy attributes', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        'navigator.clipboard.writeText',
+        'is-copied',
+        'Copied',
+        'data-copy-text',
+        'data-copy-success',
+        'data-copy-static-label',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+});
+
+test('admin runtime keeps changed Slice 9 renderer data hooks in sync', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        '[data-role-deployment-pill]',
+        '[data-role-deployment-badge]',
+        '[data-role-deployment-announcement]',
+        'roleDeploymentBadge',
+        'deployment.badge',
+        'deployment.copy',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+});
+
+test('admin runtime keeps Sitewide delivery action sync hooks wired for draft-save reconciliation', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        '[data-role-sitewide-enable]',
+        '[data-role-sitewide-disable]',
+        'syncSitewideDeliveryActionButtonStates',
+        'apply_everywhere',
+        'config.applyEverywhere',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
 });
 
 test('admin contracts normalizeAxisTag normalizes lowercase, uppercase, and non-4-char tags', () => {

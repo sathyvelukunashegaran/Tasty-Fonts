@@ -101,7 +101,7 @@ final class AdminPageContextBuilder
         $roleDeploymentContext = $this->buildRoleDeploymentContext($roles, $appliedRoles, $applyEverywhere, $settings);
         $localEnvironmentNotice = $this->buildLocalEnvironmentNotice($settings);
         $gutenbergIntegration = $this->buildGutenbergIntegrationContext($settings);
-        $etchIntegration = $this->buildEtchIntegrationContext();
+        $etchIntegration = $this->buildEtchIntegrationContext($settings);
         $acssIntegration = $this->buildAcssIntegrationContext($settings);
         $bricksIntegration = $this->buildBricksIntegrationContext($settings);
         $oxygenIntegration = $this->buildOxygenIntegrationContext($settings);
@@ -747,6 +747,7 @@ final class AdminPageContextBuilder
                 'enabled' => !empty($integration['enabled']),
                 'available' => !array_key_exists('available', $integration) || !empty($integration['available']),
                 'title' => $this->stringValue($integration, 'title'),
+                'status' => $this->stringValue($integration, 'status'),
                 'status_label' => $this->stringValue($integration, 'status_label'),
                 'status_copy' => $this->stringValue($integration, 'status_copy'),
             ];
@@ -860,11 +861,25 @@ final class AdminPageContextBuilder
      */
     public function buildUpdateChannelOptions(): array
     {
-        return [
-            ['value' => SettingsRepository::UPDATE_CHANNEL_STABLE, 'label' => $this->formatUpdateChannelLabel(SettingsRepository::UPDATE_CHANNEL_STABLE)],
-            ['value' => SettingsRepository::UPDATE_CHANNEL_BETA, 'label' => $this->formatUpdateChannelLabel(SettingsRepository::UPDATE_CHANNEL_BETA)],
-            ['value' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY, 'label' => $this->formatUpdateChannelLabel(SettingsRepository::UPDATE_CHANNEL_NIGHTLY)],
-        ];
+        $options = [];
+
+        foreach ([
+            SettingsRepository::UPDATE_CHANNEL_STABLE,
+            SettingsRepository::UPDATE_CHANNEL_BETA,
+            SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
+        ] as $channel) {
+            $baseLabel = $this->formatUpdateChannelLabel($channel);
+            $versionLabel = $this->latestUpdateChannelVersionLabel($channel);
+
+            $options[] = [
+                'value' => $channel,
+                'label' => $versionLabel !== ''
+                    ? sprintf(__('%1$s (%2$s)', 'tasty-fonts'), $baseLabel, $versionLabel)
+                    : $baseLabel,
+            ];
+        }
+
+        return $options;
     }
 
     public function formatUpdateChannelLabel(string $channel): string
@@ -874,6 +889,41 @@ final class AdminPageContextBuilder
             SettingsRepository::UPDATE_CHANNEL_NIGHTLY => __('Nightly', 'tasty-fonts'),
             default => __('Stable', 'tasty-fonts'),
         };
+    }
+
+    private function latestUpdateChannelVersionLabel(string $channel): string
+    {
+        if (!$this->updater instanceof GitHubUpdater) {
+            return '';
+        }
+
+        $overview = $this->updater->getChannelOverview($channel);
+        $release = $overview['latest_available'] ?? null;
+
+        if (!is_array($release)) {
+            return '';
+        }
+
+        return $this->formatUpdateChannelVersionLabel($this->stringValue($release, 'version'));
+    }
+
+    private function formatUpdateChannelVersionLabel(string $version): string
+    {
+        $version = trim($version);
+
+        if ($version === '') {
+            return '';
+        }
+
+        if (preg_match('/^([0-9]+\.[0-9]+\.[0-9]+)-beta\.([0-9]+)$/', $version, $matches) === 1) {
+            return sprintf(__('%1$s beta %2$s', 'tasty-fonts'), $matches[1], $matches[2]);
+        }
+
+        if (preg_match('/^([0-9]+\.[0-9]+\.[0-9]+)-dev\.([0-9]+)$/', $version, $matches) === 1) {
+            return sprintf(__('%1$s nightly %2$s', 'tasty-fonts'), $matches[1], $matches[2]);
+        }
+
+        return $version;
     }
 
     /**
@@ -1040,7 +1090,8 @@ final class AdminPageContextBuilder
     public function buildGeneratedCssPanel(array $settings): array
     {
         $download = $this->buildGeneratedCssDownloadData($settings);
-        $value = !empty($download['downloadable'])
+        $isDownloadable = !empty($download['downloadable']);
+        $value = $isDownloadable
             ? trim((string) ($download['content'] ?? ''))
             : __('Not generated while sitewide delivery is off.', 'tasty-fonts');
 
@@ -1050,8 +1101,9 @@ final class AdminPageContextBuilder
             'target' => 'tasty-fonts-output-generated',
             'value' => $value,
             'readable_display_value' => $this->buildGeneratedCssReadableDisplayValue($settings, $value),
-            'download_url' => !empty($download['downloadable']) ? (string) ($download['url'] ?? '') : '',
+            'download_url' => $isDownloadable ? (string) ($download['url'] ?? '') : '',
             'download_filename' => (string) ($download['filename'] ?? 'tasty-fonts.css'),
+            'is_empty' => !$isDownloadable,
             'active' => false,
         ];
     }
@@ -1162,6 +1214,11 @@ final class AdminPageContextBuilder
             [
                 'key' => 'code',
                 'label' => __('Code', 'tasty-fonts'),
+                'active' => false,
+            ],
+            [
+                'key' => 'snippet',
+                'label' => __('Snippet', 'tasty-fonts'),
                 'active' => false,
             ],
         ];
@@ -1310,36 +1367,41 @@ final class AdminPageContextBuilder
     public function buildRoleDeploymentContext(array $draftRoles, array $appliedRoles, bool $applyEverywhere, ?array $settings = null): array
     {
         $settings = $settings ?? $this->settings->getSettings();
+        $draftSummary = $this->buildRoleDeliverySummary($draftRoles, $settings);
+        $liveSummary = $this->buildRoleDeliverySummary($appliedRoles, $settings);
 
         if (!$applyEverywhere) {
             return [
-                'badge' => __('Saved Only', 'tasty-fonts'),
+                'state' => 'off',
+                'badge' => __('Off', 'tasty-fonts'),
                 'badge_class' => 'is-warning',
-                'title' => __('Saved Roles Only', 'tasty-fonts'),
-                'copy' => sprintf(
-                    __('Sitewide roles are off. %s', 'tasty-fonts'),
-                    $this->buildRoleDeliverySummary($draftRoles, $settings)
-                ),
+                'title' => __('Sitewide delivery: Off', 'tasty-fonts'),
+                'copy' => __('Role assignments are saved as draft only and are not served sitewide.', 'tasty-fonts'),
+                'summary' => $draftSummary,
             ];
         }
 
         if ($this->roleSetsMatch($draftRoles, $appliedRoles, $settings)) {
             return [
+                'state' => 'live',
                 'badge' => __('Live', 'tasty-fonts'),
-                'badge_class' => 'is-success',
-                'title' => __('Live Roles Active', 'tasty-fonts'),
-                'copy' => $this->buildRoleDeliverySummary($draftRoles, $settings),
+                'badge_class' => 'is-live',
+                'title' => __('Sitewide delivery: Live', 'tasty-fonts'),
+                'copy' => __('Role assignments are served to visitors, editors, and integrations.', 'tasty-fonts'),
+                'summary' => $draftSummary,
             ];
         }
 
         return [
-            'badge' => __('Pending', 'tasty-fonts'),
+            'state' => 'pending_publish',
+            'badge' => __('Pending publish', 'tasty-fonts'),
             'badge_class' => 'is-warning',
-            'title' => __('Saved Roles Differ From Live', 'tasty-fonts'),
-            'copy' => sprintf(
-                __('Saved: %1$s. Live: %2$s. Publish Roles to make these changes live.', 'tasty-fonts'),
-                $this->buildRoleDeliverySummary($draftRoles, $settings),
-                $this->buildRoleDeliverySummary($appliedRoles, $settings)
+            'title' => __('Sitewide delivery: Pending publish', 'tasty-fonts'),
+            'copy' => __('Saved assignments differ from what is currently served. Publish Roles to update sitewide delivery.', 'tasty-fonts'),
+            'summary' => sprintf(
+                __('Saved: %1$s Live: %2$s', 'tasty-fonts'),
+                $draftSummary,
+                $liveSummary
             ),
         ];
     }
@@ -1693,7 +1755,7 @@ final class AdminPageContextBuilder
         $enabled = !empty($settings['block_editor_font_library_sync_enabled']);
         $isLocal = SiteEnvironment::isLikelyLocalEnvironment(rest_url(''), SiteEnvironment::currentEnvironmentType());
 
-        return [
+        $context = [
             'enabled' => $enabled,
             'is_local' => $isLocal,
             'title' => __('Gutenberg Font Library', 'tasty-fonts'),
@@ -1702,19 +1764,27 @@ final class AdminPageContextBuilder
                     ? __('Sync imported families to WordPress. Keep it on unless local SSL or loopback checks fail.', 'tasty-fonts')
                     : __('Sync imported families to the WordPress Font Library.', 'tasty-fonts'))
                 : __('Sync imported families to WordPress typography controls.', 'tasty-fonts'),
-            'status_label' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
+            'status_label' => $enabled ? __('Configured', 'tasty-fonts') : __('Off', 'tasty-fonts'),
             'status_copy' => $enabled
                 ? ($isLocal
-                    ? __('On. Keep it on unless local SSL or loopback checks fail.', 'tasty-fonts')
-                    : __('On. Imported families sync to WordPress.', 'tasty-fonts'))
+                    ? __('Configured. Imported families sync to WordPress; keep it on unless local SSL or loopback checks fail.', 'tasty-fonts')
+                    : __('Configured. Imported families sync to WordPress.', 'tasty-fonts'))
                 : __('Off. Imported families stay inside Tasty.', 'tasty-fonts'),
         ];
+
+        return $this->applySitewideIntegrationDependency(
+            $context,
+            !empty($settings['auto_apply_roles']),
+            __('Turn on Sitewide Delivery before Gutenberg Font Library sync can publish Tasty fonts.', 'tasty-fonts'),
+            __('Needs Sitewide Delivery. Turn on Sitewide Delivery before Gutenberg Font Library sync can publish Tasty fonts.', 'tasty-fonts')
+        );
     }
 
     /**
+     * @param NormalizedSettings $settings
      * @return IntegrationContext
      */
-    public function buildEtchIntegrationContext(): array
+    public function buildEtchIntegrationContext(array $settings): array
     {
         $available = class_exists(\Etch\Services\StylesheetService::class);
 
@@ -1722,14 +1792,40 @@ final class AdminPageContextBuilder
             $available = (bool) apply_filters('tasty_fonts_etch_integration_available', $available);
         }
 
-        return [
+        $configured = array_key_exists('etch_integration_enabled', $settings)
+            ? $this->nullableBoolValue($settings['etch_integration_enabled']) !== null
+            : false;
+        $explicitlyDisabled = ($settings['etch_integration_enabled'] ?? null) === false;
+        $enabled = $available && !$explicitlyDisabled;
+        $status = !$available
+            ? 'unavailable'
+            : ($enabled ? 'active' : 'disabled');
+
+        $context = [
             'available' => $available,
-            'status' => $available ? 'active' : 'inactive',
+            'enabled' => $enabled,
+            'configured' => $configured,
+            'status' => $status,
             'title' => __('Etch Canvas Bridge', 'tasty-fonts'),
-            'description' => $available
-                ? __('Loads Tasty fonts inside Etch canvas previews.', 'tasty-fonts')
-                : __('Available automatically when Etch is active.', 'tasty-fonts'),
+            'description' => match ($status) {
+                'active' => __('Loads Tasty fonts inside Etch canvas previews.', 'tasty-fonts'),
+                'disabled' => __('Etch canvas loading is off. Turn it on to load Tasty fonts inside Etch canvas previews.', 'tasty-fonts'),
+                default => __('Available automatically when Etch is active.', 'tasty-fonts'),
+            },
+            'status_label' => $this->buildBuilderIntegrationStatusLabel($status),
+            'status_copy' => match ($status) {
+                'active' => __('Configured. Etch canvas previews receive Tasty Fonts runtime assets.', 'tasty-fonts'),
+                'disabled' => __('Off. Tasty Fonts will not load runtime assets into Etch canvas previews.', 'tasty-fonts'),
+                default => __('Not active. Turn on Etch to use the canvas bridge.', 'tasty-fonts'),
+            },
         ];
+
+        return $this->applySitewideIntegrationDependency(
+            $context,
+            !empty($settings['auto_apply_roles']),
+            __('Turn on Sitewide Delivery before Etch Canvas Bridge can load Tasty fonts.', 'tasty-fonts'),
+            __('Needs Sitewide Delivery. Turn on Sitewide Delivery before Etch Canvas Bridge can load Tasty fonts.', 'tasty-fonts')
+        );
     }
 
     /**
@@ -1745,21 +1841,28 @@ final class AdminPageContextBuilder
 
         $status = is_string($state['status'] ?? null) ? $state['status'] : 'disabled';
 
-        return array_merge(
+        $context = array_merge(
             $state,
             [
                 'title' => __('Automatic.css', 'tasty-fonts'),
                 'description' => match ($status) {
-                    'synced' => __('Automatic.css is mapped to Tasty role variables.', 'tasty-fonts'),
-                    'ready' => __('Save settings to apply the Automatic.css mapping.', 'tasty-fonts'),
+                    'synced' => __('Automatic.css role variables are live through Sitewide delivery.', 'tasty-fonts'),
+                    'ready' => __('Automatic.css is configured. Save settings to apply the mapping.', 'tasty-fonts'),
                     'out_of_sync' => __('Re-save to refresh the Automatic.css mapping.', 'tasty-fonts'),
-                    'waiting_for_sitewide_roles' => __('Turn on sitewide roles to sync Automatic.css.', 'tasty-fonts'),
+                    'waiting_for_sitewide_roles' => __('Turn on Sitewide Delivery before Automatic.css can sync Tasty role variables.', 'tasty-fonts'),
                     'unavailable' => __('Sync Automatic.css when it is active.', 'tasty-fonts'),
                     default => __('Map Automatic.css font settings to Tasty roles.', 'tasty-fonts'),
                 },
                 'status_label' => $this->buildAcssIntegrationStatusLabel($status),
                 'status_copy' => $this->buildAcssIntegrationStatusCopy($status, $state),
             ]
+        );
+
+        return $this->applySitewideIntegrationDependency(
+            $context,
+            $sitewideRolesEnabled,
+            __('Turn on Sitewide Delivery before Automatic.css can sync Tasty role variables.', 'tasty-fonts'),
+            __('Needs Sitewide Delivery. Turn on Sitewide Delivery before Automatic.css receives role output.', 'tasty-fonts')
         );
     }
 
@@ -1773,12 +1876,12 @@ final class AdminPageContextBuilder
 
         $status = $state['status'];
 
-        return array_merge(
+        $context = array_merge(
             $state,
             [
                 'title' => __('Bricks Builder', 'tasty-fonts'),
                 'description' => match ($status) {
-                    'active' => __('Manage Bricks typography with Tasty roles.', 'tasty-fonts'),
+                    'active' => __('Bricks is configured. Role output reaches Theme Styles only when Sitewide delivery is on.', 'tasty-fonts'),
                     'unavailable' => __('Manage Bricks typography when Bricks is active.', 'tasty-fonts'),
                     default => __('Let Tasty manage Bricks typography.', 'tasty-fonts'),
                 },
@@ -1787,10 +1890,17 @@ final class AdminPageContextBuilder
                 'feature_descriptions' => [
                     'selectors' => __('Show published families in Bricks controls.', 'tasty-fonts'),
                     'builder_preview' => __('Load active fonts in Bricks previews.', 'tasty-fonts'),
-                    'theme_styles' => __('Sync role fonts to Bricks Theme Styles.', 'tasty-fonts'),
+                    'theme_styles' => __('Sync role fonts to Bricks Theme Styles when Sitewide delivery is on.', 'tasty-fonts'),
                     'google_fonts' => __('Keep Bricks pickers focused on Tasty Fonts.', 'tasty-fonts'),
                 ],
             ]
+        );
+
+        return $this->applySitewideIntegrationDependency(
+            $context,
+            !empty($settings['auto_apply_roles']),
+            __('Turn on Sitewide Delivery before Bricks can receive Tasty typography.', 'tasty-fonts'),
+            __('Needs Sitewide Delivery. Turn on Sitewide Delivery before Bricks can receive Tasty typography.', 'tasty-fonts')
         );
     }
 
@@ -1807,7 +1917,7 @@ final class AdminPageContextBuilder
 
         $status = $state['status'];
 
-        return array_merge(
+        $context = array_merge(
             $state,
             [
                 'title' => __('Oxygen Builder', 'tasty-fonts'),
@@ -1819,6 +1929,13 @@ final class AdminPageContextBuilder
                 'status_label' => $this->buildBuilderIntegrationStatusLabel($status),
                 'status_copy' => $this->buildOxygenIntegrationStatusCopy($status),
             ]
+        );
+
+        return $this->applySitewideIntegrationDependency(
+            $context,
+            !empty($settings['auto_apply_roles']),
+            __('Turn on Sitewide Delivery before Oxygen can receive Tasty fonts.', 'tasty-fonts'),
+            __('Needs Sitewide Delivery. Turn on Sitewide Delivery before Oxygen can receive Tasty fonts.', 'tasty-fonts')
         );
     }
 
@@ -2491,13 +2608,42 @@ final class AdminPageContextBuilder
         };
     }
 
+    /**
+     * @param IntegrationContext $context
+     * @return IntegrationContext
+     */
+    private function applySitewideIntegrationDependency(
+        array $context,
+        bool $sitewideRolesEnabled,
+        string $dependencyDescription,
+        string $dependencyStatusCopy
+    ): array {
+        $controlDisabled = ($context['available'] ?? true) !== true;
+        $controlChecked = !empty($context['enabled']);
+
+        if (!$sitewideRolesEnabled) {
+            $context['status'] = 'waiting_for_sitewide_roles';
+            $context['description'] = $dependencyDescription;
+            $context['status_label'] = __('Needs Sitewide Delivery', 'tasty-fonts');
+            $context['status_copy'] = $dependencyStatusCopy;
+            $controlDisabled = true;
+            $controlChecked = false;
+        }
+
+        $context['control_disabled'] = $controlDisabled;
+        $context['control_checked'] = $controlChecked;
+        $context['submitted_enabled_value'] = !empty($context['enabled']) ? '1' : '0';
+
+        return $context;
+    }
+
     private function buildAcssIntegrationStatusLabel(string $status): string
     {
         return match ($status) {
-            'synced' => __('Synced', 'tasty-fonts'),
-            'ready' => __('Ready to Apply', 'tasty-fonts'),
-            'out_of_sync' => __('Needs Reapply', 'tasty-fonts'),
-            'waiting_for_sitewide_roles' => __('Waiting for Sitewide Roles', 'tasty-fonts'),
+            'synced' => __('Live', 'tasty-fonts'),
+            'ready' => __('Configured', 'tasty-fonts'),
+            'out_of_sync' => __('Needs reapply', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Needs Sitewide Delivery', 'tasty-fonts'),
             'unavailable' => __('Not Active', 'tasty-fonts'),
             default => __('Off', 'tasty-fonts'),
         };
@@ -2511,10 +2657,10 @@ final class AdminPageContextBuilder
         $current = is_array($state['current'] ?? null) ? $state['current'] : ['heading' => '', 'body' => ''];
 
         return match ($status) {
-            'synced' => __('Automatic.css is using Tasty role variables.', 'tasty-fonts'),
-            'ready' => __('Save settings to apply the Automatic.css mapping.', 'tasty-fonts'),
-            'out_of_sync' => __('Automatic.css no longer matches the saved mapping.', 'tasty-fonts'),
-            'waiting_for_sitewide_roles' => __('Turn on sitewide roles to apply Automatic.css sync.', 'tasty-fonts'),
+            'synced' => __('Live. Sitewide delivery is distributing Tasty role variables to Automatic.css.', 'tasty-fonts'),
+            'ready' => __('Configured. Save settings to apply the Automatic.css mapping before it goes live.', 'tasty-fonts'),
+            'out_of_sync' => __('Needs reapply. Automatic.css no longer matches the saved Tasty role mapping.', 'tasty-fonts'),
+            'waiting_for_sitewide_roles' => __('Needs Sitewide Delivery. Turn on Sitewide Delivery before Automatic.css receives role output.', 'tasty-fonts'),
             'unavailable' => __('Automatic.css is not active.', 'tasty-fonts'),
             default => sprintf(
                 __('Current values: heading `%1$s`, body `%2$s`.', 'tasty-fonts'),
@@ -2527,7 +2673,7 @@ final class AdminPageContextBuilder
     private function buildBuilderIntegrationStatusLabel(string $status): string
     {
         return match ($status) {
-            'active' => __('On', 'tasty-fonts'),
+            'active' => __('Configured', 'tasty-fonts'),
             'unavailable' => __('Not Active', 'tasty-fonts'),
             default => __('Off', 'tasty-fonts'),
         };
@@ -2536,7 +2682,7 @@ final class AdminPageContextBuilder
     private function buildBricksIntegrationStatusCopy(string $status): string
     {
         return match ($status) {
-            'active' => __('Bricks can use published Tasty fonts.', 'tasty-fonts'),
+            'active' => __('Configured. Bricks is connected; role output is live only when Sitewide delivery is on.', 'tasty-fonts'),
             'unavailable' => __('Bricks is not active.', 'tasty-fonts'),
             default => __('Bricks integration is off.', 'tasty-fonts'),
         };
@@ -2545,7 +2691,7 @@ final class AdminPageContextBuilder
     private function buildOxygenIntegrationStatusCopy(string $status): string
     {
         return match ($status) {
-            'active' => __('Oxygen can use published Tasty fonts.', 'tasty-fonts'),
+            'active' => __('Configured. Oxygen is connected; Tasty fonts are available without implying role output is live.', 'tasty-fonts'),
             'unavailable' => __('Oxygen is not active.', 'tasty-fonts'),
             default => __('Oxygen integration is off.', 'tasty-fonts'),
         };

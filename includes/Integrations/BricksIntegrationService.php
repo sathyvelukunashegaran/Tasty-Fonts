@@ -638,6 +638,8 @@ final class BricksIntegrationService
             $status = 'waiting_for_sitewide_roles';
         } elseif ($applied && $synced) {
             $status = 'synced';
+        } elseif ($applied) {
+            $status = 'out_of_sync';
         } else {
             $status = 'ready';
         }

@@ -37,11 +37,12 @@ $tests['plugin_activation_creates_provider_index_files_and_generated_css'] = sta
     assertContainsValue('FilesMatch', (string) file_get_contents($root . '/.htaccess'), 'Plugin activation should block PHP requests inside the font storage root.');
 
     $settings = (new SettingsRepository())->getSettings();
-    assertSameValue(true, !empty($settings['google_font_imports_enabled']), 'Plugin activation should leave Google Fonts imports enabled by default.');
-    assertSameValue(true, !empty($settings['bunny_font_imports_enabled']), 'Plugin activation should leave Bunny Fonts imports enabled by default.');
-    assertSameValue(true, !empty($settings['local_font_uploads_enabled']), 'Plugin activation should leave custom uploads enabled by default.');
+    assertSameValue(false, !empty($settings['google_font_imports_enabled']), 'Plugin activation should leave Google Fonts imports disabled by default.');
+    assertSameValue(false, !empty($settings['bunny_font_imports_enabled']), 'Plugin activation should leave Bunny Fonts imports disabled by default.');
+    assertSameValue(false, !empty($settings['local_font_uploads_enabled']), 'Plugin activation should leave custom uploads disabled by default.');
     assertSameValue(false, !empty($settings['adobe_font_imports_enabled']), 'Plugin activation should leave Adobe imports disabled by default.');
     assertSameValue(false, !empty($settings['custom_css_url_imports_enabled']), 'Plugin activation should leave URL imports disabled by default.');
+    assertSameValue(true, !empty($settings['delete_uploaded_files_on_uninstall']), 'Plugin activation should leave the keep-uploaded-fonts toggle off by default.');
 
     resetPluginSingleton();
 };

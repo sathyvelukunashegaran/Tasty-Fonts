@@ -67,6 +67,7 @@ final class HealthCheckService
             $this->buildTransferCheck($transferCapability),
             $this->buildGoogleAccessCheck($googleAccess),
             $this->buildUpdateChannelCheck($updateChannelStatus),
+            ...$this->buildIntegrationChecks($runtimeManifest),
             $this->buildLibraryCheck($counts),
         ];
     }
@@ -356,7 +357,10 @@ final class HealthCheckService
     private function buildBlockEditorSyncCheck(array $runtimeManifest, array $environment): array
     {
         $editor = is_array($runtimeManifest['editor'] ?? null) ? $runtimeManifest['editor'] : [];
-        $enabled = !empty($editor['block_editor_sync_enabled']);
+        $delivery = is_array($runtimeManifest['delivery'] ?? null) ? $runtimeManifest['delivery'] : [];
+        $configured = !empty($editor['block_editor_sync_enabled']);
+        $sitewideDeliveryEnabled = !empty($delivery['auto_apply_roles']);
+        $enabled = $configured && $sitewideDeliveryEnabled;
         $isLocal = !empty($environment) || $this->isLocalRestUrl();
 
         return $this->check(
@@ -516,6 +520,53 @@ final class HealthCheckService
                 : __('Enable the PHP ZipArchive extension on this server before exporting or validating transfer bundles.', 'tasty-fonts'),
             $this->docsUrl('Advanced-Tools')
         );
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeManifest
+     * @return list<HealthCheck>
+     */
+    private function buildIntegrationChecks(array $runtimeManifest): array
+    {
+        $integrations = is_array($runtimeManifest['integrations'] ?? null) ? $runtimeManifest['integrations'] : [];
+        $checks = [];
+
+        foreach ($integrations as $key => $integration) {
+            if (!is_array($integration)) {
+                continue;
+            }
+
+            $available = !array_key_exists('available', $integration) || !empty($integration['available']);
+            $enabled = !empty($integration['enabled']);
+            $status = FontUtils::scalarStringValue($integration['status'] ?? '');
+
+            if (!$available || ($enabled && $status !== 'waiting_for_sitewide_roles')) {
+                continue;
+            }
+
+            $title = FontUtils::scalarStringValue($integration['title'] ?? '');
+            $title = $title !== '' ? $title : ucwords(str_replace('_', ' ', (string) $key));
+            $statusLabel = FontUtils::scalarStringValue($integration['status_label'] ?? '');
+            $statusCopy = FontUtils::scalarStringValue($integration['status_copy'] ?? '');
+
+            $checks[] = $this->check(
+                'integration_' . sanitize_key((string) $key),
+                'integration',
+                'info',
+                $title,
+                $statusCopy !== ''
+                    ? $statusCopy
+                    : __('This integration is available but is not currently distributing Tasty Fonts output.', 'tasty-fonts'),
+                [
+                    ['label' => __('Status', 'tasty-fonts'), 'value' => $statusLabel !== '' ? $statusLabel : __('Off', 'tasty-fonts')],
+                ],
+                ['slug' => 'review_integrations', 'label' => __('Review Integrations', 'tasty-fonts')],
+                __('Review Integration settings if this connected tool should receive Tasty Fonts output.', 'tasty-fonts'),
+                $this->docsUrl('Integrations')
+            );
+        }
+
+        return $checks;
     }
 
     /**

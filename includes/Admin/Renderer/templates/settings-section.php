@@ -460,8 +460,9 @@
                                                                     </span>
                                                                 </label>
                                                                 <input type="hidden" name="class_output_role_monospace_enabled" value="0">
-                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled'; ?>">
-                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_monospace_enabled" value="1" data-output-mono-dependent <?php checked($classOutputRoleMonospaceEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled is-disabled-by-dependency'; ?>" data-settings-dependency-tooltip="<?php echo esc_attr__('Enable the monospace role in Settings > Behavior to use .font-monospace.', 'tasty-fonts'); ?>"<?php echo $monospaceRoleEnabled ? '' : ' data-settings-help-tooltip="' . esc_attr__('Enable the monospace role in Settings > Behavior to use .font-monospace.', 'tasty-fonts') . '"'; ?>>
+																	<input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_monospace_enabled" value="1" data-output-mono-dependent data-settings-dependency-description="tasty-fonts-class-output-role-monospace-dependency" <?php echo $monospaceRoleEnabled ? '' : 'aria-describedby="tasty-fonts-class-output-role-monospace-dependency"'; ?> <?php checked($classOutputRoleMonospaceEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+																	<span id="tasty-fonts-class-output-role-monospace-dependency" class="screen-reader-text"><?php esc_html_e('Enable the monospace role in Settings > Behavior to use this control.', 'tasty-fonts'); ?></span>
                                                                     <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                                     <span class="tasty-fonts-toggle-copy">
                                                                         <span class="tasty-fonts-toggle-title"><?php esc_html_e('Monospace Class', 'tasty-fonts'); ?></span>
@@ -501,8 +502,9 @@
                                                                     </span>
                                                                 </label>
                                                                 <input type="hidden" name="class_output_role_alias_code_enabled" value="0">
-                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled'; ?>">
-                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_alias_code_enabled" value="1" data-output-mono-dependent <?php checked($classOutputRoleAliasCodeEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled is-disabled-by-dependency'; ?>" data-settings-dependency-tooltip="<?php echo esc_attr__('Enable the monospace role in Settings > Behavior to use .font-code.', 'tasty-fonts'); ?>"<?php echo $monospaceRoleEnabled ? '' : ' data-settings-help-tooltip="' . esc_attr__('Enable the monospace role in Settings > Behavior to use .font-code.', 'tasty-fonts') . '"'; ?>>
+																	<input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_role_alias_code_enabled" value="1" data-output-mono-dependent data-settings-dependency-description="tasty-fonts-class-output-role-alias-code-dependency" <?php echo $monospaceRoleEnabled ? '' : 'aria-describedby="tasty-fonts-class-output-role-alias-code-dependency"'; ?> <?php checked($classOutputRoleAliasCodeEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+																	<span id="tasty-fonts-class-output-role-alias-code-dependency" class="screen-reader-text"><?php esc_html_e('Enable the monospace role in Settings > Behavior to use this control.', 'tasty-fonts'); ?></span>
                                                                     <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                                     <span class="tasty-fonts-toggle-copy">
                                                                         <span class="tasty-fonts-toggle-title"><?php esc_html_e('Code Alias', 'tasty-fonts'); ?></span>
@@ -542,8 +544,9 @@
                                                                     </span>
                                                                 </label>
                                                                 <input type="hidden" name="class_output_category_mono_enabled" value="0">
-                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled'; ?>">
-                                                                    <input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_category_mono_enabled" value="1" data-output-mono-dependent <?php checked($classOutputCategoryMonoEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+                                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--nested<?php echo $monospaceRoleEnabled ? '' : ' is-disabled is-disabled-by-dependency'; ?>" data-settings-dependency-tooltip="<?php echo esc_attr__('Enable the monospace role in Settings > Behavior to use .font-mono.', 'tasty-fonts'); ?>"<?php echo $monospaceRoleEnabled ? '' : ' data-settings-help-tooltip="' . esc_attr__('Enable the monospace role in Settings > Behavior to use .font-mono.', 'tasty-fonts') . '"'; ?>>
+																	<input type="checkbox" class="tasty-fonts-toggle-input" name="class_output_category_mono_enabled" value="1" data-output-mono-dependent data-settings-dependency-description="tasty-fonts-class-output-category-mono-dependency" <?php echo $monospaceRoleEnabled ? '' : 'aria-describedby="tasty-fonts-class-output-category-mono-dependency"'; ?> <?php checked($classOutputCategoryMonoEnabled); ?> <?php disabled(!$monospaceRoleEnabled); ?>>
+																	<span id="tasty-fonts-class-output-category-mono-dependency" class="screen-reader-text"><?php esc_html_e('Enable the monospace role in Settings > Behavior to use this control.', 'tasty-fonts'); ?></span>
                                                                     <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                                     <span class="tasty-fonts-toggle-copy">
                                                                         <span class="tasty-fonts-toggle-title"><?php esc_html_e('Mono Class', 'tasty-fonts'); ?></span>
@@ -738,12 +741,28 @@
                             hidden
                         >
                             <?php
-                            $etchAvailable = !empty($etchIntegration['available']);
-                            $gutenbergStatusClass = !empty($gutenbergIntegration['enabled']) ? ' is-success' : '';
+							$integrationControlDisabled = static fn (array $integration): bool => array_key_exists('control_disabled', $integration)
+								? !empty($integration['control_disabled'])
+								: (($integration['available'] ?? true) !== true);
+							$integrationControlChecked = static fn (array $integration): bool => array_key_exists('control_checked', $integration)
+								? !empty($integration['control_checked'])
+								: (($integration['enabled'] ?? false) === true);
+							$integrationSubmittedValue = static fn (array $integration): string => (string) ($integration['submitted_enabled_value'] ?? (!empty($integration['enabled']) ? '1' : '0'));
+
+							$gutenbergStatus = (string) ($gutenbergIntegration['status'] ?? (!empty($gutenbergIntegration['enabled']) ? 'active' : 'disabled'));
+							$gutenbergStatusClass = $gutenbergStatus === 'waiting_for_sitewide_roles'
+								? ' is-warning'
+								: (!empty($gutenbergIntegration['enabled']) ? ' is-success' : '');
                             $bricksStatus = (string) ($bricksIntegration['status'] ?? 'disabled');
-                            $bricksStatusBadgeClass = $bricksStatus === 'active' ? ' is-success' : '';
+							$bricksStatusBadgeClass = $bricksStatus === 'waiting_for_sitewide_roles' ? ' is-warning' : ($bricksStatus === 'active' ? ' is-success' : '');
+							$bricksStatusHelp = trim((string) ($bricksIntegration['status_copy'] ?? ''));
+							$bricksBadgeClass = 'tasty-fonts-badge' . $bricksStatusBadgeClass;
+							$bricksBadgeInteractive = !$trainingWheelsOff && $bricksStatusHelp !== '';
+							if ($bricksBadgeInteractive) {
+								$bricksBadgeClass .= ' tasty-fonts-badge--interactive tasty-fonts-badge--help';
+							}
                             $oxygenStatus = (string) ($oxygenIntegration['status'] ?? 'disabled');
-                            $oxygenStatusBadgeClass = $oxygenStatus === 'active' ? ' is-success' : '';
+							$oxygenStatusBadgeClass = $oxygenStatus === 'waiting_for_sitewide_roles' ? ' is-warning' : ($oxygenStatus === 'active' ? ' is-success' : '');
                             $oxygenStatusHelp = trim((string) ($oxygenIntegration['status_copy'] ?? ''));
                             $oxygenBadgeClass = 'tasty-fonts-badge' . $oxygenStatusBadgeClass;
                             if (!$trainingWheelsOff && $oxygenStatusHelp !== '') {
@@ -757,8 +776,10 @@
                                 default => '',
                             };
 
-                            $etchStatusHelp = trim((string) ($etchIntegration['description'] ?? ''));
-                            $etchBadgeClass = 'tasty-fonts-badge' . ($etchAvailable ? ' is-success' : '');
+                            $etchStatusHelp = trim((string) ($etchIntegration['status_copy'] ?? ''));
+                            $etchStatus = (string) ($etchIntegration['status'] ?? 'disabled');
+							$etchStatusBadgeClass = $etchStatus === 'waiting_for_sitewide_roles' ? ' is-warning' : ($etchStatus === 'active' ? ' is-success' : '');
+                            $etchBadgeClass = 'tasty-fonts-badge' . $etchStatusBadgeClass;
                             $etchBadgeInteractive = !$trainingWheelsOff && $etchStatusHelp !== '';
                             if ($etchBadgeInteractive) {
                                 $etchBadgeClass .= ' tasty-fonts-badge--interactive tasty-fonts-badge--help';
@@ -777,6 +798,14 @@
                             if ($acssBadgeInteractive) {
                                 $acssBadgeClass .= ' tasty-fonts-badge--interactive tasty-fonts-badge--help';
                             }
+                            $acssControlDisabled = array_key_exists('control_disabled', $acssIntegration)
+                                ? !empty($acssIntegration['control_disabled'])
+                                : (($acssIntegration['available'] ?? true) !== true);
+                            $acssControlChecked = array_key_exists('control_checked', $acssIntegration)
+                                ? !empty($acssIntegration['control_checked'])
+                                : (($acssIntegration['enabled'] ?? false) === true);
+                            $acssSubmittedEnabledValue = (string) ($acssIntegration['submitted_enabled_value'] ?? '0');
+                            $acssDependencyDescriptionId = 'tasty-fonts-acss-sitewide-dependency';
                             ?>
                             <div class="tasty-fonts-output-settings-panel tasty-fonts-integrations-panel">
                                 <div class="tasty-fonts-output-settings-copy">
@@ -791,42 +820,61 @@
                                         </div>
                                         <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
                                             <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
-                                            <div class="tasty-fonts-output-settings-quick tasty-fonts-output-settings-choice tasty-fonts-integration-row--readonly">
-                                                <div class="tasty-fonts-output-settings-submenu-copy">
-                                                    <span class="tasty-fonts-toggle-title-line tasty-fonts-integration-heading">
-                                                        <span class="tasty-fonts-integration-mark tasty-fonts-integration-mark--etch" aria-hidden="true"></span>
-                                                        <span><?php echo esc_html((string) ($etchIntegration['title'] ?? __('Etch Canvas Bridge', 'tasty-fonts'))); ?></span>
-                                                        <?php if ($etchBadgeInteractive): ?>
-                                                            <button
-                                                                type="button"
-                                                                class="<?php echo esc_attr($etchBadgeClass); ?>"
-                                                                <?php $this->renderPassiveHelpAttributes($etchStatusHelp); ?>
-                                                                aria-label="<?php esc_attr_e('Etch integration status', 'tasty-fonts'); ?>"
-                                                            >
-                                                                <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
-                                                            </button>
-                                                        <?php else: ?>
-                                                            <span class="<?php echo esc_attr($etchBadgeClass); ?>">
-                                                                <?php echo esc_html($etchAvailable ? __('Active', 'tasty-fonts') : __('Inactive', 'tasty-fonts')); ?>
+                                            <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($etchIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
+                                                <input type="hidden" name="etch_integration_enabled" value="<?php echo esc_attr($integrationSubmittedValue($etchIntegration) === '1' ? '1' : '0'); ?>">
+                                                <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($etchStatusHelp); ?>">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="tasty-fonts-toggle-input"
+                                                        name="etch_integration_enabled"
+                                                        value="1"
+                                                        <?php checked($integrationControlChecked($etchIntegration)); ?>
+                                                        <?php disabled($integrationControlDisabled($etchIntegration)); ?>
+                                                        <?php echo $integrationControlDisabled($etchIntegration) && $etchStatus === 'waiting_for_sitewide_roles' ? 'aria-describedby="tasty-fonts-etch-sitewide-dependency"' : ''; ?>
+                                                    >
+                                                    <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
+                                                    <span class="tasty-fonts-toggle-copy">
+                                                        <span class="tasty-fonts-toggle-title-line">
+                                                            <span class="tasty-fonts-toggle-title tasty-fonts-integration-title">
+                                                                <span class="tasty-fonts-integration-mark tasty-fonts-integration-mark--etch" aria-hidden="true"></span>
+                                                                <span><?php echo esc_html((string) ($etchIntegration['title'] ?? __('Etch Canvas Bridge', 'tasty-fonts'))); ?></span>
                                                             </span>
+                                                            <?php if ($etchBadgeInteractive): ?>
+                                                                <button
+                                                                    type="button"
+                                                                    class="<?php echo esc_attr($etchBadgeClass); ?>"
+                                                                    <?php $this->renderPassiveHelpAttributes($etchStatusHelp); ?>
+                                                                    aria-label="<?php esc_attr_e('Etch integration status', 'tasty-fonts'); ?>"
+                                                                >
+                                                                    <?php echo esc_html((string) ($etchIntegration['status_label'] ?? __('Off', 'tasty-fonts'))); ?>
+                                                                </button>
+                                                            <?php else: ?>
+                                                                <span class="<?php echo esc_attr($etchBadgeClass); ?>">
+                                                                    <?php echo esc_html((string) ($etchIntegration['status_label'] ?? __('Off', 'tasty-fonts'))); ?>
+                                                                </span>
+                                                            <?php endif; ?>
+                                                        </span>
+                                                        <?php if ($showSettingsDescriptions && (string) ($etchIntegration['description'] ?? '') !== ''): ?>
+                                                            <span class="tasty-fonts-toggle-description"><?php echo esc_html((string) ($etchIntegration['description'] ?? '')); ?></span>
                                                         <?php endif; ?>
                                                     </span>
-                                                    <?php if ($showSettingsDescriptions && (string) ($etchIntegration['description'] ?? '') !== ''): ?>
-                                                        <p><?php echo esc_html((string) ($etchIntegration['description'] ?? '')); ?></p>
-                                                    <?php endif; ?>
-                                                </div>
+                                                </label>
+                                                <?php if ($integrationControlDisabled($etchIntegration) && $etchStatus === 'waiting_for_sitewide_roles'): ?>
+                                                    <span id="tasty-fonts-etch-sitewide-dependency" class="screen-reader-text"><?php esc_html_e('Turn on Sitewide Delivery before Etch Canvas Bridge can load Tasty fonts.', 'tasty-fonts'); ?></span>
+                                                <?php endif; ?>
                                             </div>
 
-                                        <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration">
-                                            <input type="hidden" name="bricks_integration_enabled" value="0">
-                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration">
+                                        <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($bricksIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
+                                            <input type="hidden" name="bricks_integration_enabled" value="<?php echo esc_attr($integrationSubmittedValue($bricksIntegration) === '1' ? '1' : '0'); ?>">
+                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($bricksStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"
                                                     class="tasty-fonts-toggle-input"
                                                     name="bricks_integration_enabled"
                                                     value="1"
-                                                    <?php checked(($bricksIntegration['enabled'] ?? false) === true); ?>
-                                                    <?php disabled(($bricksIntegration['available'] ?? true) !== true); ?>
+                                                    <?php checked($integrationControlChecked($bricksIntegration)); ?>
+                                                    <?php disabled($integrationControlDisabled($bricksIntegration)); ?>
+                                                    <?php echo $integrationControlDisabled($bricksIntegration) && $bricksStatus === 'waiting_for_sitewide_roles' ? 'aria-describedby="tasty-fonts-bricks-sitewide-dependency"' : ''; ?>
                                                 >
                                                 <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                 <span class="tasty-fonts-toggle-copy">
@@ -835,7 +883,7 @@
                                                             <span class="tasty-fonts-integration-mark tasty-fonts-integration-mark--bricks" aria-hidden="true"></span>
                                                             <span><?php echo esc_html((string) ($bricksIntegration['title'] ?? __('Bricks Builder', 'tasty-fonts'))); ?></span>
                                                         </span>
-                                                        <span class="<?php echo esc_attr('tasty-fonts-badge' . $bricksStatusBadgeClass); ?>">
+                                                        <span class="<?php echo esc_attr($bricksBadgeClass); ?>" <?php $this->renderPassiveHelpAttributes($bricksStatusHelp); ?>>
                                                             <?php echo esc_html((string) ($bricksIntegration['status_label'] ?? __('Off', 'tasty-fonts'))); ?>
                                                         </span>
                                                     </span>
@@ -844,8 +892,11 @@
                                                     <?php endif; ?>
                                                 </span>
                                             </label>
+                                            <?php if ($integrationControlDisabled($bricksIntegration) && $bricksStatus === 'waiting_for_sitewide_roles'): ?>
+                                                <span id="tasty-fonts-bricks-sitewide-dependency" class="screen-reader-text"><?php esc_html_e('Turn on Sitewide Delivery before Bricks can receive Tasty typography.', 'tasty-fonts'); ?></span>
+                                            <?php endif; ?>
 
-                                            <?php if (($bricksIntegration['available'] ?? false) === true): ?>
+                                            <?php if (($bricksIntegration['available'] ?? false) === true && !$integrationControlDisabled($bricksIntegration)): ?>
                                             <?php
                                             $bricksManagedControlsEnabled = !empty($bricksIntegration['theme_styles']['enabled'])
                                                   || !empty($bricksIntegration['google_fonts']['enabled']);
@@ -1077,16 +1128,17 @@
                                             <?php endif; ?>
                                         </div>
 
-                                        <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration">
-                                            <input type="hidden" name="oxygen_integration_enabled" value="0">
-                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration">
+										<div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($oxygenIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
+											<input type="hidden" name="oxygen_integration_enabled" value="<?php echo esc_attr($integrationSubmittedValue($oxygenIntegration) === '1' ? '1' : '0'); ?>">
+                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($oxygenStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"
                                                     class="tasty-fonts-toggle-input"
                                                     name="oxygen_integration_enabled"
                                                     value="1"
-                                                    <?php checked(($oxygenIntegration['enabled'] ?? false) === true); ?>
-                                                    <?php disabled(($oxygenIntegration['available'] ?? true) !== true); ?>
+													<?php checked($integrationControlChecked($oxygenIntegration)); ?>
+													<?php disabled($integrationControlDisabled($oxygenIntegration)); ?>
+													<?php echo $integrationControlDisabled($oxygenIntegration) && $oxygenStatus === 'waiting_for_sitewide_roles' ? 'aria-describedby="tasty-fonts-oxygen-sitewide-dependency"' : ''; ?>
                                                 >
                                                 <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                 <span class="tasty-fonts-toggle-copy">
@@ -1104,6 +1156,9 @@
                                                     <?php endif; ?>
                                                 </span>
                                             </label>
+                                            <?php if ($integrationControlDisabled($oxygenIntegration) && $oxygenStatus === 'waiting_for_sitewide_roles'): ?>
+                                                <span id="tasty-fonts-oxygen-sitewide-dependency" class="screen-reader-text"><?php esc_html_e('Turn on Sitewide Delivery before Oxygen can receive Tasty fonts.', 'tasty-fonts'); ?></span>
+                                            <?php endif; ?>
                                         </div>
 
                                             </div>
@@ -1117,15 +1172,17 @@
                                         </div>
                                         <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
                                             <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
-                                        <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration">
-                                            <input type="hidden" name="block_editor_font_library_sync_enabled" value="0">
-                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration">
+										<div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($gutenbergIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
+											<input type="hidden" name="block_editor_font_library_sync_enabled" value="<?php echo esc_attr($integrationSubmittedValue($gutenbergIntegration) === '1' ? '1' : '0'); ?>">
+                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($gutenbergStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"
                                                     class="tasty-fonts-toggle-input"
                                                     name="block_editor_font_library_sync_enabled"
                                                     value="1"
-                                                    <?php checked($blockEditorFontLibrarySyncEnabled); ?>
+													<?php checked($integrationControlChecked($gutenbergIntegration)); ?>
+													<?php disabled($integrationControlDisabled($gutenbergIntegration)); ?>
+													<?php echo $integrationControlDisabled($gutenbergIntegration) && $gutenbergStatus === 'waiting_for_sitewide_roles' ? 'aria-describedby="tasty-fonts-gutenberg-sitewide-dependency"' : ''; ?>
                                                 >
                                                 <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                 <span class="tasty-fonts-toggle-copy">
@@ -1143,6 +1200,9 @@
                                                     <?php endif; ?>
                                                 </span>
                                             </label>
+                                            <?php if ($integrationControlDisabled($gutenbergIntegration) && $gutenbergStatus === 'waiting_for_sitewide_roles'): ?>
+                                                <span id="tasty-fonts-gutenberg-sitewide-dependency" class="screen-reader-text"><?php esc_html_e('Turn on Sitewide Delivery before Gutenberg Font Library sync can publish Tasty fonts.', 'tasty-fonts'); ?></span>
+                                            <?php endif; ?>
                                         </div>
 
                                             </div>
@@ -1156,16 +1216,17 @@
                                         </div>
                                         <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
                                             <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
-                                        <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration">
-                                            <input type="hidden" name="acss_font_role_sync_enabled" value="0">
-                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration">
+                                        <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $acssControlDisabled ? ' is-disabled-by-dependency' : ''; ?>">
+                                            <input type="hidden" name="acss_font_role_sync_enabled" value="<?php echo esc_attr($acssSubmittedEnabledValue === '1' ? '1' : '0'); ?>">
+                                            <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($acssStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"
                                                     class="tasty-fonts-toggle-input"
                                                     name="acss_font_role_sync_enabled"
                                                     value="1"
-                                                    <?php checked(($acssIntegration['enabled'] ?? false) === true); ?>
-                                                    <?php disabled(($acssIntegration['available'] ?? true) !== true); ?>
+                                                    <?php checked($acssControlChecked); ?>
+                                                    <?php disabled($acssControlDisabled); ?>
+                                                    <?php echo $acssControlDisabled && $acssStatus === 'waiting_for_sitewide_roles' ? 'aria-describedby="' . esc_attr($acssDependencyDescriptionId) . '"' : ''; ?>
                                                 >
                                                 <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                                 <span class="tasty-fonts-toggle-copy">
@@ -1183,8 +1244,11 @@
                                                     <?php endif; ?>
                                                 </span>
                                             </label>
+                                            <?php if ($acssControlDisabled && $acssStatus === 'waiting_for_sitewide_roles'): ?>
+                                                <span id="<?php echo esc_attr($acssDependencyDescriptionId); ?>" class="screen-reader-text"><?php esc_html_e('Turn on Sitewide Delivery before Automatic.css can receive Tasty Fonts role output.', 'tasty-fonts'); ?></span>
+                                            <?php endif; ?>
 
-                                            <?php if (($acssIntegration['enabled'] ?? false) === true && ($acssIntegration['available'] ?? false) === true): ?>
+                                            <?php if (($acssIntegration['enabled'] ?? false) === true && ($acssIntegration['available'] ?? false) === true && !$acssControlDisabled): ?>
                                             <?php
                                             $acssMappingRows = [
                                                 [
@@ -1345,7 +1409,7 @@
                                         </div>
                                         <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
                                         <input type="hidden" name="delete_uploaded_files_on_uninstall" value="1">
-                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output<?php echo $deleteUploadedFilesOnUninstall ? ' is-risky' : ''; ?>" data-settings-help-tooltip="<?php echo esc_attr__('Review before turning this off. When disabled, uninstall removes plugin-managed uploaded font files.', 'tasty-fonts'); ?>">
                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="delete_uploaded_files_on_uninstall" value="0" <?php checked(!$deleteUploadedFilesOnUninstall); ?>>
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">

@@ -112,6 +112,7 @@ test('admin typography tokens enforce a readable 12px minimum', () => {
   ];
 
   assert.match(tokensCss, /--tasty-font-size-minimum:\s*12px;/);
+  assert.match(tokensCss, /--tasty-font-size-utility-minimum:\s*10px;/);
 
   for (const token of requiredAliases) {
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -178,9 +179,7 @@ test('admin compact icon controls use 40px targets and help controls stay visual
     { selector: '.tasty-fonts-toast.is-actionable .tasty-fonts-toast-dismiss', token: '--tasty-icon-button-size' },
     { selector: '.tasty-fonts-select-clear', token: '--tasty-clear-button-size' },
     { selector: '.tasty-fonts-log-toggle.button', token: '--tasty-icon-button-size' },
-    { selector: '#tasty-fonts-settings-page .tasty-fonts-settings-row-help', token: '--tasty-help-button-size' },
-    { selector: '#tasty-fonts-settings-page .tasty-fonts-settings-copy-with-help > .tasty-fonts-settings-row-help', token: '--tasty-help-button-size' },
-    { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-health-help-trigger', token: '--tasty-help-button-size' },
+    { selector: '.tasty-fonts-help-trigger', token: '--tasty-help-button-size' },
     { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-diagnostic-copy-button.button', token: '--tasty-icon-button-size' },
     { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-copy-button.button', token: '--tasty-icon-button-size' },
     { selector: '#tasty-fonts-diagnostics-page .tasty-fonts-admin .tasty-fonts-output-download-button.button', token: '--tasty-icon-button-size' }
@@ -203,6 +202,42 @@ test('admin compact icon controls use 40px targets and help controls stay visual
       `${selector} should consume ${token} for its effective hit target.`
     );
   }
+});
+
+test('admin CSS keeps the settings help icon as the canonical help trigger', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+  const helpBlock = cssBlockForSelector(adminCss, '.tasty-fonts-help-trigger');
+  const helpSelectorPattern = /([^{}]*?(?:help-trigger|settings-row-help)[^{}]*)\{([\s\S]*?)\}/g;
+  const violations = [];
+
+  assert.match(helpBlock, /width:\s*var\(--tasty-help-button-size\);/);
+  assert.match(helpBlock, /height:\s*var\(--tasty-help-button-size\);/);
+  assert.match(helpBlock, /border-radius:\s*var\(--tasty-radius-pill\);/);
+  assert.match(helpBlock, /cursor:\s*help;/);
+  assert.match(helpBlock, /transition:\s*var\(--tasty-transition-control\);/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-help-trigger:hover,'), /box-shadow:\s*var\(--tasty-shadow-rise-1\);/);
+
+  const globalButtonFocusIndex = adminCss.indexOf('.tasty-fonts-admin button:focus,');
+  const scopedHelpFocusIndex = adminCss.indexOf('.tasty-fonts-admin .tasty-fonts-help-trigger:hover,');
+  assert.notEqual(globalButtonFocusIndex, -1, 'admin.css should keep the global button focus rule discoverable.');
+  assert.notEqual(scopedHelpFocusIndex, -1, 'admin.css should include a scoped help trigger focus override.');
+  assert.ok(
+    scopedHelpFocusIndex > globalButtonFocusIndex,
+    'The scoped help trigger focus override must come after the global button focus rule so buttons keep settings-style help chrome.'
+  );
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-admin .tasty-fonts-help-trigger:hover,'), /box-shadow:\s*var\(--tasty-shadow-rise-1\);/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-admin .tasty-fonts-help-trigger:hover,'), /outline:\s*none;/);
+
+  for (const match of adminCss.matchAll(helpSelectorPattern)) {
+    const selector = match[1].trim().replace(/\s+/g, ' ');
+    const body = match[2];
+
+    if (/--tasty-icon-button-size/.test(body)) {
+      violations.push(`${selector} must not promote help icons to the larger icon-button size`);
+    }
+  }
+
+  assert.deepEqual(violations, []);
 });
 
 test('admin CSS keeps settings row help and controls vertically centered', () => {
@@ -251,9 +286,31 @@ test('admin CSS uses one tokenized gradient for library preview boxes', () => {
     );
   }
 
+  const inlinePreviewBlock = cssBlockForSelector(adminCss, '.tasty-fonts-font-inline-preview');
+  assert.match(
+    inlinePreviewBlock,
+    /border-block:\s*var\(--tasty-layout-1px\) solid var\(--tasty-library-preview-border\);/,
+    'Collapsed inline previews should use quiet horizontal hairlines instead of nested-card chrome.'
+  );
+  assert.match(
+    inlinePreviewBlock,
+    /box-shadow:\s*var\(--tasty-shadow-inset-rail\);/,
+    'Collapsed inline previews should regain deliberate specimen containment through the shared inset rail token.'
+  );
+  assert.doesNotMatch(
+    inlinePreviewBlock,
+    /border:\s*var\(--tasty-layout-1px\) solid var\(--tasty-library-preview-border-strong\);/,
+    'Collapsed inline previews must not reintroduce the full strong inner-card border.'
+  );
+  assert.doesNotMatch(
+    inlinePreviewBlock,
+    /border-radius:\s*var\(--tasty-radius-control\);/,
+    'Collapsed inline previews must not reintroduce rounded inner-card chrome.'
+  );
+
   const monospaceBlock = cssBlockForSelector(
     adminCss,
-    '.tasty-fonts-font-inline-preview.is-monospace,\n.tasty-fonts-font-specimen.is-monospace,\n.tasty-fonts-face-preview.is-monospace'
+    '.tasty-fonts-font-specimen.is-monospace,\n.tasty-fonts-face-preview.is-monospace'
   );
 
   assert.doesNotMatch(monospaceBlock, /\bbackground\s*:/, 'Monospace previews should inherit the shared preview box gradient.');
