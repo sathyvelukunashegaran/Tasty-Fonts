@@ -98,6 +98,12 @@ final class AdminController
     private readonly AdminPageRenderer $renderer;
     private readonly AdminPageContextBuilder $pageContextBuilder;
     private readonly AdminAccessService $adminAccess;
+    private readonly MaintenanceActions $maintenanceActions;
+    private readonly RollbackActions $rollbackActions;
+    private readonly SiteTransferExportActions $siteTransferExportActions;
+    private readonly SupportActions $supportActions;
+    private readonly GoogleApiKeyActions $googleApiKeyActions;
+    private readonly GoogleApiKeyValidator $googleApiKeyValidator;
 
     public function __construct(
         private readonly Storage $storage,
@@ -125,10 +131,43 @@ final class AdminController
         private readonly ?RuntimeAssetPlanner $runtimePlanner = null,
         private readonly ?CustomCssUrlImportService $customCssImport = null,
         private readonly ?CustomCssImportSnapshotService $customCssSnapshots = null,
-        private readonly ?CustomCssFinalImportService $customCssFinalImport = null
+        private readonly ?CustomCssFinalImportService $customCssFinalImport = null,
+        ?MaintenanceActions $maintenanceActions = null,
+        ?RollbackActions $rollbackActions = null,
+        ?SiteTransferExportActions $siteTransferExportActions = null,
+        ?SupportActions $supportActions = null,
+        ?GoogleApiKeyActions $googleApiKeyActions = null,
+        ?GoogleApiKeyValidator $googleApiKeyValidator = null
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
         $this->adminAccess = $adminAccess ?? new AdminAccessService($this->settings);
+        $this->maintenanceActions = $maintenanceActions ?? new MaintenanceActions(
+            $this->storage,
+            $this->assets,
+            $this->developerTools,
+            $this->siteTransfer,
+            $this->snapshots,
+            $this->log
+        );
+        $this->rollbackActions = $rollbackActions ?? new RollbackActions(
+            $this->snapshots,
+            $this->log
+        );
+        $this->siteTransferExportActions = $siteTransferExportActions ?? new SiteTransferExportActions(
+            $this->siteTransfer,
+            $this->log
+        );
+        $this->supportActions = $supportActions ?? new SupportActions(
+            $this->supportBundles,
+            $this->log
+        );
+        $this->googleApiKeyValidator = $googleApiKeyValidator ?? new GoogleApiKeyValidator($this->googleClient);
+        $this->googleApiKeyActions = $googleApiKeyActions ?? new GoogleApiKeyActions(
+            $this->settings,
+            $this->googleClient,
+            $this->log,
+            $this->googleApiKeyValidator
+        );
         $this->pageContextBuilder = new AdminPageContextBuilder(
             $this->storage,
             $this->settings,
@@ -1084,37 +1123,7 @@ final class AdminController
      */
     public function resetPluginSettingsToDefaults(): array|WP_Error
     {
-        $snapshot = $this->snapshots->createSnapshot('before_reset_settings');
-
-        if (is_wp_error($snapshot)) {
-            return $snapshot;
-        }
-
-        $settings = $this->developerTools->resetPluginSettings();
-
-        if (is_wp_error($settings)) {
-            return $settings;
-        }
-
-        $message = __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'plugin_settings_reset',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Reset', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Preserved', 'tasty-fonts'), 'value' => __('Managed font library and files', 'tasty-fonts')],
-                    ['label' => __('Reset', 'tasty-fonts'), 'value' => __('Settings, roles, access rules, and stored Google key data', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        return $this->maintenanceActions->resetPluginSettingsToDefaults();
     }
 
     /**
@@ -1122,37 +1131,7 @@ final class AdminController
      */
     public function wipeManagedFontLibrary(): array|WP_Error
     {
-        $snapshot = $this->snapshots->createSnapshot('before_wipe_library');
-
-        if (is_wp_error($snapshot)) {
-            return $snapshot;
-        }
-
-        $settings = $this->developerTools->wipeManagedFontLibrary();
-
-        if (is_wp_error($settings)) {
-            return $settings;
-        }
-
-        $message = __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'managed_font_library_wiped',
-            [
-                'outcome' => 'danger',
-                'status_label' => __('Deleted', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Deleted', 'tasty-fonts'), 'value' => __('Managed font library and font storage files', 'tasty-fonts')],
-                    ['label' => __('Recreated', 'tasty-fonts'), 'value' => __('Empty storage scaffold', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        return $this->maintenanceActions->wipeManagedFontLibrary();
     }
 
     /**
@@ -1160,19 +1139,7 @@ final class AdminController
      */
     public function googleApiKeyStatus(): array
     {
-        $status = $this->settings->getGoogleApiKeyStatus();
-        $hasGoogleApiKey = $this->settings->hasGoogleApiKey();
-        $message = $hasGoogleApiKey
-            ? __('Google Fonts API key is stored.', 'tasty-fonts')
-            : __('Google Fonts API key is not stored.', 'tasty-fonts');
-
-        return [
-            'message' => $message,
-            'has_google_api_key' => $hasGoogleApiKey,
-            'google_api_key_status' => $this->stringValue($status, 'state', $hasGoogleApiKey ? 'unknown' : 'empty'),
-            'google_api_key_status_message' => $this->stringValue($status, 'message'),
-            'google_api_key_checked_at' => $this->intValue($status, 'checked_at'),
-        ];
+        return $this->googleApiKeyActions->status();
     }
 
     /**
@@ -1180,62 +1147,7 @@ final class AdminController
      */
     public function saveGoogleApiKey(string $googleApiKey): array|WP_Error
     {
-        $googleApiKey = trim(sanitize_text_field($googleApiKey));
-
-        if ($googleApiKey === '') {
-            return new WP_Error(
-                'tasty_fonts_google_api_key_empty',
-                __('A Google Fonts API key is required.', 'tasty-fonts')
-            );
-        }
-
-        $validation = $this->validateGoogleApiKeyValue(
-            $googleApiKey,
-            'tasty_fonts_google_api_key_invalid',
-            __('Google Fonts API key could not be validated.', 'tasty-fonts')
-        );
-
-        if (is_wp_error($validation)) {
-            $this->log->add(
-                __('Google Fonts API key validation failed.', 'tasty-fonts'),
-                $this->buildActivityLogContext(
-                    LogRepository::CATEGORY_SETTINGS,
-                    'google_api_key_validation_failed',
-                    [
-                        'outcome' => 'error',
-                        'status_label' => __('Validation failed', 'tasty-fonts'),
-                        'source' => __('Settings', 'tasty-fonts'),
-                        'details' => [
-                            ['label' => __('Google API key', 'tasty-fonts'), 'value' => __('Not saved', 'tasty-fonts')],
-                        ],
-                    ]
-                )
-            );
-            return $validation;
-        }
-
-        $this->settings->saveSettings(['google_api_key' => $googleApiKey]);
-        $this->settings->saveGoogleApiKeyStatus($validation['state'], $validation['message']);
-        $this->googleClient->clearCatalogCache();
-
-        $message = __('Google Fonts API key validated.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_SETTINGS,
-            'google_api_key_validated',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Validated', 'tasty-fonts'),
-                'source' => __('Settings', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Google API key', 'tasty-fonts'), 'value' => __('Saved', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return array_merge(
-            $this->googleApiKeyStatus(),
-            ['message' => $message]
-        );
+        return $this->googleApiKeyActions->save($googleApiKey);
     }
 
     /**
@@ -1243,48 +1155,7 @@ final class AdminController
      */
     public function deletePluginManagedFiles(): array|WP_Error
     {
-        $settings = $this->developerTools->wipeManagedFontLibrary();
-
-        if (is_wp_error($settings)) {
-            return $settings;
-        }
-
-        $generatedCssPath = $this->storage->getGeneratedCssPath();
-
-        if (is_string($generatedCssPath) && $generatedCssPath !== '' && file_exists($generatedCssPath) && !$this->storage->deleteAbsolutePath($generatedCssPath)) {
-            return new WP_Error(
-                'tasty_fonts_managed_files_delete_failed',
-                __('Generated CSS could not be deleted after managed file cleanup.', 'tasty-fonts')
-            );
-        }
-
-        $exportCleanup = $this->siteTransfer->deleteAllExportBundles();
-        $snapshotCleanup = $this->snapshots->deleteAllSnapshots();
-
-        $message = __('Plugin-managed files deleted. Storage reset to an empty scaffold.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'plugin_managed_files_deleted',
-            [
-                'outcome' => 'danger',
-                'status_label' => __('Deleted', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Transfer exports deleted', 'tasty-fonts'), 'value' => (string) $this->intValue($exportCleanup, 'deleted_export_bundles'), 'kind' => 'count'],
-                    ['label' => __('Rollback snapshots deleted', 'tasty-fonts'), 'value' => (string) $this->intValue($snapshotCleanup, 'deleted_snapshots'), 'kind' => 'count'],
-                    ['label' => __('Storage', 'tasty-fonts'), 'value' => __('Managed font files and generated CSS removed; scaffold recreated', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-            'deleted_export_bundles' => $this->intValue($exportCleanup, 'deleted_export_bundles'),
-            'deleted_export_files' => $this->intValue($exportCleanup, 'deleted_export_files'),
-            'deleted_snapshots' => $this->intValue($snapshotCleanup, 'deleted_snapshots'),
-            'deleted_snapshot_files' => $this->intValue($snapshotCleanup, 'deleted_snapshot_files'),
-        ];
+        return $this->maintenanceActions->deletePluginManagedFiles();
     }
 
     /**
@@ -1292,28 +1163,7 @@ final class AdminController
      */
     public function clearPluginCachesAndRegenerateAssets(): array|WP_Error
     {
-        if (!$this->developerTools->clearPluginCachesAndRegenerateAssets()) {
-            return new WP_Error(
-                'tasty_fonts_maintenance_failed',
-                __('Plugin caches were cleared, but generated assets could not be rebuilt.', 'tasty-fonts')
-            );
-        }
-
-        $message = __('Plugin caches cleared and generated assets refreshed.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'plugin_caches_refreshed',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Refreshed', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Affected assets', 'tasty-fonts'), 'value' => __('Caches, generated CSS, and runtime assets', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return ['message' => $message];
+        return $this->maintenanceActions->clearPluginCachesAndRegenerateAssets();
     }
 
     /**
@@ -1321,28 +1171,7 @@ final class AdminController
      */
     public function regenerateCss(): array|WP_Error
     {
-        if (!$this->developerTools->regenerateCss()) {
-            return new WP_Error(
-                'tasty_fonts_regenerate_css_failed',
-                __('Generated CSS could not be rebuilt.', 'tasty-fonts')
-            );
-        }
-
-        $message = __('Generated CSS regenerated.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'generated_css_regenerated',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Regenerated', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Affected asset', 'tasty-fonts'), 'value' => __('Generated CSS', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return ['message' => $message];
+        return $this->maintenanceActions->regenerateCss();
     }
 
     /**
@@ -1350,22 +1179,7 @@ final class AdminController
      */
     public function rescanFontLibrary(): array
     {
-        $this->assets->refreshGeneratedAssets(true, false);
-        $message = __('Fonts rescanned.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'font_library_rescanned',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Rescanned', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Affected area', 'tasty-fonts'), 'value' => __('Font library and generated assets', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return ['message' => $message];
+        return $this->maintenanceActions->rescanFontLibrary();
     }
 
     /**
@@ -1373,28 +1187,7 @@ final class AdminController
      */
     public function repairStorageScaffold(): array|WP_Error
     {
-        if (!$this->developerTools->ensureStorageScaffolding()) {
-            return new WP_Error(
-                'tasty_fonts_storage_scaffold_repair_failed',
-                __('Storage scaffold could not be repaired.', 'tasty-fonts')
-            );
-        }
-
-        $message = __('Storage scaffold repaired.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'storage_scaffold_repaired',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Repaired', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-                'details' => [
-                    ['label' => __('Affected area', 'tasty-fonts'), 'value' => __('Storage directories and index files', 'tasty-fonts')],
-                ],
-            ]
-        ));
-
-        return ['message' => $message];
+        return $this->maintenanceActions->repairStorageScaffold();
     }
 
     /**
@@ -1402,22 +1195,7 @@ final class AdminController
      */
     public function resetIntegrationDetectionState(): array
     {
-        $settings = $this->developerTools->resetIntegrationDetectionState();
-        $message = __('Integration detection state reset.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'integration_detection_reset',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Reset', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-            ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        return $this->maintenanceActions->resetIntegrationDetectionState();
     }
 
     /**
@@ -1425,19 +1203,7 @@ final class AdminController
      */
     public function resetSuppressedNotices(): array
     {
-        $this->developerTools->resetSuppressedNotices();
-        $message = __('Suppressed notices reset. Hidden reminders can appear again.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'suppressed_notices_reset',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Reset', 'tasty-fonts'),
-                'source' => __('Developer', 'tasty-fonts'),
-            ]
-        ));
-
-        return ['message' => $message];
+        return $this->maintenanceActions->resetSuppressedNotices();
     }
 
     /**
@@ -1445,21 +1211,7 @@ final class AdminController
      */
     public function createRollbackSnapshot(string $reason = 'manual'): array|WP_Error
     {
-        $result = $this->snapshots->createSnapshot($reason);
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $snapshot = $result['snapshot'];
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot created.', 'tasty-fonts'));
-        $this->log->add($message, $this->buildTransferLogContext('rollback_snapshot_created'));
-
-        return [
-            'message' => $message,
-            'snapshot' => $snapshot,
-            'snapshots' => $this->snapshots->listSnapshots(),
-        ];
+        return $this->rollbackActions->createSnapshot($reason);
     }
 
     /**
@@ -1467,7 +1219,7 @@ final class AdminController
      */
     public function listRollbackSnapshots(): array
     {
-        return ['snapshots' => $this->snapshots->listSnapshots()];
+        return $this->rollbackActions->listSnapshots();
     }
 
     /**
@@ -1475,35 +1227,7 @@ final class AdminController
      */
     public function restoreRollbackSnapshot(string $snapshotId): array|WP_Error
     {
-        $preview = $this->snapshots->previewRestore($snapshotId);
-
-        if (is_wp_error($preview)) {
-            return $preview;
-        }
-
-        $safetySnapshot = $this->snapshots->createSnapshot('before_snapshot_restore');
-
-        if (is_wp_error($safetySnapshot)) {
-            return $safetySnapshot;
-        }
-
-        $result = $this->snapshots->restoreSnapshot($snapshotId);
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot restored.', 'tasty-fonts'));
-        $this->log->add($message, $this->buildTransferLogContext('rollback_snapshot_restored'));
-
-        return array_merge(
-            $result,
-            [
-                'message' => $message,
-                'preview' => $preview,
-                'snapshots' => $this->snapshots->listSnapshots(),
-            ]
-        );
+        return $this->rollbackActions->restoreSnapshot($snapshotId);
     }
 
     /**
@@ -1511,20 +1235,7 @@ final class AdminController
      */
     public function renameRollbackSnapshot(string $snapshotId, string $label): array|WP_Error
     {
-        $result = $this->snapshots->renameSnapshot($snapshotId, $label);
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot renamed.', 'tasty-fonts'));
-        $this->log->add($message, $this->buildTransferLogContext('rollback_snapshot_renamed'));
-
-        return [
-            'message' => $message,
-            'snapshot' => $result['snapshot'],
-            'snapshots' => $this->snapshots->listSnapshots(),
-        ];
+        return $this->rollbackActions->renameSnapshot($snapshotId, $label);
     }
 
     /**
@@ -1532,20 +1243,7 @@ final class AdminController
      */
     public function deleteRollbackSnapshot(string $snapshotId): array|WP_Error
     {
-        $result = $this->snapshots->deleteSnapshot($snapshotId);
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot deleted.', 'tasty-fonts'));
-        $this->log->add($message, $this->buildTransferLogContext('rollback_snapshot_deleted'));
-
-        return [
-            'message' => $message,
-            'snapshot' => $result['snapshot'],
-            'snapshots' => $this->snapshots->listSnapshots(),
-        ];
+        return $this->rollbackActions->deleteSnapshot($snapshotId);
     }
 
     /**
@@ -1553,16 +1251,7 @@ final class AdminController
      */
     public function deleteAllRollbackSnapshots(): array
     {
-        $result = $this->snapshots->deleteAllSnapshots();
-        $message = __('All rollback snapshots deleted.', 'tasty-fonts');
-        $this->log->add($message, $this->buildTransferLogContext('rollback_snapshots_deleted_all'));
-
-        return [
-            'message' => $message,
-            'snapshots' => $this->snapshots->listSnapshots(),
-            'deleted_snapshots' => $this->intValue($result, 'deleted_snapshots'),
-            'deleted_snapshot_files' => $this->intValue($result, 'deleted_snapshot_files'),
-        ];
+        return $this->rollbackActions->deleteAllSnapshots();
     }
 
     /**
@@ -1587,18 +1276,7 @@ final class AdminController
      */
     public function runAdvancedToolsAction(string $action): array|WP_Error
     {
-        $result = match ($action) {
-            'clear_plugin_caches' => $this->clearPluginCachesAndRegenerateAssets(),
-            'regenerate_css' => $this->regenerateCss(),
-            'rescan_font_library' => $this->rescanFontLibrary(),
-            'repair_storage_scaffold' => $this->repairStorageScaffold(),
-            'reset_integration_detection_state' => $this->resetIntegrationDetectionState(),
-            'reset_suppressed_notices' => $this->resetSuppressedNotices(),
-            default => new WP_Error(
-                'tasty_fonts_invalid_tools_action',
-                __('Unknown advanced tools action.', 'tasty-fonts')
-            ),
-        };
+        $result = $this->maintenanceActions->runAdvancedToolsAction($action);
 
         if (is_wp_error($result)) {
             return $result;
@@ -1649,7 +1327,7 @@ final class AdminController
      */
     public function exportSiteTransferBundle(): array|WP_Error
     {
-        return $this->siteTransfer->buildExportBundle(true);
+        return $this->siteTransferExportActions->exportBundle();
     }
 
     /**
@@ -1657,19 +1335,7 @@ final class AdminController
      */
     public function renameSiteTransferExportBundle(string $exportId, string $label): array|WP_Error
     {
-        $result = $this->siteTransfer->renameExportBundle($exportId, $label);
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $message = $this->stringValue($result, 'message', __('Export bundle renamed.', 'tasty-fonts'));
-        $this->log->add($message, $this->buildTransferLogContext('site_transfer_export_renamed'));
-
-        return [
-            'message' => $message,
-            'export_bundles' => $this->siteTransfer->listExportBundles(),
-        ];
+        return $this->siteTransferExportActions->renameBundle($exportId, $label);
     }
 
     /**
@@ -1677,19 +1343,7 @@ final class AdminController
      */
     public function setSiteTransferExportBundleProtected(string $exportId, bool $protected): array|WP_Error
     {
-        $result = $this->siteTransfer->setExportBundleProtected($exportId, $protected);
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $message = $this->stringValue($result, 'message', $protected ? __('Export bundle protected.', 'tasty-fonts') : __('Export bundle unprotected.', 'tasty-fonts'));
-        $this->log->add($message, $this->buildTransferLogContext('site_transfer_export_protection_changed'));
-
-        return [
-            'message' => $message,
-            'export_bundles' => $this->siteTransfer->listExportBundles(),
-        ];
+        return $this->siteTransferExportActions->setBundleProtected($exportId, $protected);
     }
 
     /**
@@ -1697,19 +1351,7 @@ final class AdminController
      */
     public function deleteSiteTransferExportBundle(string $exportId): array|WP_Error
     {
-        $result = $this->siteTransfer->deleteExportBundle($exportId);
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $message = $this->stringValue($result, 'message', __('Export bundle deleted.', 'tasty-fonts'));
-        $this->log->add($message, $this->buildTransferLogContext('site_transfer_export_deleted'));
-
-        return [
-            'message' => $message,
-            'export_bundles' => $this->siteTransfer->listExportBundles(),
-        ];
+        return $this->siteTransferExportActions->deleteBundle($exportId);
     }
 
     /**
@@ -1717,21 +1359,7 @@ final class AdminController
      */
     public function deleteAllSiteTransferExportBundles(): array|WP_Error
     {
-        $result = $this->siteTransfer->deleteAllExportBundlesUnlessProtected();
-
-        if (is_wp_error($result)) {
-            return $result;
-        }
-
-        $message = __('All site transfer export bundles deleted.', 'tasty-fonts');
-        $this->log->add($message, $this->buildTransferLogContext('site_transfer_exports_deleted_all'));
-
-        return [
-            'message' => $message,
-            'export_bundles' => $this->siteTransfer->listExportBundles(),
-            'deleted_export_bundles' => $this->intValue($result, 'deleted_export_bundles'),
-            'deleted_export_files' => $this->intValue($result, 'deleted_export_files'),
-        ];
+        return $this->siteTransferExportActions->deleteAllBundles();
     }
 
     /**
@@ -1739,27 +1367,7 @@ final class AdminController
      */
     public function buildSupportBundle(): array|WP_Error
     {
-        $bundle = $this->supportBundles->buildBundle($this->buildAdvancedToolsPayload());
-
-        if (is_wp_error($bundle)) {
-            return $bundle;
-        }
-
-        $message = __('Support bundle created.', 'tasty-fonts');
-        $this->log->add($message, $this->buildActivityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'support_bundle_created',
-            [
-                'outcome' => 'success',
-                'status_label' => __('Created', 'tasty-fonts'),
-                'source' => __('Support', 'tasty-fonts'),
-            ]
-        ));
-
-        return [
-            'message' => $message,
-            'bundle' => $bundle,
-        ];
+        return $this->supportActions->buildBundle($this->buildAdvancedToolsPayload());
     }
 
     /**
@@ -1962,21 +1570,7 @@ final class AdminController
      */
     private function validateGoogleApiKeyValue(string $googleApiKey, string $errorCode, string $fallbackMessage): array|WP_Error
     {
-        $validation = $this->googleClient->validateApiKey($googleApiKey);
-        $validationState = $this->stringValue($validation, 'state', 'unknown');
-        $validationMessage = $this->stringValue($validation, 'message');
-
-        if ($validationState === 'valid') {
-            return [
-                'state' => $validationState,
-                'message' => $validationMessage,
-            ];
-        }
-
-        return new WP_Error(
-            $errorCode,
-            $validationMessage !== '' ? $validationMessage : $fallbackMessage
-        );
+        return $this->googleApiKeyValidator->validate($googleApiKey, $errorCode, $fallbackMessage);
     }
 
     /**
@@ -2236,9 +1830,10 @@ final class AdminController
         }
 
         check_admin_referer('tasty_fonts_rescan_fonts');
-        $this->assets->refreshGeneratedAssets(true, false);
-        $this->log->add(__('Fonts rescanned.', 'tasty-fonts'));
-        $this->redirectWithNoticeKey('rescan');
+
+        $result = $this->rescanFontLibrary();
+
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Fonts rescanned.', 'tasty-fonts')));
     }
 
     private function handleLocalEnvironmentNoticeAction(): bool

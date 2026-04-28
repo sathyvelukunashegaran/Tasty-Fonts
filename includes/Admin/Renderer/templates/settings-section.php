@@ -1380,13 +1380,17 @@
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">
                                                 <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Additional Access Rules', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-admin-access-mode-copy"><?php esc_html_e('Grant Tasty Fonts access to extra roles and users. Administrators always keep access.', 'tasty-fonts'); ?></span>
+                                                <?php if ($showSettingsDescriptions): ?>
+                                                    <span class="tasty-fonts-admin-access-mode-copy"><?php esc_html_e('Grant Tasty Fonts access to extra roles and users. Administrators always keep access.', 'tasty-fonts'); ?></span>
+                                                <?php endif; ?>
                                             </span>
                                         </label>
                                         <div class="tasty-fonts-admin-access-summary-bar<?php echo $showSettingsDescriptions ? '' : ' is-compact'; ?>">
                                             <p class="tasty-fonts-admin-access-summary-intro" data-admin-access-summary-state="disabled"<?php echo $adminAccessCustomEnabled ? ' hidden' : ''; ?>>
                                                 <strong><?php esc_html_e('Administrators always have access.', 'tasty-fonts'); ?></strong>
-                                                <span><?php esc_html_e('Turn custom access on to grant additional roles or users.', 'tasty-fonts'); ?></span>
+                                                <?php if ($showSettingsDescriptions): ?>
+                                                    <span><?php esc_html_e('Turn custom access on to grant additional roles or users.', 'tasty-fonts'); ?></span>
+                                                <?php endif; ?>
                                             </p>
                                             <div class="tasty-fonts-admin-access-summary-intro" data-admin-access-summary-state="enabled"<?php echo $adminAccessCustomEnabled ? '' : ' hidden'; ?>>
                                                 <span class="tasty-fonts-admin-access-summary-token tasty-fonts-admin-access-stat<?php echo $adminAccessRoleCount > 0 ? ' has-selection' : ''; ?>">
@@ -1411,7 +1415,9 @@
                                                 <div class="tasty-fonts-admin-access-field-head">
                                                     <div class="tasty-fonts-admin-access-copy">
                                                         <h5 id="tasty-fonts-admin-access-roles-label"><?php esc_html_e('Additional Roles', 'tasty-fonts'); ?></h5>
-                                                        <p class="tasty-fonts-admin-access-note"><?php esc_html_e('Grant access to everyone in selected roles.', 'tasty-fonts'); ?></p>
+                                                        <?php if ($showSettingsDescriptions): ?>
+                                                            <p class="tasty-fonts-admin-access-note"><?php esc_html_e('Grant access to everyone in selected roles.', 'tasty-fonts'); ?></p>
+                                                        <?php endif; ?>
                                                     </div>
                                                     <div class="tasty-fonts-admin-access-field-controls">
                                                         <p class="tasty-fonts-admin-access-field-summary" data-admin-access-selected-summary="roles"><?php echo esc_html(sprintf(_n('%1$d role selected · reaches %2$d user.', '%1$d roles selected · reaches %2$d users.', $adminAccessRoleCount, 'tasty-fonts'), $adminAccessRoleCount, $adminAccessRoleImpact)); ?></p>
@@ -1460,7 +1466,9 @@
                                                 <div class="tasty-fonts-admin-access-field-head">
                                                     <div class="tasty-fonts-admin-access-copy">
                                                         <h5 id="tasty-fonts-admin-access-users-label"><?php esc_html_e('Specific Users', 'tasty-fonts'); ?></h5>
-                                                        <p class="tasty-fonts-admin-access-note"><?php esc_html_e('Grant access to selected users only.', 'tasty-fonts'); ?></p>
+                                                        <?php if ($showSettingsDescriptions): ?>
+                                                            <p class="tasty-fonts-admin-access-note"><?php esc_html_e('Grant access to selected users only.', 'tasty-fonts'); ?></p>
+                                                        <?php endif; ?>
                                                     </div>
                                                     <div class="tasty-fonts-admin-access-field-controls">
                                                         <p class="tasty-fonts-admin-access-field-summary" data-admin-access-selected-summary="users"><?php echo esc_html(sprintf(_n('%d user selected.', '%d users selected.', $adminAccessUserCount, 'tasty-fonts'), $adminAccessUserCount)); ?></p>

@@ -6,16 +6,18 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\Storage;
 use WP_Error;
 
 /**
+ * Shared workflow for hosted provider imports.
+ *
  * @phpstan-type HostedFamily array<string, mixed>
  * @phpstan-type HostedProfile array<string, mixed>
  * @phpstan-type HostedFace array<string, mixed>
- * @phpstan-type HostedProviderMeta array<string, mixed>
- * @phpstan-type HostedImportConfig array<string, string>
  * @phpstan-type HostedVariantList list<string>
  * @phpstan-type HostedVariantPlan array{import: HostedVariantList, skipped: HostedVariantList}
  * @phpstan-type HostedManifestResult array{faces: list<HostedFace>, files: int}
@@ -34,9 +36,91 @@ use WP_Error;
  *     delivery_id?: string
  * }
  */
-trait HostedProviderImportTrait
+final class HostedImportWorkflow
 {
-    private function normalizeHostedDeliveryMode(string $deliveryMode): string
+    public function __construct(
+        private readonly Storage $storage,
+        private readonly ImportRepository $imports,
+        private readonly AssetService $assets,
+        private readonly LogRepository $log,
+        private readonly HostedImportVariantPlanner $variantPlanner
+    ) {}
+
+    /**
+     * @return HostedImportResult|WP_Error
+     */
+    public function import(
+        HostedImportRequest $request,
+        HostedImportProviderAdapterInterface $provider
+    ): array|WP_Error {
+        $config = $provider->config();
+        $familyName = trim(wp_strip_all_tags($request->familyName));
+
+        if ($familyName === '') {
+            return $this->error($config->missingFamilyCode, $config->missingFamilyMessage);
+        }
+
+        $familySlug = FontUtils::slugify($familyName);
+        $deliveryMode = $this->normalizeDeliveryMode($request->deliveryMode);
+        $formatMode = $provider->normalizeFormatMode($request->formatMode);
+        $requestedVariants = FontUtils::normalizeVariantTokens($request->variants);
+        $existingFamily = $this->imports->getFamily($familySlug);
+        $existingProfile = $this->findDeliveryProfile(
+            $existingFamily,
+            $provider->providerKey(),
+            $deliveryMode,
+            $provider->profileFormatFilter($formatMode)
+        );
+        $variantPlan = $this->variantPlanner->plan(
+            $requestedVariants,
+            $existingProfile,
+            static fn (array $variants): array => $provider->normalizeRequestedVariants($variants, $formatMode)
+        );
+
+        if ($variantPlan['import'] === []) {
+            return $this->buildSkippedImportResult(
+                $familyName,
+                $deliveryMode,
+                $requestedVariants,
+                $variantPlan,
+                $config
+            );
+        }
+
+        $metadata = $provider->fetchMetadata($familyName);
+        $css = $provider->fetchCss($familyName, $variantPlan['import'], $metadata, $formatMode);
+
+        if (is_wp_error($css)) {
+            return $this->error($this->normalizeErrorCode($css->get_error_code()), $css->get_error_message());
+        }
+
+        $faces = $this->selectImportFaces($familyName, $css, $variantPlan['import'], $provider, $config);
+
+        if (is_wp_error($faces)) {
+            return $faces;
+        }
+
+        $draft = $provider->buildProfileDraft([
+            'family_name' => $familyName,
+            'family_slug' => $familySlug,
+            'delivery_mode' => $deliveryMode,
+            'format_mode' => $formatMode,
+            'metadata' => $metadata,
+            'existing_family' => $existingFamily,
+            'existing_profile' => $existingProfile,
+            'imported_variants' => $variantPlan['import'],
+        ]);
+        $profile = $this->normalizeMap($draft['profile']);
+        $faceProvider = $this->normalizeMap($draft['face_provider']);
+
+        $result = $deliveryMode === 'cdn'
+            ? $this->saveCdnProfile($familyName, $familySlug, $faces, $variantPlan, $existingFamily, $existingProfile, $profile, $faceProvider, $config)
+            : $this->saveSelfHostedProfile($familyName, $familySlug, $faces, $variantPlan, $existingFamily, $existingProfile, $profile, $faceProvider, $config);
+
+        return $this->completeImport($result, $provider->providerKey());
+    }
+
+    private function normalizeDeliveryMode(string $deliveryMode): string
     {
         $deliveryMode = strtolower(trim($deliveryMode));
 
@@ -47,14 +131,17 @@ trait HostedProviderImportTrait
      * @param HostedFamily|null $family
      * @return HostedProfile|null
      */
-    private function findHostedDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = ''): ?array
+    private function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = ''): ?array
     {
         if (!is_array($family)) {
             return null;
         }
 
+        $provider = strtolower(trim($provider));
+        $type = strtolower(trim($type));
+
         foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
-            $profile = $this->normalizeHostedMap($profile);
+            $profile = $this->normalizeMap($profile);
 
             if (
                 $profile === []
@@ -76,66 +163,19 @@ trait HostedProviderImportTrait
 
     /**
      * @param HostedVariantList $requestedVariants
-     * @param HostedProfile|null $existingProfile
-     * @return HostedVariantPlan
-     */
-    private function buildHostedVariantPlan(array $requestedVariants, ?array $existingProfile, ?callable $normalizeRequested = null): array
-    {
-        $existingKeys = [];
-
-        foreach ((array) ($existingProfile['faces'] ?? []) as $face) {
-            $face = $this->normalizeHostedMap($face);
-
-            if ($face === []) {
-                continue;
-            }
-
-            $existingKeys[HostedImportSupport::faceKeyFromFace($face)] = true;
-        }
-
-        $normalizedRequested = $normalizeRequested === null
-            ? $requestedVariants
-            : $this->normalizeHostedVariantList($normalizeRequested($requestedVariants));
-        $toImport = [];
-        $skipped = [];
-
-        foreach ($normalizedRequested as $variant) {
-            $faceKey = HostedImportSupport::faceKeyFromVariant($variant);
-
-            if ($faceKey === null) {
-                continue;
-            }
-
-            if (isset($existingKeys[$faceKey])) {
-                $skipped[] = $variant;
-                continue;
-            }
-
-            $toImport[] = $variant;
-        }
-
-        return [
-            'import' => array_values(array_unique($toImport)),
-            'skipped' => array_values(array_unique($skipped)),
-        ];
-    }
-
-    /**
-     * @param HostedVariantList $requestedVariants
      * @param HostedVariantPlan $variantPlan
-     * @param array<string, string> $messages
      * @return HostedImportResult
      */
-    private function buildHostedSkippedImportResult(
+    private function buildSkippedImportResult(
         string $familyName,
         string $deliveryMode,
         array $requestedVariants,
         array $variantPlan,
-        array $messages
+        HostedImportProviderConfig $config
     ): array {
         $message = $deliveryMode === 'cdn'
-            ? sprintf($this->stringValue($messages, 'cdn'), $familyName)
-            : sprintf($this->stringValue($messages, 'existing'), $familyName);
+            ? sprintf($config->skippedCdnMessage, $familyName)
+            : sprintf($config->skippedExistingMessage, $familyName);
 
         $this->log->add($message, [
             'category' => LogRepository::CATEGORY_IMPORT,
@@ -170,32 +210,31 @@ trait HostedProviderImportTrait
      * @param HostedVariantList $requestedVariants
      * @return list<HostedFace>|WP_Error
      */
-    private function selectHostedImportFaces(
+    private function selectImportFaces(
         string $familyName,
         string $css,
         array $requestedVariants,
-        callable $parseFaces,
-        string $emptyCode,
-        string $emptyMessage
+        HostedImportProviderAdapterInterface $provider,
+        HostedImportProviderConfig $config
     ): array|WP_Error {
         $faces = HostedImportSupport::selectPreferredFaces(
-            $this->normalizeHostedFaceList($parseFaces($css, $familyName)),
+            FontUtils::normalizeFaceList($provider->parseFaces($css, $familyName)),
             $requestedVariants
         );
 
         if ($faces === []) {
-            return $this->error($emptyCode, $emptyMessage);
+            return $this->error($config->noFacesCode, $config->noFacesMessage);
         }
 
         return $faces;
     }
 
     /**
-     * @param HostedImportConfig $config
+     * @return string|WP_Error
      */
-    private function resolveHostedImportTarget(string $familySlug, array $config): string|WP_Error
+    private function resolveImportTarget(string $familySlug, HostedImportProviderConfig $config): string|WP_Error
     {
-        $root = $this->getHostedImportRootDirectory($config);
+        $root = $this->getImportRootDirectory($config);
 
         if (is_wp_error($root)) {
             return $root;
@@ -205,18 +244,15 @@ trait HostedProviderImportTrait
 
         if (!$this->storage->ensureDirectory($familyDirectory)) {
             return $this->error(
-                $this->stringValue($config, 'family_dir_error_code'),
-                $this->storageErrorMessage($this->stringValue($config, 'family_dir_error_message'))
+                $config->familyDirErrorCode,
+                $this->storageErrorMessage($config->familyDirErrorMessage)
             );
         }
 
         return $familyDirectory;
     }
 
-    /**
-     * @param HostedImportConfig $config
-     */
-    private function getHostedImportRootDirectory(array $config): string|WP_Error
+    private function getImportRootDirectory(HostedImportProviderConfig $config): string|WP_Error
     {
         if (!$this->storage->ensureRootDirectory()) {
             return $this->error(
@@ -225,7 +261,7 @@ trait HostedProviderImportTrait
             );
         }
 
-        $providerRoot = $this->storage->getProviderRoot($this->stringValue($config, 'provider_root'));
+        $providerRoot = $this->storage->getProviderRoot($config->providerRoot);
 
         if (!$providerRoot) {
             return $this->error(
@@ -239,18 +275,17 @@ trait HostedProviderImportTrait
 
     /**
      * @param HostedFace $face
-     * @param HostedProviderMeta $provider
-     * @param HostedImportConfig $config
-     * @return array<string, mixed>|WP_Error|null
+     * @param array<string, mixed> $provider
+     * @return HostedFace|WP_Error|null
      */
-    private function buildHostedManifestFace(
+    private function buildManifestFace(
         string $familyName,
         string $familySlug,
         string $familyDirectory,
         array $face,
         array $provider,
         int &$downloadedFiles,
-        array $config
+        HostedImportProviderConfig $config
     ): array|WP_Error|null {
         $relativeFiles = [];
 
@@ -268,7 +303,7 @@ trait HostedProviderImportTrait
                 continue;
             }
 
-            $download = $this->downloadHostedFontFile(FontUtils::scalarStringValue($url), $absolutePath, $config);
+            $download = $this->downloadFontFile(FontUtils::scalarStringValue($url), $absolutePath, $config);
 
             if (is_wp_error($download)) {
                 return $download;
@@ -282,14 +317,47 @@ trait HostedProviderImportTrait
             return null;
         }
 
+        return $this->buildStoredFace($familyName, $familySlug, $face, $relativeFiles, $provider, $config->source);
+    }
+
+    /**
+     * @param list<HostedFace> $faces
+     * @param array<string, mixed> $provider
+     * @return list<HostedFace>
+     */
+    private function buildCdnFaces(string $familyName, string $familySlug, array $faces, array $provider, string $source): array
+    {
+        $cdnFaces = [];
+
+        foreach ($faces as $face) {
+            $cdnFaces[] = $this->buildStoredFace($familyName, $familySlug, $face, FontUtils::normalizeStringMap($face['files'] ?? []), $provider, $source);
+        }
+
+        return $cdnFaces;
+    }
+
+    /**
+     * @param HostedFace $face
+     * @param array<string, string> $files
+     * @param array<string, mixed> $provider
+     * @return HostedFace
+     */
+    private function buildStoredFace(
+        string $familyName,
+        string $familySlug,
+        array $face,
+        array $files,
+        array $provider,
+        string $source
+    ): array {
         return [
             'family' => $familyName,
             'slug' => $familySlug,
-            'source' => $this->stringValue($config, 'source'),
+            'source' => $source,
             'weight' => $this->stringValue($face, 'weight', '400'),
             'style' => $this->stringValue($face, 'style', 'normal'),
             'unicode_range' => $this->stringValue($face, 'unicode_range'),
-            'files' => $relativeFiles,
+            'files' => $files,
             'provider' => $provider,
             'is_variable' => !empty($face['is_variable']),
             'axes' => $this->arrayValue($face, 'axes'),
@@ -299,51 +367,22 @@ trait HostedProviderImportTrait
 
     /**
      * @param list<HostedFace> $faces
-     * @param HostedProviderMeta $provider
-     * @return list<array<string, mixed>>
-     */
-    private function buildHostedCdnFaces(string $familyName, string $familySlug, array $faces, array $provider, string $source): array
-    {
-        $cdnFaces = [];
-
-        foreach ($faces as $face) {
-            $cdnFaces[] = [
-                'family' => $familyName,
-                'slug' => $familySlug,
-                'source' => $source,
-                'weight' => $this->stringValue($face, 'weight', '400'),
-                'style' => $this->stringValue($face, 'style', 'normal'),
-                'unicode_range' => $this->stringValue($face, 'unicode_range'),
-                'files' => $this->arrayValue($face, 'files'),
-                'provider' => $provider,
-                'is_variable' => !empty($face['is_variable']),
-                'axes' => $this->arrayValue($face, 'axes'),
-                'variation_defaults' => $this->arrayValue($face, 'variation_defaults'),
-            ];
-        }
-
-        return $cdnFaces;
-    }
-
-    /**
-     * @param list<HostedFace> $faces
-     * @param HostedProviderMeta $provider
-     * @param HostedImportConfig $config
+     * @param array<string, mixed> $provider
      * @return HostedManifestResult|WP_Error
      */
-    private function buildHostedManifestFaces(
+    private function buildManifestFaces(
         string $familyName,
         string $familySlug,
         string $familyDirectory,
         array $faces,
         array $provider,
-        array $config
+        HostedImportProviderConfig $config
     ): array|WP_Error {
         $manifestFaces = [];
         $downloadedFiles = 0;
 
         foreach ($faces as $face) {
-            $manifestFace = $this->buildHostedManifestFace(
+            $manifestFace = $this->buildManifestFace(
                 $familyName,
                 $familySlug,
                 $familyDirectory,
@@ -375,7 +414,7 @@ trait HostedProviderImportTrait
      * @param HostedVariantList $importedVariants
      * @return HostedPersistResult
      */
-    private function persistHostedProfile(
+    private function persistProfile(
         string $familyName,
         string $familySlug,
         array $profile,
@@ -384,13 +423,13 @@ trait HostedProviderImportTrait
         array $importedVariants
     ): array {
         $profile['faces'] = HostedImportSupport::mergeManifestFaces(
-            $this->normalizeHostedFaceList($existingProfile['faces'] ?? []),
-            $this->normalizeHostedFaceList($profile['faces'] ?? [])
+            FontUtils::normalizeFaceList($existingProfile['faces'] ?? []),
+            FontUtils::normalizeFaceList($profile['faces'] ?? [])
         );
         $profile['variants'] = array_values(
             array_unique(
                 array_merge(
-                    $this->normalizeHostedVariantList($existingProfile['variants'] ?? []),
+                    FontUtils::normalizeVariantTokens($this->stringList($existingProfile['variants'] ?? [])),
                     $importedVariants
                 )
             )
@@ -417,10 +456,10 @@ trait HostedProviderImportTrait
      * @param HostedFamily|null $existingFamily
      * @param HostedProfile|null $existingProfile
      * @param HostedProfile $profile
-     * @param HostedImportConfig $config
+     * @param array<string, mixed> $provider
      * @return HostedImportResult|WP_Error
      */
-    private function saveHostedSelfHostedProfile(
+    private function saveSelfHostedProfile(
         string $familyName,
         string $familySlug,
         array $faces,
@@ -428,20 +467,16 @@ trait HostedProviderImportTrait
         ?array $existingFamily,
         ?array $existingProfile,
         array $profile,
-        array $config,
-        string $emptyManifestCode,
-        string $emptyManifestMessage,
-        string $successTemplate
+        array $provider,
+        HostedImportProviderConfig $config
     ): array|WP_Error {
-        $familyDirectory = $this->resolveHostedImportTarget($familySlug, $config);
+        $familyDirectory = $this->resolveImportTarget($familySlug, $config);
 
         if (is_wp_error($familyDirectory)) {
             return $familyDirectory;
         }
 
-        $provider = $this->arrayValue($profile, 'provider_face');
-        unset($profile['provider_face']);
-        $manifest = $this->buildHostedManifestFaces($familyName, $familySlug, $familyDirectory, $faces, $provider, $config);
+        $manifest = $this->buildManifestFaces($familyName, $familySlug, $familyDirectory, $faces, $provider, $config);
 
         if (is_wp_error($manifest)) {
             return $manifest;
@@ -450,10 +485,10 @@ trait HostedProviderImportTrait
         $manifestFaces = $manifest['faces'];
 
         if ($manifestFaces === []) {
-            return $this->error($emptyManifestCode, $emptyManifestMessage);
+            return $this->error($config->emptyManifestCode, $config->emptyManifestMessage);
         }
 
-        $persisted = $this->persistHostedProfile(
+        $persisted = $this->persistProfile(
             $familyName,
             $familySlug,
             $profile + ['faces' => $manifestFaces],
@@ -464,15 +499,15 @@ trait HostedProviderImportTrait
 
         $faceCount = count($manifestFaces);
         $fileCount = $this->intValue($manifest, 'files');
-        $message = $this->buildHostedImportMessageWithFiles(
-            $successTemplate,
+        $message = $this->buildImportMessageWithFiles(
+            $config->selfHostedSuccessMessage,
             $familyName,
             $faceCount,
             $fileCount,
             count($variantPlan['skipped'])
         );
 
-        return $this->finalizeHostedImportResult(
+        return $this->finalizeImportResult(
             'imported',
             $message,
             $familyName,
@@ -492,10 +527,10 @@ trait HostedProviderImportTrait
      * @param HostedFamily|null $existingFamily
      * @param HostedProfile|null $existingProfile
      * @param HostedProfile $profile
-     * @param HostedImportConfig $config
-     * @return HostedImportResult|WP_Error
+     * @param array<string, mixed> $provider
+     * @return HostedImportResult
      */
-    private function saveHostedCdnProfile(
+    private function saveCdnProfile(
         string $familyName,
         string $familySlug,
         array $faces,
@@ -503,19 +538,11 @@ trait HostedProviderImportTrait
         ?array $existingFamily,
         ?array $existingProfile,
         array $profile,
-        array $config,
-        string $successTemplate
-    ): array|WP_Error {
-        $provider = $this->arrayValue($profile, 'provider_face');
-        unset($profile['provider_face']);
-        $cdnFaces = $this->buildHostedCdnFaces(
-            $familyName,
-            $familySlug,
-            $faces,
-            $provider,
-            $this->stringValue($config, 'source')
-        );
-        $persisted = $this->persistHostedProfile(
+        array $provider,
+        HostedImportProviderConfig $config
+    ): array {
+        $cdnFaces = $this->buildCdnFaces($familyName, $familySlug, $faces, $provider, $config->source);
+        $persisted = $this->persistProfile(
             $familyName,
             $familySlug,
             $profile + ['faces' => $cdnFaces],
@@ -525,14 +552,14 @@ trait HostedProviderImportTrait
         );
 
         $faceCount = count($cdnFaces);
-        $message = $this->buildHostedImportMessageWithoutFiles(
-            $successTemplate,
+        $message = $this->buildImportMessageWithoutFiles(
+            $config->cdnSuccessMessage,
             $familyName,
             $faceCount,
             count($variantPlan['skipped'])
         );
 
-        return $this->finalizeHostedImportResult(
+        return $this->finalizeImportResult(
             'saved',
             $message,
             $familyName,
@@ -546,7 +573,7 @@ trait HostedProviderImportTrait
         );
     }
 
-    private function buildHostedImportMessageWithFiles(
+    private function buildImportMessageWithFiles(
         string $template,
         string $familyName,
         int $faceCount,
@@ -573,7 +600,7 @@ trait HostedProviderImportTrait
         return $message;
     }
 
-    private function buildHostedImportMessageWithoutFiles(
+    private function buildImportMessageWithoutFiles(
         string $template,
         string $familyName,
         int $faceCount,
@@ -603,7 +630,7 @@ trait HostedProviderImportTrait
      * @param HostedVariantPlan $variantPlan
      * @return HostedImportResult
      */
-    private function finalizeHostedImportResult(
+    private function finalizeImportResult(
         string $status,
         string $message,
         string $familyName,
@@ -653,7 +680,7 @@ trait HostedProviderImportTrait
      * @param HostedImportResult|WP_Error $result
      * @return HostedImportResult|WP_Error
      */
-    private function completeHostedImport(array|WP_Error $result, string $provider): array|WP_Error
+    private function completeImport(array|WP_Error $result, string $provider): array|WP_Error
     {
         if (is_wp_error($result)) {
             return $result;
@@ -665,12 +692,9 @@ trait HostedProviderImportTrait
         return $result;
     }
 
-    /**
-     * @param HostedImportConfig $config
-     */
-    private function downloadHostedFontFile(string $url, string $targetPath, array $config): bool|WP_Error
+    private function downloadFontFile(string $url, string $targetPath, HostedImportProviderConfig $config): bool|WP_Error
     {
-        $validated = $this->validateHostedRemoteFontUrl($url, $config);
+        $validated = $this->validateRemoteFontUrl($url, $config);
 
         if (is_wp_error($validated)) {
             return $validated;
@@ -688,35 +712,29 @@ trait HostedProviderImportTrait
         );
 
         if (is_wp_error($response)) {
-            return $this->error($this->normalizeHostedErrorCode($response->get_error_code()), $response->get_error_message());
+            return $this->error($this->normalizeErrorCode($response->get_error_code()), $response->get_error_message());
         }
 
         $status = (int) wp_remote_retrieve_response_code($response);
 
         if ($status !== 200) {
             return $this->error(
-                $this->stringValue($config, 'download_failed_code'),
-                sprintf(__('Font download failed with status %d.', 'tasty-fonts'), $status)
+                $config->downloadFailedCode,
+                sprintf($config->downloadFailedMessage, $status)
             );
         }
 
         $body = wp_remote_retrieve_body($response);
 
         if ($body === '') {
-            return $this->error(
-                $this->stringValue($config, 'empty_file_code'),
-                $this->stringValue($config, 'empty_file_message')
-            );
+            return $this->error($config->emptyFileCode, $config->emptyFileMessage);
         }
 
-        if (strlen($body) > static::MAX_FONT_FILE_BYTES) {
-            return $this->error(
-                $this->stringValue($config, 'file_too_large_code'),
-                __('The downloaded font file exceeded the safety size limit.', 'tasty-fonts')
-            );
+        if (strlen($body) > $config->maxFontFileBytes) {
+            return $this->error($config->fileTooLargeCode, $config->fileTooLargeMessage);
         }
 
-        $contentType = strtolower($this->normalizeHostedHeaderValue(wp_remote_retrieve_header($response, 'content-type')));
+        $contentType = strtolower($this->normalizeHeaderValue(wp_remote_retrieve_header($response, 'content-type')));
 
         if (
             $contentType !== ''
@@ -724,115 +742,31 @@ trait HostedProviderImportTrait
             && !str_contains($contentType, 'font')
             && !str_contains($contentType, 'octet-stream')
         ) {
-            return $this->error(
-                $this->stringValue($config, 'invalid_type_code'),
-                $this->stringValue($config, 'invalid_type_message')
-            );
+            return $this->error($config->invalidTypeCode, $config->invalidTypeMessage);
         }
 
         if (!$this->storage->writeAbsoluteFile($targetPath, $body)) {
             return $this->error(
-                $this->stringValue($config, 'write_failed_code'),
-                $this->storageErrorMessage($this->stringValue($config, 'write_failed_message'))
+                $config->writeFailedCode,
+                $this->storageErrorMessage($config->writeFailedMessage)
             );
         }
 
         return true;
     }
 
-    /**
-     * @param mixed $faces
-     * @return list<HostedFace>
-     */
-    private function normalizeHostedFaceList(mixed $faces): array
+    private function validateRemoteFontUrl(string $url, HostedImportProviderConfig $config): bool|WP_Error
     {
-        if (!is_array($faces)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($faces as $face) {
-            $face = $this->normalizeHostedMap($face);
-
-            if ($face === []) {
-                continue;
-            }
-
-            $normalized[] = $face;
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param mixed $variants
-     * @return HostedVariantList
-     */
-    private function normalizeHostedVariantList(mixed $variants): array
-    {
-        if (!is_array($variants)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($variants as $variant) {
-            if (!is_scalar($variant)) {
-                continue;
-            }
-
-            $normalized[] = (string) $variant;
-        }
-
-        return FontUtils::normalizeVariantTokens($normalized);
-    }
-
-    private function normalizeHostedErrorCode(int|string $code): string
-    {
-        return is_int($code) ? (string) $code : $code;
-    }
-
-    private function normalizeHostedHeaderValue(mixed $value): string
-    {
-        if (is_string($value)) {
-            return trim($value);
-        }
-
-        if (!is_array($value)) {
-            return '';
-        }
-
-        foreach ($value as $entry) {
-            if (is_scalar($entry)) {
-                return trim((string) $entry);
-            }
-        }
-
-        return '';
-    }
-
-    /**
-     * @param HostedImportConfig $config
-     */
-    private function validateHostedRemoteFontUrl(string $url, array $config): bool|WP_Error
-    {
-        $parts = $this->normalizeHostedMap(wp_parse_url($url));
+        $parts = $this->normalizeMap(wp_parse_url($url));
         $host = strtolower($this->stringValue($parts, 'host'));
         $path = strtolower($this->stringValue($parts, 'path'));
 
-        if ($host !== strtolower($this->stringValue($config, 'expected_host'))) {
-            return $this->error(
-                $this->stringValue($config, 'invalid_host_code'),
-                $this->stringValue($config, 'invalid_host_message')
-            );
+        if ($host !== strtolower($config->expectedHost)) {
+            return $this->error($config->invalidHostCode, $config->invalidHostMessage);
         }
 
         if (!str_ends_with($path, '.woff2')) {
-            return $this->error(
-                $this->stringValue($config, 'invalid_extension_code'),
-                $this->stringValue($config, 'invalid_extension_message')
-            );
+            return $this->error($config->invalidExtensionCode, $config->invalidExtensionMessage);
         }
 
         return true;
@@ -863,11 +797,35 @@ trait HostedProviderImportTrait
         return new WP_Error($code, $message);
     }
 
+    private function normalizeErrorCode(int|string $code): string
+    {
+        return is_int($code) ? (string) $code : $code;
+    }
+
+    private function normalizeHeaderValue(mixed $value): string
+    {
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if (!is_array($value)) {
+            return '';
+        }
+
+        foreach ($value as $entry) {
+            if (is_scalar($entry)) {
+                return trim((string) $entry);
+            }
+        }
+
+        return '';
+    }
+
     /**
      * @param mixed $value
      * @return array<string, mixed>
      */
-    private function normalizeHostedMap(mixed $value): array
+    private function normalizeMap(mixed $value): array
     {
         if (!is_array($value)) {
             return [];
@@ -906,7 +864,31 @@ trait HostedProviderImportTrait
      */
     private function arrayValue(array $values, string $key): array
     {
-        return $this->normalizeHostedMap($values[$key] ?? []);
+        return $this->normalizeMap($values[$key] ?? []);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $values): array
+    {
+        if (!is_array($values)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($values as $value) {
+            $normalizedValue = FontUtils::scalarStringValue($value);
+
+            if ($normalizedValue === '') {
+                continue;
+            }
+
+            $normalized[] = $normalizedValue;
+        }
+
+        return $normalized;
     }
 
     /**

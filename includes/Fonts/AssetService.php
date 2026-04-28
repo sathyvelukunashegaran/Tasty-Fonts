@@ -8,9 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
-use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
-use TastyFonts\Support\TransientKey;
 
 /**
  * @phpstan-type GeneratedStylesheetState array{
@@ -32,17 +30,13 @@ final class AssetService
     public const TRANSIENT_CSS = 'tasty_fonts_css_v2';
     public const TRANSIENT_HASH = 'tasty_fonts_css_hash_v2';
     public const TRANSIENT_REGENERATE_CSS_QUEUED = 'tasty_fonts_regenerate_css_queued';
-    private const CONTENT_HASH_ALGORITHM = 'sha256';
-    private const VERSION_HASH_LENGTH = 16;
     private const REGENERATE_CSS_QUEUE_TTL = 30;
-    private const INLINE_STYLE_CONTEXT_RUNTIME = 'runtime';
-    private const INLINE_STYLE_CONTEXT_ADMIN_PREVIEW = 'admin_preview';
 
-    private ?string $css = null;
-    private ?string $hash = null;
-    /** @var array<string, string> */
-    private array $inlineStyleNonces = [];
-    private bool $inlineStyleOutputBufferStarted = false;
+    private readonly GeneratedCssCache $cssCache;
+    private readonly GeneratedStylesheetFile $stylesheetFile;
+    private readonly GeneratedCssRegenerationQueue $regenerationQueue;
+    private readonly InlineStyleNonceManager $inlineStyleNonceManager;
+    private readonly GeneratedCssDelivery $delivery;
 
     /**
      * Create the asset service.
@@ -57,13 +51,36 @@ final class AssetService
      * @param LogRepository $log Log repository used for generated-file write notices.
      */
     public function __construct(
-        private readonly Storage $storage,
+        Storage $storage,
         private readonly CatalogService $catalog,
-        private readonly SettingsRepository $settings,
-        private readonly CssBuilder $cssBuilder,
+        SettingsRepository $settings,
+        CssBuilder $cssBuilder,
         private readonly RuntimeAssetPlanner $planner,
-        private readonly LogRepository $log
+        LogRepository $log
     ) {
+        $this->cssCache = new GeneratedCssCache(
+            $catalog,
+            $settings,
+            $cssBuilder,
+            $planner,
+            self::TRANSIENT_CSS,
+            self::TRANSIENT_HASH
+        );
+        $this->stylesheetFile = new GeneratedStylesheetFile($storage, $this->cssCache, $log);
+        $this->regenerationQueue = new GeneratedCssRegenerationQueue(
+            self::ACTION_REGENERATE_CSS,
+            self::TRANSIENT_REGENERATE_CSS_QUEUED,
+            self::REGENERATE_CSS_QUEUE_TTL
+        );
+        $this->inlineStyleNonceManager = new InlineStyleNonceManager();
+        $this->delivery = new GeneratedCssDelivery(
+            $this->cssCache,
+            $this->stylesheetFile,
+            $this->inlineStyleNonceManager,
+            $planner,
+            $settings,
+            $cssBuilder
+        );
     }
 
     /**
@@ -75,10 +92,7 @@ final class AssetService
      */
     public function invalidate(): void
     {
-        delete_transient(TransientKey::forSite(self::TRANSIENT_CSS));
-        delete_transient(TransientKey::forSite(self::TRANSIENT_HASH));
-        $this->css = null;
-        $this->hash = null;
+        $this->cssCache->invalidate();
     }
 
     /**
@@ -90,36 +104,7 @@ final class AssetService
      */
     public function getCss(): string
     {
-        if (is_string($this->css)) {
-            return $this->css;
-        }
-
-        $cachedCss = get_transient(TransientKey::forSite(self::TRANSIENT_CSS));
-        $cachedHash = get_transient(TransientKey::forSite(self::TRANSIENT_HASH));
-
-        if (is_string($cachedCss) && is_string($cachedHash)) {
-            $this->css = $cachedCss;
-            $this->hash = $cachedHash;
-
-            return $this->css;
-        }
-
-        $catalog = $this->catalog->getCatalog();
-        $localCatalog = $this->planner->getLocalRuntimeCatalog();
-        $variableFamilies = $this->planner->getRuntimeVariableFamilies();
-        $settings = $this->settings->getSettings();
-        $roles = !empty($settings['auto_apply_roles'])
-            ? $this->settings->getAppliedRoles($catalog)
-            : $this->settings->getRoles($catalog);
-
-        $this->css = $this->cssBuilder->build($localCatalog, $roles, $settings, $variableFamilies);
-        $this->css = FontUtils::scalarStringValue(apply_filters('tasty_fonts_generated_css', $this->css, $localCatalog, $roles, $settings));
-        $this->hash = $this->hashContents($this->css);
-
-        set_transient(TransientKey::forSite(self::TRANSIENT_CSS), $this->css, DAY_IN_SECONDS);
-        set_transient(TransientKey::forSite(self::TRANSIENT_HASH), $this->hash, DAY_IN_SECONDS);
-
-        return $this->css;
+        return $this->cssCache->getCss();
     }
 
     /**
@@ -131,13 +116,7 @@ final class AssetService
      */
     public function getCssHash(): string
     {
-        if ($this->hash !== null) {
-            return $this->hash;
-        }
-
-        $this->getCss();
-
-        return (string) $this->hash;
+        return $this->cssCache->getHash();
     }
 
     /**
@@ -149,7 +128,7 @@ final class AssetService
      */
     public function expectedFileHash(): string
     {
-        return $this->hashContents($this->getVersionedCss());
+        return $this->stylesheetFile->expectedFileHash();
     }
 
     /**
@@ -162,26 +141,9 @@ final class AssetService
      */
     public function ensureGeneratedCssFile(bool $logWriteResult = true): bool
     {
-        $queuedState = get_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED));
+        $logWriteResult = $this->regenerationQueue->resolveLogWriteResult($logWriteResult, func_num_args() === 0);
 
-        if (func_num_args() === 0 && is_array($queuedState) && array_key_exists('log_write_result', $queuedState)) {
-            $logWriteResult = !empty($queuedState['log_write_result']);
-        }
-
-        delete_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED));
-
-        $state = $this->getGeneratedStylesheetState();
-        $path = (string) $state['path'];
-
-        if ($path === '') {
-            return false;
-        }
-
-        if (!empty($state['is_current'])) {
-            return true;
-        }
-
-        return $this->writeGeneratedCssFile($state, $logWriteResult);
+        return $this->stylesheetFile->ensureFile($logWriteResult);
     }
 
     /**
@@ -200,7 +162,7 @@ final class AssetService
         }
 
         $this->invalidate();
-        $this->queueGeneratedCssRegeneration($logWriteResult);
+        $this->regenerationQueue->queue($logWriteResult);
     }
 
     /**
@@ -213,26 +175,7 @@ final class AssetService
      */
     public function enqueue(string $handle): void
     {
-        $css = $this->getCss();
-        $state = $this->getGeneratedStylesheetState();
-
-        $url = (string) $state['url'];
-        $expectedVersion = (string) $state['expected_version'];
-
-        if (!$this->isInlineDeliveryEnabled() && !empty($state['is_current']) && $url !== '') {
-            wp_enqueue_style($handle, $url, [], $expectedVersion);
-            return;
-        }
-
-        wp_register_style($handle, false);
-        wp_enqueue_style($handle);
-
-        if ($css !== '') {
-            wp_add_inline_style($handle, $css);
-            $this->armInlineStyleNonceHandling($handle, $css, self::INLINE_STYLE_CONTEXT_RUNTIME);
-        }
-
-        $this->writeGeneratedCssFile($state);
+        $this->delivery->enqueueGeneratedCss($handle);
     }
 
     /**
@@ -245,17 +188,7 @@ final class AssetService
      */
     public function enqueueFontFacesOnly(string $handle): void
     {
-        $catalog = $this->planner->getLocalPreviewCatalog();
-        $settings = $this->settings->getSettings();
-        $css = $this->cssBuilder->buildFontFaceOnly($catalog, $settings, 'swap');
-
-        wp_register_style($handle, false);
-        wp_enqueue_style($handle);
-
-        if ($css !== '') {
-            wp_add_inline_style($handle, $css);
-            $this->armInlineStyleNonceHandling($handle, $css, self::INLINE_STYLE_CONTEXT_ADMIN_PREVIEW);
-        }
+        $this->delivery->enqueuePreviewFontFacesOnly($handle);
     }
 
     /**
@@ -278,20 +211,7 @@ final class AssetService
      */
     public function getStatus(): array
     {
-        $state = $this->getGeneratedStylesheetState();
-
-        return [
-            'path' => $state['path'],
-            'url' => $state['url'],
-            'exists' => $state['exists'],
-            'size' => $state['size'],
-            'last_modified' => $state['last_modified'],
-            'expected_hash' => $state['expected_hash'],
-            'expected_version' => $state['expected_version'],
-            'current_hash' => $state['current_hash'],
-            'is_current' => $state['is_current'],
-            'write_path' => $state['write_path'],
-        ];
+        return $this->stylesheetFile->getStatus();
     }
 
     /**
@@ -303,16 +223,7 @@ final class AssetService
      */
     public function getVersionedStylesheetUrl(): ?string
     {
-        $state = $this->getGeneratedStylesheetState();
-        $url = (string) $state['url'];
-
-        if ($url === '') {
-            return null;
-        }
-
-        $version = !empty($state['exists']) ? (string) $state['expected_version'] : TASTY_FONTS_VERSION;
-
-        return add_query_arg('ver', $version, $url);
+        return $this->stylesheetFile->getVersionedStylesheetUrl();
     }
 
     /**
@@ -329,9 +240,7 @@ final class AssetService
 
     public function isInlineDeliveryEnabled(): bool
     {
-        $settings = $this->settings->getSettings();
-
-        return ($settings['css_delivery_mode'] ?? 'file') === 'inline';
+        return $this->delivery->isInlineDeliveryEnabled();
     }
 
     /**
@@ -348,207 +257,6 @@ final class AssetService
      */
     public function filterInlineStyleOutputBuffer(string $html): string
     {
-        if ($html === '' || $this->inlineStyleNonces === [] || !str_contains($html, '<style')) {
-            return $html;
-        }
-
-        $styleIds = array_keys($this->inlineStyleNonces);
-        $pattern = '/<style\b(?P<before>[^>]*)\bid=(["\'])(?P<id>' . implode('|', array_map('preg_quote', $styleIds)) . ')\2(?P<after>[^>]*)>/i';
-        $filtered = preg_replace_callback(
-            $pattern,
-            function (array $matches): string {
-                $styleId = (string) ($matches['id'] ?? '');
-                $nonce = (string) ($this->inlineStyleNonces[$styleId] ?? '');
-
-                if ($nonce === '') {
-                    return (string) $matches[0];
-                }
-
-                $attributes = (string) ($matches['before'] ?? '') . ' ' . (string) ($matches['after'] ?? '');
-
-                if (preg_match('/\snonce\s*=/i', $attributes) === 1) {
-                    return (string) $matches[0];
-                }
-
-                $tag = (string) $matches[0];
-                $position = strrpos($tag, '>');
-
-                if ($position === false) {
-                    return $tag;
-                }
-
-                return substr($tag, 0, $position)
-                    . ' nonce="' . esc_attr($nonce) . '"'
-                    . substr($tag, $position);
-            },
-            $html
-        );
-
-        return is_string($filtered) ? $filtered : $html;
+        return $this->inlineStyleNonceManager->filterOutputBuffer($html);
     }
-
-    private function getVersionedCss(): string
-    {
-        return "/* Version: " . TASTY_FONTS_VERSION . " */\n" . $this->getCss();
-    }
-
-    private function hashContents(string $contents): string
-    {
-        return hash(self::CONTENT_HASH_ALGORITHM, $contents);
-    }
-
-    private function hashFile(string $path): string
-    {
-        return (string) hash_file(self::CONTENT_HASH_ALGORITHM, $path);
-    }
-
-    private function versionTokenFromHash(string $hash): string
-    {
-        return substr($hash, 0, self::VERSION_HASH_LENGTH);
-    }
-
-    private function armInlineStyleNonceHandling(string $handle, string $css, string $context): void
-    {
-        $nonce = $this->getInlineStyleNonce($handle, $css, $context);
-
-        if ($nonce === '' || !$this->shouldUsePluginInlineStyleNonceStrategy($handle, $css, $context)) {
-            return;
-        }
-
-        $this->inlineStyleNonces[$handle . '-inline-css'] = $nonce;
-
-        if (
-            $this->inlineStyleOutputBufferStarted
-            || PHP_SAPI === 'cli'
-            || PHP_SAPI === 'phpdbg'
-        ) {
-            return;
-        }
-
-        ob_start([$this, 'filterInlineStyleOutputBuffer']);
-        $this->inlineStyleOutputBufferStarted = true;
-    }
-
-    private function shouldUsePluginInlineStyleNonceStrategy(string $handle, string $css, string $context): bool
-    {
-        $strategy = strtolower(trim(FontUtils::scalarStringValue(apply_filters(
-            'tasty_fonts_inline_style_nonce_strategy',
-            'auto',
-            $handle,
-            $context,
-            $css
-        ))));
-
-        if (in_array($strategy, ['off', 'disabled', 'none', 'core'], true)) {
-            return false;
-        }
-
-        if ($strategy === 'auto' && $this->coreSupportsInlineStyleNonceHandling()) {
-            return false;
-        }
-
-        return in_array($strategy, ['auto', 'buffer', 'output_buffer', 'plugin'], true);
-    }
-
-    private function getInlineStyleNonce(string $handle, string $css, string $context): string
-    {
-        $nonce = apply_filters('tasty_fonts_inline_style_nonce', '', $handle, $css, $context);
-
-        return is_string($nonce) ? trim($nonce) : '';
-    }
-
-    private function coreSupportsInlineStyleNonceHandling(): bool
-    {
-        return function_exists('wp_get_inline_style_tag') || function_exists('wp_print_inline_style_tag');
-    }
-
-    private function queueGeneratedCssRegeneration(bool $logWriteResult = true): void
-    {
-        if (get_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED)) !== false) {
-            return;
-        }
-
-        set_transient(
-            TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED),
-            ['log_write_result' => $logWriteResult ? 1 : 0],
-            self::REGENERATE_CSS_QUEUE_TTL
-        );
-
-        $scheduled = wp_schedule_single_event(time(), self::ACTION_REGENERATE_CSS);
-
-        if ($scheduled === false) {
-            delete_transient(TransientKey::forSite(self::TRANSIENT_REGENERATE_CSS_QUEUED));
-        }
-    }
-
-    /**
-     * @return GeneratedStylesheetState
-     */
-    private function getGeneratedStylesheetState(): array
-    {
-        $path = $this->storage->getGeneratedCssPath() ?? '';
-        $url = $this->storage->getGeneratedCssUrl() ?? '';
-        $writePath = $path;
-        $state = $this->buildStylesheetStateForPath($path, $url);
-        $expectedHash = $this->expectedFileHash();
-
-        return [
-            'path' => $state['path'],
-            'url' => $state['url'],
-            'exists' => $state['exists'],
-            'size' => $state['size'],
-            'last_modified' => $state['last_modified'],
-            'expected_hash' => $expectedHash,
-            'expected_version' => $this->versionTokenFromHash($expectedHash),
-            'current_hash' => $state['current_hash'],
-            'is_current' => $state['exists'] && $state['current_hash'] === $expectedHash,
-            'write_path' => $writePath,
-        ];
-    }
-
-    /**
-     * @param GeneratedStylesheetState $state
-     */
-    private function writeGeneratedCssFile(array $state, bool $logWriteResult = true): bool
-    {
-        $path = $state['write_path'];
-
-        if ($path === '' || !empty($state['is_current'])) {
-            return $path !== '' && !empty($state['is_current']);
-        }
-
-        $written = $this->storage->writeAbsoluteFile($path, $this->getVersionedCss());
-
-        if ($logWriteResult) {
-            $this->log->add(
-                $written
-                    ? __('Generated CSS file written successfully.', 'tasty-fonts')
-                    : __('Could not write generated CSS file. Inline fallback will be used.', 'tasty-fonts')
-            );
-        }
-
-        return $written;
-    }
-
-    /**
-     * @return array{path: string, url: string, exists: bool, size: int, last_modified: int, current_hash: string}
-     */
-    private function buildStylesheetStateForPath(string $path, string $url): array
-    {
-        if ($path !== '') {
-            clearstatcache(true, $path);
-        }
-
-        $exists = $path !== '' && file_exists($path);
-
-        return [
-            'path' => $path,
-            'url' => $url,
-            'exists' => $exists,
-            'size' => $exists ? (int) filesize($path) : 0,
-            'last_modified' => $exists ? (int) filemtime($path) : 0,
-            'current_hash' => $exists ? $this->hashFile($path) : '',
-        ];
-    }
-
 }

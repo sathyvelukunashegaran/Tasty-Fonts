@@ -3169,6 +3169,81 @@ $tests['asset_service_debounces_background_css_regeneration_events'] = static fu
     );
 };
 
+$tests['runtime_service_skips_frontend_assets_while_sitewide_delivery_is_disabled'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $inlineStyles;
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings([
+        'auto_apply_roles' => false,
+        'class_output_enabled' => true,
+    ]);
+
+    $services['runtime']->enqueueFrontend();
+
+    assertSameValue(false, array_key_exists('tasty-fonts-frontend', $enqueuedStyles), 'Frontend runtime should not enqueue the generated stylesheet while sitewide delivery is disabled.');
+    assertSameValue([], $inlineStyles, 'Frontend runtime should not add inline generated CSS while sitewide delivery is disabled.');
+};
+
+$tests['runtime_service_enqueues_frontend_assets_when_sitewide_delivery_is_enabled'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->setAutoApplyRoles(true);
+
+    $services['runtime']->enqueueFrontend();
+
+    assertSameValue(true, array_key_exists('tasty-fonts-frontend', $enqueuedStyles), 'Frontend runtime should enqueue the generated stylesheet once sitewide delivery is enabled.');
+};
+
 $tests['runtime_service_enqueues_adobe_stylesheet_and_exposes_it_to_etch_canvas'] = static function (): void {
     resetTestState();
 
@@ -4209,6 +4284,20 @@ $tests['runtime_service_skips_font_preloads_when_setting_or_live_roles_are_disab
     $services = makeServiceGraph();
     $services['storage']->ensureRootDirectory();
     $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-400.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
     $services['settings']->saveAppliedRoles(
         [
             'heading' => 'Inter',
@@ -4224,7 +4313,10 @@ $tests['runtime_service_skips_font_preloads_when_setting_or_live_roles_are_disab
     $outputWithSitewideOff = (string) ob_get_clean();
 
     $services['settings']->setAutoApplyRoles(true);
-    $services['settings']->saveSettings(['preload_primary_fonts' => '0']);
+    $services['settings']->saveSettings([
+        'preload_primary_fonts' => '0',
+        'remote_connection_hints' => '0',
+    ]);
 
     ob_start();
     $services['runtime']->outputPreloadHints();
@@ -5133,6 +5225,27 @@ $tests['runtime_service_enqueues_bricks_frontend_override_when_live_bricks_style
     );
 };
 
+$tests['runtime_service_skips_bricks_frontend_override_when_sitewide_delivery_is_disabled'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $inlineScripts;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'bricks_integration_enabled' => true,
+        'bricks_theme_styles_sync_enabled' => true,
+        'bricks_theme_style_target_mode' => BricksIntegrationService::TARGET_MODE_MANAGED,
+        'bricks_theme_style_target_id' => BricksIntegrationService::MANAGED_THEME_STYLE_ID,
+    ]);
+    $services['bricks_integration']->applyThemeStylesSync(BricksIntegrationService::TARGET_MODE_MANAGED, BricksIntegrationService::MANAGED_THEME_STYLE_ID);
+
+    $services['runtime']->enqueueBricksFrontendOverride();
+
+    assertSameValue(false, isset($inlineScripts['bricks-scripts'][0]), 'Bricks frontend fixer script should not leave a Tasty Fonts trace while sitewide delivery is disabled.');
+    assertSameValue(false, isset($enqueuedStyles['tasty-fonts-bricks-runtime-override']), 'Bricks frontend override stylesheet should stay disabled while sitewide delivery is disabled.');
+};
+
 $tests['runtime_service_enqueues_bricks_variable_fix_script_for_frontend_and_builder_canvas_styles'] = static function (): void {
     resetTestState();
 
@@ -5142,6 +5255,7 @@ $tests['runtime_service_enqueues_bricks_variable_fix_script_for_frontend_and_bui
     $services['settings']->saveSettings([
         'bricks_integration_enabled' => true,
     ]);
+    $services['settings']->setAutoApplyRoles(true);
 
     $services['runtime']->enqueueBricksFrontendOverride();
 

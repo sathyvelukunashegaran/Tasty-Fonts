@@ -11419,6 +11419,31 @@ h3.tasty-fonts-section-title {
     gap: var(--tasty-space-2);
 }
 
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-output-settings-choice,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-output-settings-text-field,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-output-settings-section--advanced > .tasty-fonts-output-settings-choice,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--channel,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-integrations-panel > .tasty-fonts-settings-board .tasty-fonts-integration-row--readonly,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-admin-access-panel.is-compact .tasty-fonts-admin-access-mode-toggle {
+    align-items: center;
+}
+
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-output-settings-choice::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-output-settings-text-field::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-output-settings-section--advanced > .tasty-fonts-output-settings-choice::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-settings-flat-row--channel::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-integrations-panel > .tasty-fonts-settings-board .tasty-fonts-integration-row--readonly::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration::before,
+.tasty-fonts-admin.is-training-wheels-off #tasty-fonts-settings-page .tasty-fonts-admin-access-panel.is-compact .tasty-fonts-admin-access-mode-toggle::before {
+    align-self: center;
+    margin-top: var(--tasty-layout-0);
+}
+
 #tasty-fonts-settings-page .tasty-fonts-admin-access-grid {
     gap: var(--tasty-layout-0);
     padding-top: var(--tasty-layout-0);

@@ -6,11 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added hosted import workflow, generated CSS seam, library mutation, and admin action regression coverage for the extracted service modules.
 - Added Advanced Tools bulk cleanup actions for deleting all rollback snapshots and all retained site-transfer export bundles, with confirmation phrases, admin POST handlers, activity logs, and guardrails that block export deletion while any bundle is locked.
 - Added a URL Import source filter for the Font Library so custom CSS URL import families can be isolated in library views while still retaining their self-hosted or external-request delivery filters.
 
 ### Changed
 
+- Refactored generated CSS handling behind the existing AssetService façade into focused cache, canonical stylesheet, regeneration queue, delivery, and inline nonce services.
+- Replaced the shared hosted-provider import trait with a reusable hosted import workflow, request/config/provider adapter layer, and shared variant planner for Google and Bunny imports.
+- Split library catalog discovery, delivery/profile mutations, publish-state changes, role protection checks, and admin maintenance actions into focused service modules while preserving the existing public controller/service entry points.
 - Moved font import workflow controls into Settings > Behavior, keeping Google Fonts, Bunny Fonts, and custom uploads enabled by default while Adobe Fonts and URL imports remain opt-in.
 - Moved Show Onboarding Hints and Show Activity Log into the Advanced Tools Developer tab so Settings > Behavior focuses on import workflows, font capabilities, cleanup, and access.
 - Simplified Advanced Tools developer controls so the release rail appears first and saves channel changes immediately without a separate save button.

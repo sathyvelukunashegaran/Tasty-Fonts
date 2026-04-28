@@ -1,25 +1,39 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const contracts = require('../../assets/js/admin-contracts.js');
+
 const {
     buildCustomCssDryRunRequest,
     buildCustomCssFinalImportRequest,
     buildCustomCssImportErrorMessage,
+    buildVariationSettings,
     canDisableOutputLayer,
+    cssAxisTag,
+    defaultRoleFallback,
+    defaultRoleWeight,
     describeFontType,
     deriveExactOutputQuickMode,
     escapeFontFamily,
     getTabNavigationTargetIndex,
+    hasExplicitRoleWeight,
     hasStaticFontMetadata,
     hasVariableFontMetadata,
     isTrustedHostedStylesheetUrl,
     logEntryMatchesFilters,
+    normalizeAxisSettings,
+    normalizeAxisTag,
+    normalizeAxisValue,
     normalizeCustomCssDryRunPlan,
     normalizeSettingsFieldName,
     normalizeOutputQuickModePreference,
+    normalizeRoleState,
+    normalizeRoleWeightValue,
     parsePhpIniSizeToBytes,
     rowMatchesLibraryFilters,
     resolveLogPagination,
+    resolveRoleFallback,
+    resolveRoleWeight,
     resolveStatusAnnouncement,
     resolveAssignedRoleState,
     renderCustomCssDryRunErrorHtml,
@@ -32,7 +46,178 @@ const {
     sanitizeOutputQuickModePreference,
     shouldHydrateFamilyDetails,
     slugify,
-} = require('../../assets/js/admin-contracts.js');
+} = contracts;
+
+const requiredAdminContractExports = [
+    'buildCustomCssDryRunRequest',
+    'buildCustomCssFinalImportRequest',
+    'buildCustomCssImportErrorMessage',
+    'buildVariationSettings',
+    'canDisableOutputLayer',
+    'cssAxisTag',
+    'defaultRoleFallback',
+    'defaultRoleWeight',
+    'deriveExactOutputQuickMode',
+    'describeFontType',
+    'escapeFontFamily',
+    'getTabNavigationTargetIndex',
+    'hasExplicitRoleWeight',
+    'hasStaticFontMetadata',
+    'hasVariableFontMetadata',
+    'isTrustedHostedStylesheetUrl',
+    'logEntryMatchesFilters',
+    'normalizeAxisSettings',
+    'normalizeAxisTag',
+    'normalizeAxisValue',
+    'normalizeCustomCssDryRunPlan',
+    'normalizeOutputQuickModePreference',
+    'normalizeRoleState',
+    'normalizeRoleWeightValue',
+    'normalizeSettingsFieldName',
+    'parsePhpIniSizeToBytes',
+    'renderCustomCssDryRunErrorHtml',
+    'renderCustomCssDryRunReviewHtml',
+    'resolveAssignedRoleState',
+    'resolveLogPagination',
+    'resolveRoleFallback',
+    'resolveRoleWeight',
+    'resolveStatusAnnouncement',
+    'roleStatesMatch',
+    'rowMatchesLibraryFilters',
+    'sanitizeFallback',
+    'sanitizeOutputQuickModePreference',
+    'serializeSettingsFormEntries',
+    'settingsStatesMatch',
+    'shouldDisableFieldDuringSiteTransferSubmit',
+    'shouldHydrateFamilyDetails',
+    'slugify',
+];
+
+test('admin contracts expose the required flat CommonJS and browser surface', () => {
+    assert.equal(globalThis.TastyFontsAdminContracts, contracts);
+
+    requiredAdminContractExports.forEach((exportName) => {
+        assert.equal(typeof contracts[exportName], 'function', `${exportName} should be exported as a function`);
+    });
+});
+
+test('admin contracts strictly normalize axis tags, values, and variation settings', () => {
+    assert.equal(normalizeAxisTag(' wght '), 'WGHT');
+    assert.equal(normalizeAxisTag('WEIGHT'), '');
+    assert.equal(cssAxisTag('WGHT'), 'wght');
+    assert.equal(cssAxisTag('XPRN'), 'XPRN');
+    assert.equal(normalizeAxisValue(' -12.5 '), '-12.5');
+    assert.equal(normalizeAxisValue('12px'), '');
+
+    const normalized = normalizeAxisSettings({
+        wght: ' 650 ',
+        WdTh: '100.5',
+        slnt: '-8',
+        ital: 0,
+        XPRN: '0.25',
+        opsz: '12px',
+        WGH: '2',
+    });
+
+    assert.deepEqual(normalized, {
+        ITAL: '0',
+        SLNT: '-8',
+        WDTH: '100.5',
+        WGHT: '650',
+        XPRN: '0.25',
+    });
+    assert.equal(buildVariationSettings(normalized), '"ital" 0, "slnt" -8, "wdth" 100.5, "wght" 650, "XPRN" 0.25');
+    assert.equal(buildVariationSettings({ opsz: 'fluid' }), 'normal');
+});
+
+test('admin contracts normalize role weights and resolve explicit/default weights', () => {
+    assert.equal(normalizeRoleWeightValue(' normal '), '400');
+    assert.equal(normalizeRoleWeightValue('bold'), '700');
+    assert.equal(normalizeRoleWeightValue(' 650 '), '650');
+    assert.equal(normalizeRoleWeightValue('1000'), '1000');
+    assert.equal(normalizeRoleWeightValue('0400'), '400');
+    assert.equal(normalizeRoleWeightValue('0'), '');
+    assert.equal(normalizeRoleWeightValue('1001'), '');
+    assert.equal(normalizeRoleWeightValue('650.5'), '');
+    assert.equal(defaultRoleWeight('heading'), '700');
+    assert.equal(defaultRoleWeight('body'), '400');
+    assert.equal(resolveRoleWeight('heading', {}), '700');
+    assert.equal(resolveRoleWeight('body', { bodyWeight: 'bold' }), '700');
+    assert.equal(resolveRoleWeight('body', { bodyAxes: { wght: '512' }, bodyWeight: '700' }), '512');
+    assert.equal(hasExplicitRoleWeight('heading', {}), false);
+    assert.equal(hasExplicitRoleWeight('heading', { headingWeight: 'normal' }), true);
+    assert.equal(hasExplicitRoleWeight('heading', { headingAxes: { wght: '0' } }), true);
+});
+
+test('admin contracts normalize role state using monospace, variable, and family catalog options', () => {
+    const options = {
+        monospaceRoleEnabled: true,
+        variableFontsEnabled: true,
+        roleFamilyCatalog: {
+            Inter: { fallback: 'Inter fallback, sans-serif' },
+            Mono: { fallback: 'Mono fallback, monospace' },
+        },
+    };
+
+    assert.deepEqual(
+        normalizeRoleState({
+            heading: ' Inter ',
+            body: ' Body Sans ',
+            monospace: ' Mono ',
+            headingWeight: 'bold',
+            body_weight: 'normal',
+            monospaceWeight: 'invalid',
+            headingAxes: { wght: '650', opsz: 'bad' },
+            body_axes: { wdth: '98.5' },
+            monospaceAxes: { slnt: '-4' },
+        }, options),
+        {
+            heading: 'Inter',
+            body: 'Body Sans',
+            monospace: 'Mono',
+            headingFallback: 'Inter fallback, sans-serif',
+            bodyFallback: 'system-ui, sans-serif',
+            monospaceFallback: 'Mono fallback, monospace',
+            headingWeight: '700',
+            bodyWeight: '400',
+            monospaceWeight: '',
+            headingAxes: { WGHT: '650' },
+            bodyAxes: { WDTH: '98.5' },
+            monospaceAxes: { SLNT: '-4' },
+        }
+    );
+
+    assert.deepEqual(
+        normalizeRoleState({
+            monospace: 'Mono',
+            monospaceFallback: 'Custom Mono, monospace',
+            headingAxes: { wght: '650' },
+            monospaceAxes: { wght: '450' },
+        }, {
+            ...options,
+            monospaceRoleEnabled: false,
+            variableFontsEnabled: false,
+        }),
+        {
+            heading: '',
+            body: '',
+            monospace: '',
+            headingFallback: 'system-ui, sans-serif',
+            bodyFallback: 'system-ui, sans-serif',
+            monospaceFallback: 'Custom Mono, monospace',
+            headingWeight: '',
+            bodyWeight: '',
+            monospaceWeight: '',
+            headingAxes: {},
+            bodyAxes: {},
+            monospaceAxes: {},
+        }
+    );
+
+    assert.equal(resolveRoleFallback('heading', { heading: 'Inter' }, options), 'Inter fallback, sans-serif');
+    assert.equal(resolveRoleFallback('heading', { heading: 'Inter', headingFallback: 'serif' }, options), 'serif');
+    assert.equal(defaultRoleFallback('monospace'), 'monospace');
+});
 
 test('admin contracts slugify values into stable font slugs', () => {
     assert.equal(slugify('Satoshi Display'), 'satoshi-display');

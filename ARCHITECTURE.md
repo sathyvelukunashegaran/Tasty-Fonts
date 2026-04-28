@@ -60,12 +60,16 @@ Two background cron actions are registered inside `registerRuntimeHooks()`:
 Generated CSS rebuilds flow through the font layer:
 
 ```text
-CatalogService
-  -> RuntimeAssetPlanner
-  -> CssBuilder
-  -> AssetService
+CatalogService + SettingsRepository
+  -> RuntimeAssetPlanner + CssBuilder
+  -> GeneratedCssCache
+  -> GeneratedStylesheetFile
+  -> GeneratedCssDelivery
+  -> AssetService façade
   -> uploads/fonts/.generated/tasty-fonts.css or inline fallback
 ```
+
+`AssetService` remains the compatibility entry point for plugin activation, cron regeneration, admin diagnostics, developer tools, runtime enqueue calls, and existing tests. The generated CSS seam modules under `includes/Fonts/` split the implementation behind that façade: `GeneratedCssCache` builds and caches the CSS/hash payload, `GeneratedStylesheetFile` owns canonical file state and writes, `GeneratedCssRegenerationQueue` debounces scheduled rebuilds, `GeneratedCssDelivery` handles file-vs-inline enqueue behavior, and `InlineStyleNonceManager` owns inline style CSP nonce buffering. Runtime planning data such as preload candidates, preconnect origins, and external stylesheets remains in `RuntimeAssetPlanner`.
 
 ## Central Model
 

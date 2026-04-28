@@ -2708,7 +2708,10 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertNotContainsValue('Delete Uploaded Fonts on Uninstall', $output, 'The Behavior panel should not frame uploaded font retention as a delete setting.');
     assertSameValue(1, preg_match('/name="delete_uploaded_files_on_uninstall" value="1"[\s\S]*name="delete_uploaded_files_on_uninstall" value="0"/', $output), 'The positive uninstall retention toggle should still submit the stored inverse setting correctly.');
     assertContainsValue('Enable Additional Access Rules', $output, 'The admin-access panel should expose the master toggle for fine-grained access with positive wording.');
-    assertContainsValue('Grant Tasty Fonts access to extra roles and users. Administrators always keep access.', $output, 'The admin-access toggle should describe the enabled behavior instead of off/on modes.');
+    assertNotContainsValue('Grant Tasty Fonts access to extra roles and users. Administrators always keep access.', $output, 'Show Onboarding Hints should omit admin-access toggle helper copy when turned off.');
+    assertNotContainsValue('Turn custom access on to grant additional roles or users.', $output, 'Show Onboarding Hints should omit admin-access summary helper copy when turned off.');
+    assertNotContainsValue('Grant access to everyone in selected roles.', $output, 'Show Onboarding Hints should omit admin-access role helper copy when turned off.');
+    assertNotContainsValue('Grant access to selected users only.', $output, 'Show Onboarding Hints should omit admin-access user helper copy when turned off.');
     assertNotContainsValue('Custom access is on.', $output, 'The admin-access row should no longer render a separate status summary line.');
     assertNotContainsValue('Administrators:', $output, 'The admin-access row should no longer render a separate summary bar above the detailed controls.');
     assertNotContainsValue('Specific users:', $output, 'The admin-access row should no longer render the removed summary bar labels.');

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Admin\GoogleApiKeyValidationClient;
+use TastyFonts\Admin\GoogleApiKeyValidator;
 use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyFontsClient;
@@ -2739,6 +2741,32 @@ $tests['cli_command_routes_phase_four_actions_through_admin_controller'] = stati
     $snapshotOutput = (string) ob_get_clean();
 
     assertContainsValue('"snapshots": []', $snapshotOutput, 'The WP-CLI snapshot list command should expose JSON output for automation.');
+};
+
+$tests['google_api_key_validator_preserves_empty_success_messages'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $validationClient = new class implements GoogleApiKeyValidationClient {
+        /**
+         * @return array<string, mixed>
+         */
+        public function validateApiKey(string $apiKey): array
+        {
+            unset($apiKey);
+
+            return ['state' => 'valid'];
+        }
+    };
+    $validator = new GoogleApiKeyValidator(new GoogleFontsClient($settings), $validationClient);
+    $result = $validator->validate(
+        'valid-key',
+        'tasty_fonts_google_api_key_invalid',
+        'Google Fonts API key could not be validated.'
+    );
+
+    assertFalseValue(is_wp_error($result), 'Valid API key validation should not return a WP_Error.');
+    assertSameValue('', (string) ($result['message'] ?? null), 'A valid Google API key response without a message should not reuse the failure fallback message.');
 };
 
 $tests['cli_transfer_import_accepts_prompted_google_api_key_without_printing_it'] = static function (): void {

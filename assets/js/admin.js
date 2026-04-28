@@ -22,109 +22,108 @@
         ? wpI18n._n
         : (single, plural, count) => (count === 1 ? single : plural);
     const wpSprintf = typeof wpI18n.sprintf === 'function' ? wpI18n.sprintf : null;
-    const rowMatchesLibraryFilters = typeof adminContracts.rowMatchesLibraryFilters === 'function'
-        ? adminContracts.rowMatchesLibraryFilters
-        : ({ name = '', sources = '', categories = '' }, filters = {}) => {
-            const query = String(filters.query || '').trim().toLowerCase();
-            const sourceFilter = String(filters.sourceFilter || 'all').trim().toLowerCase();
-            const categoryFilter = String(filters.categoryFilter || 'all').trim().toLowerCase();
-            const sourceTokens = String(sources || '').split(/\s+/).filter(Boolean);
-            const categoryTokens = String(categories || '').split(/\s+/).filter(Boolean);
-            const matchesQuery = !query || String(name || '').toLowerCase().includes(query);
-            const matchesSource = !sourceFilter
-                || sourceFilter === 'all'
-                || sourceTokens.includes(sourceFilter)
-                || (sourceFilter === 'published' && sourceTokens.includes('role_active'));
-            const matchesCategory = !categoryFilter
-                || categoryFilter === 'all'
-                || categoryTokens.includes(categoryFilter);
+    const requiredAdminContractNames = [
+        'buildCustomCssDryRunRequest',
+        'buildCustomCssFinalImportRequest',
+        'buildCustomCssImportErrorMessage',
+        'buildVariationSettings',
+        'canDisableOutputLayer',
+        'cssAxisTag',
+        'defaultRoleFallback',
+        'defaultRoleWeight',
+        'describeFontType',
+        'escapeFontFamily',
+        'getTabNavigationTargetIndex',
+        'hasExplicitRoleWeight',
+        'isTrustedHostedStylesheetUrl',
+        'logEntryMatchesFilters',
+        'normalizeAxisSettings',
+        'normalizeAxisTag',
+        'normalizeAxisValue',
+        'normalizeCustomCssDryRunPlan',
+        'normalizeOutputQuickModePreference',
+        'normalizeRoleState',
+        'normalizeRoleWeightValue',
+        'normalizeSettingsFieldName',
+        'parsePhpIniSizeToBytes',
+        'renderCustomCssDryRunErrorHtml',
+        'renderCustomCssDryRunReviewHtml',
+        'resolveAssignedRoleState',
+        'resolveLogPagination',
+        'resolveRoleWeight',
+        'resolveStatusAnnouncement',
+        'roleStatesMatch',
+        'rowMatchesLibraryFilters',
+        'sanitizeFallback',
+        'sanitizeOutputQuickModePreference',
+        'serializeSettingsFormEntries',
+        'settingsStatesMatch',
+        'shouldDisableFieldDuringSiteTransferSubmit',
+        'shouldHydrateFamilyDetails',
+        'slugify',
+    ];
 
-            return matchesQuery && matchesSource && matchesCategory;
-        };
-    const shouldHydrateFamilyDetails = typeof adminContracts.shouldHydrateFamilyDetails === 'function'
-        ? adminContracts.shouldHydrateFamilyDetails
-        : (state = {}) => !state.loaded && !state.loading && String(state.familySlug || '').trim() !== '';
-    const shouldDisableFieldDuringSiteTransferSubmit = typeof adminContracts.shouldDisableFieldDuringSiteTransferSubmit === 'function'
-        ? adminContracts.shouldDisableFieldDuringSiteTransferSubmit
-        : (tagName = '', type = '') => {
-            const normalizedTagName = String(tagName || '').trim().toLowerCase();
-            const normalizedType = String(type || '').trim().toLowerCase();
+    function resolveRequiredAdminContracts(contracts = {}) {
+        const missing = requiredAdminContractNames.filter((name) => typeof contracts[name] !== 'function');
 
-            if (normalizedTagName === 'button') {
-                return true;
-            }
+        if (missing.length > 0) {
+            console.error(
+                'Tasty Fonts admin could not initialize because required admin contract helpers are missing:',
+                missing.join(', ')
+            );
 
-            if (normalizedTagName === 'input') {
-                return normalizedType === 'submit' || normalizedType === 'button';
-            }
+            return null;
+        }
 
-            return false;
-        };
-    const logEntryMatchesFilters = typeof adminContracts.logEntryMatchesFilters === 'function'
-        ? adminContracts.logEntryMatchesFilters
-        : (actor = '', searchValue = '', actorFilter = '', query = '') => {
-            const normalizedActor = String(actor || '').trim().toLowerCase();
-            const normalizedSearchValue = String(searchValue || '').trim().toLowerCase();
-            const normalizedActorFilter = String(actorFilter || '').trim().toLowerCase();
-            const normalizedQuery = String(query || '').trim().toLowerCase();
-            const matchesActor = !normalizedActorFilter || normalizedActor === normalizedActorFilter;
-            const matchesQuery = !normalizedQuery || normalizedSearchValue.includes(normalizedQuery);
+        return contracts;
+    }
 
-            return matchesActor && matchesQuery;
-        };
-    const resolveLogPagination = typeof adminContracts.resolveLogPagination === 'function'
-        ? adminContracts.resolveLogPagination
-        : (visibleCount = 0, requestedPage = 1, pageSize = 5) => {
-            const normalizedVisibleCount = Math.max(0, Number.parseInt(visibleCount, 10) || 0);
-            const normalizedPageSize = Math.max(1, Number.parseInt(pageSize, 10) || 5);
-            const totalPages = Math.max(1, Math.ceil(normalizedVisibleCount / normalizedPageSize));
-            const page = Math.min(Math.max(1, Number.parseInt(requestedPage, 10) || 1), totalPages);
-            const start = normalizedVisibleCount === 0 ? 0 : (page - 1) * normalizedPageSize;
-            const end = normalizedVisibleCount === 0 ? 0 : Math.min(start + normalizedPageSize, normalizedVisibleCount);
+    const resolvedAdminContracts = resolveRequiredAdminContracts(adminContracts);
 
-            return {
-                page,
-                pageSize: normalizedPageSize,
-                totalPages,
-                start,
-                end,
-                hasPrevious: page > 1,
-                hasNext: page < totalPages,
-            };
-        };
-    const parsePhpIniSizeToBytes = typeof adminContracts.parsePhpIniSizeToBytes === 'function'
-        ? adminContracts.parsePhpIniSizeToBytes
-        : (value = '') => {
-            const normalized = String(value || '').trim().toLowerCase();
+    if (!resolvedAdminContracts) {
+        return;
+    }
 
-            if (!normalized) {
-                return 0;
-            }
-
-            const match = normalized.match(/^(\d+(?:\.\d+)?)\s*([gmk])?b?$/);
-
-            if (!match) {
-                return 0;
-            }
-
-            const amount = Number.parseFloat(match[1] || '0');
-            const unit = String(match[2] || '');
-
-            if (!Number.isFinite(amount) || amount <= 0) {
-                return 0;
-            }
-
-            switch (unit) {
-                case 'g':
-                    return Math.round(amount * 1024 * 1024 * 1024);
-                case 'm':
-                    return Math.round(amount * 1024 * 1024);
-                case 'k':
-                    return Math.round(amount * 1024);
-                default:
-                    return Math.round(amount);
-            }
-        };
+    const {
+        buildCustomCssDryRunRequest,
+        buildCustomCssFinalImportRequest,
+        buildCustomCssImportErrorMessage,
+        buildVariationSettings: contractBuildVariationSettings,
+        canDisableOutputLayer,
+        cssAxisTag: contractCssAxisTag,
+        defaultRoleFallback: contractDefaultRoleFallback,
+        defaultRoleWeight: contractDefaultRoleWeight,
+        describeFontType,
+        escapeFontFamily,
+        getTabNavigationTargetIndex,
+        hasExplicitRoleWeight: contractHasExplicitRoleWeight,
+        isTrustedHostedStylesheetUrl,
+        logEntryMatchesFilters,
+        normalizeAxisSettings: contractNormalizeAxisSettings,
+        normalizeAxisTag: contractNormalizeAxisTag,
+        normalizeAxisValue: contractNormalizeAxisValue,
+        normalizeCustomCssDryRunPlan,
+        normalizeOutputQuickModePreference,
+        normalizeRoleState: contractNormalizeRoleState,
+        normalizeRoleWeightValue: contractNormalizeRoleWeightValue,
+        normalizeSettingsFieldName,
+        parsePhpIniSizeToBytes,
+        renderCustomCssDryRunErrorHtml,
+        renderCustomCssDryRunReviewHtml,
+        resolveAssignedRoleState: contractResolveAssignedRoleState,
+        resolveLogPagination,
+        resolveRoleWeight: contractResolveRoleWeight,
+        resolveStatusAnnouncement,
+        roleStatesMatch: contractRoleStatesMatch,
+        rowMatchesLibraryFilters,
+        sanitizeFallback,
+        sanitizeOutputQuickModePreference,
+        serializeSettingsFormEntries,
+        settingsStatesMatch,
+        shouldDisableFieldDuringSiteTransferSubmit,
+        shouldHydrateFamilyDetails,
+        slugify,
+    } = resolvedAdminContracts;
     const roleHeading = document.getElementById('tasty_fonts_heading_font');
     const roleBody = document.getElementById('tasty_fonts_body_font');
     const roleMonospace = document.getElementById('tasty_fonts_monospace_font');
@@ -564,280 +563,13 @@
         return helpTooltipLayer;
     }
 
-    // Shared helpers
-    const slugify = typeof adminContracts.slugify === 'function'
-        ? adminContracts.slugify
-        : (value) => String(value || '').toLowerCase().replace(/[^a-z0-9\-_]+/g, '-').replace(/^-+|-+$/g, '') || 'font';
-
-    const sanitizeFallback = typeof adminContracts.sanitizeFallback === 'function'
-        ? adminContracts.sanitizeFallback
-        : (fallback, defaultValue = 'sans-serif') => {
-            const sanitized = String(fallback || '')
-                .trim()
-                .replace(/[^a-zA-Z0-9,\- "'`]+/g, '')
-                .replace(/\s*,\s*/g, ', ')
-                .replace(/\s+/g, ' ')
-                .replace(/^[,\s]+|[,\s]+$/g, '');
-
-            return sanitized || defaultValue;
-        };
-
-    const escapeFontFamily = typeof adminContracts.escapeFontFamily === 'function'
-        ? adminContracts.escapeFontFamily
-        : (family) => String(family || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const isTrustedHostedStylesheetUrl = typeof adminContracts.isTrustedHostedStylesheetUrl === 'function'
-        ? adminContracts.isTrustedHostedStylesheetUrl
-        : (href) => {
-            try {
-                const url = new URL(String(href || ''));
-                const allowedOrigins = new Set([
-                    'https://fonts.googleapis.com',
-                    'https://fonts.bunny.net',
-                ]);
-
-                return url.protocol === 'https:'
-                    && allowedOrigins.has(url.origin)
-                    && url.pathname === '/css2';
-            } catch (error) {
-                return false;
-            }
-        };
-    const settingsStatesMatch = typeof adminContracts.settingsStatesMatch === 'function'
-        ? adminContracts.settingsStatesMatch
-        : (left, right) => JSON.stringify(left || {}) === JSON.stringify(right || {});
-    const normalizeSettingsFieldName = typeof adminContracts.normalizeSettingsFieldName === 'function'
-        ? adminContracts.normalizeSettingsFieldName
-        : (name) => String(name || '').replace(/\[\]$/, '').trim();
+    // Shared helper options
     const settingsFormIgnoredKeys = [
         '_wpnonce',
         '_wp_http_referer',
         'tasty_fonts_save_settings',
         'tasty_fonts_output_quick_mode',
     ];
-    const serializeSettingsFormEntries = typeof adminContracts.serializeSettingsFormEntries === 'function'
-        ? adminContracts.serializeSettingsFormEntries
-        : (entries, options = {}) => {
-            const ignoredKeys = new Set(Array.isArray(options.ignoredKeys) ? options.ignoredKeys.map((key) => String(key || '')) : []);
-            const body = {};
-
-            Array.from(entries || []).forEach((entry) => {
-                if (!Array.isArray(entry) || entry.length < 2) {
-                    return;
-                }
-
-                const rawKey = String(entry[0] || '');
-                const value = entry[1];
-                const normalizedKey = rawKey.replace(/\[\]$/, '').trim();
-
-                if (rawKey === '' || ignoredKeys.has(rawKey) || normalizedKey === '' || typeof value !== 'string') {
-                    return;
-                }
-
-                if (rawKey.endsWith('[]')) {
-                    if (!Array.isArray(body[normalizedKey])) {
-                        body[normalizedKey] = [];
-                    }
-
-                    if (value !== '') {
-                        body[normalizedKey].push(value);
-                    }
-
-                    return;
-                }
-
-                body[normalizedKey] = value;
-            });
-
-            return body;
-        };
-    const getTabNavigationTargetIndex = typeof adminContracts.getTabNavigationTargetIndex === 'function'
-        ? adminContracts.getTabNavigationTargetIndex
-        : (key, currentIndex, count, orientation = 'horizontal') => {
-            if (typeof currentIndex !== 'number' || typeof count !== 'number' || count < 2 || currentIndex < 0 || currentIndex >= count) {
-                return null;
-            }
-
-            const normalizedOrientation = String(orientation || 'horizontal').trim().toLowerCase() === 'vertical'
-                ? 'vertical'
-                : 'horizontal';
-
-            switch (key) {
-                case 'ArrowRight':
-                    return normalizedOrientation === 'horizontal' ? (currentIndex + 1) % count : null;
-                case 'ArrowDown':
-                    return normalizedOrientation === 'vertical' ? (currentIndex + 1) % count : null;
-                case 'ArrowLeft':
-                    return normalizedOrientation === 'horizontal' ? (currentIndex - 1 + count) % count : null;
-                case 'ArrowUp':
-                    return normalizedOrientation === 'vertical' ? (currentIndex - 1 + count) % count : null;
-                case 'Home':
-                    return 0;
-                case 'End':
-                    return count - 1;
-                default:
-                    return null;
-            }
-        };
-    const resolveStatusAnnouncement = typeof adminContracts.resolveStatusAnnouncement === 'function'
-        ? adminContracts.resolveStatusAnnouncement
-        : (type) => (String(type || '').trim().toLowerCase() === 'error'
-            ? { role: 'alert', live: 'assertive' }
-            : { role: 'status', live: 'polite' });
-    const buildCustomCssDryRunRequest = typeof adminContracts.buildCustomCssDryRunRequest === 'function'
-        ? adminContracts.buildCustomCssDryRunRequest
-        : (url) => ({ url: String(url || '').trim() });
-    const buildCustomCssFinalImportRequest = typeof adminContracts.buildCustomCssFinalImportRequest === 'function'
-        ? adminContracts.buildCustomCssFinalImportRequest
-        : (snapshotToken, selectedFaceIds = [], options = {}) => ({
-            snapshot_token: String(snapshotToken || '').trim(),
-            selected_face_ids: Array.isArray(selectedFaceIds) ? selectedFaceIds : [],
-            delivery_mode: String(options.deliveryMode || 'self_hosted').trim() || 'self_hosted',
-            family_fallbacks: options.familyFallbacks || {},
-            duplicate_handling: String(options.duplicateHandling || 'skip').trim() || 'skip',
-            activate: !!options.activate,
-            publish: !!options.publish,
-        });
-    const buildCustomCssImportErrorMessage = typeof adminContracts.buildCustomCssImportErrorMessage === 'function'
-        ? adminContracts.buildCustomCssImportErrorMessage
-        : (payload, fallback) => getApiMessage(payload, fallback);
-    const normalizeCustomCssDryRunPlan = typeof adminContracts.normalizeCustomCssDryRunPlan === 'function'
-        ? adminContracts.normalizeCustomCssDryRunPlan
-        : (payload) => (payload && typeof payload === 'object' ? payload : {});
-    const renderCustomCssDryRunReviewHtml = typeof adminContracts.renderCustomCssDryRunReviewHtml === 'function'
-        ? adminContracts.renderCustomCssDryRunReviewHtml
-        : () => '';
-    const escapeCustomCssStatusHtml = (value) => String(value || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    const renderCustomCssDryRunErrorHtml = typeof adminContracts.renderCustomCssDryRunErrorHtml === 'function'
-        ? adminContracts.renderCustomCssDryRunErrorHtml
-        : (message) => `<div class="tasty-fonts-empty tasty-fonts-empty--panel" role="alert">${escapeCustomCssStatusHtml(message)}</div>`;
-
-    const describeFontType = typeof adminContracts.describeFontType === 'function'
-        ? adminContracts.describeFontType
-        : (entry, provider = 'library') => {
-            const hasVariable = !!(
-                entry
-                && typeof entry === 'object'
-                && (
-                    !!entry.has_variable_faces
-                    || !!entry.is_variable
-                    || (entry.variation_axes && typeof entry.variation_axes === 'object' && Object.keys(entry.variation_axes).length > 0)
-                    || (entry.axes && typeof entry.axes === 'object' && Object.keys(entry.axes).length > 0)
-                    || (Array.isArray(entry.axis_tags) && entry.axis_tags.some((tag) => /^[A-Z0-9]{4}$/i.test(String(tag || '').trim())))
-                    || (Array.isArray(entry.faces) && entry.faces.some((face) => face && typeof face === 'object' && (!!face.is_variable || (face.axes && Object.keys(face.axes).length > 0))))
-                )
-            );
-            const hasStatic = !!(
-                entry
-                && typeof entry === 'object'
-                && (
-                    !!entry.has_static_faces
-                    || (
-                        entry.formats
-                        && typeof entry.formats === 'object'
-                        && entry.formats.static
-                        && typeof entry.formats.static === 'object'
-                    )
-                    || (Array.isArray(entry.faces) && entry.faces.some((face) => face && typeof face === 'object' && !face.is_variable && !(face.axes && Object.keys(face.axes).length > 0)))
-                    || !hasVariable
-                )
-            );
-            const normalizedProvider = String(provider || '').trim().toLowerCase();
-
-            if (normalizedProvider === 'bunny') {
-                return {
-                    type: 'static',
-                    hasVariable: false,
-                    hasStatic: true,
-                    isSourceOnly: false,
-                };
-            }
-
-            const variableFormat = entry && entry.formats && typeof entry.formats === 'object'
-                ? entry.formats.variable
-                : null;
-
-            return {
-                type: hasStatic && hasVariable ? 'static-variable' : (hasVariable ? 'variable' : 'static'),
-                hasVariable,
-                hasStatic,
-                isSourceOnly: !!(
-                    hasVariable
-                    && (
-                        (variableFormat && typeof variableFormat === 'object' && variableFormat.source_only)
-                        || (normalizedProvider === 'bunny' && (!variableFormat || variableFormat.available === false))
-                    )
-                ),
-            };
-        };
-    const sanitizeOutputQuickModePreference = typeof adminContracts.sanitizeOutputQuickModePreference === 'function'
-        ? adminContracts.sanitizeOutputQuickModePreference
-        : (value) => {
-            const normalized = String(value || '').trim().toLowerCase();
-
-            return ['minimal', 'variables', 'classes', 'custom'].includes(normalized) ? normalized : '';
-        };
-    const deriveExactOutputQuickMode = typeof adminContracts.deriveExactOutputQuickMode === 'function'
-        ? adminContracts.deriveExactOutputQuickMode
-        : (state = {}) => {
-            const minimalEnabled = !!state.minimalEnabled;
-            const classOutputEnabled = !!state.classOutputEnabled;
-            const variableOutputEnabled = !!state.variableOutputEnabled;
-            const roleUsageFontWeightEnabled = !!state.roleUsageFontWeightEnabled;
-            const classFlags = Array.isArray(state.classFlags) ? state.classFlags.filter((value) => typeof value === 'boolean') : [];
-            const variableFlags = Array.isArray(state.variableFlags) ? state.variableFlags.filter((value) => typeof value === 'boolean') : [];
-
-            if (minimalEnabled) {
-                return 'minimal';
-            }
-
-            if (!roleUsageFontWeightEnabled && !classOutputEnabled && variableOutputEnabled && variableFlags.every((value) => value)) {
-                return 'variables';
-            }
-
-            if (!roleUsageFontWeightEnabled && classOutputEnabled && !variableOutputEnabled && classFlags.every((value) => value)) {
-                return 'classes';
-            }
-
-            return 'custom';
-        };
-    const normalizeOutputQuickModePreference = typeof adminContracts.normalizeOutputQuickModePreference === 'function'
-        ? adminContracts.normalizeOutputQuickModePreference
-        : (preference, state = {}) => {
-            const normalizedPreference = sanitizeOutputQuickModePreference(preference);
-            const exactMode = deriveExactOutputQuickMode(state);
-
-            if (normalizedPreference === 'custom') {
-                return 'custom';
-            }
-
-            if (!normalizedPreference) {
-                return exactMode;
-            }
-
-            return exactMode === normalizedPreference ? normalizedPreference : 'custom';
-        };
-    const canDisableOutputLayer = typeof adminContracts.canDisableOutputLayer === 'function'
-        ? adminContracts.canDisableOutputLayer
-        : (layerKey, state = {}) => {
-            const normalizedLayerKey = String(layerKey || '').trim().toLowerCase();
-            const classOutputEnabled = !!state.classOutputEnabled;
-            const variableOutputEnabled = !!state.variableOutputEnabled;
-
-            if (normalizedLayerKey === 'classes') {
-                return !classOutputEnabled || variableOutputEnabled;
-            }
-
-            if (normalizedLayerKey === 'variables') {
-                return !variableOutputEnabled || classOutputEnabled;
-            }
-
-            return true;
-        };
 
     function buildStack(family, fallback, defaultFallback = 'sans-serif') {
         const sanitizedFallback = sanitizeFallback(fallback, defaultFallback);
@@ -886,156 +618,62 @@
         );
     }
 
-    function defaultRoleFallback(roleKey) {
-        return roleKey === 'monospace' ? 'monospace' : 'system-ui, sans-serif';
-    }
-
-    function resolveRoleFallbackValue(roleKey, input = {}) {
-        const defaultFallback = defaultRoleFallback(roleKey);
-        const familyName = String(input[roleKey] || '').trim();
-        const explicitFallback = String(input[`${roleKey}Fallback`] || input[`${roleKey}_fallback`] || '').trim();
-
-        if (explicitFallback !== '') {
-            return sanitizeFallback(explicitFallback, defaultFallback);
-        }
-
-        if (familyName) {
-            const entry = roleFamilyEntryForFamily(familyName);
-            const entryFallback = entry && typeof entry.fallback === 'string' ? entry.fallback : '';
-
-            if (entryFallback.trim() !== '') {
-                return sanitizeFallback(entryFallback, defaultFallback);
-            }
-        }
-
-        return defaultFallback;
-    }
-
     function buildRoleSelectionKey(roleKeys) {
         return ['heading', 'body', 'monospace'].filter((roleKey) => roleKeys.includes(roleKey)).join('-');
     }
 
-    function normalizeAxisTag(tag) {
-        const normalized = String(tag || '').trim().toUpperCase();
-
-        return /^[A-Z0-9]{4}$/.test(normalized) ? normalized : '';
-    }
-
-    function cssAxisTag(tag) {
-        switch (normalizeAxisTag(tag)) {
-            case 'WGHT':
-                return 'wght';
-            case 'WDTH':
-                return 'wdth';
-            case 'SLNT':
-                return 'slnt';
-            case 'ITAL':
-                return 'ital';
-            case 'OPSZ':
-                return 'opsz';
-            default:
-                return normalizeAxisTag(tag);
-        }
-    }
-
-    function normalizeAxisValue(value) {
-        const normalized = String(value ?? '').trim();
-
-        return /^-?\d+(?:\.\d+)?$/.test(normalized) ? normalized : '';
-    }
-
-    function normalizeAxisSettings(input = {}) {
-        if (!input || typeof input !== 'object') {
-            return {};
-        }
-
-        const normalized = {};
-
-        Object.entries(input).forEach(([tag, value]) => {
-            const normalizedTag = normalizeAxisTag(tag);
-            const normalizedValue = normalizeAxisValue(value);
-
-            if (!normalizedTag || !normalizedValue) {
-                return;
-            }
-
-            normalized[normalizedTag] = normalizedValue;
-        });
-
-        return Object.keys(normalized)
-            .sort()
-            .reduce((carry, tag) => {
-                carry[tag] = normalized[tag];
-                return carry;
-            }, {});
-    }
-
-    function normalizeRoleWeightValue(value) {
-        const normalized = String(value || '').trim().toLowerCase();
-
-        if (!normalized) {
-            return '';
-        }
-
-        if (normalized === 'normal') {
-            return '400';
-        }
-
-        if (normalized === 'bold') {
-            return '700';
-        }
-
-        return /^\d{1,4}$/.test(normalized) ? normalized : '';
-    }
-
-    function buildVariationSettings(settings = {}) {
-        const normalized = normalizeAxisSettings(settings);
-        const parts = Object.entries(normalized).map(([tag, value]) => `"${cssAxisTag(tag)}" ${value}`);
-
-        return parts.length ? parts.join(', ') : 'normal';
-    }
-
-    function normalizeRoleState(input = {}) {
+    function roleContractOptions(overrides = {}) {
         return {
-            heading: String(input.heading || '').trim(),
-            body: String(input.body || '').trim(),
-            monospace: monospaceRoleEnabled ? String(input.monospace || '').trim() : '',
-            headingFallback: resolveRoleFallbackValue('heading', input),
-            bodyFallback: resolveRoleFallbackValue('body', input),
-            monospaceFallback: resolveRoleFallbackValue('monospace', input),
-            headingWeight: normalizeRoleWeightValue(input.headingWeight || input.heading_weight),
-            bodyWeight: normalizeRoleWeightValue(input.bodyWeight || input.body_weight),
-            monospaceWeight: normalizeRoleWeightValue(input.monospaceWeight || input.monospace_weight),
-            headingAxes: variableFontsEnabled ? normalizeAxisSettings(input.headingAxes || input.heading_axes) : {},
-            bodyAxes: variableFontsEnabled ? normalizeAxisSettings(input.bodyAxes || input.body_axes) : {},
-            monospaceAxes: variableFontsEnabled && monospaceRoleEnabled
-                ? normalizeAxisSettings(input.monospaceAxes || input.monospace_axes)
-                : {},
+            monospaceRoleEnabled,
+            variableFontsEnabled,
+            roleFamilyCatalog,
+            ...overrides,
         };
     }
 
+    function defaultRoleFallback(roleKey) {
+        return contractDefaultRoleFallback(roleKey);
+    }
+
+
+    function normalizeAxisTag(tag) {
+        return contractNormalizeAxisTag(tag);
+    }
+
+    function cssAxisTag(tag) {
+        return contractCssAxisTag(tag);
+    }
+
+    function normalizeAxisValue(value) {
+        return contractNormalizeAxisValue(value);
+    }
+
+    function normalizeAxisSettings(input = {}) {
+        return contractNormalizeAxisSettings(input);
+    }
+
+    function normalizeRoleWeightValue(value) {
+        return contractNormalizeRoleWeightValue(value);
+    }
+
+    function buildVariationSettings(settings = {}) {
+        return contractBuildVariationSettings(settings);
+    }
+
+    function normalizeRoleState(input = {}) {
+        return contractNormalizeRoleState(input, roleContractOptions());
+    }
+
     function defaultRoleWeight(roleKey) {
-        return roleKey === 'heading' ? '700' : '400';
+        return contractDefaultRoleWeight(roleKey);
     }
 
     function resolveRoleWeight(roleKey, state = {}) {
-        const axes = normalizeAxisSettings(state[`${roleKey}Axes`] || state[`${roleKey}_axes`] || {});
-
-        if (axes.WGHT) {
-            return axes.WGHT;
-        }
-
-        return normalizeRoleWeightValue(state[`${roleKey}Weight`] || state[`${roleKey}_weight`]) || defaultRoleWeight(roleKey);
+        return contractResolveRoleWeight(roleKey, state);
     }
 
     function hasExplicitRoleWeight(roleKey, state = {}) {
-        const axes = normalizeAxisSettings(state[`${roleKey}Axes`] || state[`${roleKey}_axes`] || {});
-
-        if (axes.WGHT) {
-            return true;
-        }
-
-        return normalizeRoleWeightValue(state[`${roleKey}Weight`] || state[`${roleKey}_weight`]) !== '';
+        return contractHasExplicitRoleWeight(roleKey, state);
     }
 
     function buildRoleDataFromValues(values = {}) {
@@ -6205,59 +5843,16 @@
     let initialDraftRoleState = roleForm ? currentDraftRoleState() : normalizeRoleState({});
 
     function resolveAssignedRoleState(roleKey, family, currentState = {}, preserveStates = []) {
-        if (typeof adminContracts.resolveAssignedRoleState === 'function') {
-            return adminContracts.resolveAssignedRoleState(roleKey, family, currentState, {
-                monospaceRoleEnabled,
-                variableFontsEnabled,
-                roleFamilyCatalog,
-                preserveStates,
-            });
-        }
-
-        const normalizedRoleKey = String(roleKey || '').trim();
-        const nextFamily = String(family || '').trim();
-        const nextState = normalizeRoleState({
-            ...currentState,
-            [normalizedRoleKey]: nextFamily,
-            [`${normalizedRoleKey}Weight`]: '',
-            [`${normalizedRoleKey}Axes`]: {},
-        });
-        const matchingState = preserveStates
-            .map((state) => normalizeRoleState(state))
-            .find((state) => String(state[normalizedRoleKey] || '').trim() === nextFamily);
-
-        if (!matchingState) {
-            return nextState;
-        }
-
-        nextState[`${normalizedRoleKey}Weight`] = String(matchingState[`${normalizedRoleKey}Weight`] || '').trim();
-        nextState[`${normalizedRoleKey}Axes`] = variableFontsEnabled ? (matchingState[`${normalizedRoleKey}Axes`] || {}) : {};
-
-        return nextState;
+        return contractResolveAssignedRoleState(
+            roleKey,
+            family,
+            currentState,
+            roleContractOptions({ preserveStates })
+        );
     }
 
     function roleStatesMatch(left = {}, right = {}) {
-        if (typeof adminContracts.roleStatesMatch === 'function') {
-            return adminContracts.roleStatesMatch(left, right, {
-                monospaceRoleEnabled,
-                variableFontsEnabled,
-                roleFamilyCatalog,
-            });
-        }
-
-        const leftState = normalizeRoleState(left);
-        const rightState = normalizeRoleState(right);
-        const keys = monospaceRoleEnabled
-            ? ['heading', 'body', 'monospace', 'headingFallback', 'bodyFallback', 'monospaceFallback', 'headingWeight', 'bodyWeight', 'monospaceWeight', 'headingAxes', 'bodyAxes', 'monospaceAxes']
-            : ['heading', 'body', 'headingFallback', 'bodyFallback', 'headingWeight', 'bodyWeight', 'headingAxes', 'bodyAxes'];
-
-        return keys.every((key) => {
-            if (key.endsWith('Axes')) {
-                return JSON.stringify(leftState[key] || {}) === JSON.stringify(rightState[key] || {});
-            }
-
-            return leftState[key] === rightState[key];
-        });
+        return contractRoleStatesMatch(left, right, roleContractOptions());
     }
 
     function syncDisabledRoleActionHelp(target, disabled, copy) {

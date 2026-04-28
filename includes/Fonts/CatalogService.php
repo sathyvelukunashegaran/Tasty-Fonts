@@ -9,16 +9,11 @@ defined('ABSPATH') || exit;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
-use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use TastyFonts\Support\TransientKey;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use SplFileInfo;
 
 /**
- * @phpstan-import-type ParsedFilenameResult from \TastyFonts\Fonts\FontFilenameParser
  * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
  * @phpstan-type CatalogFace array<string, mixed>
  * @phpstan-type DeliveryProfile array<string, mixed>
@@ -38,8 +33,6 @@ use SplFileInfo;
 final class CatalogService
 {
     public const TRANSIENT_CATALOG = 'tasty_fonts_catalog_v3';
-    private const LOCAL_FORMATS = ['woff2', 'woff', 'ttf', 'otf'];
-    private const IMPORTED_SOURCES = ['google', 'bunny', 'custom'];
     private const DEFAULT_COUNTS = [
         'families' => 0,
         'files' => 0,
@@ -61,17 +54,24 @@ final class CatalogService
      *
      * @param Storage $storage Storage abstraction for uploads/fonts discovery and URL resolution.
      * @param ImportRepository $imports Repository for stored imported family records.
-     * @param FontFilenameParser $parser Parser used to infer family metadata from local filenames.
+     * @param FontFilenameParser $parser Parser used by the default local catalog scanner.
      * @param LogRepository $log Log repository used when attachment changes invalidate the catalog.
-     * @param AdobeProjectClient $adobe Adobe project client used to merge hosted Adobe families into the catalog.
+     * @param AdobeProjectClient $adobe Adobe project client used by the default Adobe catalog adapter.
      */
+    private readonly LocalCatalogScanner $localScanner;
+    private readonly AdobeCatalogAdapter $adobeAdapter;
+
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
-        private readonly FontFilenameParser $parser,
+        FontFilenameParser $parser,
         private readonly LogRepository $log,
-        private readonly AdobeProjectClient $adobe
+        AdobeProjectClient $adobe,
+        ?LocalCatalogScanner $localScanner = null,
+        ?AdobeCatalogAdapter $adobeAdapter = null
     ) {
+        $this->localScanner = $localScanner ?? new LocalCatalogScanner($this->storage, $parser);
+        $this->adobeAdapter = $adobeAdapter ?? new AdobeCatalogAdapter($adobe);
     }
 
     /**
@@ -165,11 +165,11 @@ final class CatalogService
             $families[$familyName] = $this->normalizeFamilyRecord($family);
         }
 
-        foreach ($this->scanLocalFamilies() as $family) {
+        foreach ($this->localScanner->scan() as $family) {
             $this->mergeSyntheticFamily($families, $family, 'library_only');
         }
 
-        foreach ($this->loadAdobeFamilies() as $family) {
+        foreach ($this->adobeAdapter->families() as $family) {
             $this->mergeSyntheticFamily($families, $family, 'published');
         }
 
@@ -220,6 +220,85 @@ final class CatalogService
             'family' => $familyName,
             'slug' => $familySlug,
             'publish_state' => in_array($publishState, ['library_only', 'published', 'role_active'], true) ? $publishState : 'published',
+            'active_delivery_id' => $activeDeliveryId,
+            'delivery_profiles' => $deliveryProfiles,
+        ];
+    }
+
+    /**
+     * @param CatalogMap $families
+     * @param CatalogFamily $synthetic
+     * @param-out CatalogMap $families
+     */
+    private function mergeSyntheticFamily(array &$families, array $synthetic, string $defaultPublishState): void
+    {
+        $familyName = $this->stringValue($synthetic, 'family');
+        $familySlug = $this->stringValue($synthetic, 'slug', FontUtils::slugify($familyName));
+
+        if ($familyName === '' || $familySlug === '') {
+            return;
+        }
+
+        if (!isset($families[$familyName])) {
+            $families[$familyName] = $this->buildCatalogFamilyRecord(
+                $familyName,
+                $familySlug,
+                $defaultPublishState,
+                $this->stringValue($synthetic, 'active_delivery_id'),
+                $this->deliveryProfiles($synthetic['delivery_profiles'] ?? [])
+            );
+
+            return;
+        }
+
+        $existingProfiles = $this->deliveryProfiles($families[$familyName]['delivery_profiles'] ?? []);
+
+        foreach ($this->deliveryProfiles($synthetic['delivery_profiles'] ?? []) as $profileId => $profile) {
+            if (!isset($existingProfiles[$profileId])) {
+                $existingProfiles[$profileId] = $profile;
+                continue;
+            }
+
+            $existingFaces = $this->deliveryFaceList($existingProfiles[$profileId]);
+            $syntheticFaces = $this->deliveryFaceList($profile);
+            $existingProfiles[$profileId] = array_replace($profile, $existingProfiles[$profileId]);
+            $existingProfiles[$profileId]['faces'] = HostedImportSupport::mergeManifestFaces($existingFaces, $syntheticFaces);
+            $existingProfiles[$profileId]['variants'] = array_values(
+                array_unique(
+                    array_merge(
+                        $this->stringList($existingProfiles[$profileId]['variants'] ?? []),
+                        $this->stringList($profile['variants'] ?? [])
+                    )
+                )
+            );
+            $existingProfiles[$profileId]['meta'] = array_replace(
+                $this->metaValueMap($profile),
+                $this->metaValueMap($existingProfiles[$profileId])
+            );
+        }
+
+        $families[$familyName]['delivery_profiles'] = $existingProfiles;
+
+        if (trim($this->stringValue($families[$familyName], 'active_delivery_id')) === '') {
+            $families[$familyName]['active_delivery_id'] = $this->stringValue($synthetic, 'active_delivery_id');
+        }
+    }
+
+    /**
+     * @param array<string, DeliveryProfile> $deliveryProfiles
+     * @return CatalogFamily
+     */
+    private function buildCatalogFamilyRecord(
+        string $familyName,
+        string $familySlug,
+        string $publishState,
+        string $activeDeliveryId,
+        array $deliveryProfiles
+    ): array {
+        return [
+            'family' => $familyName,
+            'slug' => $familySlug,
+            'publish_state' => $publishState,
             'active_delivery_id' => $activeDeliveryId,
             'delivery_profiles' => $deliveryProfiles,
         ];
@@ -403,231 +482,6 @@ final class CatalogService
             'variation_defaults' => $this->normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
         ];
     }
-
-    /**
-     * @param CatalogMap $families
-     * @param CatalogFamily $synthetic
-     * @param-out CatalogMap $families
-     */
-    private function mergeSyntheticFamily(array &$families, array $synthetic, string $defaultPublishState): void
-    {
-        $familyName = $this->stringValue($synthetic, 'family');
-        $familySlug = $this->stringValue($synthetic, 'slug', FontUtils::slugify($familyName));
-
-        if ($familyName === '' || $familySlug === '') {
-            return;
-        }
-
-        if (!isset($families[$familyName])) {
-            $families[$familyName] = $this->buildCatalogFamilyRecord(
-                $familyName,
-                $familySlug,
-                $defaultPublishState,
-                $this->stringValue($synthetic, 'active_delivery_id'),
-                $this->deliveryProfiles($synthetic['delivery_profiles'] ?? [])
-            );
-
-            return;
-        }
-
-        $existingProfiles = $this->deliveryProfiles($families[$familyName]['delivery_profiles'] ?? []);
-
-        foreach ($this->deliveryProfiles($synthetic['delivery_profiles'] ?? []) as $profileId => $profile) {
-            if (!isset($existingProfiles[$profileId])) {
-                $existingProfiles[$profileId] = $profile;
-                continue;
-            }
-
-            $existingFaces = $this->deliveryFaceList($existingProfiles[$profileId]);
-            $syntheticFaces = $this->deliveryFaceList($profile);
-            $existingProfiles[$profileId] = array_replace($profile, $existingProfiles[$profileId]);
-            $existingProfiles[$profileId]['faces'] = HostedImportSupport::mergeManifestFaces($existingFaces, $syntheticFaces);
-            $existingProfiles[$profileId]['variants'] = array_values(
-                array_unique(
-                    array_merge(
-                        $this->stringList($existingProfiles[$profileId]['variants'] ?? []),
-                        $this->stringList($profile['variants'] ?? [])
-                    )
-                )
-            );
-            $existingProfiles[$profileId]['meta'] = array_replace(
-                $this->metaValueMap($profile),
-                $this->metaValueMap($existingProfiles[$profileId])
-            );
-        }
-
-        $families[$familyName]['delivery_profiles'] = $existingProfiles;
-
-        if (trim($this->stringValue($families[$familyName], 'active_delivery_id')) === '') {
-            $families[$familyName]['active_delivery_id'] = $this->stringValue($synthetic, 'active_delivery_id');
-        }
-    }
-
-    /**
-     * @return list<CatalogFamily>
-     */
-    private function scanLocalFamilies(): array
-    {
-        $root = $this->storage->getRoot();
-        $importRootPrefixes = $this->getImportedRootPrefixes();
-
-        if (!$root || !is_dir($root) || !is_readable($root)) {
-            return [];
-        }
-
-        /** @var CatalogMap $byFamily */
-        $byFamily = [];
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator(
-                $root,
-                RecursiveDirectoryIterator::SKIP_DOTS | RecursiveDirectoryIterator::UNIX_PATHS
-            )
-        );
-
-        foreach ($iterator as $file) {
-            if (!$file instanceof SplFileInfo || !$this->isScannableLocalFile($file, $importRootPrefixes)) {
-                continue;
-            }
-
-            $byFamily = $this->addLocalFileToFamilies($byFamily, $file);
-        }
-
-        foreach ($byFamily as &$family) {
-            $profileId = $this->localDeliveryId();
-            $profiles = $this->deliveryProfiles($family['delivery_profiles'] ?? []);
-            $profile = $profiles[$profileId] ?? [];
-            $profile['faces'] = array_values($this->deliveryFaceMap($profile));
-            $profiles[$profileId] = $profile;
-            $family['delivery_profiles'] = $profiles;
-        }
-        unset($family);
-
-        return array_values($byFamily);
-    }
-
-    /**
-     * @param CatalogMap $byFamily
-     * @return CatalogMap
-     */
-    private function addLocalFileToFamilies(array $byFamily, SplFileInfo $file): array
-    {
-        $extension = strtolower($file->getExtension());
-        $meta = $this->parser->parse($file->getBasename('.' . $extension));
-
-        if ($meta['is_variable'] && !$this->variableFontsEnabled()) {
-            return $byFamily;
-        }
-
-        $familyName = $meta['family'];
-        $familySlug = FontUtils::slugify($familyName);
-        $variantKey = FontUtils::variantKey($meta['weight'], $meta['style']);
-        $profileId = $this->localDeliveryId();
-
-        if (!isset($byFamily[$familyName])) {
-            $byFamily[$familyName] = $this->buildCatalogFamilyRecord(
-                $familyName,
-                $familySlug,
-                'library_only',
-                $profileId,
-                [$profileId => $this->buildLocalScanDeliveryProfile($profileId)]
-            );
-        }
-
-        $profiles = $this->deliveryProfiles($byFamily[$familyName]['delivery_profiles'] ?? []);
-        $profile = $profiles[$profileId] ?? $this->buildLocalScanDeliveryProfile($profileId);
-        $faces = $this->deliveryFaceMap($profile);
-
-        if (!isset($faces[$variantKey])) {
-            $faces[$variantKey] = $this->buildLocalFace($familyName, $familySlug, $meta);
-        }
-
-        $absolutePath = wp_normalize_path($file->getPathname());
-        $relativePath = $this->storage->relativePath($absolutePath);
-        $url = $this->storage->urlForRelativePath($relativePath);
-
-        if ($url === null) {
-            return $byFamily;
-        }
-
-        $face = $faces[$variantKey];
-        $face['files'] = array_replace($this->stringMap($face['files'] ?? []), [$extension => $relativePath]);
-        $face['paths'] = array_replace($this->stringMap($face['paths'] ?? []), [$extension => $relativePath]);
-        $faces[$variantKey] = $face;
-        $profile['faces'] = $faces;
-        $profile['variants'] = array_values(array_unique([...$this->stringList($profile['variants'] ?? []), $this->variantTokenFromMeta($meta)]));
-        $profiles[$profileId] = $profile;
-        $byFamily[$familyName]['delivery_profiles'] = $profiles;
-
-        return $byFamily;
-    }
-
-    /**
-     * @param ParsedFilenameResult $meta
-     * @return CatalogFace
-     */
-    private function buildLocalFace(string $familyName, string $familySlug, array $meta): array
-    {
-        $axes = $this->normalizeAxes($meta['axes']);
-
-        return [
-            'family' => $familyName,
-            'slug' => $familySlug,
-            'source' => 'local',
-            'weight' => FontUtils::normalizeWeight($meta['weight']),
-            'style' => FontUtils::normalizeStyle($meta['style']),
-            'unicode_range' => '',
-            'files' => [],
-            'paths' => [],
-            'provider' => ['type' => 'local'],
-            'is_variable' => !empty($meta['is_variable']),
-            'axes' => $axes,
-            'variation_defaults' => $this->normalizeVariationDefaults($meta['variation_defaults'], $axes),
-        ];
-    }
-
-    /**
-     * @param array<string, DeliveryProfile> $deliveryProfiles
-     * @return CatalogFamily
-     */
-    private function buildCatalogFamilyRecord(
-        string $familyName,
-        string $familySlug,
-        string $publishState,
-        string $activeDeliveryId,
-        array $deliveryProfiles
-    ): array {
-        return [
-            'family' => $familyName,
-            'slug' => $familySlug,
-            'publish_state' => $publishState,
-            'active_delivery_id' => $activeDeliveryId,
-            'delivery_profiles' => $deliveryProfiles,
-        ];
-    }
-
-    /**
-     * @return DeliveryProfile
-     */
-    private function buildLocalScanDeliveryProfile(string $profileId): array
-    {
-        return [
-            'id' => $profileId,
-            'provider' => 'local',
-            'type' => 'self_hosted',
-            'label' => __('Self-hosted', 'tasty-fonts'),
-            'variants' => [],
-            'faces' => [],
-            'meta' => ['origin' => 'local_scan'],
-        ];
-    }
-
-    private function variableFontsEnabled(): bool
-    {
-        $settings = get_option(SettingsRepository::OPTION_SETTINGS, []);
-
-        return is_array($settings) && !empty($settings['variable_fonts_enabled']);
-    }
-
     /**
      * @param list<DeliveryProfile> $profiles
      */
@@ -717,99 +571,8 @@ final class CatalogService
         return $axes;
     }
 
-    /**
-     * @return list<CatalogFamily>
-     */
-    private function loadAdobeFamilies(): array
-    {
-        $projectState = $this->adobe->getProjectStatus()['state'];
 
-        if (!$this->adobe->hasProjectId() || !in_array($projectState, ['valid', 'unknown'], true)) {
-            return [];
-        }
 
-        $projectId = $this->adobe->getProjectId();
-        $deliveryId = $this->adobeDeliveryId();
-        $families = [];
-
-        foreach ($this->adobe->getConfiguredFamilies() as $family) {
-            $familyName = $this->stringValue($family, 'family');
-            $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
-
-            if ($familyName === '' || $familySlug === '') {
-                continue;
-            }
-
-            $faces = [];
-
-            foreach ($this->deliveryFaceList(['faces' => $family['faces'] ?? []]) as $face) {
-                $axes = $this->normalizeAxes($face['axes'] ?? []);
-
-                $faces[] = [
-                    'family' => $familyName,
-                    'slug' => $familySlug,
-                    'source' => 'adobe',
-                    'weight' => FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400')),
-                    'style' => FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')),
-                    'unicode_range' => '',
-                    'files' => [],
-                    'paths' => [],
-                    'provider' => ['type' => 'adobe', 'project_id' => $projectId],
-                    'is_variable' => !empty($face['is_variable']),
-                    'axes' => $axes,
-                    'variation_defaults' => $this->normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
-                ];
-            }
-
-            $families[] = [
-                'family' => $familyName,
-                'slug' => $familySlug,
-                'publish_state' => 'published',
-                'active_delivery_id' => $deliveryId,
-                'delivery_profiles' => [
-                    $deliveryId => [
-                        'id' => $deliveryId,
-                        'provider' => 'adobe',
-                        'type' => 'adobe_hosted',
-                        'label' => __('Adobe-hosted', 'tasty-fonts'),
-                        'variants' => $this->variantsFromFaces($faces),
-                        'faces' => $faces,
-                        'meta' => ['project_id' => $projectId],
-                    ],
-                ],
-            ];
-        }
-
-        return $families;
-    }
-
-    /**
-     * @param list<CatalogFace> $faces
-     * @return list<string>
-     */
-    private function variantsFromFaces(array $faces): array
-    {
-        return HostedImportSupport::variantsFromFaces($faces);
-    }
-
-    /**
-     * @param ParsedFilenameResult $meta
-     */
-    private function variantTokenFromMeta(array $meta): string
-    {
-        $weight = FontUtils::normalizeWeight($meta['weight']);
-        $style = FontUtils::normalizeStyle($meta['style']);
-
-        if ($weight === '400' && $style === 'normal') {
-            return 'regular';
-        }
-
-        if ($weight === '400' && $style === 'italic') {
-            return 'italic';
-        }
-
-        return $weight . ($style === 'italic' ? 'italic' : '');
-    }
 
     /**
      * @param CatalogFamily $family
@@ -1134,13 +897,14 @@ final class CatalogService
                 continue;
             }
 
-            $id = $this->stringValue($profile, 'id', is_string($profileId) ? $profileId : '');
+            $normalizedProfile = FontUtils::normalizeStringKeyedMap($profile);
+            $id = $this->stringValue($normalizedProfile, 'id', is_string($profileId) ? $profileId : '');
 
             if ($id === '') {
                 continue;
             }
 
-            $normalized[$id] = FontUtils::normalizeStringKeyedMap($profile);
+            $normalized[$id] = $normalizedProfile;
         }
 
         return $normalized;
@@ -1395,15 +1159,21 @@ final class CatalogService
     }
 
     /**
-     * @param array<int|string, mixed> $values
+     * @param array<string, mixed> $values
      */
     private function stringValue(array $values, string $key, string $default = ''): string
     {
-        return self::arrayStringValue($values, $key, $default);
+        if (!array_key_exists($key, $values)) {
+            return $default;
+        }
+
+        $value = self::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
     }
 
     /**
-     * @param array<int|string, mixed> $values
+     * @param array<string, mixed> $values
      */
     private static function arrayStringValue(array $values, string $key, string $default = ''): string
     {
@@ -1439,56 +1209,6 @@ final class CatalogService
             ],
             DAY_IN_SECONDS
         );
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function getImportedRootPrefixes(): array
-    {
-        $prefixes = [];
-
-        foreach (self::IMPORTED_SOURCES as $source) {
-            $root = $this->storage->getProviderRoot($source);
-
-            if (!is_string($root) || $root === '') {
-                continue;
-            }
-
-            $prefixes[] = trailingslashit(wp_normalize_path($root));
-        }
-
-        return $prefixes;
-    }
-
-    /**
-     * @param list<string> $importRootPrefixes
-     */
-    private function isScannableLocalFile(SplFileInfo $file, array $importRootPrefixes): bool
-    {
-        if (!$file->isFile()) {
-            return false;
-        }
-
-        $absolutePath = wp_normalize_path($file->getPathname());
-
-        foreach ($importRootPrefixes as $prefix) {
-            if ($prefix !== '' && str_starts_with($absolutePath, $prefix)) {
-                return false;
-            }
-        }
-
-        return in_array(strtolower($file->getExtension()), self::LOCAL_FORMATS, true);
-    }
-
-    private function localDeliveryId(): string
-    {
-        return FontUtils::slugify('local-self_hosted');
-    }
-
-    private function adobeDeliveryId(): string
-    {
-        return FontUtils::slugify('adobe-adobe_hosted');
     }
 
     /**

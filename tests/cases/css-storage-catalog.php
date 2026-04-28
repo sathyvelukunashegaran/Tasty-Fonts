@@ -1531,6 +1531,27 @@ $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static f
     assertSameValue('library_only', (string) ($family['publish_state'] ?? ''), 'Families discovered by scanning the fonts directory should start in the library instead of being published immediately.');
 };
 
+$tests['catalog_service_local_scan_excludes_imported_roots_and_keeps_relative_paths'] = static function (): void {
+    resetTestState();
+
+    $storage = new Storage();
+    $storage->ensureRootDirectory();
+    $storage->writeAbsoluteFile((string) $storage->pathForRelativePath('loose/Loose-400-normal.woff2'), 'font-data');
+    $storage->writeAbsoluteFile((string) $storage->pathForRelativePath('google/Roboto-400-normal.woff2'), 'font-data');
+
+    $settings = new SettingsRepository();
+    $imports = new ImportRepository();
+    $log = new LogRepository();
+    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $families = $catalog->getCatalog();
+    $face = $families['Loose']['faces'][0] ?? [];
+
+    assertSameValue(['Loose'], array_values(array_keys($families)), 'Local scanning should skip imported provider roots so managed import files are not rediscovered as loose local fonts.');
+    assertSameValue('loose/Loose-400-normal.woff2', (string) ($face['paths']['woff2'] ?? ''), 'Local scanning should preserve relative storage paths for catalog hydration.');
+    assertSameValue($storage->urlForRelativePath('loose/Loose-400-normal.woff2'), (string) ($face['files']['woff2'] ?? ''), 'Catalog hydration should convert relative local files into public URLs after adapter discovery.');
+};
+
 $tests['catalog_service_only_includes_local_variable_fonts_when_the_feature_flag_is_enabled'] = static function (): void {
     resetTestState();
 

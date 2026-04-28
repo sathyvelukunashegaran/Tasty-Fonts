@@ -6,23 +6,24 @@ namespace TastyFonts\Google;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Fonts\AssetService;
-use TastyFonts\Fonts\CatalogService;
-use TastyFonts\Fonts\HostedImportSupport;
-use TastyFonts\Fonts\HostedProviderImportTrait;
-use TastyFonts\Repository\ImportRepository;
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Fonts\HostedImportProviderAdapterInterface;
+use TastyFonts\Fonts\HostedImportProviderConfig;
+use TastyFonts\Fonts\HostedImportRequest;
+use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Support\FontUtils;
-use TastyFonts\Support\Storage;
 use WP_Error;
 
 /**
- * @phpstan-type HostedFamily array<string, mixed>
- * @phpstan-type HostedProfile array<string, mixed>
- * @phpstan-type HostedFace array<string, mixed>
- * @phpstan-type ProviderMetadata array<string, mixed>
- * @phpstan-type VariantPlan array{import: list<string>, skipped: list<string>, format_mode: string}
- * @phpstan-type ProviderConfig array<string, string>
+ * @phpstan-type HostedImportContext array{
+ *     family_name: string,
+ *     family_slug: string,
+ *     delivery_mode: string,
+ *     format_mode: string,
+ *     metadata: array<string, mixed>|null,
+ *     existing_family: array<string, mixed>|null,
+ *     existing_profile: array<string, mixed>|null,
+ *     imported_variants: list<string>
+ * }
  * @phpstan-type ImportResult array{
  *     status: string,
  *     message: string,
@@ -37,39 +38,19 @@ use WP_Error;
  *     delivery_id?: string
  * }
  */
-final class GoogleImportService
+final class GoogleImportService implements HostedImportProviderAdapterInterface
 {
-    use HostedProviderImportTrait;
-
     private const MAX_FONT_FILE_BYTES = 10 * MB_IN_BYTES;
 
     public function __construct(
-        private readonly Storage $storage,
-        private readonly ImportRepository $imports,
         private readonly GoogleFontsClient $client,
         private readonly GoogleCssParser $parser,
-        CatalogService $catalog,
-        private readonly AssetService $assets,
-        private readonly LogRepository $log
-    ) {
-        unset($catalog);
-    }
+        private readonly HostedImportWorkflow $workflow
+    ) {}
 
     /**
      * @param list<string> $variants
-     * @return array{
-     *     status: string,
-     *     message: string,
-     *     family: string,
-     *     delivery_type: string,
-     *     faces: int,
-     *     files: int,
-     *     variants: list<string>,
-     *     imported_variants: list<string>,
-     *     skipped_variants: list<string>,
-     *     family_record?: array<string, mixed>,
-     *     delivery_id?: string
-     * }|WP_Error
+     * @return ImportResult|WP_Error
      */
     public function importFamily(
         string $familyName,
@@ -77,242 +58,146 @@ final class GoogleImportService
         string $deliveryMode = 'self_hosted',
         string $formatMode = 'static'
     ): array|WP_Error {
-        $familyName = trim(wp_strip_all_tags($familyName));
-
-        if ($familyName === '') {
-            return $this->error('tasty_fonts_missing_family', __('Choose a Google Fonts family before importing.', 'tasty-fonts'));
-        }
-
-        $familySlug = FontUtils::slugify($familyName);
-        $deliveryMode = $this->normalizeDeliveryMode($deliveryMode);
-        $formatMode = $this->normalizeFormatMode($formatMode);
-        $requestedVariants = FontUtils::normalizeVariantTokens($variants);
-        $existingFamily = $this->imports->getFamily($familySlug);
-        $existingProfile = $this->findDeliveryProfile($existingFamily, 'google', $deliveryMode, $formatMode);
-        $variantPlan = $this->buildVariantPlan($requestedVariants, $existingProfile, $formatMode);
-
-        if ($variantPlan['import'] === []) {
-            return $this->buildHostedSkippedImportResult(
-                $familyName,
-                $deliveryMode,
-                $requestedVariants,
-                $variantPlan,
-                [
-                    'cdn' => __('Google CDN delivery for %s already includes the selected variants.', 'tasty-fonts'),
-                    'existing' => __('%s already exists in the library for the selected variants.', 'tasty-fonts'),
-                ]
-            );
-        }
-
-        $metadata = $this->client->getFamily($familyName);
-        $css = $this->client->fetchCss(
-            $familyName,
-            $variantPlan['import'],
-            'swap',
-            is_array($metadata) ? $metadata : [],
-            $formatMode
+        return $this->workflow->import(
+            new HostedImportRequest($familyName, $variants, $deliveryMode, $formatMode),
+            $this
         );
-
-        if (is_wp_error($css)) {
-            return $this->error($this->normalizeHostedErrorCode($css->get_error_code()), $css->get_error_message());
-        }
-
-        $faces = $this->selectHostedImportFaces(
-            $familyName,
-            $css,
-            $variantPlan['import'],
-            [$this->parser, 'parse'],
-            'tasty_fonts_google_no_faces',
-            __('No usable Google Fonts faces were returned for that family.', 'tasty-fonts')
-        );
-
-        if (is_wp_error($faces)) {
-            return $faces;
-        }
-
-        $result = $deliveryMode === 'cdn'
-            ? $this->saveCdnProfile($familyName, $familySlug, $faces, $metadata, $variantPlan, $existingFamily, $existingProfile)
-            : $this->saveSelfHostedProfile($familyName, $familySlug, $faces, $metadata, $variantPlan, $existingFamily, $existingProfile);
-
-        return $this->completeHostedImport($result, 'google');
     }
 
-    /**
-     * @param list<HostedFace> $faces
-     * @param ProviderMetadata|null $metadata
-     * @param VariantPlan $variantPlan
-     * @param HostedFamily|null $existingFamily
-     * @param HostedProfile|null $existingProfile
-     * @return ImportResult|WP_Error
-     */
-    private function saveSelfHostedProfile(
-        string $familyName,
-        string $familySlug,
-        array $faces,
-        ?array $metadata,
-        array $variantPlan,
-        ?array $existingFamily,
-        ?array $existingProfile
-    ): array|WP_Error {
-        $profileId = $this->resolveProfileId($existingFamily, 'self_hosted', $variantPlan['format_mode']);
-        return $this->saveHostedSelfHostedProfile(
-            $familyName,
-            $familySlug,
-            $faces,
-            $variantPlan,
-            $existingFamily,
-            $existingProfile,
-            [
-                'id' => $profileId,
-                'provider' => 'google',
-                'provider_face' => $this->buildProviderMetadata($metadata, $variantPlan['import']),
-                'type' => 'self_hosted',
-                'format' => $variantPlan['format_mode'],
-                'label' => __('Self-hosted (Google import)', 'tasty-fonts'),
-                'meta' => [
-                    'category' => $this->stringValue($metadata, 'category'),
-                    'lastModified' => $this->stringValue($metadata, 'lastModified'),
-                    'version' => $this->stringValue($metadata, 'version'),
-                    'imported_at' => current_time('mysql'),
-                ],
-            ],
-            $this->providerConfig(),
+    public function providerKey(): string
+    {
+        return 'google';
+    }
+
+    public function config(): HostedImportProviderConfig
+    {
+        return new HostedImportProviderConfig(
+            'google',
+            'google',
+            'fonts.gstatic.com',
+            self::MAX_FONT_FILE_BYTES,
+            'tasty_fonts_google_family_dir_failed',
+            __('The Google Fonts import directory could not be created.', 'tasty-fonts'),
+            'tasty_fonts_google_invalid_host',
+            __('Google font downloads must come from fonts.gstatic.com.', 'tasty-fonts'),
+            'tasty_fonts_google_invalid_extension',
+            __('Only WOFF2 files can be imported from Google Fonts.', 'tasty-fonts'),
+            'tasty_fonts_google_download_failed',
+            __('Font download failed with status %d.', 'tasty-fonts'),
+            'tasty_fonts_google_empty_file',
+            __('Google Fonts returned an empty font file.', 'tasty-fonts'),
+            'tasty_fonts_google_file_too_large',
+            __('The downloaded font file exceeded the safety size limit.', 'tasty-fonts'),
+            'tasty_fonts_google_invalid_type',
+            __('The downloaded file was not returned as a WOFF2 font.', 'tasty-fonts'),
+            'tasty_fonts_google_write_failed',
+            __('The imported font file could not be written to uploads/fonts.', 'tasty-fonts'),
+            'tasty_fonts_google_no_faces',
+            __('No usable Google Fonts faces were returned for that family.', 'tasty-fonts'),
             'tasty_fonts_google_empty_manifest',
             __('No local font files were saved from that import.', 'tasty-fonts'),
-            __('Added %1$s as a self-hosted Google delivery (%2$d variant%3$s, %4$d file%5$s).', 'tasty-fonts')
-        );
-    }
-
-    /**
-     * @param list<HostedFace> $faces
-     * @param ProviderMetadata|null $metadata
-     * @param VariantPlan $variantPlan
-     * @param HostedFamily|null $existingFamily
-     * @param HostedProfile|null $existingProfile
-     * @return ImportResult|WP_Error
-     */
-    private function saveCdnProfile(
-        string $familyName,
-        string $familySlug,
-        array $faces,
-        ?array $metadata,
-        array $variantPlan,
-        ?array $existingFamily,
-        ?array $existingProfile
-    ): array|WP_Error {
-        $profileId = $this->resolveProfileId($existingFamily, 'cdn', $variantPlan['format_mode']);
-        return $this->saveHostedCdnProfile(
-            $familyName,
-            $familySlug,
-            $faces,
-            $variantPlan,
-            $existingFamily,
-            $existingProfile,
-            [
-                'id' => $profileId,
-                'provider' => 'google',
-                'provider_face' => $this->buildProviderMetadata($metadata, $variantPlan['import']),
-                'type' => 'cdn',
-                'format' => $variantPlan['format_mode'],
-                'label' => __('Google CDN', 'tasty-fonts'),
-                'meta' => [
-                    'category' => $this->stringValue($metadata, 'category'),
-                    'lastModified' => $this->stringValue($metadata, 'lastModified'),
-                    'version' => $this->stringValue($metadata, 'version'),
-                    'saved_at' => current_time('mysql'),
-                ],
-            ],
-            $this->providerConfig(),
+            'tasty_fonts_missing_family',
+            __('Choose a Google Fonts family before importing.', 'tasty-fonts'),
+            __('%s already exists in the library for the selected variants.', 'tasty-fonts'),
+            __('Google CDN delivery for %s already includes the selected variants.', 'tasty-fonts'),
+            __('Added %1$s as a self-hosted Google delivery (%2$d variant%3$s, %4$d file%5$s).', 'tasty-fonts'),
             __('Added %1$s as a Google CDN delivery (%2$d variant%3$s).', 'tasty-fonts')
         );
     }
 
-    private function normalizeDeliveryMode(string $deliveryMode): string
-    {
-        return $this->normalizeHostedDeliveryMode($deliveryMode);
-    }
-
-    private function normalizeFormatMode(string $formatMode): string
+    public function normalizeFormatMode(string $formatMode): string
     {
         $formatMode = strtolower(trim($formatMode));
 
         return $formatMode === 'variable' ? 'variable' : 'static';
     }
 
-    /**
-     * @param HostedFamily|null $family
-     * @return HostedProfile|null
-     */
-    private function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = 'static'): ?array
+    public function profileFormatFilter(string $formatMode): string
     {
-        return $this->findHostedDeliveryProfile($family, $provider, $type, $formatMode);
-    }
-
-    private function profileId(string $deliveryMode): string
-    {
-        return FontUtils::slugify('google-' . $deliveryMode);
-    }
-
-    /**
-     * @param HostedFamily|null $family
-     */
-    private function resolveProfileId(?array $family, string $deliveryMode, string $formatMode): string
-    {
-        $existing = $this->findDeliveryProfile($family, 'google', $deliveryMode, $formatMode);
-        $existingId = $this->stringValue($existing, 'id');
-
-        if ($existingId !== '') {
-            return $existingId;
-        }
-
-        $baseId = $this->profileId($deliveryMode);
-
-        if (!$this->findLegacyProfileConflict($family, 'google', $deliveryMode)) {
-            return $baseId;
-        }
-
-        return FontUtils::slugify($baseId . '-' . $formatMode);
-    }
-
-    /**
-     * @param HostedFamily|null $family
-     */
-    private function findLegacyProfileConflict(?array $family, string $provider, string $type): bool
-    {
-        return $this->findHostedDeliveryProfile($family, $provider, $type) !== null;
-    }
-
-    /**
-     * @param ProviderMetadata|null $metadata
-     * @param list<string> $variants
-     * @return ProviderMetadata
-     */
-    private function buildProviderMetadata(?array $metadata, array $variants): array
-    {
-        return [
-            'type' => 'google',
-            'category' => $this->stringValue($metadata, 'category'),
-            'variants' => $variants,
-            'lastModified' => $this->stringValue($metadata, 'lastModified'),
-            'version' => $this->stringValue($metadata, 'version'),
-        ];
+        return $this->normalizeFormatMode($formatMode);
     }
 
     /**
      * @param list<string> $requestedVariants
-     * @param HostedProfile|null $existingProfile
-     * @return VariantPlan
+     * @return list<string>
      */
-    private function buildVariantPlan(array $requestedVariants, ?array $existingProfile, string $formatMode = 'static'): array
+    public function normalizeRequestedVariants(array $requestedVariants, string $formatMode): array
     {
-        $variantPlan = $this->buildHostedVariantPlan(
-            $requestedVariants,
-            $existingProfile,
-            $formatMode === 'variable' ? [$this, 'normalizeVariableRequestVariants'] : null
-        );
-        $variantPlan['format_mode'] = $formatMode;
+        if ($this->normalizeFormatMode($formatMode) !== 'variable') {
+            return $requestedVariants;
+        }
 
-        return $variantPlan;
+        return $this->normalizeVariableRequestVariants($requestedVariants);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function fetchMetadata(string $familyName): ?array
+    {
+        return $this->client->getFamily($familyName);
+    }
+
+    /**
+     * @param list<string> $variants
+     * @param array<string, mixed>|null $metadata
+     */
+    public function fetchCss(
+        string $familyName,
+        array $variants,
+        ?array $metadata,
+        string $formatMode
+    ): string|WP_Error {
+        return $this->client->fetchCss(
+            $familyName,
+            $variants,
+            'swap',
+            is_array($metadata) ? $metadata : [],
+            $this->normalizeFormatMode($formatMode)
+        );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function parseFaces(string $css, string $familyName): array
+    {
+        return FontUtils::normalizeFaceList($this->parser->parse($css, $familyName));
+    }
+
+    /**
+     * @param HostedImportContext $context
+     * @return array{profile: array<string, mixed>, face_provider: array<string, mixed>}
+     */
+    public function buildProfileDraft(array $context): array
+    {
+        $deliveryMode = $this->stringValue($context, 'delivery_mode', 'self_hosted');
+        $formatMode = $this->normalizeFormatMode($this->stringValue($context, 'format_mode', 'static'));
+        $metadata = $this->normalizeMap($context['metadata'] ?? null);
+        $existingFamily = is_array($context['existing_family'] ?? null)
+            ? $this->normalizeMap($context['existing_family'])
+            : null;
+        $importedVariants = FontUtils::normalizeVariantTokens((array) $context['imported_variants']);
+        $timestampKey = $deliveryMode === 'cdn' ? 'saved_at' : 'imported_at';
+
+        return [
+            'profile' => [
+                'id' => $this->resolveProfileId($existingFamily, $deliveryMode, $formatMode),
+                'provider' => 'google',
+                'type' => $deliveryMode,
+                'format' => $formatMode,
+                'label' => $deliveryMode === 'cdn'
+                    ? __('Google CDN', 'tasty-fonts')
+                    : __('Self-hosted (Google import)', 'tasty-fonts'),
+                'meta' => [
+                    'category' => $this->stringValue($metadata, 'category'),
+                    'lastModified' => $this->stringValue($metadata, 'lastModified'),
+                    'version' => $this->stringValue($metadata, 'version'),
+                    $timestampKey => current_time('mysql'),
+                ],
+            ],
+            'face_provider' => $this->buildProviderMetadata($metadata, $importedVariants),
+        ];
     }
 
     /**
@@ -342,40 +227,123 @@ final class GoogleImportService
     }
 
     /**
-     * @return ProviderConfig
+     * @param array<string, mixed> $metadata
+     * @param list<string> $variants
+     * @return array<string, mixed>
      */
-    private function providerConfig(): array
+    private function buildProviderMetadata(array $metadata, array $variants): array
     {
         return [
-            'provider_root' => 'google',
-            'source' => 'google',
-            'family_dir_error_code' => 'tasty_fonts_google_family_dir_failed',
-            'family_dir_error_message' => __('The Google Fonts import directory could not be created.', 'tasty-fonts'),
-            'expected_host' => 'fonts.gstatic.com',
-            'invalid_host_code' => 'tasty_fonts_google_invalid_host',
-            'invalid_host_message' => __('Google font downloads must come from fonts.gstatic.com.', 'tasty-fonts'),
-            'invalid_extension_code' => 'tasty_fonts_google_invalid_extension',
-            'invalid_extension_message' => __('Only WOFF2 files can be imported from Google Fonts.', 'tasty-fonts'),
-            'download_failed_code' => 'tasty_fonts_google_download_failed',
-            'empty_file_code' => 'tasty_fonts_google_empty_file',
-            'empty_file_message' => __('Google Fonts returned an empty font file.', 'tasty-fonts'),
-            'file_too_large_code' => 'tasty_fonts_google_file_too_large',
-            'invalid_type_code' => 'tasty_fonts_google_invalid_type',
-            'invalid_type_message' => __('The downloaded file was not returned as a WOFF2 font.', 'tasty-fonts'),
-            'write_failed_code' => 'tasty_fonts_google_write_failed',
-            'write_failed_message' => __('The imported font file could not be written to uploads/fonts.', 'tasty-fonts'),
+            'type' => 'google',
+            'category' => $this->stringValue($metadata, 'category'),
+            'variants' => $variants,
+            'lastModified' => $this->stringValue($metadata, 'lastModified'),
+            'version' => $this->stringValue($metadata, 'version'),
         ];
     }
 
-    /**
-     * @param array<string, mixed>|null $values
-     */
-    private function stringValue(?array $values, string $key, string $default = ''): string
+    private function profileId(string $deliveryMode): string
     {
-        if ($values === null) {
+        return FontUtils::slugify('google-' . $deliveryMode);
+    }
+
+    /**
+     * @param array<string, mixed>|null $family
+     */
+    private function resolveProfileId(?array $family, string $deliveryMode, string $formatMode): string
+    {
+        $existing = $this->findDeliveryProfile($family, 'google', $deliveryMode, $formatMode);
+        $existingId = $this->stringValue($existing ?? [], 'id');
+
+        if ($existingId !== '') {
+            return $existingId;
+        }
+
+        $baseId = $this->profileId($deliveryMode);
+
+        if (!$this->findLegacyProfileConflict($family, 'google', $deliveryMode)) {
+            return $baseId;
+        }
+
+        return FontUtils::slugify($baseId . '-' . $formatMode);
+    }
+
+    /**
+     * @param array<string, mixed>|null $family
+     */
+    private function findLegacyProfileConflict(?array $family, string $provider, string $type): bool
+    {
+        return $this->findDeliveryProfile($family, $provider, $type) !== null;
+    }
+
+    /**
+     * @param array<string, mixed>|null $family
+     * @return array<string, mixed>|null
+     */
+    private function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = ''): ?array
+    {
+        if (!is_array($family)) {
+            return null;
+        }
+
+        $provider = strtolower(trim($provider));
+        $type = strtolower(trim($type));
+
+        foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
+            $profile = $this->normalizeMap($profile);
+
+            if (
+                $profile === []
+                || strtolower($this->stringValue($profile, 'provider')) !== $provider
+                || strtolower($this->stringValue($profile, 'type')) !== $type
+            ) {
+                continue;
+            }
+
+            if ($formatMode !== '' && FontUtils::resolveProfileFormat($profile) !== $formatMode) {
+                continue;
+            }
+
+            return $profile;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private function normalizeMap(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $item) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalized[$key] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int|string, mixed> $values
+     */
+    private function stringValue(array $values, string $key, string $default = ''): string
+    {
+        if (!array_key_exists($key, $values)) {
             return $default;
         }
 
-        return FontUtils::scalarStringValue($values[$key] ?? $default);
+        $value = FontUtils::scalarStringValue($values[$key]);
+
+        return $value !== '' ? $value : $default;
     }
 }

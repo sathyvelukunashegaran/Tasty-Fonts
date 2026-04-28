@@ -9,20 +9,16 @@ defined('ABSPATH') || exit;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
-use TastyFonts\Support\FontUtils;
-use TastyFonts\Support\RoleUsageMessageFormatter;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
-/**
- * @phpstan-import-type CatalogFamily from CatalogService
- * @phpstan-import-type CatalogFace from CatalogService
- * @phpstan-import-type DeliveryProfile from CatalogService
- */
 final class LibraryService
 {
-    private const MANAGED_IMPORT_SOURCES = ['google', 'bunny'];
-    private const MANUAL_PUBLISH_STATES = ['library_only', 'published'];
+    private readonly LibraryFamilyDeletionAction $familyDeletion;
+    private readonly LibraryDeliveryMutationAction $deliveryMutation;
+    private readonly LibraryPublishStateAction $publishState;
+    private readonly LibraryLiveRolePublishStateSynchronizer $liveRolePublishStateSync;
+    private readonly LibraryFaceDeletionAction $faceDeletion;
 
     /**
      * Create the library service.
@@ -44,6 +40,56 @@ final class LibraryService
         private readonly LogRepository $log,
         private readonly SettingsRepository $settings
     ) {
+        $errorFactory = new LibraryMutationErrorFactory($this->log);
+        $catalogResolver = new LibraryCatalogResolver($this->catalog, $errorFactory);
+        $pathCollector = new LibraryPathCollector($catalogResolver);
+        $roleProtection = new LibraryRoleProtectionPolicy($this->catalog, $this->settings);
+
+        $this->familyDeletion = new LibraryFamilyDeletionAction(
+            $this->storage,
+            $this->imports,
+            $this->assets,
+            $this->log,
+            $catalogResolver,
+            $pathCollector,
+            $roleProtection,
+            $errorFactory
+        );
+        $this->deliveryMutation = new LibraryDeliveryMutationAction(
+            $this->storage,
+            $this->imports,
+            $this->assets,
+            $this->log,
+            $catalogResolver,
+            $pathCollector,
+            $roleProtection,
+            $this->familyDeletion,
+            $errorFactory
+        );
+        $this->publishState = new LibraryPublishStateAction(
+            $this->imports,
+            $this->assets,
+            $this->log,
+            $catalogResolver,
+            $roleProtection,
+            $errorFactory
+        );
+        $this->liveRolePublishStateSync = new LibraryLiveRolePublishStateSynchronizer(
+            $this->catalog,
+            $this->imports,
+            $catalogResolver,
+            $roleProtection
+        );
+        $this->faceDeletion = new LibraryFaceDeletionAction(
+            $this->storage,
+            $this->imports,
+            $this->assets,
+            $this->log,
+            $catalogResolver,
+            $pathCollector,
+            $roleProtection,
+            $errorFactory
+        );
     }
 
     /**
@@ -56,72 +102,7 @@ final class LibraryService
      */
     public function deleteFamily(string $familySlug): bool|WP_Error
     {
-        $familySlug = FontUtils::slugify($familySlug);
-        $family = $this->findFamilyBySlug($familySlug);
-
-        if ($family === null) {
-            return $this->error(
-                'tasty_fonts_family_not_found',
-                __('That font family could not be found in the library.', 'tasty-fonts')
-            );
-        }
-
-        $familyName = $this->stringValue($family, 'family', $familySlug);
-        $roleLabels = $this->getProtectedRoleLabels($familyName);
-
-        if ($roleLabels !== []) {
-            return $this->error(
-                'tasty_fonts_family_in_use',
-                $this->buildDeleteFamilyBlockedMessage($familyName, $roleLabels)
-            );
-        }
-
-        $relativePaths = $this->collectFamilyRelativePaths($family);
-
-        if (!$this->storage->deleteRelativeFiles($relativePaths)) {
-            return $this->error(
-                'tasty_fonts_delete_failed',
-                $this->storageErrorMessage(__('The font files could not be deleted from the font storage directory.', 'tasty-fonts'))
-            );
-        }
-
-        foreach ($this->managedImportSourcesForFamily($family) as $source) {
-            $this->storage->deleteRelativeDirectory($source . '/' . $familySlug);
-        }
-
-        $this->imports->deleteFamily($familySlug);
-        $this->assets->refreshGeneratedAssets();
-        do_action('tasty_fonts_after_delete_family', $familySlug, $familyName);
-
-        $fileCount = count($relativePaths);
-        $this->log->add(
-            sprintf(
-                _n(
-                    'Font family deleted: %1$s (%2$d file removed).',
-                    'Font family deleted: %1$s (%2$d files removed).',
-                    $fileCount,
-                    'tasty-fonts'
-                ),
-                $familyName,
-                $fileCount
-            ),
-            [
-                'category' => LogRepository::CATEGORY_LIBRARY,
-                'event' => 'family_deleted',
-                'outcome' => 'danger',
-                'status_label' => __('Deleted', 'tasty-fonts'),
-                'source' => __('Library', 'tasty-fonts'),
-                'entity_type' => 'font_family',
-                'entity_id' => $familySlug,
-                'entity_name' => $familyName,
-                'details' => [
-                    ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
-                    ['label' => __('Files removed', 'tasty-fonts'), 'value' => (string) $fileCount, 'kind' => 'count'],
-                ],
-            ]
-        );
-
-        return true;
+        return $this->familyDeletion->delete($familySlug);
     }
 
     /**
@@ -141,98 +122,7 @@ final class LibraryService
      */
     public function deleteDeliveryProfile(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $selection = $this->resolveFamilyDeliverySelection($familySlug, $deliveryId);
-
-        if (is_wp_error($selection)) {
-            return $selection;
-        }
-
-        $selection = $this->normalizedSelectionPayload($selection);
-        $familySlug = $selection['family_slug'];
-        $deliveryId = $selection['delivery_id'];
-        $family = $selection['family'];
-        $profile = $selection['profile'];
-
-        $familyName = $this->stringValue($family, 'family', $familySlug);
-        $isActiveDelivery = $this->stringValue($family, 'active_delivery_id') === $deliveryId;
-
-        if ($isActiveDelivery && $this->isLiveRoleFamily($familyName)) {
-            return $this->error(
-                'tasty_fonts_delivery_in_use',
-                __('Switch the live delivery or remove the family from the active roles before deleting this delivery profile.', 'tasty-fonts')
-            );
-        }
-
-        if (count($this->availableDeliveries($family)) <= 1) {
-            $result = $this->deleteFamily($familySlug);
-
-            if (is_wp_error($result)) {
-                return $result;
-            }
-
-            return [
-                'family' => $familyName,
-                'family_slug' => $familySlug,
-                'delivery_id' => $deliveryId,
-                'deleted_family' => true,
-            ];
-        }
-
-        $relativePaths = $this->collectProfileRelativePaths($profile);
-
-        if (!$this->storage->deleteRelativeFiles($relativePaths)) {
-            return $this->error(
-                'tasty_fonts_delete_failed',
-                $this->storageErrorMessage(__('The files for that delivery profile could not be removed from the font storage directory.', 'tasty-fonts'))
-            );
-        }
-
-        $storedFamily = $this->imports->getFamily($familySlug);
-
-        if ($storedFamily !== null && isset($storedFamily['delivery_profiles'][$deliveryId])) {
-            $this->imports->deleteProfile($familySlug, $deliveryId);
-        } elseif ($isActiveDelivery) {
-            $fallbackProfile = $this->firstStoredAlternativeProfile($family, $deliveryId);
-
-            if ($fallbackProfile !== null) {
-                $this->persistProfile($family, $fallbackProfile, false);
-                $this->imports->setActiveDelivery($familySlug, $this->stringValue($fallbackProfile, 'id'));
-            }
-        }
-
-        $provider = strtolower(trim($this->stringValue($profile, 'provider')));
-
-        if ($this->isManagedImportSource($provider)) {
-            $this->storage->deleteRelativeDirectory($provider . '/' . $familySlug);
-        }
-
-        $this->assets->refreshGeneratedAssets();
-
-        $label = $this->stringValue($profile, 'label', ucfirst($provider));
-        $message = sprintf(__('Removed %1$s from %2$s.', 'tasty-fonts'), $label, $familyName);
-        $this->log->add($message, [
-            'category' => LogRepository::CATEGORY_LIBRARY,
-            'event' => 'delivery_profile_deleted',
-            'outcome' => 'danger',
-            'status_label' => __('Deleted', 'tasty-fonts'),
-            'source' => __('Library', 'tasty-fonts'),
-            'entity_type' => 'font_family',
-            'entity_id' => $familySlug,
-            'entity_name' => $familyName,
-            'details' => [
-                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
-                ['label' => __('Delivery', 'tasty-fonts'), 'value' => $label],
-                ['label' => __('Files removed', 'tasty-fonts'), 'value' => (string) count($relativePaths), 'kind' => 'count'],
-            ],
-        ]);
-
-        return [
-            'family' => $familyName,
-            'family_slug' => $familySlug,
-            'delivery_id' => $deliveryId,
-            'message' => $message,
-            'deleted_family' => false,
-        ];
+        return $this->deliveryMutation->deleteDeliveryProfile($familySlug, $deliveryId);
     }
 
     /**
@@ -252,122 +142,7 @@ final class LibraryService
      */
     public function saveFamilyDelivery(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $selection = $this->resolveFamilyDeliverySelection($familySlug, $deliveryId);
-
-        if (is_wp_error($selection)) {
-            return $selection;
-        }
-
-        $selection = $this->normalizedSelectionPayload($selection);
-        $familySlug = $selection['family_slug'];
-        $deliveryId = $selection['delivery_id'];
-        $family = $selection['family'];
-        $profile = $selection['profile'];
-
-        $this->persistProfile($family, $profile, false);
-
-        $saved = $this->imports->setActiveDelivery($familySlug, $deliveryId);
-
-        if ($saved === null) {
-            return $this->error(
-                'tasty_fonts_delivery_save_failed',
-                __('The active delivery could not be updated.', 'tasty-fonts')
-            );
-        }
-
-        $this->assets->refreshGeneratedAssets();
-
-        $familyName = $this->stringValue($family, 'family', $familySlug);
-        $message = sprintf(
-            __('Live delivery for %1$s switched to %2$s.', 'tasty-fonts'),
-            $familyName,
-            $this->stringValue($profile, 'label', __('the selected profile', 'tasty-fonts'))
-        );
-        $this->log->add($message, [
-            'category' => LogRepository::CATEGORY_LIBRARY,
-            'event' => 'active_delivery_changed',
-            'outcome' => 'success',
-            'status_label' => __('Switched', 'tasty-fonts'),
-            'source' => __('Library', 'tasty-fonts'),
-            'entity_type' => 'font_family',
-            'entity_id' => $familySlug,
-            'entity_name' => $familyName,
-            'details' => [
-                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
-                ['label' => __('Live delivery', 'tasty-fonts'), 'value' => $this->stringValue($profile, 'label', $deliveryId)],
-                ['label' => __('Delivery ID', 'tasty-fonts'), 'value' => $deliveryId],
-            ],
-        ]);
-
-        return [
-            'family' => $familyName,
-            'family_slug' => $familySlug,
-            'delivery_id' => $deliveryId,
-            'delivery_label' => $this->stringValue($profile, 'label'),
-            'message' => $message,
-        ];
-    }
-
-    /**
-     * @return array{
-     *     family_slug: string,
-     *     delivery_id: string,
-     *     family: array<string, mixed>,
-     *     profile: array<string, mixed>
-     * }|WP_Error
-     */
-    private function resolveFamilyDeliverySelection(string $familySlug, string $deliveryId): array|WP_Error
-    {
-        $familySlug = FontUtils::slugify($familySlug);
-        $deliveryId = FontUtils::slugify($deliveryId);
-        $family = $this->findFamilyBySlug($familySlug);
-
-        if ($family === null) {
-            return $this->error(
-                'tasty_fonts_family_not_found',
-                __('That font family could not be found in the library.', 'tasty-fonts')
-            );
-        }
-
-        $profile = $this->findDeliveryProfile($family, $deliveryId);
-
-        if ($profile === null) {
-            return $this->error(
-                'tasty_fonts_delivery_not_found',
-                __('That delivery profile could not be found for the selected family.', 'tasty-fonts')
-            );
-        }
-
-        return [
-            'family_slug' => $familySlug,
-            'delivery_id' => $deliveryId,
-            'family' => $family,
-            'profile' => $profile,
-        ];
-    }
-
-    /**
-     * @param array{
-     *     family_slug: string,
-     *     delivery_id: string,
-     *     family: array<string, mixed>,
-     *     profile: array<string, mixed>
-     * } $selection
-     * @return array{
-     *     family_slug: string,
-     *     delivery_id: string,
-     *     family: array<string, mixed>,
-     *     profile: array<string, mixed>
-     * }
-     */
-    private function normalizedSelectionPayload(array $selection): array
-    {
-        return [
-            'family_slug' => $this->stringValue($selection, 'family_slug'),
-            'delivery_id' => $this->stringValue($selection, 'delivery_id'),
-            'family' => (array) $selection['family'],
-            'profile' => (array) $selection['profile'],
-        ];
+        return $this->deliveryMutation->saveFamilyDelivery($familySlug, $deliveryId);
     }
 
     /**
@@ -386,79 +161,7 @@ final class LibraryService
      */
     public function saveFamilyPublishState(string $familySlug, string $publishState): array|WP_Error
     {
-        $familySlug = FontUtils::slugify($familySlug);
-        $publishState = strtolower(trim($publishState));
-        $family = $this->findFamilyBySlug($familySlug);
-
-        if ($family === null) {
-            return $this->error(
-                'tasty_fonts_family_not_found',
-                __('That font family could not be found in the library.', 'tasty-fonts')
-            );
-        }
-
-        if (!in_array($publishState, self::MANUAL_PUBLISH_STATES, true)) {
-            return $this->error(
-                'tasty_fonts_publish_state_invalid',
-                __('Choose either Published or In Library Only.', 'tasty-fonts')
-            );
-        }
-
-        $familyName = $this->stringValue($family, 'family', $familySlug);
-
-        if ($publishState === 'library_only' && $this->isLiveRoleFamily($familyName)) {
-            return $this->error(
-                'tasty_fonts_family_live',
-                __('This family is live through the current active roles. Switch roles or turn off sitewide usage before pausing it.', 'tasty-fonts')
-            );
-        }
-
-        $storedFamily = $this->imports->getFamily($familySlug);
-
-        if ($storedFamily === null) {
-                $this->imports->ensureFamily(
-                    $familyName,
-                    $familySlug,
-                    $this->stringValue($family, 'publish_state', 'published'),
-                    $this->stringValue($family, 'active_delivery_id')
-                );
-        }
-
-        $saved = $this->imports->setPublishState($familySlug, $publishState);
-
-        if ($saved === null) {
-            return $this->error(
-                'tasty_fonts_publish_state_failed',
-                __('The family publish state could not be updated.', 'tasty-fonts')
-            );
-        }
-
-        $this->assets->refreshGeneratedAssets();
-
-        $message = $publishState === 'library_only'
-            ? sprintf(__('%s is now In Library Only.', 'tasty-fonts'), $familyName)
-            : sprintf(__('%s is now Published.', 'tasty-fonts'), $familyName);
-        $this->log->add($message, [
-            'category' => LogRepository::CATEGORY_LIBRARY,
-            'event' => 'publish_state_changed',
-            'outcome' => 'success',
-            'status_label' => __('Updated', 'tasty-fonts'),
-            'source' => __('Library', 'tasty-fonts'),
-            'entity_type' => 'font_family',
-            'entity_id' => $familySlug,
-            'entity_name' => $familyName,
-            'details' => [
-                ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
-                ['label' => __('Publish state', 'tasty-fonts'), 'value' => $publishState === 'library_only' ? __('In Library Only', 'tasty-fonts') : __('Published', 'tasty-fonts')],
-            ],
-        ]);
-
-        return [
-            'family' => $familyName,
-            'family_slug' => $familySlug,
-            'publish_state' => $publishState,
-            'message' => $message,
-        ];
+        return $this->publishState->save($familySlug, $publishState);
     }
 
     /**
@@ -472,72 +175,7 @@ final class LibraryService
      */
     public function syncLiveRolePublishStates(array $liveRoles, bool $sitewideEnabled): void
     {
-        $liveFamilies = [];
-
-        if ($sitewideEnabled) {
-            foreach ($this->liveRoleKeys() as $key) {
-                $familyName = trim((string) ($liveRoles[$key] ?? ''));
-
-                if ($familyName !== '') {
-                    $liveFamilies[$familyName] = FontUtils::slugify($familyName);
-                }
-            }
-        }
-
-        foreach ($this->imports->allFamilies() as $storedFamily) {
-            $familyName = trim($storedFamily['family']);
-            $familySlug = FontUtils::slugify($storedFamily['slug']);
-
-            if ($familyName === '' || $familySlug === '') {
-                continue;
-            }
-
-            $targetState = isset($liveFamilies[$familyName])
-                ? 'role_active'
-                : $this->manualPublishStateForFamily($storedFamily);
-
-            if ($storedFamily['publish_state'] !== $targetState) {
-                $this->imports->setPublishState($familySlug, $targetState);
-            }
-        }
-
-        foreach ($liveFamilies as $familyName => $familySlug) {
-            $storedFamily = $this->imports->getFamily($familySlug);
-
-            if ($storedFamily === null) {
-                $catalogFamily = $this->findFamilyBySlug($familySlug) ?? [];
-                $this->imports->ensureFamily(
-                    $familyName,
-                    $familySlug,
-                    'role_active',
-                    $this->stringValue($catalogFamily, 'active_delivery_id'),
-                    'library_only'
-                );
-                continue;
-            }
-
-            if ($storedFamily['publish_state'] !== 'role_active') {
-                $this->imports->setPublishState($familySlug, 'role_active');
-            }
-        }
-
-        $this->catalog->invalidate();
-    }
-
-    /**
-     * @param CatalogFamily $family
-     */
-    private function manualPublishStateForFamily(array $family): string
-    {
-        $manualState = strtolower(trim($this->stringValue($family, 'manual_publish_state')));
-
-        if (in_array($manualState, self::MANUAL_PUBLISH_STATES, true)) {
-            return $manualState;
-        }
-
-        $publishState = strtolower(trim($this->stringValue($family, 'publish_state', 'published')));
-
-        return in_array($publishState, self::MANUAL_PUBLISH_STATES, true) ? $publishState : 'published';
+        $this->liveRolePublishStateSync->sync($liveRoles, $sitewideEnabled);
     }
 
     /**
@@ -559,446 +197,6 @@ final class LibraryService
         string $source = 'local',
         string $unicodeRange = ''
     ): array|WP_Error {
-        $familySlug = FontUtils::slugify($familySlug);
-        $family = $this->findFamilyBySlug($familySlug);
-
-        if ($family === null) {
-            return $this->error(
-                'tasty_fonts_family_not_found',
-                __('That font family could not be found in the library.', 'tasty-fonts')
-            );
-        }
-
-        $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
-
-        $normalizedWeight = FontUtils::normalizeWeight($weight);
-        $normalizedStyle = FontUtils::normalizeStyle($style);
-        $normalizedSource = trim($source) !== '' ? strtolower(trim($source)) : 'local';
-        $normalizedUnicodeRange = $this->isManagedImportSource($normalizedSource) ? '' : trim($unicodeRange);
-        $faces = FontUtils::normalizeFaceList($activeDelivery['faces'] ?? []);
-        $faceIndex = $this->findMatchingFaceIndex($faces, $normalizedWeight, $normalizedStyle, $normalizedSource, $normalizedUnicodeRange);
-
-        if ($faceIndex === null) {
-            return $this->error(
-                'tasty_fonts_variant_not_found',
-                __('That font variant could not be found in the library.', 'tasty-fonts')
-            );
-        }
-
-        $face = $faces[$faceIndex];
-        $familyName = $this->stringValue($family, 'family', $familySlug);
-        $roleLabels = $this->getProtectedRoleLabels($familyName);
-
-        if (count($faces) <= 1 && $roleLabels !== []) {
-            return $this->error(
-                'tasty_fonts_variant_in_use',
-                $this->buildDeleteLastVariantBlockedMessage($familyName, $roleLabels)
-            );
-        }
-
-        $relativePaths = $this->collectFaceRelativePaths($face);
-        $storedFamily = $this->imports->getFamily($familySlug);
-        $deliveryId = $this->stringValue($activeDelivery, 'id');
-        $hasStoredActiveProfile = $storedFamily !== null
-            && $deliveryId !== ''
-            && isset($storedFamily['delivery_profiles'][$deliveryId]);
-
-        if ($relativePaths === [] && !$hasStoredActiveProfile) {
-            return $this->error(
-                'tasty_fonts_variant_delete_unsupported',
-                __('That font variant cannot be deleted individually from this delivery.', 'tasty-fonts')
-            );
-        }
-
-        if ($relativePaths !== [] && !$this->storage->deleteRelativeFiles($relativePaths)) {
-            return $this->error(
-                'tasty_fonts_delete_failed',
-                __('The font files for that variant could not be deleted from the font storage directory.', 'tasty-fonts')
-            );
-        }
-
-        if ($hasStoredActiveProfile) {
-            unset($faces[$faceIndex]);
-
-            $profile = (array) $storedFamily['delivery_profiles'][$deliveryId];
-            $profile['faces'] = array_values($faces);
-            $profile['variants'] = $this->buildVariantsFromFaces($profile['faces']);
-            $this->imports->saveProfile(
-                $familyName,
-                $familySlug,
-                $profile,
-                $storedFamily['publish_state'],
-                $storedFamily['active_delivery_id'] === $deliveryId
-            );
-        }
-
-        $this->assets->refreshGeneratedAssets();
-
-        $fileCount = count($relativePaths);
-        $this->log->add(
-            sprintf(
-                _n(
-                    'Font variant deleted: %1$s %2$s %3$s (%4$d file removed).',
-                    'Font variant deleted: %1$s %2$s %3$s (%4$d files removed).',
-                    $fileCount,
-                    'tasty-fonts'
-                ),
-                $familyName,
-                $normalizedWeight,
-                $normalizedStyle,
-                $fileCount
-            ),
-            [
-                'category' => LogRepository::CATEGORY_LIBRARY,
-                'event' => 'variant_deleted',
-                'outcome' => 'danger',
-                'status_label' => __('Deleted', 'tasty-fonts'),
-                'source' => __('Library', 'tasty-fonts'),
-                'entity_type' => 'font_family',
-                'entity_id' => $familySlug,
-                'entity_name' => $familyName,
-                'details' => [
-                    ['label' => __('Family', 'tasty-fonts'), 'value' => $familyName],
-                    ['label' => __('Weight', 'tasty-fonts'), 'value' => $normalizedWeight],
-                    ['label' => __('Style', 'tasty-fonts'), 'value' => $normalizedStyle],
-                    ['label' => __('Source', 'tasty-fonts'), 'value' => $normalizedSource],
-                    ['label' => __('Files removed', 'tasty-fonts'), 'value' => (string) $fileCount, 'kind' => 'count'],
-                ],
-            ]
-        );
-
-        return [
-            'family' => $familyName,
-            'weight' => $normalizedWeight,
-            'style' => $normalizedStyle,
-        ];
-    }
-
-    /**
-     * @return CatalogFamily|null
-     */
-    private function findFamilyBySlug(string $familySlug): ?array
-    {
-        foreach ($this->catalog->getCatalog() as $family) {
-            $slug = $this->stringValue($family, 'slug');
-
-            if ($slug === $familySlug) {
-                return $family;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param CatalogFamily $family
-     * @return DeliveryProfile|null
-     */
-    private function findDeliveryProfile(array $family, string $deliveryId): ?array
-    {
-        foreach ($this->availableDeliveries($family) as $profile) {
-            if ($this->stringValue($profile, 'id') === $deliveryId) {
-                return $profile;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param CatalogFamily $family
-     * @return list<string>
-     */
-    private function collectFamilyRelativePaths(array $family): array
-    {
-        $paths = [];
-
-        foreach ($this->availableDeliveries($family) as $profile) {
-            $paths = array_merge($paths, $this->collectProfileRelativePaths($profile));
-        }
-
-        return array_values(array_unique(array_filter($paths, static fn (string $path): bool => $path !== '')));
-    }
-
-    /**
-     * @param DeliveryProfile $profile
-     * @return list<string>
-     */
-    private function collectProfileRelativePaths(array $profile): array
-    {
-        $paths = [];
-
-        foreach (FontUtils::normalizeFaceList($profile['faces'] ?? []) as $face) {
-            $paths = array_merge($paths, $this->collectFaceRelativePaths($face));
-        }
-
-        return array_values(array_unique(array_filter($paths, static fn (string $path): bool => $path !== '')));
-    }
-
-    /**
-     * @param CatalogFace $face
-     * @return list<string>
-     */
-    private function collectFaceRelativePaths(array $face): array
-    {
-        $paths = [];
-
-        foreach (FontUtils::normalizeStringMap($face['paths'] ?? []) as $path) {
-            if (trim($path) === '') {
-                continue;
-            }
-
-            $paths[] = trim($path);
-        }
-
-        foreach (FontUtils::normalizeStringMap($face['files'] ?? []) as $file) {
-            if (trim($file) === '' || FontUtils::isRemoteUrl($file)) {
-                continue;
-            }
-
-            $paths[] = trim($file);
-        }
-
-        return array_values(array_unique($paths));
-    }
-
-    /**
-     * @param list<CatalogFace> $faces
-     */
-    private function findMatchingFaceIndex(
-        array $faces,
-        string $weight,
-        string $style,
-        string $source,
-        string $unicodeRange
-    ): ?int {
-        foreach ($faces as $index => $face) {
-            if ($this->faceMatches($face, $weight, $style, $source, $unicodeRange)) {
-                return $index;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param CatalogFace $face
-     */
-    private function faceMatches(array $face, string $weight, string $style, string $source, string $unicodeRange): bool
-    {
-        $faceSource = strtolower(trim($this->stringValue($face, 'source', 'local')));
-        $faceUnicodeRange = $this->isManagedImportSource($faceSource) ? '' : trim($this->stringValue($face, 'unicode_range'));
-
-        return $faceSource === $source
-            && FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400')) === $weight
-            && FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')) === $style
-            && $faceUnicodeRange === $unicodeRange;
-    }
-
-    /**
-     * @param list<CatalogFace> $faces
-     * @return list<string>
-     */
-    private function buildVariantsFromFaces(array $faces): array
-    {
-        return HostedImportSupport::variantsFromFaces($faces);
-    }
-
-    /**
-     * @param CatalogFamily $family
-     * @return list<string>
-     */
-    private function managedImportSourcesForFamily(array $family): array
-    {
-        $sources = [];
-
-        foreach ($this->availableDeliveries($family) as $profile) {
-            if (!$this->isSelfHostedProfile($profile)) {
-                continue;
-            }
-
-            $provider = strtolower(trim($this->stringValue($profile, 'provider')));
-
-            if ($this->isManagedImportSource($provider)) {
-                $sources[] = $provider;
-            }
-        }
-
-        return array_values(array_unique($sources));
-    }
-
-    private function isManagedImportSource(string $source): bool
-    {
-        return in_array(strtolower(trim($source)), self::MANAGED_IMPORT_SOURCES, true);
-    }
-
-    /**
-     * @param DeliveryProfile $profile
-     */
-    private function isSelfHostedProfile(array $profile): bool
-    {
-        return strtolower(trim($this->stringValue($profile, 'type'))) === 'self_hosted';
-    }
-
-    private function isLiveRoleFamily(string $familyName): bool
-    {
-        if (empty($this->settings->getSettings()['auto_apply_roles'])) {
-            return false;
-        }
-
-        $catalog = $this->catalog->getCatalog();
-        $liveRoles = $this->settings->getAppliedRoles($catalog);
-
-        foreach ($this->liveRoleKeys() as $roleKey) {
-            if (($liveRoles[$roleKey] ?? '') === $familyName) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param CatalogFamily $family
-     * @param DeliveryProfile $profile
-     */
-    private function persistProfile(array $family, array $profile, bool $activate): void
-    {
-        $familyName = $this->stringValue($family, 'family');
-        $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
-
-        if ($familyName === '' || $familySlug === '') {
-            return;
-        }
-
-        $storedFamily = $this->imports->getFamily($familySlug);
-        $deliveryId = $this->stringValue($profile, 'id');
-
-        if (
-            $deliveryId !== ''
-            && $storedFamily !== null
-            && isset($storedFamily['delivery_profiles'][$deliveryId])
-        ) {
-            return;
-        }
-
-        $this->imports->saveProfile(
-            $familyName,
-            $familySlug,
-            $profile,
-            $this->stringValue($family, 'publish_state', 'published'),
-            $activate
-        );
-    }
-
-    /**
-     * @param CatalogFamily $family
-     * @return DeliveryProfile|null
-     */
-    private function firstStoredAlternativeProfile(array $family, string $excludedDeliveryId): ?array
-    {
-        foreach ($this->availableDeliveries($family) as $profile) {
-            $profileId = $this->stringValue($profile, 'id');
-
-            if ($profileId === '' || $profileId === $excludedDeliveryId) {
-                continue;
-            }
-
-            return $profile;
-        }
-
-        return null;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function getProtectedRoleLabels(string $familyName): array
-    {
-        $catalog = $this->catalog->getCatalog();
-        $roleSets = [$this->settings->getRoles($catalog)];
-
-        if (!empty($this->settings->getSettings()['auto_apply_roles'])) {
-            $roleSets[] = $this->settings->getAppliedRoles($catalog);
-        }
-
-        $roleLabels = [];
-
-        foreach ($roleSets as $roles) {
-            foreach ($this->liveRoleKeys() as $roleKey) {
-                if (($roles[$roleKey] ?? '') === $familyName) {
-                    $roleLabels[] = $roleKey;
-                }
-            }
-        }
-
-        return array_values(array_unique($roleLabels));
-    }
-
-    /**
-     * @param list<string> $roleLabels
-     */
-    private function buildDeleteFamilyBlockedMessage(string $familyName, array $roleLabels): string
-    {
-        return RoleUsageMessageFormatter::buildDeleteBlockedMessage($familyName, $roleLabels);
-    }
-
-    /**
-     * @param list<string> $roleLabels
-     */
-    private function buildDeleteLastVariantBlockedMessage(string $familyName, array $roleLabels): string
-    {
-        return RoleUsageMessageFormatter::buildDeleteLastVariantBlockedMessage($familyName, $roleLabels);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function liveRoleKeys(): array
-    {
-        $keys = ['heading', 'body'];
-
-        if (!empty($this->settings->getSettings()['monospace_role_enabled'])) {
-            $keys[] = 'monospace';
-        }
-
-        return $keys;
-    }
-
-    private function storageErrorMessage(string $fallback): string
-    {
-        $message = trim($this->storage->getLastFilesystemErrorMessage());
-
-        return $message !== '' ? $message : $fallback;
-    }
-
-    /**
-     * @param CatalogFamily $family
-     * @return list<DeliveryProfile>
-     */
-    private function availableDeliveries(array $family): array
-    {
-        return FontUtils::normalizeFaceList($family['available_deliveries'] ?? []);
-    }
-
-    /**
-     * @param array<int|string, mixed> $values
-     */
-    private function stringValue(array $values, string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values)) {
-            return $default;
-        }
-
-        $value = FontUtils::scalarStringValue($values[$key]);
-
-        return $value !== '' ? $value : $default;
-    }
-
-    private function error(string $code, string $message): WP_Error
-    {
-        $this->log->add($message);
-
-        return new WP_Error($code, $message);
+        return $this->faceDeletion->deleteFaceVariant($familySlug, $weight, $style, $source, $unicodeRange);
     }
 }

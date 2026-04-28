@@ -55,17 +55,23 @@ final class RuntimeService
      */
     public function enqueueFrontend(): void
     {
+        $hasEtchCanvasRequest = $this->hasEtchCanvasRequest();
+
+        if (!$this->sitewideDeliveryEnabled() && !$hasEtchCanvasRequest) {
+            return;
+        }
+
         $this->assets->enqueue('tasty-fonts-frontend');
         $this->enqueueExternalStylesheets($this->planner->getExternalStylesheets());
 
-        if ($this->hasEtchCanvasRequest()) {
+        if ($hasEtchCanvasRequest) {
             $this->enqueueEtchCanvasBridge();
         }
     }
 
     public function enqueueBricksFrontendOverride(): void
     {
-        if (is_admin()) {
+        if (is_admin() || !$this->sitewideDeliveryEnabled()) {
             return;
         }
 
@@ -134,7 +140,7 @@ final class RuntimeService
      */
     public function outputPreloadHints(): void
     {
-        if (is_admin() || $this->hasEtchCanvasRequest()) {
+        if (is_admin() || $this->hasEtchCanvasRequest() || !$this->sitewideDeliveryEnabled()) {
             return;
         }
 
@@ -151,7 +157,7 @@ final class RuntimeService
         }
 
         $preloadMode = $this->preloadLinkDeliveryMode();
-        $preloadUrls = $this->assets->getPrimaryFontPreloadUrls();
+        $preloadUrls = $this->planner->getPrimaryFontPreloadUrls();
 
         if (in_array($preloadMode, ['headers', 'both'], true)) {
             $this->sendPreloadLinkHeaders($this->getPreloadLinkHeaderValues($preloadUrls));
@@ -346,7 +352,7 @@ final class RuntimeService
      */
     public function getPreloadLinkHeaderValues(?array $preloadUrls = null): array
     {
-        $preloadUrls = is_array($preloadUrls) ? $preloadUrls : $this->assets->getPrimaryFontPreloadUrls();
+        $preloadUrls = is_array($preloadUrls) ? $preloadUrls : $this->planner->getPrimaryFontPreloadUrls();
         $headers = [];
 
         foreach ($preloadUrls as $url) {
@@ -361,6 +367,11 @@ final class RuntimeService
         }
 
         return array_values(array_unique($headers));
+    }
+
+    private function sitewideDeliveryEnabled(): bool
+    {
+        return !empty($this->settings->getSettings()['auto_apply_roles']);
     }
 
     private function enqueueEtchCanvasBridge(): void

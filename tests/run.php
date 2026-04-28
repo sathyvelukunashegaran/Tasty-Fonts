@@ -7,6 +7,7 @@ require_once __DIR__ . '/support/test-runner.php';
 require_once __DIR__ . '/cases/core-coverage.php';
 require_once __DIR__ . '/cases/font-foundation.php';
 require_once __DIR__ . '/cases/provider-clients.php';
+require_once __DIR__ . '/cases/hosted-import-workflow.php';
 require_once __DIR__ . '/cases/imports-library.php';
 require_once __DIR__ . '/cases/css-storage-catalog.php';
 require_once __DIR__ . '/cases/storage-context-regression.php';

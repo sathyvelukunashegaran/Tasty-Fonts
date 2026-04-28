@@ -2837,6 +2837,372 @@ $tests['library_service_save_family_delivery_returns_error_for_unknown_delivery'
 };
 
 // ---------------------------------------------------------------------------
+// LibraryService::deleteDeliveryProfile – deletion policy and side effects
+// ---------------------------------------------------------------------------
+
+$tests['library_service_delete_delivery_profile_removes_a_stored_non_active_profile_files_and_log_entry'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $localPath = $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2');
+    $customPath = $services['storage']->pathForRelativePath('custom/inter/inter-700-normal.woff2');
+    $services['storage']->writeAbsoluteFile((string) $localPath, 'local-font-data');
+    $services['storage']->writeAbsoluteFile((string) $customPath, 'custom-font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'custom-self_hosted',
+            'label' => 'Self-hosted custom CSS',
+            'provider' => 'custom',
+            'type' => 'self_hosted',
+            'variants' => ['700'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'custom',
+                'weight' => '700',
+                'style' => 'normal',
+                'files' => ['woff2' => 'custom/inter/inter-700-normal.woff2'],
+                'paths' => ['woff2' => 'custom/inter/inter-700-normal.woff2'],
+            ]],
+        ],
+        'published',
+        false
+    );
+
+    $result = $services['library']->deleteDeliveryProfile('inter', 'custom-self_hosted');
+    $saved = $services['imports']->getFamily('inter');
+    $logEntries = $services['log']->all();
+
+    assertFalseValue(is_wp_error($result), 'deleteDeliveryProfile() should delete a stored non-active delivery profile.');
+    assertSameValue(false, (bool) ($result['deleted_family'] ?? true), 'Deleting one of several delivery profiles should not delete the family.');
+    assertSameValue(false, isset($saved['delivery_profiles']['custom-self_hosted']), 'Deleting a stored delivery profile should remove only that profile from the import manifest.');
+    assertSameValue('local-self_hosted', (string) ($saved['active_delivery_id'] ?? ''), 'Deleting a non-active delivery should keep the active delivery unchanged.');
+    assertSameValue(false, is_string($customPath) && file_exists($customPath), 'Deleting a self-hosted delivery profile should remove its files.');
+    assertSameValue(true, is_string($localPath) && file_exists($localPath), 'Deleting a sibling delivery profile should not remove active profile files.');
+    assertSameValue('delivery_profile_deleted', (string) ($logEntries[0]['event'] ?? ''), 'Deleting a delivery profile should write the delivery_profile_deleted audit event.');
+};
+
+$tests['library_service_delete_delivery_profile_blocks_the_active_live_delivery'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'google',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'https://fonts.gstatic.com/s/inter/v1/inter-400-normal.woff2'],
+                'paths' => [],
+            ]],
+        ],
+        'published',
+        false
+    );
+    $catalog = ['Inter'];
+    $services['settings']->saveRoles(
+        [
+            'heading' => 'Inter',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        $catalog
+    );
+    $services['settings']->saveAppliedRoles(
+        [
+            'heading' => 'Inter',
+            'body' => 'Inter',
+            'heading_fallback' => 'sans-serif',
+            'body_fallback' => 'sans-serif',
+        ],
+        $catalog
+    );
+    $services['settings']->setAutoApplyRoles(true);
+
+    $result = $services['library']->deleteDeliveryProfile('inter', 'local-self_hosted');
+    $saved = $services['imports']->getFamily('inter');
+
+    assertTrueValue(is_wp_error($result), 'deleteDeliveryProfile() should block deleting the active delivery while the family is live.');
+    assertSameValue('tasty_fonts_delivery_in_use', $result->get_error_code(), 'Deleting the active live delivery should return the delivery-in-use error.');
+    assertTrueValue(isset($saved['delivery_profiles']['local-self_hosted']), 'Blocked active delivery deletion should leave the stored profile intact.');
+};
+
+$tests['library_service_delete_delivery_profile_deletes_the_family_when_it_is_the_only_delivery'] = static function (): void {
+    resetTestState();
+
+    $deletedFamilySlug = '';
+    $deletedFamilyName = '';
+    add_action(
+        'tasty_fonts_after_delete_family',
+        static function (string $familySlug, string $familyName) use (&$deletedFamilySlug, &$deletedFamilyName): void {
+            $deletedFamilySlug = $familySlug;
+            $deletedFamilyName = $familyName;
+        },
+        10,
+        2
+    );
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $fontPath = $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile((string) $fontPath, 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $result = $services['library']->deleteDeliveryProfile('inter', 'local-self_hosted');
+
+    assertFalseValue(is_wp_error($result), 'deleteDeliveryProfile() should delegate to family deletion when the only profile is removed.');
+    assertSameValue(true, (bool) ($result['deleted_family'] ?? false), 'Deleting the only delivery profile should mark the result as a deleted family.');
+    assertSameValue(null, $services['imports']->getFamily('inter'), 'Deleting the only delivery profile should remove the family import manifest.');
+    assertSameValue(false, is_string($fontPath) && file_exists($fontPath), 'Deleting the only delivery profile should remove the family files through family deletion.');
+    assertSameValue('inter', $deletedFamilySlug, 'Delegated family deletion should still fire the family-delete hook with the deleted slug.');
+    assertSameValue('Inter', $deletedFamilyName, 'Delegated family deletion should still fire the family-delete hook with the deleted family name.');
+};
+
+$tests['library_service_delete_delivery_profile_switches_active_synthetic_delivery_to_stored_fallback'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $localPath = $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2');
+    $services['storage']->writeAbsoluteFile((string) $localPath, 'font-data');
+    $services['imports']->saveFamily([
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'publish_state' => 'published',
+        'active_delivery_id' => 'local-self_hosted',
+        'delivery_profiles' => [
+            'google-cdn' => [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'variants' => ['regular'],
+                'faces' => [[
+                    'family' => 'Inter',
+                    'slug' => 'inter',
+                    'source' => 'google',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'https://fonts.gstatic.com/s/inter/v1/inter-400-normal.woff2'],
+                    'paths' => [],
+                ]],
+            ],
+        ],
+    ]);
+
+    $result = $services['library']->deleteDeliveryProfile('inter', 'local-self_hosted');
+    $saved = $services['imports']->getFamily('inter');
+
+    assertFalseValue(is_wp_error($result), 'deleteDeliveryProfile() should allow deleting an active synthetic profile when an alternative delivery exists.');
+    assertSameValue(false, (bool) ($result['deleted_family'] ?? true), 'Deleting an active synthetic profile with alternatives should keep the family.');
+    assertSameValue('google-cdn', (string) ($saved['active_delivery_id'] ?? ''), 'Deleting an active synthetic delivery should switch the stored family to the first alternative delivery.');
+    assertTrueValue(isset($saved['delivery_profiles']['google-cdn']), 'The fallback delivery should remain stored after the synthetic active delivery is removed.');
+    assertSameValue(false, is_string($localPath) && file_exists($localPath), 'Deleting the active synthetic local delivery should remove its scanned file.');
+};
+
+$tests['library_service_delete_delivery_profile_returns_error_when_profile_file_cleanup_fails'] = static function (): void {
+    resetTestState();
+
+    global $filesystemMethod;
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $localPath = $services['storage']->pathForRelativePath('inter/Inter-400-normal.woff2');
+    $customPath = $services['storage']->pathForRelativePath('custom/inter/inter-700-normal.woff2');
+    $services['storage']->writeAbsoluteFile((string) $localPath, 'local-font-data');
+    $services['storage']->writeAbsoluteFile((string) $customPath, 'custom-font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'custom-self_hosted',
+            'label' => 'Self-hosted custom CSS',
+            'provider' => 'custom',
+            'type' => 'self_hosted',
+            'variants' => ['700'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'custom',
+                'weight' => '700',
+                'style' => 'normal',
+                'files' => ['woff2' => 'custom/inter/inter-700-normal.woff2'],
+                'paths' => ['woff2' => 'custom/inter/inter-700-normal.woff2'],
+            ]],
+        ],
+        'published',
+        false
+    );
+    $filesystemMethod = 'ftpext';
+
+    $result = $services['library']->deleteDeliveryProfile('inter', 'custom-self_hosted');
+    $saved = $services['imports']->getFamily('inter');
+
+    assertTrueValue(is_wp_error($result), 'deleteDeliveryProfile() should return a WP_Error when delivery file cleanup fails.');
+    assertSameValue('tasty_fonts_delete_failed', $result->get_error_code(), 'File cleanup failures should use the delete_failed error code.');
+    assertContainsValue('Direct filesystem access is unavailable', $result->get_error_message(), 'File cleanup failures should surface the storage filesystem error when available.');
+    assertTrueValue(isset($saved['delivery_profiles']['custom-self_hosted']), 'Failed file cleanup should leave the delivery profile in the import manifest.');
+    assertSameValue(true, is_string($customPath) && file_exists($customPath), 'Failed file cleanup should leave the delivery file in place.');
+};
+
+$tests['library_service_delete_delivery_profile_ignores_managed_provider_directory_cleanup_failure'] = static function (): void {
+    resetTestState();
+
+    global $wpFilesystemShouldInit;
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $providerDirectory = $services['storage']->pathForRelativePath('google/inter');
+    mkdir((string) $providerDirectory, FS_CHMOD_DIR, true);
+    file_put_contents((string) $providerDirectory . '/leftover.txt', 'leftover');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Local Upload',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-self_hosted',
+            'label' => 'Self-hosted (Google import)',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        false
+    );
+    $wpFilesystemShouldInit = false;
+
+    $result = $services['library']->deleteDeliveryProfile('inter', 'google-self_hosted');
+    $saved = $services['imports']->getFamily('inter');
+
+    assertFalseValue(is_wp_error($result), 'Managed provider directory cleanup failures should not fail delivery-profile deletion.');
+    assertSameValue(false, (bool) ($result['deleted_family'] ?? true), 'A managed provider directory cleanup failure should still keep the family when other deliveries exist.');
+    assertSameValue(false, isset($saved['delivery_profiles']['google-self_hosted']), 'The managed delivery profile should still be removed when provider directory cleanup fails.');
+    assertSameValue(true, is_string($providerDirectory) && file_exists($providerDirectory), 'Failed best-effort provider directory cleanup may leave the provider directory behind.');
+};
+
+// ---------------------------------------------------------------------------
 // LibraryService::saveFamilyPublishState – success and error paths
 // ---------------------------------------------------------------------------
 

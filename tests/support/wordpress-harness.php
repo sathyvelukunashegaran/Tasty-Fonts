@@ -114,6 +114,8 @@ use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedImportSupport;
+use TastyFonts\Fonts\HostedImportVariantPlanner;
+use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Fonts\UploadedFileValidatorInterface;
@@ -1978,6 +1980,7 @@ function makeServiceGraph(): array
     $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe);
     $cssBuilder = new CssBuilder();
     $assets = new AssetService($storage, $catalog, $settings, $cssBuilder, $planner, $log);
+    $hostedImportWorkflow = new HostedImportWorkflow($storage, $imports, $assets, $log, new HostedImportVariantPlanner());
     $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings);
     $localUpload = new LocalUploadService(
         $storage,
@@ -1988,8 +1991,8 @@ function makeServiceGraph(): array
         $log,
         new StubUploadedFileValidator()
     );
-    $bunnyImport = new BunnyImportService($storage, $imports, $bunny, new BunnyCssParser(), $catalog, $assets, $log);
-    $googleImport = new GoogleImportService($storage, $imports, $google, new GoogleCssParser(), $catalog, $assets, $log);
+    $bunnyImport = new BunnyImportService($bunny, new BunnyCssParser(), $hostedImportWorkflow);
+    $googleImport = new GoogleImportService($google, new GoogleCssParser(), $hostedImportWorkflow);
     $acssIntegration = new AcssIntegrationService();
     $bricksIntegration = new BricksIntegrationService();
     $oxygenIntegration = new OxygenIntegrationService();
@@ -2066,6 +2069,7 @@ function makeServiceGraph(): array
         'catalog' => $catalog,
         'planner' => $planner,
         'assets' => $assets,
+        'hosted_import_workflow' => $hostedImportWorkflow,
         'library' => $library,
         'local_upload' => $localUpload,
         'adobe' => $adobe,

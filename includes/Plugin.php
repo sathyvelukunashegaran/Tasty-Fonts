@@ -23,6 +23,8 @@ use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
+use TastyFonts\Fonts\HostedImportVariantPlanner;
+use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Fonts\NativeUploadedFileValidator;
@@ -63,6 +65,7 @@ final class Plugin
     private readonly CssBuilder $cssBuilder;
     private readonly RuntimeAssetPlanner $planner;
     private readonly AssetService $assets;
+    private readonly HostedImportWorkflow $hostedImportWorkflow;
     private readonly LibraryService $library;
     private readonly LocalUploadService $localUpload;
     private readonly AdobeProjectClient $adobe;
@@ -124,6 +127,13 @@ final class Plugin
             $this->planner,
             $this->log
         );
+        $this->hostedImportWorkflow = new HostedImportWorkflow(
+            $this->storage,
+            $this->imports,
+            $this->assets,
+            $this->log,
+            new HostedImportVariantPlanner()
+        );
         $this->library = new LibraryService(
             $this->storage,
             $this->catalog,
@@ -142,22 +152,14 @@ final class Plugin
             new NativeUploadedFileValidator()
         );
         $this->bunnyImport = new BunnyImportService(
-            $this->storage,
-            $this->imports,
             $this->bunnyClient,
             $bunnyCssParser,
-            $this->catalog,
-            $this->assets,
-            $this->log
+            $this->hostedImportWorkflow
         );
         $this->googleImport = new GoogleImportService(
-            $this->storage,
-            $this->imports,
             $this->googleClient,
             $googleCssParser,
-            $this->catalog,
-            $this->assets,
-            $this->log
+            $this->hostedImportWorkflow
         );
         $this->acssIntegration = new AcssIntegrationService();
         $this->bricksIntegration = new BricksIntegrationService();

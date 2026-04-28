@@ -219,8 +219,27 @@
         };
     }
 
-    function normalizeRoleWeight(weight) {
-        return String(weight || '').trim();
+    function cssAxisTag(tag) {
+        switch (normalizeAxisTag(tag)) {
+            case 'WGHT':
+                return 'wght';
+            case 'WDTH':
+                return 'wdth';
+            case 'SLNT':
+                return 'slnt';
+            case 'ITAL':
+                return 'ital';
+            case 'OPSZ':
+                return 'opsz';
+            default:
+                return normalizeAxisTag(tag);
+        }
+    }
+
+    function normalizeAxisValue(value) {
+        const normalized = String(value ?? '').trim();
+
+        return /^-?\d+(?:\.\d+)?$/.test(normalized) ? normalized : '';
     }
 
     function normalizeAxisSettings(axes) {
@@ -230,15 +249,54 @@
 
         const normalized = {};
 
-        Object.entries(axes)
-            .map(([key, value]) => [normalizeAxisTag(key), String(value || '').trim()])
-            .filter(([key, value]) => key !== '' && value !== '')
-            .sort()
-            .forEach(([key, value]) => {
-                normalized[key] = value;
-            });
+        Object.entries(axes).forEach(([tag, value]) => {
+            const normalizedTag = normalizeAxisTag(tag);
+            const normalizedValue = normalizeAxisValue(value);
 
-        return normalized;
+            if (!normalizedTag || !normalizedValue) {
+                return;
+            }
+
+            normalized[normalizedTag] = normalizedValue;
+        });
+
+        return Object.keys(normalized)
+            .sort()
+            .reduce((carry, tag) => {
+                carry[tag] = normalized[tag];
+                return carry;
+            }, {});
+    }
+
+    function normalizeRoleWeightValue(weight) {
+        const normalized = String(weight || '').trim().toLowerCase();
+
+        if (!normalized) {
+            return '';
+        }
+
+        if (normalized === 'normal') {
+            return '400';
+        }
+
+        if (normalized === 'bold') {
+            return '700';
+        }
+
+        if (!/^\d{1,4}$/.test(normalized)) {
+            return '';
+        }
+
+        const numeric = Number.parseInt(normalized, 10);
+
+        return numeric >= 1 && numeric <= 1000 ? String(numeric) : '';
+    }
+
+    function buildVariationSettings(settings = {}) {
+        const normalized = normalizeAxisSettings(settings);
+        const parts = Object.entries(normalized).map(([tag, value]) => `"${cssAxisTag(tag)}" ${value}`);
+
+        return parts.length ? parts.join(', ') : 'normal';
     }
 
     function defaultRoleFallback(roleKey) {
@@ -279,15 +337,39 @@
             headingFallback: resolveRoleFallback('heading', input, options),
             bodyFallback: resolveRoleFallback('body', input, options),
             monospaceFallback: resolveRoleFallback('monospace', input, options),
-            headingWeight: normalizeRoleWeight(input.headingWeight || input.heading_weight),
-            bodyWeight: normalizeRoleWeight(input.bodyWeight || input.body_weight),
-            monospaceWeight: normalizeRoleWeight(input.monospaceWeight || input.monospace_weight),
+            headingWeight: normalizeRoleWeightValue(input.headingWeight || input.heading_weight),
+            bodyWeight: normalizeRoleWeightValue(input.bodyWeight || input.body_weight),
+            monospaceWeight: normalizeRoleWeightValue(input.monospaceWeight || input.monospace_weight),
             headingAxes: variableFontsEnabled ? normalizeAxisSettings(input.headingAxes || input.heading_axes) : {},
             bodyAxes: variableFontsEnabled ? normalizeAxisSettings(input.bodyAxes || input.body_axes) : {},
             monospaceAxes: variableFontsEnabled && monospaceRoleEnabled
                 ? normalizeAxisSettings(input.monospaceAxes || input.monospace_axes)
                 : {},
         };
+    }
+
+    function defaultRoleWeight(roleKey) {
+        return roleKey === 'heading' ? '700' : '400';
+    }
+
+    function resolveRoleWeight(roleKey, state = {}) {
+        const axes = normalizeAxisSettings(state[`${roleKey}Axes`] || state[`${roleKey}_axes`] || {});
+
+        if (axes.WGHT) {
+            return axes.WGHT;
+        }
+
+        return normalizeRoleWeightValue(state[`${roleKey}Weight`] || state[`${roleKey}_weight`]) || defaultRoleWeight(roleKey);
+    }
+
+    function hasExplicitRoleWeight(roleKey, state = {}) {
+        const axes = normalizeAxisSettings(state[`${roleKey}Axes`] || state[`${roleKey}_axes`] || {});
+
+        if (axes.WGHT) {
+            return true;
+        }
+
+        return normalizeRoleWeightValue(state[`${roleKey}Weight`] || state[`${roleKey}_weight`]) !== '';
     }
 
     function roleStatesMatch(left = {}, right = {}, options = {}) {
@@ -826,7 +908,11 @@
         buildCustomCssDryRunRequest,
         buildCustomCssFinalImportRequest,
         buildCustomCssImportErrorMessage,
+        buildVariationSettings,
         canDisableOutputLayer,
+        cssAxisTag,
+        defaultRoleFallback,
+        defaultRoleWeight,
         describeFontType,
         deriveExactOutputQuickMode,
         escapeFontFamily,
@@ -835,12 +921,20 @@
         hasVariableFontMetadata,
         isTrustedHostedStylesheetUrl,
         normalizeCustomCssDryRunPlan,
+        hasExplicitRoleWeight,
         logEntryMatchesFilters,
+        normalizeAxisSettings,
+        normalizeAxisTag,
+        normalizeAxisValue,
         normalizeOutputQuickModePreference,
+        normalizeRoleState,
+        normalizeRoleWeightValue,
         parsePhpIniSizeToBytes,
         rowMatchesLibraryFilters,
         normalizeSettingsFieldName,
         resolveLogPagination,
+        resolveRoleFallback,
+        resolveRoleWeight,
         resolveStatusAnnouncement,
         resolveAssignedRoleState,
         renderCustomCssDryRunErrorHtml,
