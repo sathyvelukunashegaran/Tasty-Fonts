@@ -308,6 +308,20 @@ final class MaintenanceActions
     }
 
     /**
+     * @return Payload
+     */
+    public function deleteAllHistory(): array
+    {
+        $deletedEntries = count($this->log->all());
+        $this->log->clear();
+
+        return [
+            'message' => __('Activity history deleted.', 'tasty-fonts'),
+            'deleted_history_entries' => $deletedEntries,
+        ];
+    }
+
+    /**
      * @return Payload|WP_Error
      */
     public function runAdvancedToolsAction(string $action): array|WP_Error

@@ -50,9 +50,7 @@
                                                     >
                                                         <?php foreach ($availableDeliveries as $profile): ?>
                                                             <?php if (!is_array($profile)) { continue; } ?>
-                                                            <option value="<?php echo esc_attr((string) ($profile['id'] ?? '')); ?>" <?php selected($activeDeliveryId, (string) ($profile['id'] ?? '')); ?>>
-                                                                <?php echo esc_html($this->translateProfileLabel((string) ($profile['label'] ?? ''))); ?>
-                                                            </option>
+                                                            <option value="<?php echo esc_attr((string) ($profile['id'] ?? '')); ?>" <?php selected($activeDeliveryId, (string) ($profile['id'] ?? '')); ?>><?php echo esc_html($this->buildDeliveryProfileDisplayLabel($profile, $availableDeliveries)); ?></option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                 </span>
@@ -159,7 +157,7 @@
                             <div class="tasty-fonts-detail-card-list tasty-fonts-detail-card-list--deliveries">
                                 <?php foreach ($availableDeliveries as $profile): ?>
                                     <?php if (!is_array($profile)) { continue; } ?>
-                                    <?php $this->renderDeliveryProfileCard($familyName, $familySlug, $activeDeliveryId, $publishState, $profile); ?>
+                                    <?php $this->renderDeliveryProfileCard($familyName, $familySlug, $activeDeliveryId, $publishState, $profile, $availableDeliveries); ?>
                                 <?php endforeach; ?>
                             </div>
                         </section>

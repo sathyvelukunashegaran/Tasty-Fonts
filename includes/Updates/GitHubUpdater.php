@@ -80,7 +80,13 @@ final class GitHubUpdater
             $transient = (object) get_object_vars($transient);
         }
 
-        $release = $this->getLatestReleaseForChannel($this->selectedChannel());
+        $selectedChannel = $this->selectedChannel();
+
+        if ($this->isLocalDevelopmentInstallForChannel($selectedChannel)) {
+            return $transient;
+        }
+
+        $release = $this->getLatestReleaseForChannel($selectedChannel);
 
         if ($release === null || !$this->hasNewerVersion($release['version'])) {
             return $transient;
@@ -165,7 +171,9 @@ final class GitHubUpdater
         $latestRelease = $this->getLatestReleaseForChannel($channel);
         $state = 'unavailable';
 
-        if ($latestRelease !== null) {
+        if ($this->isLocalDevelopmentInstallForChannel($channel)) {
+            $state = 'development';
+        } elseif ($latestRelease !== null) {
             $comparison = version_compare($latestRelease['version'], $installedVersion);
 
             if ($comparison > 0) {
@@ -582,6 +590,16 @@ final class GitHubUpdater
     private function hasNewerVersion(string $version): bool
     {
         return $version !== '' && version_compare($version, $this->installedVersion(), '>');
+    }
+
+    private function isLocalDevelopmentInstallForChannel(string $channel): bool
+    {
+        return $channel === self::CHANNEL_NIGHTLY && $this->isPlainDevelopmentVersion($this->installedVersion());
+    }
+
+    private function isPlainDevelopmentVersion(string $version): bool
+    {
+        return preg_match('/^[0-9]+\.[0-9]+\.[0-9]+-dev$/', trim($version)) === 1;
     }
 
     private function classifyReleaseChannel(string $version): string

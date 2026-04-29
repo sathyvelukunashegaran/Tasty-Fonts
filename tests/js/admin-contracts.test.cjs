@@ -1164,11 +1164,18 @@ test('admin runtime keeps settings dirty state wired to changed row data attribu
 
     for (const hook of [
         '[data-settings-form]',
+        '#tasty-fonts-settings-page',
         '[data-settings-save-shell]',
         '[data-settings-save-button]',
         '[data-settings-clear-button]',
         'has-unsaved-changes',
+        'has-pending-toggle-change',
         'data-settings-row-changed',
+        'data-settings-toggle-pending',
+        'data-settings-pending-badge',
+        'aria-describedby',
+        'tasty-fonts-settings-pending-badge-',
+        'settingsPendingSave',
         'data-has-unsaved-changes',
         'data-settings-group-changed',
     ]) {
@@ -1236,6 +1243,23 @@ test('admin runtime keeps Sitewide delivery action sync hooks wired for draft-sa
         'syncSitewideDeliveryActionButtonStates',
         'apply_everywhere',
         'config.applyEverywhere',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+});
+
+test('admin runtime keeps family row quick action hooks wired', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        '[data-family-quick-publish]',
+        '[data-family-quick-delivery]',
+        'handleQuickFamilyPublishClick',
+        'handleQuickFamilyDeliveryClick',
+        'persistFamilyPublishState',
+        'persistFamilyDelivery',
+        'saveFamilyPublishState',
+        'saveFamilyDelivery',
     ]) {
         assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
     }

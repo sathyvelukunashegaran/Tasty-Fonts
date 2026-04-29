@@ -174,6 +174,327 @@ $tests['family_card_renderer_summary_rows_omit_heavy_details_until_hydrated'] = 
     assertNotContainsValue('Font Faces', $output, 'Summary family cards should omit face detail markup until hydrated.');
 };
 
+$tests['family_card_renderer_summary_rows_expose_quick_publish_and_delivery_actions'] = static function (): void {
+    resetTestState();
+
+    $renderer = new FamilyCardRenderer(new Storage());
+
+    $renderSummary = static function (FamilyCardRenderer $renderer, array $family): string {
+        ob_start();
+        try {
+            $renderer->renderFamilySummaryRow(
+                $family,
+                ['heading' => '', 'body' => ''],
+                [],
+                [],
+                [
+                    ['value' => 'inherit', 'label' => 'Use plugin default'],
+                ],
+                'The quick brown fox jumps over the lazy dog.'
+            );
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            throw $e;
+        }
+
+        return (string) ob_get_clean();
+    };
+
+    $googleFamily = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'delivery_filter_tokens' => ['published', 'external'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'google-cdn',
+        'active_delivery' => [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'variants' => ['regular'],
+            ],
+            [
+                'id' => 'bunny-cdn',
+                'label' => 'Bunny CDN',
+                'provider' => 'bunny',
+                'type' => 'cdn',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => [],
+                'paths' => [],
+            ],
+        ],
+    ];
+
+    $googleOutput = $renderSummary($renderer, $googleFamily);
+    assertContainsValue('data-family-quick-publish', $googleOutput, 'Summary rows should render a quick publish action button.');
+    assertContainsValue('data-family-quick-delivery', $googleOutput, 'Summary rows should render a quick delivery action button.');
+    assertContainsValue('data-family-edit-action="publish-state"', $googleOutput, 'Quick publish should expose a publish-state edit hook.');
+    assertContainsValue('data-family-edit-action="delivery"', $googleOutput, 'Quick delivery should expose a delivery edit hook.');
+    assertContainsValue('data-target-publish-state="library_only"', $googleOutput, 'Published families should target library_only in quick publish.');
+    assertContainsValue('data-target-delivery-id="bunny-cdn"', $googleOutput, 'Quick delivery should target the single safe alternate profile id.');
+
+    $googleWithOnlyLocalAlternateOutput = $renderSummary($renderer, array_merge($googleFamily, [
+        'available_deliveries' => [
+            $googleFamily['available_deliveries'][0],
+            [
+                'id' => 'local-self-hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+                'meta' => ['origin' => 'local_upload'],
+            ],
+        ],
+    ]));
+    assertContainsValue('data-disabled-reason="No alternate delivery profile is available."', $googleWithOnlyLocalAlternateOutput, 'Quick delivery should ignore local/uploaded alternates when determining safe quick targets.');
+
+    $googleWithOnlyAdobeAlternateOutput = $renderSummary($renderer, array_merge($googleFamily, [
+        'available_deliveries' => [
+            $googleFamily['available_deliveries'][0],
+            [
+                'id' => 'adobe-hosted',
+                'label' => 'Adobe-hosted',
+                'provider' => 'adobe',
+                'type' => 'adobe_hosted',
+                'variants' => ['regular'],
+            ],
+        ],
+    ]));
+    assertContainsValue('data-disabled-reason="No alternate delivery profile is available."', $googleWithOnlyAdobeAlternateOutput, 'Quick delivery should ignore Adobe-hosted alternates when determining safe quick targets.');
+
+    $libraryOnlyOutput = $renderSummary($renderer, array_merge($googleFamily, ['publish_state' => 'library_only']));
+    assertContainsValue('data-target-publish-state="published"', $libraryOnlyOutput, 'Library-only families should target published in quick publish.');
+
+    $roleActiveOutput = $renderSummary($renderer, array_merge($googleFamily, ['publish_state' => 'role_active']));
+    assertMatchesPattern('/data-family-quick-publish[\s\S]*disabled/', $roleActiveOutput, 'Role-active families should disable the quick publish button.');
+    assertContainsValue('data-disabled-reason="Publish state is auto-managed while this family is used in live roles."', $roleActiveOutput, 'Role-active families should expose a publish disabled reason.');
+    assertNotContainsValue('data-target-publish-state="role_active"', $roleActiveOutput, 'Quick publish should never target role_active.');
+
+    $googleSelfHostedOutput = $renderSummary($renderer, array_merge($googleFamily, [
+        'active_delivery_id' => 'google-self-hosted',
+        'active_delivery' => [
+            'id' => 'google-self-hosted',
+            'label' => 'Self-hosted (Google import)',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-self-hosted',
+                'label' => 'Self-hosted (Google import)',
+                'provider' => 'google',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+            ],
+            [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'variants' => ['regular'],
+            ],
+        ],
+    ]));
+    assertContainsValue('data-target-delivery-id="google-cdn"', $googleSelfHostedOutput, 'Google self-hosted active families should keep quick delivery enabled when exactly one alternate exists.');
+    assertNotContainsValue('data-disabled-reason="Quick delivery is unavailable for Adobe-hosted and local/uploaded families."', $googleSelfHostedOutput, 'Google self-hosted active families should not be treated as local/uploaded-only quick delivery blocks.');
+
+    $multiAlternateOutput = $renderSummary($renderer, array_merge($googleFamily, [
+        'available_deliveries' => [
+            $googleFamily['available_deliveries'][0],
+            $googleFamily['available_deliveries'][1],
+            [
+                'id' => 'cdnjs-cdn',
+                'label' => 'CDNJS CDN',
+                'provider' => 'custom',
+                'type' => 'cdn',
+                'variants' => ['regular'],
+            ],
+        ],
+    ]));
+	assertContainsValue('data-target-delivery-id="bunny-cdn"', $multiAlternateOutput, 'Quick delivery should cycle to the next safe profile when multiple alternates exist.');
+
+    $localFamilyOutput = $renderSummary($renderer, [
+        'family' => 'JetBrains Mono',
+        'slug' => 'jetbrains-mono',
+        'delivery_filter_tokens' => ['published', 'same-origin'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'local-self-hosted',
+        'active_delivery' => [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'local-self-hosted',
+                'label' => 'Self-hosted',
+                'provider' => 'local',
+                'type' => 'self_hosted',
+                'variants' => ['regular'],
+            ],
+            [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'local',
+                'files' => [],
+                'paths' => [],
+            ],
+        ],
+    ]);
+    assertContainsValue('data-target-delivery-id="google-cdn"', $localFamilyOutput, 'Local/uploaded active families should still cycle to the next safe quick delivery target.');
+};
+
+$tests['family_card_renderer_disambiguates_google_cdn_labels_by_format_when_needed'] = static function (): void {
+    resetTestState();
+
+    $renderer = new AdminPageRenderer(new Storage());
+    $family = [
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'delivery_filter_tokens' => ['google', 'published'],
+        'publish_state' => 'published',
+        'active_delivery_id' => 'google-cdn-static',
+        'active_delivery' => [
+            'id' => 'google-cdn-static',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'format' => 'static',
+            'variants' => ['regular'],
+        ],
+        'available_deliveries' => [
+            [
+                'id' => 'google-cdn-static',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'format' => 'static',
+                'variants' => ['regular'],
+            ],
+            [
+                'id' => 'google-cdn-variable',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'format' => 'variable',
+                'variants' => ['regular'],
+            ],
+        ],
+        'faces' => [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'source' => 'google',
+                'files' => [],
+                'paths' => [],
+            ],
+        ],
+    ];
+
+    ob_start();
+    try {
+        invokePrivateMethod(
+            $renderer,
+            'renderFamilyRow',
+            [
+                $family,
+                ['heading' => '', 'body' => ''],
+                [],
+                [],
+                [
+                    ['value' => 'inherit', 'label' => 'Use plugin default'],
+                ],
+                'The quick brown fox jumps over the lazy dog.',
+                [],
+            ]
+        );
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+
+    $output = (string) ob_get_clean();
+
+    assertContainsValue('title="Google CDN · Static"', $output, 'Active delivery labels should include format when sibling delivery labels would otherwise be ambiguous.');
+    assertContainsValue('>Google CDN · Static<', $output, 'Active delivery selectors should include a static-disambiguated option label.');
+    assertContainsValue('>Google CDN · Variable<', $output, 'Active delivery selectors should include a variable-disambiguated option label.');
+    assertContainsValue('data-target-delivery-label="Google CDN · Variable"', $output, 'Quick delivery labels should disambiguate target profiles with matching base labels.');
+};
+
+$tests['family_card_renderer_delivery_profile_status_badge_is_active_only'] = static function (): void {
+    resetTestState();
+
+    $renderer = new FamilyCardRenderer(new Storage());
+
+    ob_start();
+    try {
+        $renderer->renderDeliveryProfileCard(
+            'Inter',
+            'inter',
+            'google-cdn',
+            'published',
+            [
+                'id' => 'google-cdn',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'format' => 'static',
+                'variants' => ['regular'],
+            ]
+        );
+        $renderer->renderDeliveryProfileCard(
+            'Inter',
+            'inter',
+            'google-cdn',
+            'published',
+            [
+                'id' => 'google-cdn-variable',
+                'label' => 'Google CDN',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'format' => 'variable',
+                'variants' => ['regular'],
+            ]
+        );
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+
+    $output = (string) ob_get_clean();
+
+	assertSameValue(1, substr_count($output, 'Active delivery'), 'Only the active delivery profile card should show the active-delivery status pill exactly once.');
+    assertNotContainsValue('>Live<', $output, 'Delivery profile cards should no longer use the Live status pill copy.');
+    assertNotContainsValue('>Saved<', $output, 'Inactive delivery profile cards should no longer show a Saved status pill.');
+};
+
 $tests['family_card_renderer_marks_usage_from_live_roles_not_draft_roles'] = static function (): void {
     resetTestState();
 
@@ -645,6 +966,9 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
     assertContainsValue('Review before turning this off. When disabled, uninstall removes plugin-managed uploaded font files.', $output, 'Risky Settings rows should explain the review-worthy consequence.');
 	assertNotContainsValue('has-unsaved-changes', $output, 'Routine Settings rows should not render persistent changed markers before the user edits the form.');
 	assertNotContainsValue('data-settings-row-changed', $output, 'Settings changed row markers should be applied by JS only after a tracked value changes.');
+	assertNotContainsValue('has-pending-toggle-change', $output, 'Pending toggle markers should be client-side only and absent from initial Settings markup.');
+	assertNotContainsValue('data-settings-toggle-pending', $output, 'Pending toggle data attributes should be client-side only and absent from initial Settings markup.');
+	assertNotContainsValue('data-settings-pending-badge', $output, 'Pending save badge nodes should be injected by JS only after changes.');
     assertContainsValue('>Font Library<', $output, 'The unified admin page should still include the library section inside its own tab panel.');
     assertContainsValue('Show Activity Log', $output, 'The Behavior panel should expose an activity log visibility setting.');
     assertContainsValue('Events are still recorded when hidden.', $output, 'The activity log visibility setting should explain that logging continues while hidden.');
@@ -3097,10 +3421,18 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
             'local_environment_notice' => [],
             'toasts' => [],
             'apply_everywhere' => true,
+            'etch_integration' => [
+                'title' => 'Etch Canvas Bridge',
+                'description' => 'Loads Tasty fonts inside Etch canvas previews.',
+                'status_label' => 'Configured',
+                'available' => true,
+                'enabled' => true,
+            ],
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
                 'description' => 'Sync imported families into the WordPress Font Library.',
                 'status_label' => 'Configured',
+                'available' => true,
                 'enabled' => true,
             ],
             'acss_integration' => [
@@ -3139,6 +3471,14 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     assertContainsValue('Canvas + Theme Controls', $output, 'The builder group should describe both Etch canvas loading and builder theme controls.');
     assertContainsValue('Etch Canvas Bridge', $output, 'The Etch bridge should render inside the builder integrations group.');
 	assertContainsValue('name="etch_integration_enabled"', $output, 'The Etch integration should render as a persisted toggle field.');
+	foreach ([
+		'etch_integration_enabled',
+		'block_editor_font_library_sync_enabled',
+		'acss_font_role_sync_enabled',
+	] as $fieldName) {
+		assertSameValue(1, preg_match('/<input[^>]*type="hidden"[^>]*name="' . preg_quote($fieldName, '/') . '"[^>]*value="0"/', $output), $fieldName . ' should submit 0 when its enabled checkbox is unchecked.');
+		assertSameValue(1, preg_match('/<input[^>]*type="checkbox"[^>]*name="' . preg_quote($fieldName, '/') . '"[^>]*checked/', $output), $fieldName . ' should still visually render as enabled.');
+	}
 	assertSameValue(
 		1,
 		preg_match('/<h4>Builders<\/h4>[\s\S]*?<div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">\s*<div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">[\s\S]*?name="bricks_integration_enabled"/', $output),
@@ -3180,6 +3520,12 @@ $tests['admin_page_renderer_disables_integrations_until_sitewide_delivery_is_on'
 	add_filter('tasty_fonts_oxygen_integration_available', static fn (): bool => true);
 
 	$services = makeServiceGraph();
+	$services['settings']->saveSettings([
+		'block_editor_font_library_sync_enabled' => '1',
+		'etch_integration_enabled' => '1',
+		'bricks_integration_enabled' => '1',
+		'oxygen_integration_enabled' => '1',
+	]);
 	$services['settings']->saveAcssFontRoleSyncState(true, false, '', '');
 
 	$builder = new \TastyFonts\Admin\AdminPageContextBuilder(
@@ -3230,6 +3576,7 @@ $tests['admin_page_renderer_disables_integrations_until_sitewide_delivery_is_on'
 	] as $fieldName) {
 		assertSameValue(1, preg_match('/<input[^>]*type="checkbox"[^>]*name="' . preg_quote($fieldName, '/') . '"[^>]*disabled/', $output), $fieldName . ' should be disabled until Sitewide Delivery is on.');
 		assertSameValue(0, preg_match('/<input[^>]*type="checkbox"[^>]*name="' . preg_quote($fieldName, '/') . '"[^>]*checked/', $output), $fieldName . ' should not visually appear on while dependency-disabled.');
+		assertSameValue(1, preg_match('/<input[^>]*type="hidden"[^>]*name="' . preg_quote($fieldName, '/') . '"[^>]*value="1"/', $output), $fieldName . ' should preserve the saved opt-in while dependency-disabled.');
 	}
 
 	assertContainsValue('aria-describedby="tasty-fonts-etch-sitewide-dependency"', $output, 'The disabled Etch control should keep an accessible dependency explanation.');
@@ -3286,6 +3633,62 @@ $tests['admin_page_renderer_integration_scan_summary_uses_effective_sitewide_sta
 	assertContainsValue('Detected integrations:', $output, 'The integration scan summary should still distinguish detected integrations.');
 	assertContainsValue('Enabled integrations: None on.', $output, 'The integration scan summary should report no effective integrations on while Sitewide Delivery disables them.');
 	assertMatchesPattern('/tasty-fonts-developer-tool-meta-enabled[\s\S]{0,600}<span>None<\/span>/', $output, 'The visible On pill should show None when every integration is dependency-disabled by Sitewide Delivery.');
+};
+
+$tests['admin_page_renderer_integration_scan_summary_prefers_effective_control_state'] = static function (): void {
+	resetTestState();
+
+	$renderer = new AdminPageRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPage([
+			'storage' => ['root' => '/tmp/uploads/fonts'],
+			'catalog' => [],
+			'available_families' => [],
+			'roles' => [],
+			'logs' => [],
+			'activity_actor_options' => [],
+			'family_fallbacks' => [],
+			'family_font_displays' => [],
+			'family_font_display_options' => [],
+			'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+			'preview_size' => 32,
+			'font_display' => 'optional',
+			'font_display_options' => [],
+			'minify_css_output' => true,
+			'preload_primary_fonts' => true,
+			'remote_connection_hints' => true,
+			'block_editor_font_library_sync_enabled' => true,
+			'training_wheels_off' => false,
+			'delete_uploaded_files_on_uninstall' => false,
+			'diagnostic_items' => [],
+			'overview_metrics' => [],
+			'output_panels' => [],
+			'generated_css_panel' => [],
+			'preview_panels' => [],
+			'local_environment_notice' => [],
+			'toasts' => [],
+			'apply_everywhere' => true,
+			'gutenberg_integration' => [
+				'title' => 'Gutenberg Font Library',
+				'description' => 'Sync imported families into the WordPress Font Library.',
+				'status' => 'active',
+				'status_label' => 'Configured',
+				'available' => true,
+				'enabled' => true,
+				'control_checked' => false,
+			],
+			'role_deployment' => [],
+		]);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('Detected integrations: Gutenberg. Enabled integrations: None on.', $output, 'The integration scan summary should use the effective visible control state instead of raw saved setup.');
+	assertMatchesPattern('/tasty-fonts-developer-tool-meta-enabled[\s\S]{0,600}<span>None<\/span>/', $output, 'The visible On pill should follow control_checked when it is provided.');
 };
 
 $tests['admin_page_renderer_keeps_dashboard_titles_and_buttons_in_title_case'] = static function (): void {
@@ -5307,6 +5710,10 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
                     'summary' => '1 retained export bundle. 1 locked.',
                     'last_run' => '',
                 ],
+                'delete_all_history' => [
+                    'summary' => '3 activity history entries retained.',
+                    'last_run' => '',
+                ],
             ],
             'site_transfer' => [
                 'available' => true,
@@ -5561,14 +5968,18 @@ $tests['admin_page_renderer_renders_advanced_tools_command_center_tabs'] = stati
     assertContainsValue('Wipe the managed font library, remove managed files, and rebuild empty storage?', $output, 'The maintenance tab should keep destructive confirmation copy for library wipes.');
     assertContainsValue('Delete all snapshots', $output, 'The danger zone should expose a bulk snapshot deletion action.');
     assertContainsValue('Delete all exports', $output, 'The danger zone should expose a guarded bulk export deletion action.');
+    assertContainsValue('Delete all history', $output, 'The danger zone should expose a retained activity history deletion action.');
     assertSameValue(1, preg_match('/name="tasty_fonts_delete_all_rollback_snapshots"[\s\S]*?value="1"/', $output), 'Bulk snapshot deletion should submit through its dedicated admin action field.');
     assertSameValue(1, preg_match('/name="tasty_fonts_delete_all_site_transfer_export_bundles"[\s\S]*?value="1"/', $output), 'Bulk export deletion should submit through its dedicated admin action field.');
+    assertSameValue(1, preg_match('/name="tasty_fonts_delete_all_history"[\s\S]*?value="1"/', $output), 'History deletion should submit through its dedicated admin action field.');
     assertContainsValue('Delete all rollback snapshots permanently?', $output, 'Bulk snapshot deletion should render destructive confirmation copy.');
     assertContainsValue('Delete all site transfer export bundles permanently?', $output, 'Bulk export deletion should render destructive confirmation copy.');
+    assertContainsValue('Delete all retained activity history permanently?', $output, 'History deletion should render destructive confirmation copy.');
     assertContainsValue('data-delete-blocked="One or more export bundles are locked. Unprotect all export bundles before deleting all exports."', $output, 'Bulk export deletion should expose a blocked-click reason while exports are locked.');
     assertContainsValue('aria-disabled="true"', $output, 'Bulk export deletion should communicate unavailable state while exports are locked.');
     assertContainsValue('data-help-tooltip="One or more export bundles are locked. Unprotect all export bundles before deleting all exports."', $output, 'Bulk export deletion should expose a hover help reason while exports are locked.');
     assertContainsValue('1 retained export bundle. 1 locked', $output, 'The danger-zone export summary should indicate locked retained exports.');
+    assertContainsValue('3 activity history entries retained', $output, 'The danger-zone history summary should indicate retained activity entries.');
     assertNotContainsValue('data-developer-confirm-input="WIPE LIBRARY"', $output, 'The maintenance tab should not render the typed confirmation unlock panel.');
     assertContainsValue('Transfer &amp; Recovery', $output, 'The transfer tab should render the redesigned transfer and recovery workflow.');
     assertContainsValue('Export Bundle', $output, 'The transfer tab should render the existing export workflow.');
@@ -5695,6 +6106,21 @@ $tests['admin_page_renderer_polishes_advanced_tools_overview_recovery_hierarchy'
 	assertContainsValue('tasty-fonts-health-group--action-needed is-empty', $infoOutput, 'Info-only overviews should render the empty action-needed state.');
 	assertContainsValue('No action needed', $infoOutput, 'Empty action-needed state should be explicit.');
 	assertSameValue(1, preg_match('/<details class="[^"]*tasty-fonts-health-group--worth-reviewing[^"]*"[^>]* open/', $infoOutput), 'Worth-reviewing summaries should remain reachable in info-only scenarios.');
+
+	$sitewideOffOutput = $renderOverview([
+		[
+			'slug' => 'sitewide_delivery',
+			'title' => 'Deploy Fonts',
+			'severity' => 'warning',
+			'message' => 'Sitewide Delivery is off, so saved role fonts are not deployed to the frontend.',
+			'guidance' => 'Open Deploy Fonts and enable Sitewide Delivery when role assignments are ready for the frontend.',
+			'action' => ['slug' => 'deploy_fonts', 'label' => 'Deploy Fonts'],
+		],
+	]);
+	assertContainsValue('tasty-fonts-health-group--action-needed has-checks', $sitewideOffOutput, 'Sitewide Delivery off should create an action-needed Overview row.');
+	assertContainsValue('Deploy Fonts', $sitewideOffOutput, 'Sitewide Delivery warnings should name the deploy action directly.');
+	assertContainsValue('Sitewide Delivery is off, so saved role fonts are not deployed to the frontend.', $sitewideOffOutput, 'Sitewide Delivery warnings should explain why deployment is needed.');
+	assertContainsValue('page=tasty-custom-fonts', $sitewideOffOutput, 'Sitewide Delivery warnings should link to the Deploy Fonts page.');
 
 	$integrationInfoOutput = $renderOverview([
 		[
@@ -6170,6 +6596,8 @@ $tests['admin_page_renderer_allows_fallback_only_heading_and_body_roles'] = stat
     assertContainsValue('data-role-weight-editor="body"', $output, 'The role form should render the body weight editor shell.');
     assertNotContainsValue('data-role-delivery-select="heading"', $output, 'The role form should not render a heading delivery selector once delivery is locked to the library.');
     assertNotContainsValue('data-role-delivery-select="body"', $output, 'The role form should not render a body delivery selector once delivery is locked to the library.');
+	assertContainsValue('data-help-tooltip="Choose the delivery method in the Font Library. Role selectors use the family’s active delivery profile."', $output, 'Role family selectors should explain that delivery is controlled in the Font Library.');
+	assertContainsValue('aria-label="Explain role family delivery"', $output, 'Role family delivery tooltips should expose a clear accessible label.');
     assertSameValue(true, substr_count($output, 'Use Fallback Only') >= 3, 'Heading, body, and preview selectors should all expose fallback-only choices.');
     assertContainsValue('Fallback only (sans-serif)', $output, 'Fallback-only heading selections should render a readable preview label.');
     assertContainsValue('Fallback only (serif)', $output, 'Fallback-only body selections should render a readable preview label.');

@@ -160,9 +160,10 @@ final class GoogleFontsClient
     /**
      * @return list<SearchResultItem>
      */
-    public function searchFamilies(string $query, int $limit = 20): array
+    public function searchFamilies(string $query, int $limit = 20, int $offset = 0): array
     {
         $query = strtolower(trim($query));
+        $offset = max(0, $offset);
 
         if ($query === '' || !$this->canSearch()) {
             return [];
@@ -196,7 +197,7 @@ final class GoogleFontsClient
             }
         );
 
-        return array_slice($results, 0, $limit);
+        return array_slice($results, $offset, $limit);
     }
 
     /**

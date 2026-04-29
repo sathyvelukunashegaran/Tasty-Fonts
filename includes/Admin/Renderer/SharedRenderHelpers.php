@@ -957,8 +957,16 @@ trait SharedRenderHelpers
             </div>
             <p class="tasty-fonts-studio-card-copy tasty-fonts-role-box-description"><?php echo esc_html($this->stringValue($config, 'description')); ?></p>
             <div class="tasty-fonts-role-fields">
-                <label class="tasty-fonts-stack-field">
-                    <?php $this->renderFieldLabel(__('Family', 'tasty-fonts')); ?>
+                <div class="tasty-fonts-stack-field">
+                    <span class="tasty-fonts-field-label-row">
+                        <label class="tasty-fonts-field-label-text" for="<?php echo esc_attr($this->stringValue($config, 'family_select_id')); ?>"><?php esc_html_e('Family', 'tasty-fonts'); ?></label>
+                        <button
+                            type="button"
+                            class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-help-trigger"
+                            aria-label="<?php esc_attr_e('Explain role family delivery', 'tasty-fonts'); ?>"
+                            <?php $this->renderPassiveHelpAttributes(__('Choose the delivery method in the Font Library. Role selectors use the family’s active delivery profile.', 'tasty-fonts')); ?>
+                        >?</button>
+                    </span>
                     <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
                         <select name="<?php echo esc_attr($this->stringValue($config, 'family_input_name')); ?>" id="<?php echo esc_attr($this->stringValue($config, 'family_select_id')); ?>" form="<?php echo esc_attr($roleFormId); ?>">
                             <option value="" <?php selected($roles[$roleKey] ?? '', ''); ?>><?php esc_html_e('Use Fallback Only', 'tasty-fonts'); ?></option>
@@ -966,7 +974,7 @@ trait SharedRenderHelpers
                         </select>
                         <?php $this->renderClearSelectButton($this->stringValue($config, 'clear_family_label'), $this->stringValue($config, 'family_select_id')); ?>
                     </span>
-                </label>
+                </div>
                 <label class="tasty-fonts-stack-field">
                     <?php $this->renderFieldLabel(__('Fallback', 'tasty-fonts')); ?>
                     <?php

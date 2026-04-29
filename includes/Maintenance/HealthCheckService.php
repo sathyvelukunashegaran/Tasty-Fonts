@@ -59,6 +59,7 @@ final class HealthCheckService
     ): array {
         return [
             $this->buildGeneratedCssCheck($assetStatus, $settings),
+            $this->buildSitewideDeliveryCheck($runtimeManifest, $settings),
             $this->buildStorageCheck($storage),
             $this->buildSelfHostedFilesCheck($runtimeManifest),
             $this->buildExternalStylesheetCheck($runtimeManifest, $settings),
@@ -212,6 +213,37 @@ final class HealthCheckService
             $action,
             $guidance,
             $this->docsUrl('Advanced-Tools')
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeManifest
+     * @param NormalizedSettings $settings
+     * @return HealthCheck
+     */
+    private function buildSitewideDeliveryCheck(array $runtimeManifest, array $settings): array
+    {
+        $delivery = is_array($runtimeManifest['delivery'] ?? null) ? $runtimeManifest['delivery'] : [];
+        $enabled = array_key_exists('auto_apply_roles', $delivery)
+            ? !empty($delivery['auto_apply_roles'])
+            : !empty($settings['auto_apply_roles']);
+
+        return $this->check(
+            'sitewide_delivery',
+            'runtime',
+            $enabled ? 'ok' : 'warning',
+            __('Deploy Fonts', 'tasty-fonts'),
+            $enabled
+                ? __('Sitewide Delivery is on, so published role fonts can be served to the frontend.', 'tasty-fonts')
+                : __('Sitewide Delivery is off, so saved role fonts are not deployed to the frontend.', 'tasty-fonts'),
+            [
+                ['label' => __('Sitewide Delivery', 'tasty-fonts'), 'value' => $enabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts')],
+            ],
+            $enabled ? null : ['slug' => 'deploy_fonts', 'label' => __('Deploy Fonts', 'tasty-fonts')],
+            $enabled
+                ? __('Use Deploy Fonts to review, save, or publish role assignments when they change.', 'tasty-fonts')
+                : __('Open Deploy Fonts and enable Sitewide Delivery when role assignments are ready for the frontend.', 'tasty-fonts'),
+            $this->docsUrl('Deploy-Fonts')
         );
     }
 

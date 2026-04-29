@@ -89,14 +89,14 @@
                         $developerIntegrationAvailable = !array_key_exists('available', $developerIntegrationContext)
                             || !empty($developerIntegrationContext['available']);
                         $developerIntegrationStatus = trim((string) ($developerIntegrationContext['status'] ?? ''));
-						if ($developerIntegrationStatus === 'waiting_for_sitewide_roles') {
-							$developerIntegrationEnabled = false;
-						} elseif (array_key_exists('control_checked', $developerIntegrationContext)) {
-							$developerIntegrationEnabled = !empty($developerIntegrationContext['control_checked']);
-						} else {
-							$developerIntegrationEnabled = !empty($developerIntegrationContext['enabled'])
-								|| in_array($developerIntegrationStatus, ['active', 'synced', 'ready', 'out_of_sync'], true);
-						}
+                        if ($developerIntegrationStatus === 'waiting_for_sitewide_roles') {
+                            $developerIntegrationEnabled = false;
+                        } elseif (array_key_exists('control_checked', $developerIntegrationContext)) {
+                            $developerIntegrationEnabled = !empty($developerIntegrationContext['control_checked']);
+                        } else {
+                            $developerIntegrationEnabled = !empty($developerIntegrationContext['enabled'])
+                                || in_array($developerIntegrationStatus, ['active', 'synced', 'ready', 'out_of_sync'], true);
+                        }
 	                        $developerIntegrationEntry = [
 	                            'slug' => $developerIntegrationSlug,
 	                            'title' => $developerIntegrationTitle,
@@ -137,6 +137,14 @@
                                 'external' => false,
                             ];
                         }
+
+						if ($actionSlug === 'deploy_fonts') {
+							return [
+								'label' => __('Deploy Fonts', 'tasty-fonts'),
+								'url' => $deployFontsPageUrl,
+								'external' => false,
+							];
+						}
 
 						if ($actionSlug === 'review_integrations') {
 							return [
@@ -315,6 +323,17 @@
                                     'confirm_message' => __('Delete all site transfer export bundles permanently?', 'tasty-fonts'),
                                     'blocked' => $exportDeleteAllBlocked,
                                     'blocked_message' => $exportDeleteAllBlockedMessage,
+                                ],
+                                [
+                                    'slug' => 'delete_all_history',
+                                    'title' => __('Delete all history', 'tasty-fonts'),
+                                    'description' => __('Deletes every retained activity log entry, including action history used by Last run chips. Settings, fonts, snapshots, and exports stay untouched.', 'tasty-fonts'),
+                                    'nonce' => 'tasty_fonts_delete_all_history',
+                                    'action_name' => 'tasty_fonts_delete_all_history',
+                                    'button_label' => __('Delete All History', 'tasty-fonts'),
+                                    'button_class' => 'button button-secondary tasty-fonts-button-danger tasty-fonts-advanced-row-action tasty-fonts-advanced-row-action--delete tasty-fonts-developer-action-button',
+                                    'card_class' => 'tasty-fonts-developer-tool-card--danger',
+                                    'confirm_message' => __('Delete all retained activity history permanently?', 'tasty-fonts'),
                                 ],
                             ],
 	                        ],

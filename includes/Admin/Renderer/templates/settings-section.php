@@ -748,6 +748,9 @@
 								? !empty($integration['control_checked'])
 								: (($integration['enabled'] ?? false) === true);
 							$integrationSubmittedValue = static fn (array $integration): string => (string) ($integration['submitted_enabled_value'] ?? (!empty($integration['enabled']) ? '1' : '0'));
+							$integrationHiddenFallbackValue = static fn (array $integration): string => $integrationControlDisabled($integration)
+								? ($integrationSubmittedValue($integration) === '1' ? '1' : '0')
+								: '0';
 
 							$gutenbergStatus = (string) ($gutenbergIntegration['status'] ?? (!empty($gutenbergIntegration['enabled']) ? 'active' : 'disabled'));
 							$gutenbergStatusClass = $gutenbergStatus === 'waiting_for_sitewide_roles'
@@ -805,6 +808,7 @@
                                 ? !empty($acssIntegration['control_checked'])
                                 : (($acssIntegration['enabled'] ?? false) === true);
                             $acssSubmittedEnabledValue = (string) ($acssIntegration['submitted_enabled_value'] ?? '0');
+                            $acssHiddenEnabledValue = $acssControlDisabled && $acssSubmittedEnabledValue === '1' ? '1' : '0';
                             $acssDependencyDescriptionId = 'tasty-fonts-acss-sitewide-dependency';
                             ?>
                             <div class="tasty-fonts-output-settings-panel tasty-fonts-integrations-panel">
@@ -821,7 +825,7 @@
                                         <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
                                             <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
                                             <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($etchIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
-                                                <input type="hidden" name="etch_integration_enabled" value="<?php echo esc_attr($integrationSubmittedValue($etchIntegration) === '1' ? '1' : '0'); ?>">
+                                                <input type="hidden" name="etch_integration_enabled" value="<?php echo esc_attr($integrationHiddenFallbackValue($etchIntegration)); ?>">
                                                 <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($etchStatusHelp); ?>">
                                                     <input
                                                         type="checkbox"
@@ -865,7 +869,7 @@
                                             </div>
 
                                         <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($bricksIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
-                                            <input type="hidden" name="bricks_integration_enabled" value="<?php echo esc_attr($integrationSubmittedValue($bricksIntegration) === '1' ? '1' : '0'); ?>">
+                                            <input type="hidden" name="bricks_integration_enabled" value="<?php echo esc_attr($integrationHiddenFallbackValue($bricksIntegration)); ?>">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($bricksStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"
@@ -1129,7 +1133,7 @@
                                         </div>
 
 										<div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($oxygenIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
-											<input type="hidden" name="oxygen_integration_enabled" value="<?php echo esc_attr($integrationSubmittedValue($oxygenIntegration) === '1' ? '1' : '0'); ?>">
+											<input type="hidden" name="oxygen_integration_enabled" value="<?php echo esc_attr($integrationHiddenFallbackValue($oxygenIntegration)); ?>">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($oxygenStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"
@@ -1173,7 +1177,7 @@
                                         <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
                                             <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
 										<div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $integrationControlDisabled($gutenbergIntegration) ? ' is-disabled-by-dependency' : ''; ?>">
-											<input type="hidden" name="block_editor_font_library_sync_enabled" value="<?php echo esc_attr($integrationSubmittedValue($gutenbergIntegration) === '1' ? '1' : '0'); ?>">
+											<input type="hidden" name="block_editor_font_library_sync_enabled" value="<?php echo esc_attr($integrationHiddenFallbackValue($gutenbergIntegration)); ?>">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($gutenbergStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"
@@ -1217,7 +1221,7 @@
                                         <div class="tasty-fonts-output-settings-form tasty-fonts-integrations-form">
                                             <div class="tasty-fonts-output-settings-list tasty-fonts-integrations-list tasty-fonts-settings-board-list">
                                         <div class="tasty-fonts-output-settings-detail-group tasty-fonts-output-settings-detail-group--integration<?php echo $acssControlDisabled ? ' is-disabled-by-dependency' : ''; ?>">
-                                            <input type="hidden" name="acss_font_role_sync_enabled" value="<?php echo esc_attr($acssSubmittedEnabledValue === '1' ? '1' : '0'); ?>">
+                                            <input type="hidden" name="acss_font_role_sync_enabled" value="<?php echo esc_attr($acssHiddenEnabledValue); ?>">
                                             <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output tasty-fonts-toggle-field--integration" data-settings-help-tooltip="<?php echo esc_attr($acssStatusHelp); ?>">
                                                 <input
                                                     type="checkbox"

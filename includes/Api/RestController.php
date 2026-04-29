@@ -76,12 +76,8 @@ final class RestController
     public function registerRoutes(): void
     {
         $this->registerRoute(self::ROUTES['saveSettings'], 'PATCH', [$this, 'saveSettings'], $this->settingsArgs());
-        $this->registerRoute(self::ROUTES['searchGoogle'], 'GET', [$this, 'searchGoogle'], [
-            'query' => $this->buildTextArg(true),
-        ]);
-        $this->registerRoute(self::ROUTES['searchBunny'], 'GET', [$this, 'searchBunny'], [
-            'query' => $this->buildTextArg(true),
-        ]);
+        $this->registerRoute(self::ROUTES['searchGoogle'], 'GET', [$this, 'searchGoogle'], $this->searchArgs());
+        $this->registerRoute(self::ROUTES['searchBunny'], 'GET', [$this, 'searchBunny'], $this->searchArgs());
         $this->registerRoute(self::ROUTES['googleFamily'], 'GET', [$this, 'fetchGoogleFamily'], [
             'family' => $this->buildTextArg(true),
         ]);
@@ -158,7 +154,13 @@ final class RestController
 
     public function searchGoogle(WP_REST_Request $request): mixed
     {
-        return $this->restResult($this->admin->searchGoogle($this->getTextParam($request, 'query')));
+        return $this->restResult(
+            $this->admin->searchGoogle(
+                $this->getTextParam($request, 'query'),
+                $this->getIntParam($request, 'limit', 20),
+                $this->getIntParam($request, 'offset', 0)
+            )
+        );
     }
 
     public function saveSettings(WP_REST_Request $request): mixed
@@ -170,7 +172,13 @@ final class RestController
 
     public function searchBunny(WP_REST_Request $request): mixed
     {
-        return $this->restResult($this->admin->searchBunny($this->getTextParam($request, 'query')));
+        return $this->restResult(
+            $this->admin->searchBunny(
+                $this->getTextParam($request, 'query'),
+                $this->getIntParam($request, 'limit', 20),
+                $this->getIntParam($request, 'offset', 0)
+            )
+        );
     }
 
     public function fetchGoogleFamily(WP_REST_Request $request): mixed
@@ -438,6 +446,17 @@ final class RestController
         return $value === null ? $default : (string) $value;
     }
 
+    private function getIntParam(WP_REST_Request $request, string $key, int $default = 0): int
+    {
+        $value = $request->get_param($key);
+
+        if (!is_scalar($value) && $value !== null) {
+            return $default;
+        }
+
+        return $value === null ? $default : (int) $value;
+    }
+
     /**
      * @return list<string>
      */
@@ -544,6 +563,18 @@ final class RestController
     /**
      * @return RouteArgs
      */
+    private function searchArgs(): array
+    {
+        return [
+            'query' => $this->buildTextArg(true),
+            'limit' => $this->buildIntegerArg(),
+            'offset' => $this->buildIntegerArg(),
+        ];
+    }
+
+    /**
+     * @return RouteArgs
+     */
     private function hostedImportArgs(): array
     {
         return [
@@ -596,6 +627,19 @@ final class RestController
             'required' => $required,
             'sanitize_callback' => [$this, 'sanitizeTextArg'],
             'validate_callback' => fn (mixed $value): bool => $this->validateTextArg($value, $required, $allowedValues),
+        ];
+    }
+
+    /**
+     * @return TextArg
+     */
+    private function buildIntegerArg(bool $required = false): array
+    {
+        return [
+            'type' => 'integer',
+            'required' => $required,
+            'sanitize_callback' => [$this, 'sanitizeIntegerArg'],
+            'validate_callback' => fn (mixed $value): bool => $this->validateIntegerArg($value, $required),
         ];
     }
 
@@ -667,6 +711,15 @@ final class RestController
         }
 
         return !empty($value) ? '1' : '0';
+    }
+
+    public function sanitizeIntegerArg(mixed $value): int
+    {
+        if (!is_scalar($value) && $value !== null) {
+            return 0;
+        }
+
+        return max(0, (int) $value);
     }
 
     /**
@@ -749,6 +802,15 @@ final class RestController
     public function validateToggleArg(mixed $value): bool
     {
         return is_scalar($value) || $value === null;
+    }
+
+    public function validateIntegerArg(mixed $value, bool $required = false): bool
+    {
+        if ($value === null) {
+            return !$required;
+        }
+
+        return is_scalar($value) && (string) $value !== '';
     }
 
     public function validateStringArrayArg(mixed $value, bool $required = false): bool

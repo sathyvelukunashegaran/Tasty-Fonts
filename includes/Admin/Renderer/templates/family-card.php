@@ -116,6 +116,46 @@
                                 <?php endif; ?>
                                 <button
                                     type="button"
+                                    class="button tasty-fonts-family-quick-action-button tasty-fonts-family-quick-publish-button tasty-fonts-font-action-button--icon <?php echo !empty($quickPublishAction['enabled']) ? '' : 'is-disabled'; ?>"
+                                    data-family-quick-publish
+                                    data-family-edit-action="publish-state"
+                                    data-family-slug="<?php echo esc_attr($familySlug); ?>"
+                                    data-family-name="<?php echo esc_attr($familyName); ?>"
+                                    data-current-publish-state="<?php echo esc_attr((string) ($quickPublishAction['current_state'] ?? '')); ?>"
+                                    data-target-publish-state="<?php echo esc_attr((string) ($quickPublishAction['target_state'] ?? '')); ?>"
+                                    aria-label="<?php echo esc_attr((string) ($quickPublishAction['label'] ?? __('Quick publish unavailable', 'tasty-fonts'))); ?>"
+                                    aria-disabled="<?php echo !empty($quickPublishAction['enabled']) ? 'false' : 'true'; ?>"
+                                    title="<?php echo esc_attr((string) ($quickPublishAction['help'] ?? '')); ?>"
+                                    <?php $this->renderPassiveHelpAttributes((string) (!empty($quickPublishAction['disabled_reason']) ? $quickPublishAction['disabled_reason'] : ($quickPublishAction['help'] ?? ''))); ?>
+                                    <?php if (!empty($quickPublishAction['disabled_reason'])) : ?>
+                                        data-disabled-reason="<?php echo esc_attr((string) $quickPublishAction['disabled_reason']); ?>"
+                                    <?php endif; ?>
+                                >
+                                    <span class="screen-reader-text"><?php echo esc_html((string) ($quickPublishAction['label'] ?? __('Quick publish unavailable', 'tasty-fonts'))); ?></span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="button tasty-fonts-family-quick-action-button tasty-fonts-family-quick-delivery-button tasty-fonts-font-action-button--icon <?php echo !empty($quickDeliveryAction['enabled']) ? '' : 'is-disabled'; ?>"
+                                    data-family-quick-delivery
+                                    data-family-edit-action="delivery"
+                                    data-family-slug="<?php echo esc_attr($familySlug); ?>"
+                                    data-family-name="<?php echo esc_attr($familyName); ?>"
+                                    data-current-delivery-id="<?php echo esc_attr($activeDeliveryId); ?>"
+                                    data-target-delivery-id="<?php echo esc_attr((string) ($quickDeliveryAction['target_delivery_id'] ?? '')); ?>"
+                                    data-target-delivery-label="<?php echo esc_attr((string) ($quickDeliveryAction['target_delivery_label'] ?? '')); ?>"
+                                    data-target-delivery-method="<?php echo esc_attr((string) ($quickDeliveryAction['target_delivery_method'] ?? '')); ?>"
+                                    aria-label="<?php echo esc_attr((string) ($quickDeliveryAction['label'] ?? __('Quick delivery unavailable', 'tasty-fonts'))); ?>"
+                                    aria-disabled="<?php echo !empty($quickDeliveryAction['enabled']) ? 'false' : 'true'; ?>"
+                                    title="<?php echo esc_attr((string) ($quickDeliveryAction['help'] ?? '')); ?>"
+                                    <?php $this->renderPassiveHelpAttributes((string) (!empty($quickDeliveryAction['disabled_reason']) ? $quickDeliveryAction['disabled_reason'] : ($quickDeliveryAction['help'] ?? ''))); ?>
+                                    <?php if (!empty($quickDeliveryAction['disabled_reason'])) : ?>
+                                        data-disabled-reason="<?php echo esc_attr((string) $quickDeliveryAction['disabled_reason']); ?>"
+                                    <?php endif; ?>
+                                >
+                                    <span class="screen-reader-text"><?php echo esc_html((string) ($quickDeliveryAction['label'] ?? __('Quick delivery unavailable', 'tasty-fonts'))); ?></span>
+                                </button>
+                                <button
+                                    type="button"
                                     class="button tasty-fonts-disclosure-button tasty-fonts-disclosure-button--card tasty-fonts-font-action-button--details"
                                     data-disclosure-toggle="<?php echo esc_attr($detailsId); ?>"
                                     data-family-details-toggle

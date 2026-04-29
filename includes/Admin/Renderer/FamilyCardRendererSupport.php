@@ -6,6 +6,7 @@ namespace TastyFonts\Admin\Renderer;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Admin\DeliveryProfileLabelHelper;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\RoleUsageMessageFormatter;
 
@@ -16,6 +17,16 @@ use TastyFonts\Support\RoleUsageMessageFormatter;
  * @phpstan-type CategoryAliasOwners array<string, string>
  * @phpstan-type RendererFlagOptions array<string, mixed>
  * @phpstan-type SnippetMap array<string, string>
+ * @phpstan-type QuickDeliveryAction array{
+ *   enabled: bool,
+ *   target_delivery_id: string,
+ *   target_delivery_label: string,
+ *   target_delivery_method: string,
+ *   label: string,
+ *   help: string,
+ *   disabled_reason: string,
+ *   eligible_count: int
+ * }
  */
 trait FamilyCardRendererSupport
 {
@@ -429,21 +440,19 @@ trait FamilyCardRendererSupport
 
     protected function translateProfileLabel(string $label): string
     {
-        $normalized = trim($label);
+        return DeliveryProfileLabelHelper::baseLabel($label);
+    }
 
-        if ($normalized === '') {
-            return '';
-        }
-
-        return match ($normalized) {
-            'Self-hosted' => __('Self-hosted', 'tasty-fonts'),
-            'Self-hosted (Google import)' => __('Self-hosted (Google import)', 'tasty-fonts'),
-            'Google CDN' => __('Google CDN', 'tasty-fonts'),
-            'Self-hosted (Bunny import)' => __('Self-hosted (Bunny import)', 'tasty-fonts'),
-            'Bunny CDN' => __('Bunny CDN', 'tasty-fonts'),
-            'Adobe-hosted' => __('Adobe-hosted', 'tasty-fonts'),
-            default => $normalized,
-        };
+    /**
+     * @param DeliveryProfile $profile
+     * @param list<DeliveryProfile> $siblingProfiles
+     */
+    protected function buildDeliveryProfileDisplayLabel(
+        array $profile,
+        array $siblingProfiles = [],
+        string $formatPolicy = DeliveryProfileLabelHelper::FORMAT_AUTO
+    ): string {
+        return DeliveryProfileLabelHelper::displayLabel($profile, $siblingProfiles, $formatPolicy);
     }
 
     /**
@@ -462,6 +471,179 @@ trait FamilyCardRendererSupport
             'custom:self_hosted' => __('Self-hosted custom CSS files', 'tasty-fonts'),
             default => __('Self-hosted files', 'tasty-fonts'),
         };
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function isQuickDeliveryNonMigratableProfile(array $profile): bool
+    {
+        $provider = strtolower(trim($this->mapStringValue($profile, 'provider')));
+        $type = strtolower(trim($this->mapStringValue($profile, 'type')));
+        $meta = FontUtils::normalizeStringKeyedMap($profile['meta'] ?? null);
+        $origin = strtolower(trim(FontUtils::scalarStringValue($meta['origin'] ?? '')));
+        $sourceType = strtolower(trim(FontUtils::scalarStringValue($meta['source_type'] ?? '')));
+
+        return $provider === 'adobe'
+            || $type === 'adobe_hosted'
+            || $provider === 'local'
+            || $origin === 'local_upload'
+            || $sourceType === 'local_upload';
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function quickDeliveryMethodToken(array $profile): string
+    {
+        $type = strtolower(trim($this->mapStringValue($profile, 'type')));
+
+        return match ($type) {
+            'self_hosted' => 'self_hosted',
+            'cdn', 'remote' => 'external',
+            default => '',
+        };
+    }
+
+    /**
+     * @param DeliveryProfile $profile
+     */
+    protected function quickDeliveryFormatToken(array $profile): string
+    {
+        return FontUtils::resolveProfileFormat($profile) === 'variable' ? 'variable' : 'static';
+    }
+
+    /**
+     * @param list<DeliveryProfile> $availableDeliveries
+     * @param array<string, mixed> $activeDelivery
+     * @return QuickDeliveryAction
+     */
+    protected function buildQuickDeliveryAction(array $availableDeliveries, string $activeDeliveryId, array $activeDelivery = []): array
+    {
+        $effectiveActiveDeliveryId = trim($activeDeliveryId);
+
+        if ($effectiveActiveDeliveryId === '') {
+            $effectiveActiveDeliveryId = trim($this->mapStringValue($activeDelivery, 'id'));
+        }
+
+        if ($activeDelivery === [] && $effectiveActiveDeliveryId !== '') {
+            foreach ($availableDeliveries as $delivery) {
+                if (trim($this->mapStringValue($delivery, 'id')) !== $effectiveActiveDeliveryId) {
+                    continue;
+                }
+
+                $activeDelivery = $delivery;
+                break;
+            }
+        }
+
+
+        $orderedDeliveries = [];
+        $seenDeliveryIds = [];
+        $activeIndex = null;
+
+        foreach ($availableDeliveries as $delivery) {
+            $deliveryId = trim($this->mapStringValue($delivery, 'id'));
+
+            if ($deliveryId === '' || isset($seenDeliveryIds[$deliveryId])) {
+                continue;
+            }
+
+            $seenDeliveryIds[$deliveryId] = true;
+            $deliveryMethod = $this->quickDeliveryMethodToken($delivery);
+            $isEligibleTarget = $deliveryMethod !== '' && !$this->isQuickDeliveryNonMigratableProfile($delivery);
+            $deliveryIndex = count($orderedDeliveries);
+
+            if ($effectiveActiveDeliveryId !== '' && $deliveryId === $effectiveActiveDeliveryId) {
+                $activeIndex = $deliveryIndex;
+            }
+
+            $orderedDeliveries[] = [
+                'id' => $deliveryId,
+                'method' => $deliveryMethod,
+                'profile' => $delivery,
+                'is_eligible_target' => $isEligibleTarget,
+            ];
+        }
+
+        $eligibleTargetCount = 0;
+
+        foreach ($orderedDeliveries as $delivery) {
+            if (empty($delivery['is_eligible_target'])) {
+                continue;
+            }
+
+            if ($effectiveActiveDeliveryId !== '' && $delivery['id'] === $effectiveActiveDeliveryId) {
+                continue;
+            }
+
+            ++$eligibleTargetCount;
+        }
+
+
+        $target = null;
+        $orderedDeliveryCount = count($orderedDeliveries);
+
+        if ($orderedDeliveryCount > 0 && $activeIndex !== null) {
+            for ($offset = 1; $offset <= $orderedDeliveryCount; ++$offset) {
+                $candidate = $orderedDeliveries[($activeIndex + $offset) % $orderedDeliveryCount];
+
+                if ($candidate['id'] === $effectiveActiveDeliveryId || empty($candidate['is_eligible_target'])) {
+                    continue;
+                }
+
+                $target = $candidate;
+                break;
+            }
+        }
+
+        if ($target === null) {
+            foreach ($orderedDeliveries as $candidate) {
+                if (($effectiveActiveDeliveryId !== '' && $candidate['id'] === $effectiveActiveDeliveryId)
+                    || empty($candidate['is_eligible_target'])
+                ) {
+                    continue;
+                }
+
+                $target = $candidate;
+                break;
+            }
+        }
+
+        if ($target === null) {
+            $disabledReason = __('No alternate delivery profile is available.', 'tasty-fonts');
+
+            return [
+                'enabled' => false,
+                'target_delivery_id' => '',
+                'target_delivery_label' => '',
+                'target_delivery_method' => '',
+                'label' => __('Quick delivery unavailable', 'tasty-fonts'),
+                'help' => $disabledReason,
+                'disabled_reason' => $disabledReason,
+                'eligible_count' => $eligibleTargetCount,
+            ];
+        }
+
+        $targetProfile = $target['profile'];
+        $targetDeliveryId = trim($target['id']);
+        $targetDeliveryMethod = trim($target['method']);
+        $targetDeliveryLabel = $this->buildDeliveryProfileDisplayLabel($targetProfile, $availableDeliveries);
+
+        if ($targetDeliveryLabel === '') {
+            $targetDeliveryLabel = __('Alternate delivery', 'tasty-fonts');
+        }
+
+        return [
+            'enabled' => true,
+            'target_delivery_id' => $targetDeliveryId,
+            'target_delivery_label' => $targetDeliveryLabel,
+            'target_delivery_method' => $targetDeliveryMethod,
+            'label' => sprintf(__('Switch delivery to %s', 'tasty-fonts'), $targetDeliveryLabel),
+            'help' => sprintf(__('Switch active delivery to %s.', 'tasty-fonts'), $targetDeliveryLabel),
+            'disabled_reason' => '',
+            'eligible_count' => $eligibleTargetCount,
+        ];
     }
 
     /**

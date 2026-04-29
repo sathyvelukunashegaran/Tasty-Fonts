@@ -41,9 +41,10 @@ final class BunnyFontsClient
     /**
      * @return FamilySearchResultList
      */
-    public function searchFamilies(string $query, int $limit = 20): array
+    public function searchFamilies(string $query, int $limit = 20, int $offset = 0): array
     {
         $query = strtolower(trim($query));
+        $offset = max(0, $offset);
 
         if ($query === '') {
             return [];
@@ -79,7 +80,7 @@ final class BunnyFontsClient
 
         $items = [];
 
-        foreach (array_slice($results, 0, $limit) as $item) {
+        foreach (array_slice($results, $offset, $limit) as $item) {
             $slug = $item['slug'];
             $family = $slug !== '' ? $this->fetchFamilyBySlug($slug) : null;
             $items[] = $family ?? $this->buildFallbackFamilyRecord($slug, $item['family']);

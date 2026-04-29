@@ -158,6 +158,8 @@
     const roleFamilyCatalog = config.roleFamilyCatalog && typeof config.roleFamilyCatalog === 'object'
         ? config.roleFamilyCatalog
         : {};
+    const hostedSearchPageSize = 12;
+    const hostedSearchScrollThreshold = 160;
     const roleWeightEditors = {
         heading: document.querySelector('[data-role-weight-editor="heading"]'),
         body: document.querySelector('[data-role-weight-editor="body"]'),
@@ -341,11 +343,21 @@
     let selectedSearchFamily = null;
     let searchResults = [];
     let searchTimer = 0;
+    let googleSearchQuery = '';
+    let googleSearchHasMore = false;
+    let googleSearchNextOffset = 0;
+    let googleSearchLoadingMore = false;
+    let googleSearchRequestToken = 0;
     let googleFamilyLookupTimer = 0;
     let googleFamilyLookupToken = 0;
     let selectedBunnySearchFamily = null;
     let bunnySearchResults = [];
     let bunnySearchTimer = 0;
+    let bunnySearchQuery = '';
+    let bunnySearchHasMore = false;
+    let bunnySearchNextOffset = 0;
+    let bunnySearchLoadingMore = false;
+    let bunnySearchRequestToken = 0;
     let bunnyFamilyLookupTimer = 0;
     let bunnyFamilyLookupToken = 0;
     let importInFlight = false;
@@ -425,6 +437,9 @@
         searchDisabled: __('Add a Google Fonts API key above to enable search, or use manual import below.', 'tasty-fonts'),
         bunnySearching: __('Searching Bunny Fonts…', 'tasty-fonts'),
         bunnySearchEmpty: __('No Bunny Fonts families matched that search.', 'tasty-fonts'),
+        searchMoreAvailable: __('Scroll to load more families.', 'tasty-fonts'),
+        searchLoadingMore: __('Loading more families…', 'tasty-fonts'),
+        searchLoadError: __('More results could not be loaded.', 'tasty-fonts'),
         selectFamily: __('Select a family from search results or type one manually.', 'tasty-fonts'),
         bunnySelectFamily: __('Type a Bunny Fonts family name before importing.', 'tasty-fonts'),
         bunnyImportFamilyEmpty: __('Choose or type a Bunny family.', 'tasty-fonts'),
@@ -552,6 +567,7 @@
         roleWeightDefault: __('Use Role Default (%1$s)', 'tasty-fonts'),
         roleWeightSummary: __('Static weights for %1$s. Choose one to override role weight output.', 'tasty-fonts'),
         settingsUnsaved: __('Unsaved changes', 'tasty-fonts'),
+        settingsPendingSave: __('Pending save', 'tasty-fonts'),
         settingsChangedGroupLabel: __('Changed', 'tasty-fonts'),
         settingsLeaveWarning: __('You have unsaved settings changes.', 'tasty-fonts'),
         adminAccessRoleMetricSingle: __('%d role', 'tasty-fonts'),
@@ -1062,6 +1078,143 @@
         });
     }
 
+    function isSettingsToggleRow(row) {
+        if (!(row instanceof HTMLElement)) {
+            return false;
+        }
+
+        if (!row.closest('#tasty-fonts-settings-page')) {
+            return false;
+        }
+
+        const form = row.closest('form');
+
+        if (!(form instanceof HTMLFormElement) || !form.matches('[data-settings-form]')) {
+            return false;
+        }
+
+        return !!row.querySelector('.tasty-fonts-toggle-input');
+    }
+
+    function getSettingsPendingBadgeHost(row) {
+        if (!(row instanceof HTMLElement)) {
+            return null;
+        }
+
+        if (row.classList.contains('tasty-fonts-toggle-copy')) {
+            return row;
+        }
+
+        return row.querySelector(':scope > .tasty-fonts-toggle-copy')
+            || row.querySelector(':scope > .tasty-fonts-toggle-field .tasty-fonts-toggle-copy')
+            || row.querySelector('.tasty-fonts-toggle-copy');
+    }
+
+    function ensureSettingsPendingBadge(row) {
+        const host = getSettingsPendingBadgeHost(row);
+
+        if (!(host instanceof HTMLElement)) {
+            return null;
+        }
+
+        let badge = host.querySelector('[data-settings-pending-badge]');
+
+        if (!(badge instanceof HTMLElement)) {
+            badge = document.createElement('span');
+            badge.className = 'tasty-fonts-settings-pending-badge';
+            badge.setAttribute('data-settings-pending-badge', '');
+            badge.textContent = getString('settingsPendingSave', 'Pending save');
+            const titleLine = host.querySelector('.tasty-fonts-toggle-title-line');
+            const title = host.querySelector('.tasty-fonts-toggle-title');
+
+            if (titleLine instanceof HTMLElement) {
+                titleLine.appendChild(badge);
+            } else if (title instanceof HTMLElement) {
+                title.appendChild(badge);
+            } else {
+                host.appendChild(badge);
+            }
+        }
+
+        return badge;
+    }
+
+    function updatePendingBadgeDescribedBy(input, badgeId, include) {
+        if (!(input instanceof HTMLInputElement) || !badgeId) {
+            return;
+        }
+
+        const tokens = String(input.getAttribute('aria-describedby') || '')
+            .split(/\s+/)
+            .filter(Boolean)
+            .filter((token) => token !== badgeId);
+
+        if (include) {
+            tokens.push(badgeId);
+        }
+
+        if (tokens.length > 0) {
+            input.setAttribute('aria-describedby', tokens.join(' '));
+            return;
+        }
+
+        input.removeAttribute('aria-describedby');
+    }
+
+    function ensurePendingBadgeId(badge, input) {
+        if (!(badge instanceof HTMLElement)) {
+            return '';
+        }
+
+        if (badge.id) {
+            return badge.id;
+        }
+
+        const inputId = input instanceof HTMLInputElement ? String(input.id || '').trim() : '';
+        const inputName = input instanceof HTMLInputElement ? String(input.getAttribute('name') || '').trim() : '';
+        const fallbackSource = inputId || inputName || 'settings-toggle';
+        const safeSource = fallbackSource.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'settings-toggle';
+
+        badge.id = `tasty-fonts-settings-pending-badge-${safeSource}`;
+
+        return badge.id;
+    }
+
+    function syncSettingsPendingToggleState(row, pending) {
+        if (!(row instanceof HTMLElement)) {
+            return;
+        }
+
+        const isPendingToggle = isSettingsToggleRow(row);
+        const badge = row.querySelector('[data-settings-pending-badge]');
+        const toggleInput = row.querySelector('.tasty-fonts-toggle-input');
+        const input = toggleInput instanceof HTMLInputElement ? toggleInput : null;
+
+        if (!isPendingToggle || !pending) {
+            row.classList.remove('has-pending-toggle-change');
+            row.removeAttribute('data-settings-toggle-pending');
+
+            if (badge instanceof HTMLElement) {
+                badge.hidden = true;
+                updatePendingBadgeDescribedBy(input, String(badge.id || ''), false);
+            }
+
+            return;
+        }
+
+        row.classList.add('has-pending-toggle-change');
+        row.setAttribute('data-settings-toggle-pending', '');
+
+        const ensuredBadge = ensureSettingsPendingBadge(row);
+
+        if (ensuredBadge instanceof HTMLElement) {
+            ensuredBadge.hidden = false;
+            ensuredBadge.textContent = getString('settingsPendingSave', 'Pending save');
+            const badgeId = ensurePendingBadgeId(ensuredBadge, input);
+            updatePendingBadgeDescribedBy(input, badgeId, true);
+        }
+    }
+
     function syncSettingsChangedRows(form, initialState = {}, currentState = {}) {
         if (!(form instanceof HTMLFormElement)) {
             return;
@@ -1080,6 +1233,7 @@
             const changed = dirtyState.changedRows.includes(String(index));
             row.classList.toggle('has-unsaved-changes', changed);
             row.toggleAttribute('data-settings-row-changed', changed);
+            syncSettingsPendingToggleState(row, changed);
         });
 
         syncSettingsGroupChangedIndicators(form);
@@ -6939,6 +7093,38 @@
         return getErrorMessage(error, getString('familyPublishStateSaveError', 'The publish state could not be updated.'));
     }
 
+    async function persistFamilyDelivery(familySlug, deliveryId) {
+        const payload = await requestJson(getRoutePath('saveFamilyDelivery', 'families/delivery'), {
+            method: 'PATCH',
+            body: {
+                family_slug: familySlug,
+                delivery_id: deliveryId
+            },
+            fallbackMessage: getString('familyDeliverySaveError', 'The live delivery could not be updated.')
+        });
+
+        return {
+            payload,
+            message: payload.message || getString('familyDeliverySaved', 'Live delivery updated.')
+        };
+    }
+
+    async function persistFamilyPublishState(familySlug, publishState) {
+        const payload = await requestJson(getRoutePath('saveFamilyPublishState', 'families/publish-state'), {
+            method: 'PATCH',
+            body: {
+                family_slug: familySlug,
+                publish_state: publishState
+            },
+            fallbackMessage: getString('familyPublishStateSaveError', 'The publish state could not be updated.')
+        });
+
+        return {
+            payload,
+            message: payload.message || getString('familyPublishStateSaved', 'Publish state updated.')
+        };
+    }
+
     function buildRoleDraftErrorMessage(error) {
         return getErrorMessage(error, getString('rolesDraftSaveError', 'The roles could not be saved.'));
     }
@@ -7159,15 +7345,8 @@
         }
 
         try {
-            const payload = await requestJson(getRoutePath('saveFamilyDelivery', 'families/delivery'), {
-                method: 'PATCH',
-                body: {
-                    family_slug: familySlug,
-                    delivery_id: nextValue
-                },
-                fallbackMessage: getString('familyDeliverySaveError', 'The live delivery could not be updated.')
-            });
-            const message = payload.message || getString('familyDeliverySaved', 'Live delivery updated.');
+            const result = await persistFamilyDelivery(familySlug, nextValue);
+            const message = result.message;
 
             selector.dataset.savedValue = nextValue;
             syncFamilyDeliverySaveState(saveForm);
@@ -7220,15 +7399,8 @@
         }
 
         try {
-            const payload = await requestJson(getRoutePath('saveFamilyPublishState', 'families/publish-state'), {
-                method: 'PATCH',
-                body: {
-                    family_slug: familySlug,
-                    publish_state: nextValue
-                },
-                fallbackMessage: getString('familyPublishStateSaveError', 'The publish state could not be updated.')
-            });
-            const message = payload.message || getString('familyPublishStateSaved', 'Publish state updated.');
+            const result = await persistFamilyPublishState(familySlug, nextValue);
+            const message = result.message;
 
             selector.dataset.savedValue = nextValue;
             syncFamilyPublishStateSaveState(saveForm);
@@ -7868,13 +8040,95 @@
         updateGoogleImportSummary();
     }
 
-    function renderSearchResults(items) {
+    function searchResultKey(item, provider) {
+        if (provider === 'bunny') {
+            return normalizeFamilyKey(item && (item.slug || item.family) ? (item.slug || item.family) : '');
+        }
+
+        return normalizeFamilyKey(item && item.family ? item.family : '');
+    }
+
+    function mergeSearchResultItems(currentItems, nextItems, provider) {
+        const merged = Array.isArray(currentItems) ? currentItems.slice() : [];
+        const seen = new Set(merged.map((item) => searchResultKey(item, provider)).filter(Boolean));
+
+        (Array.isArray(nextItems) ? nextItems : []).forEach((item) => {
+            const key = searchResultKey(item, provider);
+
+            if (!key || seen.has(key)) {
+                return;
+            }
+
+            seen.add(key);
+            merged.push(item);
+        });
+
+        return merged;
+    }
+
+    function removeSearchLoadState(container) {
+        if (!container) {
+            return;
+        }
+
+        container.querySelectorAll('[data-search-load-state]').forEach((element) => element.remove());
+    }
+
+    function renderSearchLoadState(container, message, state = 'loading') {
+        if (!container) {
+            return;
+        }
+
+        removeSearchLoadState(container);
+
+        if (!message) {
+            return;
+        }
+
+        const status = document.createElement('div');
+        status.className = 'tasty-fonts-search-load-state';
+        status.dataset.searchLoadState = state;
+        status.setAttribute('role', 'status');
+        status.textContent = message;
+        container.appendChild(status);
+    }
+
+    function normalizeSearchNextOffset(payload, fallbackOffset) {
+        const nextOffset = Number.parseInt(payload && payload.next_offset, 10);
+
+        return Number.isFinite(nextOffset) && nextOffset >= 0 ? nextOffset : fallbackOffset;
+    }
+
+    function shouldLoadMoreSearchResults(container) {
+        if (!container) {
+            return false;
+        }
+
+        return container.scrollHeight - container.scrollTop - container.clientHeight <= hostedSearchScrollThreshold;
+    }
+
+    function renderSearchResults(items, options = {}) {
         if (!googleResults) {
             return;
         }
 
-        searchResults = items || [];
-        googleResults.innerHTML = '';
+        const nextItems = Array.isArray(items) ? items : [];
+        const shouldAppend = !!options.append;
+        let itemsToRender = nextItems;
+        removeSearchLoadState(googleResults);
+
+        if (shouldAppend) {
+            const existingKeys = new Set(searchResults.map((item) => searchResultKey(item, 'google')).filter(Boolean));
+            itemsToRender = nextItems.filter((item) => {
+                const key = searchResultKey(item, 'google');
+
+                return key && !existingKeys.has(key);
+            });
+            searchResults = mergeSearchResultItems(searchResults, nextItems, 'google');
+        } else {
+            searchResults = nextItems;
+            googleResults.innerHTML = '';
+        }
 
         if (!searchResults.length) {
             updateGooglePreviewStylesheet([]);
@@ -7884,7 +8138,7 @@
 
         updateGooglePreviewStylesheet(searchResults);
 
-        searchResults.forEach((item) => {
+        itemsToRender.forEach((item) => {
             const card = document.createElement('button');
             const head = document.createElement('span');
             const title = document.createElement('span');
@@ -7938,6 +8192,10 @@
             card.append(head, preview, meta);
             googleResults.appendChild(card);
         });
+
+        if (options.hasMore) {
+            renderSearchLoadState(googleResults, getString('searchMoreAvailable', 'Scroll to load more families.'), 'idle');
+        }
 
         const matchedFamily = findGoogleFamilyMatch(currentGoogleImportFamily());
 
@@ -8063,13 +8321,28 @@
         updateBunnyImportSummary();
     }
 
-    function renderBunnySearchResults(items) {
+    function renderBunnySearchResults(items, options = {}) {
         if (!bunnyResults) {
             return;
         }
 
-        bunnySearchResults = items || [];
-        bunnyResults.innerHTML = '';
+        const nextItems = Array.isArray(items) ? items : [];
+        const shouldAppend = !!options.append;
+        let itemsToRender = nextItems;
+        removeSearchLoadState(bunnyResults);
+
+        if (shouldAppend) {
+            const existingKeys = new Set(bunnySearchResults.map((item) => searchResultKey(item, 'bunny')).filter(Boolean));
+            itemsToRender = nextItems.filter((item) => {
+                const key = searchResultKey(item, 'bunny');
+
+                return key && !existingKeys.has(key);
+            });
+            bunnySearchResults = mergeSearchResultItems(bunnySearchResults, nextItems, 'bunny');
+        } else {
+            bunnySearchResults = nextItems;
+            bunnyResults.innerHTML = '';
+        }
 
         if (!bunnySearchResults.length) {
             updateBunnySearchPreviewStylesheet([]);
@@ -8079,7 +8352,7 @@
 
         updateBunnySearchPreviewStylesheet(bunnySearchResults);
 
-        bunnySearchResults.forEach((item) => {
+        itemsToRender.forEach((item) => {
             const card = document.createElement('button');
             const head = document.createElement('span');
             const title = document.createElement('span');
@@ -8136,6 +8409,10 @@
             card.append(head, preview, meta);
             bunnyResults.appendChild(card);
         });
+
+        if (options.hasMore) {
+            renderSearchLoadState(bunnyResults, getString('searchMoreAvailable', 'Scroll to load more families.'), 'idle');
+        }
 
         const matchedFamily = findBunnyFamilyMatch(currentBunnyImportFamily());
 
@@ -9081,13 +9358,21 @@
             return;
         }
 
+        const normalizedQuery = String(query || '').trim();
+        const requestToken = ++googleSearchRequestToken;
+        googleSearchQuery = normalizedQuery;
+        googleSearchHasMore = false;
+        googleSearchNextOffset = 0;
+        googleSearchLoadingMore = false;
+
         if (!config.googleApiEnabled) {
             updateGooglePreviewStylesheet([]);
             renderEmptyState(googleResults, getString('searchDisabled', ''));
             return;
         }
 
-        if (query.trim().length < 2) {
+        if (normalizedQuery.length < 2) {
+            searchResults = [];
             updateGooglePreviewStylesheet([]);
             googleResults.innerHTML = '';
             return;
@@ -9098,14 +9383,73 @@
         try {
             const payload = await requestJson(getRoutePath('searchGoogle', 'google/search'), {
                 method: 'GET',
-                query: { query },
+                query: { query: normalizedQuery, limit: hostedSearchPageSize, offset: 0 },
                 fallbackMessage: getString('importError', 'Request failed.')
             });
 
-            renderSearchResults(payload.items || []);
+            if (requestToken !== googleSearchRequestToken) {
+                return;
+            }
+
+            const items = Array.isArray(payload.items) ? payload.items : [];
+            googleSearchHasMore = !!payload.has_more;
+            googleSearchNextOffset = normalizeSearchNextOffset(payload, items.length);
+            renderSearchResults(items, { hasMore: googleSearchHasMore });
+
+            if (googleSearchHasMore && shouldLoadMoreSearchResults(googleResults)) {
+                void loadMoreGoogleSearchResults();
+            }
         } catch (error) {
+            if (requestToken !== googleSearchRequestToken) {
+                return;
+            }
+
             updateGooglePreviewStylesheet([]);
             renderEmptyState(googleResults, getErrorMessage(error, getString('importError', 'Request failed.')));
+        }
+    }
+
+    async function loadMoreGoogleSearchResults() {
+        if (!googleResults || googleSearchLoadingMore || !googleSearchHasMore || googleSearchQuery.length < 2) {
+            return;
+        }
+
+        const requestToken = googleSearchRequestToken;
+        let shouldContinue = false;
+        googleSearchLoadingMore = true;
+        renderSearchLoadState(googleResults, getString('searchLoadingMore', 'Loading more families…'), 'loading');
+
+        try {
+            const payload = await requestJson(getRoutePath('searchGoogle', 'google/search'), {
+                method: 'GET',
+                query: { query: googleSearchQuery, limit: hostedSearchPageSize, offset: googleSearchNextOffset },
+                fallbackMessage: getString('searchLoadError', 'More results could not be loaded.')
+            });
+
+            if (requestToken !== googleSearchRequestToken) {
+                return;
+            }
+
+            const items = Array.isArray(payload.items) ? payload.items : [];
+            googleSearchHasMore = !!payload.has_more;
+            googleSearchNextOffset = normalizeSearchNextOffset(payload, googleSearchNextOffset + items.length);
+            renderSearchResults(items, { append: true, hasMore: googleSearchHasMore });
+            shouldContinue = googleSearchHasMore && shouldLoadMoreSearchResults(googleResults);
+        } catch (error) {
+            if (requestToken !== googleSearchRequestToken) {
+                return;
+            }
+
+            googleSearchHasMore = false;
+            renderSearchLoadState(googleResults, getErrorMessage(error, getString('searchLoadError', 'More results could not be loaded.')), 'error');
+        } finally {
+            if (requestToken === googleSearchRequestToken) {
+                googleSearchLoadingMore = false;
+
+                if (shouldContinue) {
+                    window.setTimeout(() => void loadMoreGoogleSearchResults(), 0);
+                }
+            }
         }
     }
 
@@ -9114,13 +9458,20 @@
             return;
         }
 
+        const normalizedQuery = String(query || '').trim();
+        const requestToken = ++bunnySearchRequestToken;
+        bunnySearchQuery = normalizedQuery;
+        bunnySearchHasMore = false;
+        bunnySearchNextOffset = 0;
+        bunnySearchLoadingMore = false;
+
         if (!hasRestConfig() || !window.fetch) {
             updateBunnySearchPreviewStylesheet([]);
             bunnyResults.innerHTML = '';
             return;
         }
 
-        if (query.trim().length < 2) {
+        if (normalizedQuery.length < 2) {
             bunnySearchResults = [];
             updateBunnySearchPreviewStylesheet([]);
             bunnyResults.innerHTML = '';
@@ -9131,15 +9482,74 @@
         try {
             const payload = await requestJson(getRoutePath('searchBunny', 'bunny/search'), {
                 method: 'GET',
-                query: { query },
+                query: { query: normalizedQuery, limit: hostedSearchPageSize, offset: 0 },
                 fallbackMessage: getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.')
             });
 
-            renderBunnySearchResults(payload.items || []);
+            if (requestToken !== bunnySearchRequestToken) {
+                return;
+            }
+
+            const items = Array.isArray(payload.items) ? payload.items : [];
+            bunnySearchHasMore = !!payload.has_more;
+            bunnySearchNextOffset = normalizeSearchNextOffset(payload, items.length);
+            renderBunnySearchResults(items, { hasMore: bunnySearchHasMore });
+
+            if (bunnySearchHasMore && shouldLoadMoreSearchResults(bunnyResults)) {
+                void loadMoreBunnySearchResults();
+            }
         } catch (error) {
+            if (requestToken !== bunnySearchRequestToken) {
+                return;
+            }
+
             bunnySearchResults = [];
             updateBunnySearchPreviewStylesheet([]);
             renderEmptyState(bunnyResults, getErrorMessage(error, getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.')));
+        }
+    }
+
+    async function loadMoreBunnySearchResults() {
+        if (!bunnyResults || bunnySearchLoadingMore || !bunnySearchHasMore || bunnySearchQuery.length < 2) {
+            return;
+        }
+
+        const requestToken = bunnySearchRequestToken;
+        let shouldContinue = false;
+        bunnySearchLoadingMore = true;
+        renderSearchLoadState(bunnyResults, getString('searchLoadingMore', 'Loading more families…'), 'loading');
+
+        try {
+            const payload = await requestJson(getRoutePath('searchBunny', 'bunny/search'), {
+                method: 'GET',
+                query: { query: bunnySearchQuery, limit: hostedSearchPageSize, offset: bunnySearchNextOffset },
+                fallbackMessage: getString('searchLoadError', 'More results could not be loaded.')
+            });
+
+            if (requestToken !== bunnySearchRequestToken) {
+                return;
+            }
+
+            const items = Array.isArray(payload.items) ? payload.items : [];
+            bunnySearchHasMore = !!payload.has_more;
+            bunnySearchNextOffset = normalizeSearchNextOffset(payload, bunnySearchNextOffset + items.length);
+            renderBunnySearchResults(items, { append: true, hasMore: bunnySearchHasMore });
+            shouldContinue = bunnySearchHasMore && shouldLoadMoreSearchResults(bunnyResults);
+        } catch (error) {
+            if (requestToken !== bunnySearchRequestToken) {
+                return;
+            }
+
+            bunnySearchHasMore = false;
+            renderSearchLoadState(bunnyResults, getErrorMessage(error, getString('searchLoadError', 'More results could not be loaded.')), 'error');
+        } finally {
+            if (requestToken === bunnySearchRequestToken) {
+                bunnySearchLoadingMore = false;
+
+                if (shouldContinue) {
+                    window.setTimeout(() => void loadMoreBunnySearchResults(), 0);
+                }
+            }
         }
     }
 
@@ -11113,6 +11523,176 @@
         return true;
     }
 
+    function setQuickFamilyActionsBusyState(row, isBusy) {
+        if (!row) {
+            return;
+        }
+
+        const buttons = row.querySelectorAll('[data-family-quick-publish], [data-family-quick-delivery]');
+
+        if (isBusy) {
+            row.classList.add('is-saving');
+            row.setAttribute('aria-busy', 'true');
+
+            buttons.forEach((button) => {
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                button.dataset.wasDisabled = button.disabled ? '1' : '0';
+                button.disabled = true;
+                button.setAttribute('aria-busy', 'true');
+            });
+            return;
+        }
+
+        if (!pageReloadScheduled) {
+            row.classList.remove('is-saving');
+            row.removeAttribute('aria-busy');
+        }
+
+        buttons.forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            if (!pageReloadScheduled) {
+                button.disabled = button.dataset.wasDisabled === '1';
+            }
+
+            delete button.dataset.wasDisabled;
+            button.removeAttribute('aria-busy');
+        });
+    }
+
+    function syncHydratedFamilyDeliverySelector(row, familySlug, deliveryId) {
+        if (!row || !familySlug || !deliveryId) {
+            return;
+        }
+
+        const selector = Array.from(row.querySelectorAll('.tasty-fonts-family-delivery-selector')).find((element) => {
+            return element instanceof HTMLSelectElement && (element.dataset.familySlug || '') === familySlug;
+        });
+
+        if (!(selector instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        selector.value = deliveryId;
+        selector.dataset.savedValue = deliveryId;
+        syncFamilyDeliverySaveState(selector.closest('[data-family-delivery-form]'));
+    }
+
+    function syncHydratedFamilyPublishStateSelector(row, familySlug, publishState) {
+        if (!row || !familySlug || !publishState) {
+            return;
+        }
+
+        const selector = Array.from(row.querySelectorAll('.tasty-fonts-family-publish-state-selector')).find((element) => {
+            return element instanceof HTMLSelectElement && (element.dataset.familySlug || '') === familySlug;
+        });
+
+        if (!(selector instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        selector.value = publishState;
+        selector.dataset.savedValue = publishState;
+        syncFamilyPublishStateSaveState(selector.closest('[data-family-publish-state-form]'));
+    }
+
+    async function saveQuickFamilyDelivery(button) {
+        const row = button.closest('[data-font-row]');
+        const blockedReason = (button.getAttribute('data-disabled-reason') || '').trim();
+
+        if (blockedReason || button.disabled || button.getAttribute('aria-disabled') === 'true') {
+            showToast(blockedReason || getString('quickDeliveryUnavailable', 'Open Details to choose a delivery profile.'), 'error');
+            return false;
+        }
+
+        const familySlug = (button.getAttribute('data-family-slug') || '').trim();
+        const targetDeliveryId = (button.getAttribute('data-target-delivery-id') || '').trim();
+
+        if (!familySlug || !targetDeliveryId || !hasRestConfig()) {
+            showToast(getString('quickDeliveryUnavailable', 'Open Details to choose a delivery profile.'), 'error');
+            return false;
+        }
+
+        setQuickFamilyActionsBusyState(row, true);
+
+        try {
+            const result = await persistFamilyDelivery(familySlug, targetDeliveryId);
+
+            syncHydratedFamilyDeliverySelector(row, familySlug, targetDeliveryId);
+            showToast(result.message, 'success');
+            reloadPageSoon(600);
+            return true;
+        } catch (error) {
+            showToast(buildFamilyDeliveryErrorMessage(error), 'error');
+            return false;
+        } finally {
+            setQuickFamilyActionsBusyState(row, false);
+        }
+    }
+
+    async function saveQuickFamilyPublishState(button) {
+        const row = button.closest('[data-font-row]');
+        const blockedReason = (button.getAttribute('data-disabled-reason') || '').trim();
+
+        if (blockedReason || button.disabled || button.getAttribute('aria-disabled') === 'true') {
+            showToast(blockedReason || getString('quickPublishUnavailable', 'Open Details to change publish state.'), 'error');
+            return false;
+        }
+
+        const familySlug = (button.getAttribute('data-family-slug') || '').trim();
+        const targetPublishState = (button.getAttribute('data-target-publish-state') || '').trim();
+
+        if (!familySlug || !targetPublishState || !hasRestConfig()) {
+            showToast(getString('quickPublishUnavailable', 'Open Details to change publish state.'), 'error');
+            return false;
+        }
+
+        setQuickFamilyActionsBusyState(row, true);
+
+        try {
+            const result = await persistFamilyPublishState(familySlug, targetPublishState);
+
+            syncHydratedFamilyPublishStateSelector(row, familySlug, targetPublishState);
+            showToast(result.message, 'success');
+            reloadPageSoon(600);
+            return true;
+        } catch (error) {
+            showToast(buildFamilyPublishStateErrorMessage(error), 'error');
+            return false;
+        } finally {
+            setQuickFamilyActionsBusyState(row, false);
+        }
+    }
+
+    function handleQuickFamilyPublishClick(event) {
+        const button = event.target.closest('[data-family-quick-publish]');
+
+        if (!button) {
+            return false;
+        }
+
+        event.preventDefault();
+        void saveQuickFamilyPublishState(button);
+        return true;
+    }
+
+    function handleQuickFamilyDeliveryClick(event) {
+        const button = event.target.closest('[data-family-quick-delivery]');
+
+        if (!button) {
+            return false;
+        }
+
+        event.preventDefault();
+        void saveQuickFamilyDelivery(button);
+        return true;
+    }
+
     // Event binding
     function handleDocumentClick(event) {
         const toastDismiss = event.target.closest('[data-toast-dismiss]');
@@ -11146,6 +11726,14 @@
         }
 
         if (handleRoleAssignClick(event)) {
+            return;
+        }
+
+        if (handleQuickFamilyPublishClick(event)) {
+            return;
+        }
+
+        if (handleQuickFamilyDeliveryClick(event)) {
             return;
         }
 
@@ -11468,6 +12056,14 @@
             });
         }
 
+        if (googleResults) {
+            googleResults.addEventListener('scroll', () => {
+                if (shouldLoadMoreSearchResults(googleResults)) {
+                    void loadMoreGoogleSearchResults();
+                }
+            }, { passive: true });
+        }
+
         if (manualFamily) {
             manualFamily.addEventListener('input', () => {
                 window.clearTimeout(googleFamilyLookupTimer);
@@ -11605,6 +12201,14 @@
                     void runBunnySearch(bunnySearch.value);
                 }, 250);
             });
+        }
+
+        if (bunnyResults) {
+            bunnyResults.addEventListener('scroll', () => {
+                if (shouldLoadMoreSearchResults(bunnyResults)) {
+                    void loadMoreBunnySearchResults();
+                }
+            }, { passive: true });
         }
 
         if (bunnyFamily) {

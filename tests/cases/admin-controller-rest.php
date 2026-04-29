@@ -1843,7 +1843,7 @@ $tests['admin_controller_localizes_role_family_catalog_from_active_deliveries'] 
     $inter = is_array($catalog['Inter'] ?? null) ? $catalog['Inter'] : [];
 
     assertSameValue('inter-variable-active', (string) ($inter['activeDeliveryId'] ?? ''), 'Admin scripts should localize the active delivery ID for each family.');
-    assertContainsValue('Self-hosted (active)', (string) ($inter['activeDeliveryLabel'] ?? ''), 'Admin scripts should localize the active delivery label for each family.');
+    assertContainsValue('Self-hosted (active) · Variable', (string) ($inter['activeDeliveryLabel'] ?? ''), 'Admin scripts should localize the active delivery label for each family.');
     assertSameValue('variable', (string) ($inter['format'] ?? ''), 'Admin scripts should localize the active delivery format for each family.');
     assertSameValue(true, !empty($inter['hasWeightAxis']), 'Admin scripts should report whether the active delivery exposes a weight axis.');
     assertSameValue(
@@ -2604,7 +2604,7 @@ $tests['rest_controller_rejects_destructive_bulk_delete_tools_actions'] = static
 
     $services = makeServiceGraph();
 
-    foreach (['delete_all_exports', 'delete_all_snapshots'] as $action) {
+    foreach (['delete_all_exports', 'delete_all_snapshots', 'delete_all_history'] as $action) {
         $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/tools/action');
         $request->set_param('action', $action);
 
@@ -3681,6 +3681,66 @@ $tests['google_search_cooldown_cache_is_shared_between_repeated_rest_requests'] 
     assertSameValue(4, (int) ($secondData['items'][0]['variants_count'] ?? 0), 'The second REST search response should reuse the cooldown cache instead of re-reading the mutated catalog.');
 };
 
+$tests['hosted_font_search_rest_requests_page_results_by_offset'] = static function (): void {
+    resetTestState();
+
+    global $currentUserId;
+
+    $currentUserId = 43;
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'google_font_imports_enabled' => '1',
+        'google_api_key' => 'live-key',
+    ]);
+    $services['settings']->saveGoogleApiKeyStatus('valid');
+    set_transient(
+        TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG),
+        [
+            'inter' => [
+                'family' => 'Inter',
+                'category' => 'sans-serif',
+                'variants_count' => 1,
+                'variants' => ['regular'],
+                'is_variable' => false,
+                'axes' => [],
+            ],
+            'inter-tight' => [
+                'family' => 'Inter Tight',
+                'category' => 'sans-serif',
+                'variants_count' => 1,
+                'variants' => ['regular'],
+                'is_variable' => false,
+                'axes' => [],
+            ],
+            'interstellar' => [
+                'family' => 'Interstellar',
+                'category' => 'display',
+                'variants_count' => 1,
+                'variants' => ['regular'],
+                'is_variable' => false,
+                'axes' => [],
+            ],
+        ],
+        HOUR_IN_SECONDS
+    );
+
+    $firstRequest = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/google/search');
+    $firstRequest->set_query_params(['query' => 'Inter', 'limit' => 1, 'offset' => 0]);
+    $firstResponse = $services['rest']->searchGoogle($firstRequest);
+    $firstData = $firstResponse instanceof WP_REST_Response ? $firstResponse->get_data() : [];
+
+    $secondRequest = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/google/search');
+    $secondRequest->set_query_params(['query' => 'Inter', 'limit' => 1, 'offset' => 1]);
+    $secondResponse = $services['rest']->searchGoogle($secondRequest);
+    $secondData = $secondResponse instanceof WP_REST_Response ? $secondResponse->get_data() : [];
+
+    assertSameValue('Inter', (string) ($firstData['items'][0]['family'] ?? ''), 'The first search page should return the first matching family.');
+    assertSameValue(true, !empty($firstData['has_more']), 'A limited first page should report that more search results are available.');
+    assertSameValue(1, (int) ($firstData['next_offset'] ?? 0), 'The first page should expose the next result offset.');
+    assertSameValue('Inter Tight', (string) ($secondData['items'][0]['family'] ?? ''), 'A second request during cooldown should use its own offset instead of replaying the first page.');
+    assertSameValue(2, (int) ($secondData['next_offset'] ?? 0), 'The second page should advance the next result offset.');
+};
+
 $tests['admin_controller_family_font_display_changes_refresh_generated_assets'] = static function (): void {
     resetTestState();
 
@@ -4727,6 +4787,34 @@ $tests['handle_admin_actions_returns_early_after_first_matching_handler'] = stat
     // If the dispatch stops after clear-log, only the "Activity log cleared." entry should be present.
     $logMessages = implode(' ', array_column($services['log']->all(), 'message'));
     assertNotContainsValue('rescanned', $logMessages, 'Only the clear-log handler should have fired; the rescan log message should be absent.');
+};
+
+$tests['handle_admin_actions_dispatches_delete_all_history_and_redirects'] = static function (): void {
+    resetTestState();
+
+    global $isAdminRequest;
+    global $redirectLocation;
+
+    $isAdminRequest = true;
+    $_POST['tasty_fonts_delete_all_history'] = '1';
+
+    $services = makeServiceGraph();
+    $services['log']->add('Entry before history delete');
+    add_action(
+        'tasty_fonts_before_admin_redirect_exit',
+        static function (): void {
+            throw new WpDieException('redirect');
+        }
+    );
+
+    try {
+        $services['controller']->handleAdminActions();
+    } catch (WpDieException $e) {
+        // Expected: the redirect handler terminates after wp_safe_redirect().
+    }
+
+    assertSameValue([], $services['log']->all(), 'The delete-history POST handler should clear retained activity history without seeding a replacement log entry.');
+    assertSameValue(false, empty($redirectLocation), 'The delete-history POST handler should redirect after completion.');
 };
 
 $tests['handle_admin_actions_dispatches_bulk_snapshot_delete_and_redirects'] = static function (): void {

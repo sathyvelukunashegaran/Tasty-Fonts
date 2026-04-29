@@ -961,6 +961,30 @@ $tests['admin_controller_deletes_all_snapshots_and_blocks_locked_bulk_export_del
     assertSameValue([], $services['site_transfer']->listExportBundles(), 'Controller bulk export deletion should clear retained export history when nothing is locked.');
 };
 
+$tests['admin_controller_can_delete_all_activity_history'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    update_option(LogRepository::OPTION_LOG, [
+        [
+            'time' => '2026-04-29 12:00:00',
+            'message' => 'Fonts rescanned.',
+            'actor' => 'Builder',
+        ],
+        [
+            'time' => '2026-04-29 12:05:00',
+            'message' => 'Generated CSS regenerated.',
+            'actor' => 'Builder',
+        ],
+    ]);
+
+    $result = $services['controller']->deleteAllHistory();
+
+    assertSameValue('Activity history deleted.', (string) ($result['message'] ?? ''), 'Controller history deletion should return the shared success message.');
+    assertSameValue(2, (int) ($result['deleted_history_entries'] ?? 0), 'Controller history deletion should report deleted activity entries.');
+    assertSameValue([], $services['log']->all(), 'Controller history deletion should leave no retained activity log entries.');
+};
+
 $tests['site_transfer_service_rejects_checksum_mismatches_during_bundle_validation'] = static function (): void {
     resetTestState();
 
@@ -2588,8 +2612,6 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
     assertContainsValue('Run Regenerate CSS File', (string) ($checks[0]['guidance'] ?? ''), 'Generated CSS warnings should explain the next practical step.');
     assertContainsValue('Advanced-Tools', (string) ($checks[0]['help_url'] ?? ''), 'Generated CSS checks should link to the Advanced Tools knowledge base page.');
     assertSameValue('Open knowledge base', (string) ($checks[0]['help_label'] ?? ''), 'Health checks should expose a consistent knowledge-base link label.');
-    assertSameValue('storage_root', (string) ($checks[1]['slug'] ?? ''), 'Health checks should expose managed storage as a first-class check.');
-    assertSameValue('critical', (string) ($checks[1]['severity'] ?? ''), 'Unavailable managed storage should be reported as critical.');
     $checksBySlug = [];
 
     foreach ($checks as $check) {
@@ -2598,8 +2620,12 @@ $tests['health_check_service_builds_structured_advanced_tools_statuses'] = stati
         assertSameValue(true, trim((string) ($check['help_url'] ?? '')) !== '', 'Every health check should expose a knowledge-base URL.');
     }
 
+    assertSameValue(true, isset($checksBySlug['storage_root']), 'Health checks should expose managed storage as a first-class check.');
+    assertSameValue('critical', (string) ($checksBySlug['storage_root']['severity'] ?? ''), 'Unavailable managed storage should be reported as critical.');
     assertSameValue(true, isset($checksBySlug['site_transfer']), 'Health checks should expose site transfer capability.');
-    assertSameValue(false, isset($checksBySlug['sitewide_delivery']), 'Health checks should not expose the deferred sitewide delivery warning in this pass.');
+    assertSameValue(true, isset($checksBySlug['sitewide_delivery']), 'Health checks should expose Sitewide Delivery readiness.');
+    assertSameValue('warning', (string) ($checksBySlug['sitewide_delivery']['severity'] ?? ''), 'Sitewide Delivery off should be reported as an action-needed warning.');
+    assertSameValue('deploy_fonts', (string) ($checksBySlug['sitewide_delivery']['action']['slug'] ?? ''), 'Sitewide Delivery warnings should send users to Deploy Fonts.');
     assertSameValue(true, isset($checksBySlug['self_hosted_files']), 'Health checks should expose self-hosted file integrity.');
     assertSameValue(true, isset($checksBySlug['external_stylesheets']), 'Health checks should expose external stylesheet delivery.');
     assertSameValue(true, isset($checksBySlug['font_preload']), 'Health checks should expose preload readiness.');
@@ -2891,6 +2917,7 @@ $tests['admin_page_context_builder_exposes_advanced_tools_context'] = static fun
     assertSameValue(true, in_array('site_transfer_import', $toolActionIds, true), 'Advanced Tools should expose structured destructive action descriptors.');
     assertSameValue(true, in_array('delete_all_snapshots', $toolActionIds, true), 'Advanced Tools should expose the bulk snapshot delete descriptor.');
     assertSameValue(true, in_array('delete_all_exports', $toolActionIds, true), 'Advanced Tools should expose the guarded bulk export delete descriptor.');
+    assertSameValue(true, in_array('delete_all_history', $toolActionIds, true), 'Advanced Tools should expose the retained activity history delete descriptor.');
     assertSameValue(true, isset($manifest['roles']), 'The runtime manifest should expose the role resolution matrix.');
     assertSameValue(true, isset($manifest['families']), 'The runtime manifest should expose the active delivery matrix.');
     assertSameValue(true, isset($manifest['preload_urls']), 'The runtime manifest should expose runtime preload URLs.');
@@ -3320,6 +3347,47 @@ $tests['admin_controller_clears_stale_acss_managed_values_when_sync_is_off_witho
     assertSameValue('', (string) ($automaticCssSettings['text-font-weight'] ?? ''), 'Saving Automatic.css sync off without stored backups should clear stale managed body weights so Automatic.css can fall back to its defaults.');
     assertSameValue(false, (bool) ($result['settings']['acss_font_role_sync_applied'] ?? true), 'Saving Automatic.css sync off without stored backups should keep the sync marked unapplied.');
     assertContainsValue('use its defaults again', (string) ($result['message'] ?? ''), 'Saving Automatic.css sync off without stored backups should explain that stale managed values were cleared.');
+};
+
+$tests['admin_controller_clears_stale_acss_managed_backup_values_when_sync_is_disabled'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => 'var(--font-heading)',
+        'text-font-family' => 'var(--font-body)',
+        'heading-weight' => 'var(--font-heading-weight)',
+        'text-font-weight' => 'var(--font-body-weight)',
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveAcssFontRoleSyncState(
+        true,
+        true,
+        'var(--font-heading)',
+        'var(--font-body)',
+        'var(--font-heading-weight)',
+        'var(--font-body-weight)'
+    );
+
+    $result = $services['controller']->saveSettingsValues([
+        'acss_font_role_sync_enabled' => '0',
+    ]);
+
+    assertSameValue('', (string) ($automaticCssSettings['heading-font-family'] ?? ''), 'Disabling Automatic.css sync should not restore a stale Tasty-managed heading variable from backup.');
+    assertSameValue('', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Disabling Automatic.css sync should not restore a stale Tasty-managed body variable from backup.');
+    assertSameValue('', (string) ($automaticCssSettings['heading-weight'] ?? ''), 'Disabling Automatic.css sync should not restore a stale Tasty-managed heading weight variable from backup.');
+    assertSameValue('', (string) ($automaticCssSettings['text-font-weight'] ?? ''), 'Disabling Automatic.css sync should not restore a stale Tasty-managed body weight variable from backup.');
+    assertSameValue(false, (bool) ($result['settings']['acss_font_role_sync_applied'] ?? true), 'Disabling Automatic.css sync should still mark the integration unapplied after stale managed backups are cleared.');
+    assertSameValue('', (string) ($result['settings']['acss_font_role_sync_previous_heading_font_family'] ?? 'unexpected'), 'Disabling Automatic.css sync should clear stale managed heading backups from Tasty state.');
+    assertSameValue('', (string) ($result['settings']['acss_font_role_sync_previous_text_font_family'] ?? 'unexpected'), 'Disabling Automatic.css sync should clear stale managed body backups from Tasty state.');
+    assertSameValue('', (string) ($result['settings']['acss_font_role_sync_previous_heading_font_weight'] ?? 'unexpected'), 'Disabling Automatic.css sync should clear stale managed heading weight backups from Tasty state.');
+    assertSameValue('', (string) ($result['settings']['acss_font_role_sync_previous_text_font_weight'] ?? 'unexpected'), 'Disabling Automatic.css sync should clear stale managed body weight backups from Tasty state.');
+    assertContainsValue('Previous Automatic.css font settings were restored.', (string) ($result['message'] ?? ''), 'Disabling Automatic.css sync from an applied state should still report the restore action.');
 };
 
 $tests['admin_controller_restores_previous_acss_font_values_when_sitewide_roles_are_disabled'] = static function (): void {

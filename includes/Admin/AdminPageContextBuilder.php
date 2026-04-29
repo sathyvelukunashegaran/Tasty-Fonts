@@ -395,6 +395,14 @@ final class AdminPageContextBuilder
                 'dry_run_supported' => false,
             ],
             [
+                'id' => 'delete_all_history',
+                'kind' => 'destructive',
+                'label' => __('Delete all history', 'tasty-fonts'),
+                'confirm_phrase' => 'DELETE HISTORY',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
                 'id' => 'create_rollback_snapshot',
                 'kind' => 'snapshot',
                 'label' => __('Create rollback snapshot', 'tasty-fonts'),
@@ -948,18 +956,20 @@ final class AdminPageContextBuilder
             'upgrade' => __('Upgrade Available', 'tasty-fonts'),
             'rollback' => __('Rollback Available', 'tasty-fonts'),
             'current' => __('Current', 'tasty-fonts'),
+            'development' => __('Local Dev', 'tasty-fonts'),
             default => __('Unavailable', 'tasty-fonts'),
         };
         $stateClass = match ($state) {
             'upgrade' => 'is-success',
             'rollback' => 'is-warning',
-            'current' => 'is-role',
+            'current', 'development' => 'is-role',
             default => '',
         };
         $stateCopy = match ($state) {
             'upgrade' => __('A newer package is available through WordPress updates.', 'tasty-fonts'),
             'rollback' => __('This channel points to an older package. Use reinstall to switch now.', 'tasty-fonts'),
             'current' => __('This channel is already aligned with the installed version.', 'tasty-fonts'),
+            'development' => __('This is a local development checkout, so release packages are not offered as updates.', 'tasty-fonts'),
             default => __('No installable package is available for the selected channel right now.', 'tasty-fonts'),
         };
 
@@ -2351,6 +2361,16 @@ final class AdminPageContextBuilder
                 'summary' => '',
                 'last_run' => '',
             ],
+            'delete_all_history' => [
+                'summary' => count($logs) > 0
+                    ? sprintf(
+                        /* translators: %d: retained activity history entry count */
+                        _n('%d activity history entry retained.', '%d activity history entries retained.', count($logs), 'tasty-fonts'),
+                        count($logs)
+                    )
+                    : __('No activity history retained.', 'tasty-fonts'),
+                'last_run' => '',
+            ],
         ];
         $messageMap = [
             'clear_plugin_caches' => __('Plugin caches cleared and generated assets refreshed.', 'tasty-fonts'),
@@ -2363,6 +2383,7 @@ final class AdminPageContextBuilder
             'wipe_managed_font_library' => __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts'),
             'delete_all_snapshots' => __('All rollback snapshots deleted.', 'tasty-fonts'),
             'delete_all_exports' => __('All site transfer export bundles deleted.', 'tasty-fonts'),
+            'delete_all_history' => __('Activity history deleted.', 'tasty-fonts'),
         ];
 
         foreach ($messageMap as $slug => $message) {

@@ -7,6 +7,7 @@ namespace TastyFonts\Admin;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\Renderer\ToolsSectionRenderer;
+use TastyFonts\Admin\DeliveryProfileLabelHelper;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
@@ -77,6 +78,7 @@ final class AdminController
     private const ACTION_DELETE_ROLLBACK_SNAPSHOT = 'tasty_fonts_delete_rollback_snapshot';
     private const ACTION_DELETE_ALL_ROLLBACK_SNAPSHOTS = 'tasty_fonts_delete_all_rollback_snapshots';
     private const ACTION_DELETE_ALL_SITE_TRANSFER_EXPORT_BUNDLES = 'tasty_fonts_delete_all_site_transfer_export_bundles';
+    private const ACTION_DELETE_ALL_HISTORY = 'tasty_fonts_delete_all_history';
     private const IMPORT_SITE_TRANSFER_FILE_FIELD = 'tasty_fonts_site_transfer_bundle';
     private const IMPORT_SITE_TRANSFER_STAGE_TOKEN_FIELD = 'tasty_fonts_site_transfer_stage_token';
     private const IMPORT_SITE_TRANSFER_GOOGLE_API_KEY_FIELD = 'tasty_fonts_import_google_api_key';
@@ -91,6 +93,8 @@ final class AdminController
     public const SEARCH_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_search_cooldown_';
     private const SEARCH_COOLDOWN_WINDOW_SECONDS = 0.5;
     private const SEARCH_COOLDOWN_TRANSIENT_TTL = 1;
+    private const SEARCH_DEFAULT_LIMIT = 20;
+    private const SEARCH_MAX_LIMIT = 50;
     public const ACTION_COOLDOWN_TRANSIENT_PREFIX = 'tasty_fonts_action_cooldown_';
     private const ACTION_COOLDOWN_DEFAULT_WINDOW_SECONDS = 2.0;
     private const SETTINGS_STUDIO_TABS = ['output-settings', 'integrations', 'plugin-behavior'];
@@ -337,6 +341,10 @@ final class AdminController
             return;
         }
 
+        if ($this->handleDeleteAllHistoryAction()) {
+            return;
+        }
+
         if ($this->handleResetPluginSettingsAction()) {
             return;
         }
@@ -439,39 +447,49 @@ final class AdminController
     /**
      * @return Payload|WP_Error
      */
-    public function searchGoogle(string $query): array|WP_Error
+    public function searchGoogle(string $query, int $limit = self::SEARCH_DEFAULT_LIMIT, int $offset = 0): array|WP_Error
     {
         if (!$this->fontImportWorkflowEnabled('google')) {
             return $this->fontImportWorkflowDisabledError('google');
         }
 
+        $limit = $this->normalizeSearchLimit($limit);
+        $offset = $this->normalizeSearchOffset($offset);
+
         return $this->resolveRateLimitedSearch(
             'google',
             $query,
-            fn (string $resolvedQuery): array => ['items' => $this->googleClient->searchFamilies(sanitize_text_field($resolvedQuery), 20)]
+            fn (string $resolvedQuery): array => $this->buildGoogleSearchResultPage($resolvedQuery, $limit, $offset),
+            $limit,
+            $offset
         );
     }
 
     /**
      * @return Payload|WP_Error
      */
-    public function searchBunny(string $query): array|WP_Error
+    public function searchBunny(string $query, int $limit = self::SEARCH_DEFAULT_LIMIT, int $offset = 0): array|WP_Error
     {
         if (!$this->fontImportWorkflowEnabled('bunny')) {
             return $this->fontImportWorkflowDisabledError('bunny');
         }
 
+        $limit = $this->normalizeSearchLimit($limit);
+        $offset = $this->normalizeSearchOffset($offset);
+
         return $this->resolveRateLimitedSearch(
             'bunny',
             $query,
-            fn (string $resolvedQuery): array|WP_Error => $this->searchBunnyResults($resolvedQuery)
+            fn (string $resolvedQuery): array|WP_Error => $this->searchBunnyResults($resolvedQuery, $limit, $offset),
+            $limit,
+            $offset
         );
     }
 
     /**
      * @return Payload|WP_Error
      */
-    public function searchGoogleResults(string $query): array|WP_Error
+    public function searchGoogleResults(string $query, int $limit = self::SEARCH_DEFAULT_LIMIT, int $offset = 0): array|WP_Error
     {
         if (!$this->fontImportWorkflowEnabled('google')) {
             return $this->fontImportWorkflowDisabledError('google');
@@ -484,19 +502,61 @@ final class AdminController
             );
         }
 
-        return ['items' => $this->googleClient->searchFamilies(sanitize_text_field($query), 20)];
+        return $this->buildGoogleSearchResultPage(
+            sanitize_text_field($query),
+            $this->normalizeSearchLimit($limit),
+            $this->normalizeSearchOffset($offset)
+        );
     }
 
     /**
      * @return Payload|WP_Error
      */
-    public function searchBunnyResults(string $query): array|WP_Error
+    public function searchBunnyResults(string $query, int $limit = self::SEARCH_DEFAULT_LIMIT, int $offset = 0): array|WP_Error
     {
         if (!$this->fontImportWorkflowEnabled('bunny')) {
             return $this->fontImportWorkflowDisabledError('bunny');
         }
 
-        return ['items' => $this->bunnyClient->searchFamilies(sanitize_text_field($query), 12)];
+        $limit = $this->normalizeSearchLimit($limit);
+        $offset = $this->normalizeSearchOffset($offset);
+        $items = $this->bunnyClient->searchFamilies(sanitize_text_field($query), $limit + 1, $offset);
+        $hasMore = count($items) > $limit;
+
+        return [
+            'items' => array_slice($items, 0, $limit),
+            'has_more' => $hasMore,
+            'next_offset' => $offset + min(count($items), $limit),
+        ];
+    }
+
+    /**
+     * @return Payload
+     */
+    private function buildGoogleSearchResultPage(string $query, int $limit, int $offset): array
+    {
+        $items = $this->googleClient->searchFamilies(sanitize_text_field($query), $limit + 1, $offset);
+        $hasMore = count($items) > $limit;
+
+        return [
+            'items' => array_slice($items, 0, $limit),
+            'has_more' => $hasMore,
+            'next_offset' => $offset + min(count($items), $limit),
+        ];
+    }
+
+    private function normalizeSearchLimit(int $limit): int
+    {
+        if ($limit <= 0) {
+            $limit = self::SEARCH_DEFAULT_LIMIT;
+        }
+
+        return min(self::SEARCH_MAX_LIMIT, max(1, $limit));
+    }
+
+    private function normalizeSearchOffset(int $offset): int
+    {
+        return max(0, $offset);
     }
 
     /**
@@ -1212,6 +1272,14 @@ final class AdminController
     }
 
     /**
+     * @return Payload
+     */
+    public function deleteAllHistory(): array
+    {
+        return $this->maintenanceActions->deleteAllHistory();
+    }
+
+    /**
      * @return Payload|WP_Error
      */
     public function createRollbackSnapshot(string $reason = 'manual'): array|WP_Error
@@ -1857,6 +1925,19 @@ final class AdminController
         }
 
         $this->redirectWithSuccess($message);
+    }
+
+    private function handleDeleteAllHistoryAction(): bool
+    {
+        if (!isset($_POST[self::ACTION_DELETE_ALL_HISTORY])) {
+            return false;
+        }
+
+        check_admin_referer(self::ACTION_DELETE_ALL_HISTORY);
+
+        $result = $this->deleteAllHistory();
+
+        $this->redirectWithSuccess($this->stringValue($result, 'message', __('Activity history deleted.', 'tasty-fonts')));
     }
 
     private function handleResetPluginSettingsAction(): bool
@@ -3806,12 +3887,14 @@ final class AdminController
     /**
      * @return Payload|WP_Error
      */
-    private function resolveRateLimitedSearch(string $provider, string $query, callable $resolver): array|WP_Error
+    private function resolveRateLimitedSearch(string $provider, string $query, callable $resolver, int $limit = self::SEARCH_DEFAULT_LIMIT, int $offset = 0): array|WP_Error
     {
         $provider = strtolower(trim($provider));
         $query = sanitize_text_field($query);
+        $limit = $this->normalizeSearchLimit($limit);
+        $offset = $this->normalizeSearchOffset($offset);
         $cooldownKey = $this->getSearchCooldownTransientKey();
-        $cacheKey = $this->getSearchCacheTransientKey($provider, $query);
+        $cacheKey = $this->getSearchCacheTransientKey($provider, $query, $limit, $offset);
 
         if ($this->isSearchCooldownActive($cooldownKey, $provider, $query)) {
             $cached = get_transient($cacheKey);
@@ -4333,10 +4416,10 @@ final class AdminController
 
             $map[(string) $familyName] = [
                 'activeDeliveryId' => $deliveryId,
-                'activeDeliveryLabel' => trim(
-                    $this->translateProfileLabel($this->stringValue($activeDelivery, 'label'))
-                    . ' · '
-                    . ucfirst(FontUtils::resolveProfileFormat($activeDelivery))
+                'activeDeliveryLabel' => DeliveryProfileLabelHelper::displayLabel(
+                    $activeDelivery,
+                    [],
+                    DeliveryProfileLabelHelper::FORMAT_ALWAYS
                 ),
                 'format' => FontUtils::resolveProfileFormat($activeDelivery),
                 'weights' => $this->buildRoleWeightOptionsForProfile($activeDelivery),
@@ -4448,19 +4531,6 @@ final class AdminController
         $axes = $this->profileVariationAxes($profile);
 
         return isset($axes['WGHT']);
-    }
-
-    private function translateProfileLabel(string $label): string
-    {
-        return match (trim($label)) {
-            'Self-hosted' => __('Self-hosted', 'tasty-fonts'),
-            'Self-hosted (Google import)' => __('Self-hosted (Google import)', 'tasty-fonts'),
-            'Google CDN' => __('Google CDN', 'tasty-fonts'),
-            'Self-hosted (Bunny import)' => __('Self-hosted (Bunny import)', 'tasty-fonts'),
-            'Bunny CDN' => __('Bunny CDN', 'tasty-fonts'),
-            'Adobe-hosted' => __('Adobe-hosted', 'tasty-fonts'),
-            default => trim($label),
-        };
     }
 
     private function resolveConcreteRoleWeight(string $weight): string
@@ -5063,10 +5133,26 @@ final class AdminController
             $this->settings->saveAcssFontRoleSyncState(
                 false,
                 false,
-                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
-                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
-                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
-                $clearBackupWhenDisabled ? '' : $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
+                $clearBackupWhenDisabled ? '' : $this->restorableAcssBackupValue(
+                    $settings,
+                    'acss_font_role_sync_previous_heading_font_family',
+                    AcssIntegrationService::DESIRED_HEADING_VALUE
+                ),
+                $clearBackupWhenDisabled ? '' : $this->restorableAcssBackupValue(
+                    $settings,
+                    'acss_font_role_sync_previous_text_font_family',
+                    AcssIntegrationService::DESIRED_TEXT_VALUE
+                ),
+                $clearBackupWhenDisabled ? '' : $this->restorableAcssBackupValue(
+                    $settings,
+                    'acss_font_role_sync_previous_heading_font_weight',
+                    AcssIntegrationService::DESIRED_HEADING_WEIGHT_VALUE
+                ),
+                $clearBackupWhenDisabled ? '' : $this->restorableAcssBackupValue(
+                    $settings,
+                    'acss_font_role_sync_previous_text_font_weight',
+                    AcssIntegrationService::DESIRED_TEXT_WEIGHT_VALUE
+                )
             );
 
             return $applied
@@ -5185,11 +5271,58 @@ final class AdminController
     private function restoreAcssIntegration(array $settings): array|WP_Error
     {
         return $this->acssIntegration->restoreFontSettings(
-            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_family'),
-            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_family'),
-            $this->stringValue($settings, 'acss_font_role_sync_previous_heading_font_weight'),
-            $this->stringValue($settings, 'acss_font_role_sync_previous_text_font_weight')
+            $this->restorableAcssBackupValue(
+                $settings,
+                'acss_font_role_sync_previous_heading_font_family',
+                AcssIntegrationService::DESIRED_HEADING_VALUE
+            ),
+            $this->restorableAcssBackupValue(
+                $settings,
+                'acss_font_role_sync_previous_text_font_family',
+                AcssIntegrationService::DESIRED_TEXT_VALUE
+            ),
+            $this->restorableAcssBackupValue(
+                $settings,
+                'acss_font_role_sync_previous_heading_font_weight',
+                AcssIntegrationService::DESIRED_HEADING_WEIGHT_VALUE
+            ),
+            $this->restorableAcssBackupValue(
+                $settings,
+                'acss_font_role_sync_previous_text_font_weight',
+                AcssIntegrationService::DESIRED_TEXT_WEIGHT_VALUE
+            )
         );
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
+    private function restorableAcssBackupValue(array $settings, string $key, string $managedValue): string
+    {
+        $value = $this->stringValue($settings, $key);
+
+        return $this->isManagedAcssBackupValue($value, $managedValue) ? '' : $value;
+    }
+
+    private function isManagedAcssBackupValue(string $value, string $managedValue): bool
+    {
+        $normalizedValue = $this->normalizeAcssVariableReference($value);
+
+        return $normalizedValue !== ''
+            && $normalizedValue === $this->normalizeAcssVariableReference($managedValue);
+    }
+
+    private function normalizeAcssVariableReference(string $value): string
+    {
+        $value = trim($value);
+        $compacted = preg_replace('/\s+/', '', $value);
+        $value = is_string($compacted) ? $compacted : $value;
+
+        if (preg_match('/^var\((--[A-Za-z0-9_-]+)\)$/i', $value, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return str_starts_with($value, '--') ? $value : '';
     }
 
     /**
@@ -5488,7 +5621,7 @@ final class AdminController
         return TransientKey::forSite(self::SEARCH_COOLDOWN_TRANSIENT_PREFIX . max(0, (int) get_current_user_id()));
     }
 
-    private function getSearchCacheTransientKey(string $provider, string $query): string
+    private function getSearchCacheTransientKey(string $provider, string $query, int $limit = self::SEARCH_DEFAULT_LIMIT, int $offset = 0): string
     {
         return TransientKey::forSite(
             self::SEARCH_CACHE_TRANSIENT_PREFIX
@@ -5496,7 +5629,7 @@ final class AdminController
             . '_'
             . max(0, (int) get_current_user_id())
             . '_'
-            . md5(strtolower(trim($query)))
+            . md5(strtolower(trim($query)) . '|' . $this->normalizeSearchLimit($limit) . '|' . $this->normalizeSearchOffset($offset))
         );
     }
 

@@ -668,6 +668,7 @@ final class AdminPageViewBuilder
             'current' => __('Latest', 'tasty-fonts'),
             'upgrade' => __('Update Available', 'tasty-fonts'),
             'rollback' => __('Rollback Available', 'tasty-fonts'),
+            'development' => __('Local Dev', 'tasty-fonts'),
             default => $this->stringValue($updateChannelStatus, 'state_label'),
         };
     }
@@ -681,7 +682,7 @@ final class AdminPageViewBuilder
 
         return match ($state) {
             'upgrade', 'rollback' => 'is-danger',
-            'current' => 'is-role',
+            'current', 'development' => 'is-role',
             default => '',
         };
     }

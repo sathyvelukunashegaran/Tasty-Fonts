@@ -6,6 +6,7 @@ namespace TastyFonts\Admin\Renderer;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Admin\DeliveryProfileLabelHelper;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Support\FontUtils;
 
@@ -292,11 +293,15 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $savedFontDisplay = array_key_exists($familyName, $familyFontDisplays) ? $familyFontDisplays[$familyName] : '';
         $currentFontDisplay = $savedFontDisplay !== '' ? $savedFontDisplay : 'inherit';
         $publishState = $this->stringValue($family, 'publish_state', 'published');
-        $activeDelivery = is_array($family['active_delivery'] ?? null) ? $family['active_delivery'] : [];
+        $activeDelivery = FontUtils::normalizeStringKeyedMap($family['active_delivery'] ?? []);
         $activeDeliveryId = $this->stringValue($family, 'active_delivery_id');
-        $availableDeliveries = is_array($family['available_deliveries'] ?? null) ? (array) $family['available_deliveries'] : [];
+        $availableDeliveries = FontUtils::normalizeListOfStringKeyedMaps($family['available_deliveries'] ?? []);
         $deliveryCount = count($availableDeliveries);
-        $activeDeliveryLabel = $this->translateProfileLabel($this->stringValue($activeDelivery, 'label'));
+        $activeDeliveryLabel = $this->buildDeliveryProfileDisplayLabel(
+            $activeDelivery,
+            $availableDeliveries,
+            DeliveryProfileLabelHelper::FORMAT_AUTO
+        );
         $activeDeliveryLabel = $activeDeliveryLabel !== '' ? $activeDeliveryLabel : __('Unavailable', 'tasty-fonts');
         $supportsFontDisplayOverride = strtolower(trim($this->stringValue($activeDelivery, 'provider'))) !== 'adobe';
         $defaultStack = FontUtils::buildFontStack($familyName, $savedFallback);
@@ -326,6 +331,37 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $classOutputOptions
         );
         $canChangePublishState = $publishState !== 'role_active';
+        $quickPublishDisabledReason = '';
+        $quickPublishEnabled = $canChangePublishState
+            && $familySlug !== ''
+            && in_array($publishState, ['published', 'library_only'], true);
+        $quickPublishTargetState = '';
+
+        if ($quickPublishEnabled) {
+            $quickPublishTargetState = $publishState === 'published' ? 'library_only' : 'published';
+        } elseif ($publishState === 'role_active') {
+            $quickPublishDisabledReason = __('Publish state is auto-managed while this family is used in live roles.', 'tasty-fonts');
+        } elseif ($familySlug === '') {
+            $quickPublishDisabledReason = __('Quick publish is unavailable because the family identifier is missing.', 'tasty-fonts');
+        } else {
+            $quickPublishDisabledReason = __('Open Details or refresh before changing publish state.', 'tasty-fonts');
+        }
+
+        $quickPublishAction = [
+            'enabled' => $quickPublishEnabled,
+            'current_state' => $publishState,
+            'target_state' => $quickPublishTargetState,
+            'label' => $quickPublishEnabled
+                ? ($quickPublishTargetState === 'published'
+                    ? __('Quick publish this family', 'tasty-fonts')
+                    : __('Quick unpublish this family', 'tasty-fonts'))
+                : __('Quick publish unavailable', 'tasty-fonts'),
+            'help' => $quickPublishEnabled
+                ? __('Toggle publish state immediately. Open Details for explicit state controls.', 'tasty-fonts')
+                : $quickPublishDisabledReason,
+            'disabled_reason' => $quickPublishDisabledReason,
+        ];
+        $quickDeliveryAction = $this->buildQuickDeliveryAction($availableDeliveries, $activeDeliveryId, $activeDelivery);
         $isExpanded = false;
         $detailsId = 'tasty-fonts-family-details-' . sanitize_html_class($familySlug !== '' ? $familySlug : FontUtils::slugify($familyName));
         $templateView = get_defined_vars();
@@ -357,17 +393,20 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
 
     /**
      * @param DeliveryProfile $profile
+     * @param list<DeliveryProfile> $siblingProfiles
      */
     public function renderDeliveryProfileCard(
         string $familyName,
         string $familySlug,
         string $activeDeliveryId,
         string $publishState,
-        array $profile
+        array $profile,
+        array $siblingProfiles = []
     ): void {
         $profileId = $this->stringValue($profile, 'id');
         $profileLabel = $this->translateProfileLabel($this->stringValue($profile, 'label'));
-        $profileProvider = $this->stringValue($profile, 'provider');
+        $profileActionLabel = $this->buildDeliveryProfileDisplayLabel($profile, $siblingProfiles);
+        $profileActionLabel = $profileActionLabel !== '' ? $profileActionLabel : $profileLabel;
         $profileIsActive = $profileId === $activeDeliveryId;
         $profileVariantCount = $this->countProfileVariants($profile);
         $isCustomCssProfile = $this->isCustomCssProfile($profile);
@@ -387,9 +426,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                     <div class="tasty-fonts-detail-card-title-row">
                         <h5 class="tasty-fonts-detail-card-title"><?php echo esc_html($profileLabel); ?></h5>
                         <?php if ($profileIsActive): ?>
-                            <span class="tasty-fonts-badge is-success"><?php esc_html_e('Live', 'tasty-fonts'); ?></span>
-                        <?php else: ?>
-                            <span class="tasty-fonts-badge"><?php esc_html_e('Saved', 'tasty-fonts'); ?></span>
+                            <span class="tasty-fonts-badge is-success"><?php esc_html_e('Active delivery', 'tasty-fonts'); ?></span>
                         <?php endif; ?>
                         <span class="tasty-fonts-badge <?php echo esc_attr($this->stringValue($fontTypeDescriptor, 'badge_class')); ?>">
                             <?php echo esc_html($this->stringValue($fontTypeDescriptor, 'label')); ?>
@@ -408,7 +445,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                         data-family-slug="<?php echo esc_attr($familySlug); ?>"
                         data-family-name="<?php echo esc_attr($familyName); ?>"
                         data-delivery-id="<?php echo esc_attr($profileId); ?>"
-                        data-delivery-label="<?php echo esc_attr($profileLabel); ?>"
+                        data-delivery-label="<?php echo esc_attr($profileActionLabel); ?>"
                         aria-disabled="<?php echo esc_attr($profileDeleteBlocked !== '' ? 'true' : 'false'); ?>"
                         <?php disabled($profileDeleteBlocked !== ''); ?>
                         title="<?php echo esc_attr($profileDeleteBlocked !== '' ? $profileDeleteBlocked : __('Delete only this delivery profile and keep the family.', 'tasty-fonts')); ?>"
@@ -421,15 +458,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                 </div>
             </div>
 
-            <dl class="tasty-fonts-detail-meta">
-                <div class="tasty-fonts-detail-meta-item">
-                    <dt><?php esc_html_e('Provider', 'tasty-fonts'); ?></dt>
-                    <dd><?php echo esc_html($this->buildFamilySourceLabel($profileProvider)); ?></dd>
-                </div>
-                <div class="tasty-fonts-detail-meta-item">
-                    <dt><?php esc_html_e('Request Path', 'tasty-fonts'); ?></dt>
-                    <dd><?php echo esc_html($this->buildProfileRequestSummary($profile)); ?></dd>
-                </div>
+            <dl class="tasty-fonts-detail-meta tasty-fonts-detail-meta--delivery">
                 <?php if ($isCustomCssProfile): ?>
                     <div class="tasty-fonts-detail-meta-item tasty-fonts-detail-meta-item--source-url">
                         <dt><?php esc_html_e('Source CSS URL', 'tasty-fonts'); ?></dt>

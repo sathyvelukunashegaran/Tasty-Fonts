@@ -543,12 +543,124 @@ $tests['github_updater_uses_nightly_releases_when_the_nightly_channel_is_selecte
     ];
 
     $services = makeServiceGraph();
+    $installedVersion = '1.15.0-dev.202604081200';
+    $installedVersionProperty = new ReflectionProperty(GitHubUpdater::class, 'installedVersion');
+    $installedVersionProperty->setValue($services['updater'], $installedVersion);
     $services['updater']->registerHooks();
 
     $overview = $services['updater']->getChannelOverview(SettingsRepository::UPDATE_CHANNEL_NIGHTLY);
+    $transient = (object) [
+        'checked' => [plugin_basename(TASTY_FONTS_FILE) => $installedVersion],
+        'response' => [],
+    ];
+    $updateTransient = apply_filters('pre_set_site_transient_update_plugins', $transient);
+    $update = $updateTransient->response[plugin_basename(TASTY_FONTS_FILE)] ?? null;
 
     assertSameValue($nightlyVersion, (string) (($overview['latest_available']['version'] ?? '')), 'The nightly channel should select the newest stable, beta, or nightly release.');
-    assertSameValue('upgrade', (string) ($overview['state'] ?? ''), 'A newer nightly build should surface as an upgrade.');
+    assertSameValue('upgrade', (string) ($overview['state'] ?? ''), 'A newer packaged nightly build should surface as an upgrade.');
+    assertSameValue($nightlyVersion, $update->new_version ?? '', 'A packaged nightly install should receive the newer Nightly rail package update.');
+};
+
+$tests['github_updater_treats_plain_dev_nightly_as_local_development'] = static function () use ($nextPatchVersion, $secondNextPatchVersion, $releaseAssets): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $optionStore;
+
+    $stableVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
+    $nightlyVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION) . '-dev.202604091230';
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
+    ];
+
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [
+                [
+                    'tag_name' => $nightlyVersion,
+                    'draft' => false,
+                    'prerelease' => true,
+                    'body' => 'Nightly release notes.',
+                    'published_at' => '2026-04-09T00:00:00Z',
+                    'assets' => $releaseAssets($nightlyVersion, 'https://example.test/' . $nightlyVersion . '.zip'),
+                ],
+                [
+                    'tag_name' => $stableVersion,
+                    'draft' => false,
+                    'prerelease' => false,
+                    'body' => 'Stable release notes.',
+                    'published_at' => '2026-04-08T00:00:00Z',
+                    'assets' => $releaseAssets($stableVersion, 'https://example.test/' . $stableVersion . '.zip'),
+                ],
+            ]
+        ),
+    ];
+
+    $services = makeServiceGraph();
+    $services['updater']->registerHooks();
+
+    $overview = $services['updater']->getChannelOverview(SettingsRepository::UPDATE_CHANNEL_NIGHTLY);
+    $transient = (object) [
+        'checked' => [plugin_basename(TASTY_FONTS_FILE) => TASTY_FONTS_VERSION],
+        'response' => [],
+    ];
+    $updateTransient = apply_filters('pre_set_site_transient_update_plugins', $transient);
+
+    assertSameValue($nightlyVersion, (string) (($overview['latest_available']['version'] ?? '')), 'The nightly channel should still discover the newest stable, beta, or nightly release for context.');
+    assertSameValue('development', (string) ($overview['state'] ?? ''), 'A plain local -dev checkout should be treated as local development instead of an installable nightly upgrade.');
+    assertSameValue([], $updateTransient->response ?? [], 'A plain local -dev checkout should not receive a WordPress package update from the Nightly rail.');
+};
+
+$tests['admin_context_labels_plain_dev_nightly_as_local_development'] = static function () use ($secondNextPatchVersion, $releaseAssets): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+    global $optionStore;
+
+    $betaVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION) . '-beta.2';
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
+    ];
+
+    $remoteGetResponses['https://api.github.com/repos/sathyvelukunashegaran/Tasty-Custom-Fonts/releases'] = [
+        'response' => ['code' => 200],
+        'body' => json_encode(
+            [[
+                'tag_name' => $betaVersion,
+                'draft' => false,
+                'prerelease' => true,
+                'body' => 'Beta release notes.',
+                'published_at' => '2026-04-09T00:00:00Z',
+                'assets' => $releaseAssets($betaVersion, 'https://example.test/' . $betaVersion . '.zip'),
+            ]]
+        ),
+    ];
+
+    $services = makeServiceGraph();
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration'],
+        $services['updater'],
+        $services['planner']
+    );
+    $context = $builder->build();
+    $view = (new \TastyFonts\Admin\AdminPageViewBuilder(new Storage()))->build($context);
+
+    assertSameValue('development', (string) ($context['update_channel_status']['state'] ?? ''), 'Nightly selected with a plain local -dev version should expose the development state.');
+    assertSameValue('Local Dev', (string) ($context['update_channel_status']['state_label'] ?? ''), 'The update-channel context should label local development builds clearly.');
+    assertSameValue(false, (bool) ($context['update_channel_status']['can_reinstall'] ?? true), 'Local development builds should not offer package rollback or reinstall actions.');
+    assertSameValue('Nightly · Local Dev', (string) ($view['pluginVersionMeta'] ?? ''), 'The masthead badge should summarize the local development state instead of claiming an update is available.');
+    assertSameValue('is-role', (string) ($view['pluginVersionBadgeClass'] ?? ''), 'The masthead badge should style local development as an informational state, not a danger/update state.');
 };
 
 $tests['github_updater_can_reinstall_the_selected_channel_when_it_requires_a_rollback'] = static function () use ($releaseAssets): void {

@@ -267,6 +267,37 @@ test('admin CSS keeps settings group headers in title case', () => {
   assert.match(block, /text-transform:\s*none;/);
 });
 
+test('admin CSS keeps settings pending-toggle styles scoped and tokenized', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+
+  for (const selector of [
+    '#tasty-fonts-settings-page .tasty-fonts-settings-board-list > .has-pending-toggle-change::before',
+    '#tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .has-pending-toggle-change::before',
+    '#tasty-fonts-settings-page .tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .has-pending-toggle-change::before',
+    '#tasty-fonts-settings-page .tasty-fonts-output-settings-advanced-panel > .tasty-fonts-output-settings-detail-group > .tasty-fonts-toggle-field--output.has-pending-toggle-change::before',
+    '#tasty-fonts-settings-page .tasty-fonts-output-settings-details-body > .tasty-fonts-toggle-field--nested.has-pending-toggle-change::before',
+    '#tasty-fonts-settings-page .tasty-fonts-settings-pending-badge',
+    '#tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .has-pending-toggle-change .tasty-fonts-toggle-input:checked + .tasty-fonts-toggle-switch',
+    '#tasty-fonts-settings-page .tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .has-pending-toggle-change .tasty-fonts-toggle-input:checked + .tasty-fonts-toggle-switch',
+    '#tasty-fonts-settings-page .tasty-fonts-output-settings-advanced-panel > .tasty-fonts-output-settings-detail-group > .tasty-fonts-toggle-field--output.has-pending-toggle-change .tasty-fonts-toggle-input:checked + .tasty-fonts-toggle-switch',
+    '#tasty-fonts-settings-page .tasty-fonts-output-settings-details-body > .tasty-fonts-toggle-field--nested.has-pending-toggle-change .tasty-fonts-toggle-input:checked + .tasty-fonts-toggle-switch'
+  ]) {
+    assert.notEqual(adminCss.includes(selector), false, `${selector} should stay scoped to the Settings page.`);
+  }
+
+  const markerBlock = cssBlockForSelector(adminCss, '#tasty-fonts-settings-page .tasty-fonts-settings-board-list > .has-pending-toggle-change::before,');
+  assert.match(markerBlock, /background:\s*var\(--tasty-warm-amber\);/);
+  assert.match(markerBlock, /box-shadow:\s*var\(--tasty-status-dot-shadow-warm-amber\);/);
+
+  const badgeBlock = cssBlockForSelector(adminCss, '#tasty-fonts-settings-page .tasty-fonts-settings-pending-badge');
+  assert.match(badgeBlock, /border:\s*var\(--tasty-layout-1px\) solid var\(--tasty-border-amber-soft\);/);
+  assert.match(badgeBlock, /background:\s*var\(--tasty-warm-amber-soft\);/);
+  assert.match(badgeBlock, /color:\s*var\(--tasty-warning-text\);/);
+
+  assert.equal(adminCss.includes('.tasty-fonts-developer-setting-toggle.has-pending-toggle-change'), false);
+  assert.equal(adminCss.includes('#tasty-fonts-diagnostics-page .has-pending-toggle-change'), false);
+});
+
 test('admin CSS uses one tokenized gradient for library preview boxes', () => {
   const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
   const previewSelectors = [

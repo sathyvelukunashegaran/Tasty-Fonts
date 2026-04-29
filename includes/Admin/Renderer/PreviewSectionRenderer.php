@@ -514,12 +514,22 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         $selectedFamily = trim($this->roleStringValue($previewRoles, $roleKey));
         $draftFamily = trim($this->roleStringValue($draftRoles, $roleKey));
         $fallbackValue = $this->roleFallbackValue($previewRoles, $roleKey);
+        $selectId = 'tasty-fonts-preview-' . sanitize_html_class($roleKey) . '-family';
         ?>
         <div class="tasty-fonts-preview-role-picker" data-preview-role-picker="<?php echo esc_attr($roleKey); ?>">
-            <label class="tasty-fonts-stack-field tasty-fonts-preview-tray-field">
-                <?php $this->renderFieldLabel($label); ?>
+            <div class="tasty-fonts-stack-field tasty-fonts-preview-tray-field">
+                <span class="tasty-fonts-field-label-row">
+                    <label class="tasty-fonts-field-label-text" for="<?php echo esc_attr($selectId); ?>"><?php echo esc_html($label); ?></label>
+                    <button
+                        type="button"
+                        class="tasty-fonts-badge tasty-fonts-badge--interactive tasty-fonts-badge--help tasty-fonts-help-trigger"
+                        aria-label="<?php esc_attr_e('Explain role family delivery', 'tasty-fonts'); ?>"
+                        <?php $this->renderPassiveHelpAttributes(__('Choose the delivery method in the Font Library. Role selectors use the family’s active delivery profile.', 'tasty-fonts')); ?>
+                    >?</button>
+                </span>
                 <span class="tasty-fonts-select-field<?php echo $allowFallbackOnly ? ' tasty-fonts-select-field--clearable' : ''; ?>">
                     <select
+                        id="<?php echo esc_attr($selectId); ?>"
                         data-preview-role-select="<?php echo esc_attr($roleKey); ?>"
                         data-preview-draft-family="<?php echo esc_attr($draftFamily); ?>"
                         data-preview-fallback="<?php echo esc_attr($fallbackValue); ?>"
@@ -537,7 +547,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                         <?php $this->renderClearSelectButton(sprintf(__('Clear %s', 'tasty-fonts'), $label)); ?>
                     <?php endif; ?>
                 </span>
-            </label>
+            </div>
             <div class="tasty-fonts-role-weight-editor tasty-fonts-preview-role-editor" data-preview-weight-editor="<?php echo esc_attr($roleKey); ?>" hidden>
                 <label class="tasty-fonts-stack-field tasty-fonts-preview-tray-field tasty-fonts-role-weight-field">
                     <?php $this->renderFieldLabel(__('Role Weight', 'tasty-fonts')); ?>
