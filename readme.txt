@@ -3,9 +3,9 @@ Tags: fonts, typography, google fonts, adobe fonts, bunny fonts
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.14.0
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Stable tag: 1.15.0
+License: GPLv3 or later
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
 Take control of your WordPress typography with one plugin for local fonts, Google Fonts, Bunny Fonts, Adobe Fonts, and builder-friendly runtime delivery.
 
@@ -44,15 +44,15 @@ The plugin is designed for single-site activation and per-site activation inside
 
 = Release channels =
 
-The latest stable release is 1.14.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
+The latest stable release is 1.15.0. Beta and nightly builds are published from GitHub releases for teams that want early access to the upcoming line before it becomes the next stable release.
 
-= What is new in 1.14.0? =
+= What is new in 1.15.0? =
 
-1.14.0 ships a fully reworked Advanced Tools command center with dedicated tabs for Overview, Generated CSS, Developer, Transfer, Activity, and CLI. It adds rollback snapshots (automatic safety checkpoints before destructive operations), sanitized support bundles for diagnostics handoffs, full WP-CLI parity for all maintenance and transfer workflows, paginated and searchable activity logs, and a streamlined Settings page reduced to three focused tabs: Output, Integrations, and Behavior. Developer maintenance and Transfer workflows now live entirely in Advanced Tools.
+1.15.0 ships in-place Font Library refreshes, Custom CSS URL imports, safer capability-disable cleanup, richer Advanced Tools health triage, clearer live/draft role usage states, refreshed admin surfaces, and a deeper service split across generated CSS, hosted imports, catalog discovery, delivery mutations, and admin maintenance actions.
 
-= What is planned after 1.14.0 stable? =
+= What is planned after 1.15.0 stable? =
 
-The post-1.14.0 line continues with power-user and agency improvements: Phase 1 custom CSS URL imports for one public HTTPS @font-face stylesheet at a time, bulk library management, richer diagnostics, scheduled Adobe project refreshes, and more polished distribution surfaces.
+The post-1.15.0 line continues with polish for agency workflows, richer provider maintenance tools, and tighter diagnostics around advanced delivery setups.
 
 If you want to help shape that roadmap, open a feature request or feedback issue on GitHub:
 
@@ -101,6 +101,15 @@ https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues
 4. Advanced Tools screen for generated CSS, diagnostics, and activity history.
 
 == Changelog ==
+
+= 1.15.0 =
+
+* Added in-place Font Library refreshes after uploads, hosted imports, custom CSS URL imports, delivery changes, publish-state changes, and Adobe project saves.
+* Added a gated Custom CSS URL import workflow for expert users, including dry runs, review plans, duplicate handling, and final self-hosted or remote imports.
+* Added rollback-protected cleanup for variable-font and monospace capability disables.
+* Reworked Advanced Tools health triage, runtime debug details, transfer/activity surfaces, and release-channel controls.
+* Refactored generated CSS, hosted imports, catalog discovery, delivery mutations, publish-state changes, capability cleanup, and admin maintenance into focused services.
+* Fixed runtime, preview, Block Editor, integration, fallback, publish-state, and hydrated family-detail regressions across the 1.15 line.
 
 = 1.14.0 =
 

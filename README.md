@@ -6,7 +6,7 @@ Stop juggling four workflows. Stop breaking Gutenberg presets. Stop rebuilding t
 
 ![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-21759B?logo=wordpress&logoColor=white)
 ![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php&logoColor=white)
-![License: GPLv2+](https://img.shields.io/badge/License-GPLv2%2B-green)
+![License: GPLv3+](https://img.shields.io/badge/License-GPLv3%2B-green)
 ![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
 
 **[⬇ Download free →](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/releases/latest)**
@@ -266,18 +266,18 @@ Yes, since 1.13.0. Go to `Settings → Behavior → Admin Access`, toggle **Enab
 
 ---
 
-## What's New in 1.14.0
+## What's New in 1.15.0
 
-`1.14.0` is the current stable release. It ships significant quality-of-life improvements for power users and agencies:
+`1.15.0` is the current stable release. It ships broader import, diagnostics, library-refresh, and service-architecture improvements for power users and agencies:
 
-- 🖥 **Reworked Advanced Tools** — power-user command center with dedicated tabs for Overview, Generated CSS, Developer, Transfer, Activity, and CLI
-- 🔄 **Rollback snapshots** — automatic safety checkpoints before every destructive operation (settings reset, import, restore), plus manual create/rename/restore/delete
-- 📦 **Support bundles** — one-click sanitized diagnostics export for debugging and handoff (no API keys exposed)
-- 🛠 **Full WP-CLI parity** — commands for diagnostics, CSS regeneration, cache clears, rescans, transfer bundles, support bundles, and snapshots
-- 📋 **Paginated activity log** — search, filter by actor, and choose 5–100 entries per page in Advanced Tools → Activity
-- ⚙️ **Settings streamlined to 3 tabs** — Output, Integrations, and Behavior; Developer maintenance and Transfer workflows now live in Advanced Tools
+- **In-place Font Library refreshes** after uploads, hosted imports, Custom CSS URL imports, delivery changes, publish-state changes, and Adobe project saves
+- **Custom CSS URL Imports** for one public HTTPS `@font-face` stylesheet at a time, with dry-run review, duplicate handling, self-hosted downloads, and remote delivery profiles
+- **Advanced Tools health triage** with clearer Action Needed, Worth Reviewing, Checks Passed, and runtime debug details
+- **Safer capability cleanup** with rollback snapshots when variable-font or monospace support is disabled
+- **Clearer live/draft role states** across role chips, library cards, delete guardrails, and delivery-profile actions
+- **Deeper service architecture** for generated CSS, hosted imports, catalog discovery, delivery mutations, publish-state changes, capability cleanup, and admin maintenance
 
-The current development line also includes **Phase 1 Custom CSS URL Imports**: a From URL flow for one public HTTPS `@font-face` stylesheet at a time, with WOFF2/WOFF dry-run validation, self-hosted or remote-serving final import, and read-only source history. Direct font-file URLs, multiple CSS URLs, source replacement, and Verify Now remain future phases.
+The current development line continues with polish for agency workflows, richer provider maintenance tools, and tighter diagnostics around advanced delivery setups.
 
 Have a workflow you want prioritized? Open a feature request on **[GitHub Issues](https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts/issues)** — real-world agency, client, and editorial use cases shape the roadmap directly.
 
@@ -328,4 +328,4 @@ For larger changes, open an issue first so the direction is clear before impleme
 
 ## License
 
-Tasty Custom Fonts is free and open-source software, licensed under the [GNU General Public License v2 or later](LICENSE).
+Tasty Custom Fonts is free and open-source software, licensed under the [GNU General Public License v3 or later](LICENSE).

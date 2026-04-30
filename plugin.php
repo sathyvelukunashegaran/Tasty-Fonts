@@ -7,8 +7,8 @@ Version: 1.16.0-dev
 Update URI: https://github.com/sathyvelukunashegaran/Tasty-Custom-Fonts
 Author: Tasty WP
 Author URI: https://github.com/sathyvelukunashegaran
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+License: GPLv3 or later
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
 Text Domain: tasty-fonts
 Domain Path: /languages
 Requires at least: 6.5

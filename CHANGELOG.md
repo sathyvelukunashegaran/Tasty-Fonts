@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the plugin and repository license metadata from GPLv2-or-later to GPLv3-or-later.
+
 ## [1.15.0] - 2026-04-30
 
 ### Changed
