@@ -567,8 +567,9 @@ $tests['github_updater_treats_plain_dev_nightly_as_local_development'] = static 
     global $remoteGetResponses;
     global $optionStore;
 
-    $stableVersion = $nextPatchVersion(TASTY_FONTS_VERSION);
-    $nightlyVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION) . '-dev.202604091230';
+    $installedVersion = '1.15.0-dev';
+    $stableVersion = $nextPatchVersion($installedVersion);
+    $nightlyVersion = $secondNextPatchVersion($installedVersion) . '-dev.202604091230';
     $optionStore[SettingsRepository::OPTION_SETTINGS] = [
         'update_channel' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
     ];
@@ -598,11 +599,13 @@ $tests['github_updater_treats_plain_dev_nightly_as_local_development'] = static 
     ];
 
     $services = makeServiceGraph();
+    $installedVersionProperty = new ReflectionProperty(GitHubUpdater::class, 'installedVersion');
+    $installedVersionProperty->setValue($services['updater'], $installedVersion);
     $services['updater']->registerHooks();
 
     $overview = $services['updater']->getChannelOverview(SettingsRepository::UPDATE_CHANNEL_NIGHTLY);
     $transient = (object) [
-        'checked' => [plugin_basename(TASTY_FONTS_FILE) => TASTY_FONTS_VERSION],
+        'checked' => [plugin_basename(TASTY_FONTS_FILE) => $installedVersion],
         'response' => [],
     ];
     $updateTransient = apply_filters('pre_set_site_transient_update_plugins', $transient);
@@ -618,7 +621,8 @@ $tests['admin_context_labels_plain_dev_nightly_as_local_development'] = static f
     global $remoteGetResponses;
     global $optionStore;
 
-    $betaVersion = $secondNextPatchVersion(TASTY_FONTS_VERSION) . '-beta.2';
+    $installedVersion = '1.15.0-dev';
+    $betaVersion = $secondNextPatchVersion($installedVersion) . '-beta.2';
     $optionStore[SettingsRepository::OPTION_SETTINGS] = [
         'update_channel' => SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
     ];
@@ -638,6 +642,8 @@ $tests['admin_context_labels_plain_dev_nightly_as_local_development'] = static f
     ];
 
     $services = makeServiceGraph();
+    $installedVersionProperty = new ReflectionProperty(GitHubUpdater::class, 'installedVersion');
+    $installedVersionProperty->setValue($services['updater'], $installedVersion);
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],

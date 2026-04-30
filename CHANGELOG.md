@@ -4,20 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Added
-
-- Added in-place Font Library refresh after uploads, hosted imports, custom CSS URL imports, delivery changes, publish-state changes, and Adobe project saves so successful actions update the affected rows without a full admin reload when possible.
-- Added REST endpoints for refreshing Font Library rows and saving, resyncing, or removing Adobe Fonts projects, including payloads that keep role selectors, preview state, family options, and generated CSS diagnostics in sync.
-- Added rollback-protected cleanup when disabling variable fonts or the monospace role: variable font files/profiles and saved axis data are removed safely, monospace assignments/output options are cleared, and the settings response reports what changed.
-- Added live/draft role usage chips and inline role previews so Heading, Body, and Monospace assignments show whether they are published sitewide or only staged as draft changes.
-- Added an Advanced Tools Health triage model with Action Needed, Worth Reviewing, and Checks Passed groups, plus a Debug Details panel for runtime CSS paths, URLs, file facts, runtime family counts, generated CSS status, and copy-friendly support values.
-- Added Advanced Tools bulk cleanup actions for deleting rollback snapshots and retained site-transfer export bundles, with confirmation phrases, activity logs, and guardrails that preserve locked export bundles.
-- Added update-channel option labels that include the latest available Stable, Beta, or Nightly version in the Advanced Tools Developer release rail.
-- Added a URL Import source filter for the Font Library so custom CSS URL import families can be isolated in library views while still retaining their self-hosted or external-request delivery filters.
-- Added hosted import workflow, generated CSS seam, library mutation, admin action, capability cleanup, provider paging, and JS contract regression coverage for the extracted service modules and refreshed admin flows.
+## [1.15.0] - 2026-04-30
 
 ### Changed
 
+- Added a Marketing preview scene with CTA, signup, purchase, and social-follow samples so role selections can be reviewed against campaign-style content.
+- Refined admin preview and diagnostics sample copy to use TastyWP branding and consistent sample attribution.
+- Reworked compact admin control sizing so help buttons stay visually small while icon-only controls preserve larger hit targets.
+- Updated admin UI color tokens, OKLCH fallbacks, badges, hover states, and preview treatments to keep amber usage readable within the Tasty palette.
+- Improved help tooltip positioning and import/search result interaction markup for steadier admin UI behavior.
+- Updated CSS lint output and CSS audit coverage for compact controls and scoped OKLCH token overrides.
+- Added an Advanced Tools developer gate for Custom CSS URL Imports so the expert From URL workflow stays disabled by default until deliberately enabled.
+- Expanded library, catalog, runtime, storage, and settings flows so custom CSS delivery profiles participate in generated CSS, deployment planning, diagnostics, and managed storage consistently with other providers.
+- Updated README/readme feature copy to include custom CSS URL imports alongside local, Google, Bunny, and Adobe workflows.
 - Reworked the Advanced Tools overview around collapsible health triage, focused primary actions, clearer status labels, and a separate Debug Details surface instead of mixing runtime facts into the health checklist.
 - Refined Settings rows with changed-state indicators, clearer dependency-disabled states, Compact Mode wording, safer save/reset shell behavior, capability-disable warnings, and better guidance for Sitewide Delivery, integrations, and transfer actions.
 - Clarified sitewide role deployment states and publish controls so Off, Live, and Pending Publish states describe whether saved role assignments are draft-only or served to visitors and integrations.
@@ -38,6 +37,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Fixed the card preview pricing flag so the "Most Popular" label remains readable on the dark pricing tile.
+- Renamed verified diagnostics states to "Working Fine" / "OKAY" so passing health checks do not imply external verification.
+- Improved hosted-font URL resolution so relative @font-face sources from CDN stylesheets, including Fontsource CSS, resolve correctly during dry runs and imports.
+- Added regression coverage for dry-run validation, warning states, duplicate behavior, self-hosted and remote final imports, gated admin rendering, JS contracts, generated CSS, and runtime planning.
 - Fixed Advanced Tools health output so runtime reference data no longer dilutes the actionable checklist and passing diagnostics are labeled as OK rather than over-claiming verification.
 - Fixed settings save/reset handling for compact mode, monospace role support, variable font support, and integration toggles so persisted behavior matches the current Settings UI.
 - Fixed generated CSS, preview, Block Editor, and integration runtime paths to honor disabled sitewide delivery, selected-family fallback stacks, and monospace role state consistently.
@@ -48,6 +51,22 @@ All notable changes to this project will be documented in this file.
 - Added end-to-end workflow gating so disabled font import workflows are reflected in Add Fonts UI panels and rejected consistently by REST/admin actions.
 - Fixed hydrated family details so fallback, display, delivery, and publish-state controls bind only once while still initializing correctly after AJAX replacement.
 - Fixed bulk export deletion paths so locked site-transfer bundles are preserved and blocked actions expose disabled-state messaging to both the UI and controller responses.
+
+### Added
+
+- Added a gated Custom CSS URL import workflow for expert users, including server-side dry runs, font-face review, duplicate handling, and final import support for one public HTTPS stylesheet at a time.
+- Added Custom CSS provider services for URL inspection, snapshot persistence, self-hosted downloads, remote delivery profiles, and source metadata.
+- Added live admin UI support for From URL imports, including disabled developer-gate messaging, delivery-mode selection, selectable face rows, warning details, and inline errors.
+- Added documentation and wiki guidance for Custom CSS imports, provider limitations, privacy/licensing considerations, troubleshooting, and end-to-end testing.
+- Added in-place Font Library refresh after uploads, hosted imports, custom CSS URL imports, delivery changes, publish-state changes, and Adobe project saves so successful actions update the affected rows without a full admin reload when possible.
+- Added REST endpoints for refreshing Font Library rows and saving, resyncing, or removing Adobe Fonts projects, including payloads that keep role selectors, preview state, family options, and generated CSS diagnostics in sync.
+- Added rollback-protected cleanup when disabling variable fonts or the monospace role: variable font files/profiles and saved axis data are removed safely, monospace assignments/output options are cleared, and the settings response reports what changed.
+- Added live/draft role usage chips and inline role previews so Heading, Body, and Monospace assignments show whether they are published sitewide or only staged as draft changes.
+- Added an Advanced Tools Health triage model with Action Needed, Worth Reviewing, and Checks Passed groups, plus a Debug Details panel for runtime CSS paths, URLs, file facts, runtime family counts, generated CSS status, and copy-friendly support values.
+- Added Advanced Tools bulk cleanup actions for deleting rollback snapshots and retained site-transfer export bundles, with confirmation phrases, activity logs, and guardrails that preserve locked export bundles.
+- Added update-channel option labels that include the latest available Stable, Beta, or Nightly version in the Advanced Tools Developer release rail.
+- Added a URL Import source filter for the Font Library so custom CSS URL import families can be isolated in library views while still retaining their self-hosted or external-request delivery filters.
+- Added hosted import workflow, generated CSS seam, library mutation, admin action, capability cleanup, provider paging, and JS contract regression coverage for the extracted service modules and refreshed admin flows.
 
 ## [1.15.0-beta.2] - 2026-04-27
 
