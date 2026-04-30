@@ -45,22 +45,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                                 <div class="tasty-fonts-preview-specimen-poster-meta">
                                     <span class="tasty-fonts-preview-specimen-poster-eyebrow" data-role-preview="body"><?php esc_html_e('Type Specimen', 'tasty-fonts'); ?></span>
                                     <h3 class="tasty-fonts-preview-specimen-poster-title" data-role-preview="heading"><?php esc_html_e('Hello, world &mdash; this is how your typography reads.', 'tasty-fonts'); ?></h3>
-                                    <dl class="tasty-fonts-preview-specimen-poster-keys">
-                                        <div class="tasty-fonts-preview-specimen-poster-key">
-                                            <dt><?php esc_html_e('Heading Family', 'tasty-fonts'); ?></dt>
-                                            <dd data-role-preview="heading" data-role-preview-name="heading"><?php echo esc_html($this->previewRoleName('heading', $roles, $familyLabels)); ?></dd>
-                                        </div>
-                                        <div class="tasty-fonts-preview-specimen-poster-key">
-                                            <dt><?php esc_html_e('Body Family', 'tasty-fonts'); ?></dt>
-                                            <dd data-role-preview="body" data-role-preview-name="body"><?php echo esc_html($this->previewRoleName('body', $roles, $familyLabels)); ?></dd>
-                                        </div>
-                                        <?php if ($monospaceRoleEnabled): ?>
-                                            <div class="tasty-fonts-preview-specimen-poster-key">
-                                                <dt><?php esc_html_e('Monospace', 'tasty-fonts'); ?></dt>
-                                                <dd data-role-preview="monospace" data-role-preview-name="monospace"><?php echo esc_html($this->previewRoleName('monospace', $roles, $familyLabels)); ?></dd>
-                                            </div>
-                                        <?php endif; ?>
-                                    </dl>
+                                    <?php $this->renderPreviewRoleList($roles, $familyLabels, $monospaceRoleEnabled, 'tasty-fonts-preview-specimen-poster-keys', 'tasty-fonts-preview-specimen-poster-key', true); ?>
                                 </div>
                             </header>
 
@@ -499,6 +484,38 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
     }
 
     /**
+     * @param RoleSet $roles
+     * @param FamilyLabelMap $familyLabels
+     */
+    private function renderPreviewRoleList(
+        array $roles,
+        array $familyLabels,
+        bool $includeMonospace,
+        string $listClass,
+        string $itemClass,
+        bool $longLabels = false
+    ): void {
+        $items = [
+            'heading' => $longLabels ? __('Heading Family', 'tasty-fonts') : __('Heading', 'tasty-fonts'),
+            'body' => $longLabels ? __('Body Family', 'tasty-fonts') : __('Body', 'tasty-fonts'),
+        ];
+
+        if ($includeMonospace) {
+            $items['monospace'] = __('Monospace', 'tasty-fonts');
+        }
+        ?>
+        <dl class="<?php echo esc_attr($listClass); ?>">
+            <?php foreach ($items as $roleKey => $label): ?>
+                <div class="<?php echo esc_attr($itemClass); ?>">
+                    <dt><?php echo esc_html($label); ?></dt>
+                    <dd data-role-preview="<?php echo esc_attr($roleKey); ?>" data-role-preview-name="<?php echo esc_attr($roleKey); ?>"><?php echo esc_html($this->previewRoleName($roleKey, $roles, $familyLabels)); ?></dd>
+                </div>
+            <?php endforeach; ?>
+        </dl>
+        <?php
+    }
+
+    /**
      * @param FamilyOptionList $availableFamilyOptions
      * @param RoleSet $previewRoles
      * @param RoleSet $draftRoles
@@ -582,22 +599,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 <h3 class="tasty-fonts-preview-snippet-title" data-role-preview="heading"><?php esc_html_e('Copy the exact pairing you are previewing.', 'tasty-fonts'); ?></h3>
                 <p class="tasty-fonts-preview-snippet-copy" data-role-preview="body"><?php esc_html_e('This CSS is generated from the current Preview Workspace selection, including draft changes that are not published yet. Use it when you want this same font combo in custom CSS, a child theme, or a builder field.', 'tasty-fonts'); ?></p>
 
-                <dl class="tasty-fonts-preview-snippet-role-list">
-                    <div class="tasty-fonts-preview-snippet-role">
-                        <dt><?php esc_html_e('Heading', 'tasty-fonts'); ?></dt>
-                        <dd data-role-preview="heading" data-role-preview-name="heading"><?php echo esc_html($this->previewRoleName('heading', $roles, $familyLabels)); ?></dd>
-                    </div>
-                    <div class="tasty-fonts-preview-snippet-role">
-                        <dt><?php esc_html_e('Body', 'tasty-fonts'); ?></dt>
-                        <dd data-role-preview="body" data-role-preview-name="body"><?php echo esc_html($this->previewRoleName('body', $roles, $familyLabels)); ?></dd>
-                    </div>
-                    <?php if ($monospaceRoleEnabled): ?>
-                        <div class="tasty-fonts-preview-snippet-role">
-                            <dt><?php esc_html_e('Monospace', 'tasty-fonts'); ?></dt>
-                            <dd data-role-preview="monospace" data-role-preview-name="monospace"><?php echo esc_html($this->previewRoleName('monospace', $roles, $familyLabels)); ?></dd>
-                        </div>
-                    <?php endif; ?>
-                </dl>
+                <?php $this->renderPreviewRoleList($roles, $familyLabels, $monospaceRoleEnabled, 'tasty-fonts-preview-snippet-role-list', 'tasty-fonts-preview-snippet-role'); ?>
 
                 <div class="tasty-fonts-preview-snippet-note" data-role-preview="body">
                     <span class="dashicons dashicons-info-outline" aria-hidden="true"></span>

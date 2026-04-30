@@ -160,13 +160,13 @@ final class BunnyImportService implements HostedImportProviderAdapterInterface
      */
     public function buildProfileDraft(array $context): array
     {
-        $deliveryMode = $this->stringValue($context, 'delivery_mode', 'self_hosted');
-        $metadata = $this->normalizeMap($context['metadata'] ?? null);
-        $existingProfile = $this->normalizeMap($context['existing_profile'] ?? null);
+        $deliveryMode = FontUtils::stringValue($context, 'delivery_mode', 'self_hosted');
+        $metadata = FontUtils::normalizeStringKeyedMap($context['metadata'] ?? null);
+        $existingProfile = FontUtils::normalizeStringKeyedMap($context['existing_profile'] ?? null);
         $importedVariants = FontUtils::normalizeVariantTokens((array) $context['imported_variants']);
         $timestampKey = $deliveryMode === 'cdn' ? 'saved_at' : 'imported_at';
 
-        $profileId = $this->stringValue($existingProfile, 'id');
+        $profileId = FontUtils::stringValue($existingProfile, 'id');
 
         if ($profileId === '') {
             $profileId = $this->profileId($deliveryMode);
@@ -182,7 +182,7 @@ final class BunnyImportService implements HostedImportProviderAdapterInterface
                     ? __('Bunny CDN', 'tasty-fonts')
                     : __('Self-hosted (Bunny import)', 'tasty-fonts'),
                 'meta' => [
-                    'category' => $this->stringValue($metadata, 'category'),
+                    'category' => FontUtils::stringValue($metadata, 'category'),
                     $timestampKey => current_time('mysql'),
                 ],
             ],
@@ -199,7 +199,7 @@ final class BunnyImportService implements HostedImportProviderAdapterInterface
     {
         return [
             'type' => 'bunny',
-            'category' => $this->stringValue($metadata, 'category'),
+            'category' => FontUtils::stringValue($metadata, 'category'),
             'variants' => $variants,
         ];
     }
@@ -209,40 +209,4 @@ final class BunnyImportService implements HostedImportProviderAdapterInterface
         return FontUtils::slugify('bunny-' . $deliveryMode);
     }
 
-    /**
-     * @param mixed $value
-     * @return array<string, mixed>
-     */
-    private function normalizeMap(mixed $value): array
-    {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $key => $item) {
-            if (!is_string($key)) {
-                continue;
-            }
-
-            $normalized[$key] = $item;
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param array<int|string, mixed> $values
-     */
-    private function stringValue(array $values, string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values)) {
-            return $default;
-        }
-
-        $value = FontUtils::scalarStringValue($values[$key]);
-
-        return $value !== '' ? $value : $default;
-    }
 }

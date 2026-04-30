@@ -44,13 +44,12 @@ final class LibraryDeliveryMutationAction
      */
     public function saveFamilyDelivery(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $selection = $this->resolver->resolveFamilyDeliverySelection($familySlug, $deliveryId);
+        $selection = $this->resolveSelection($familySlug, $deliveryId);
 
         if (is_wp_error($selection)) {
             return $selection;
         }
 
-        $selection = $this->resolver->normalizedSelectionPayload($selection);
         $familySlug = $selection['family_slug'];
         $deliveryId = $selection['delivery_id'];
         $family = $selection['family'];
@@ -111,13 +110,12 @@ final class LibraryDeliveryMutationAction
      */
     public function deleteDeliveryProfile(string $familySlug, string $deliveryId): array|WP_Error
     {
-        $selection = $this->resolver->resolveFamilyDeliverySelection($familySlug, $deliveryId);
+        $selection = $this->resolveSelection($familySlug, $deliveryId);
 
         if (is_wp_error($selection)) {
             return $selection;
         }
 
-        $selection = $this->resolver->normalizedSelectionPayload($selection);
         $familySlug = $selection['family_slug'];
         $deliveryId = $selection['delivery_id'];
         $family = $selection['family'];
@@ -203,6 +201,25 @@ final class LibraryDeliveryMutationAction
             'message' => $message,
             'deleted_family' => false,
         ];
+    }
+
+    /**
+     * @return array{
+     *     family_slug: string,
+     *     delivery_id: string,
+     *     family: array<string, mixed>,
+     *     profile: array<string, mixed>
+     * }|WP_Error
+     */
+    private function resolveSelection(string $familySlug, string $deliveryId): array|WP_Error
+    {
+        $selection = $this->resolver->resolveFamilyDeliverySelection($familySlug, $deliveryId);
+
+        if (is_wp_error($selection)) {
+            return $selection;
+        }
+
+        return $this->resolver->normalizedSelectionPayload($selection);
     }
 
     /**

@@ -171,11 +171,11 @@ final class GoogleImportService implements HostedImportProviderAdapterInterface
      */
     public function buildProfileDraft(array $context): array
     {
-        $deliveryMode = $this->stringValue($context, 'delivery_mode', 'self_hosted');
-        $formatMode = $this->normalizeFormatMode($this->stringValue($context, 'format_mode', 'static'));
-        $metadata = $this->normalizeMap($context['metadata'] ?? null);
+        $deliveryMode = FontUtils::stringValue($context, 'delivery_mode', 'self_hosted');
+        $formatMode = $this->normalizeFormatMode(FontUtils::stringValue($context, 'format_mode', 'static'));
+        $metadata = FontUtils::normalizeStringKeyedMap($context['metadata'] ?? null);
         $existingFamily = is_array($context['existing_family'] ?? null)
-            ? $this->normalizeMap($context['existing_family'])
+            ? FontUtils::normalizeStringKeyedMap($context['existing_family'])
             : null;
         $importedVariants = FontUtils::normalizeVariantTokens((array) $context['imported_variants']);
         $timestampKey = $deliveryMode === 'cdn' ? 'saved_at' : 'imported_at';
@@ -190,9 +190,9 @@ final class GoogleImportService implements HostedImportProviderAdapterInterface
                     ? __('Google CDN', 'tasty-fonts')
                     : __('Self-hosted (Google import)', 'tasty-fonts'),
                 'meta' => [
-                    'category' => $this->stringValue($metadata, 'category'),
-                    'lastModified' => $this->stringValue($metadata, 'lastModified'),
-                    'version' => $this->stringValue($metadata, 'version'),
+                    'category' => FontUtils::stringValue($metadata, 'category'),
+                    'lastModified' => FontUtils::stringValue($metadata, 'lastModified'),
+                    'version' => FontUtils::stringValue($metadata, 'version'),
                     $timestampKey => current_time('mysql'),
                 ],
             ],
@@ -235,10 +235,10 @@ final class GoogleImportService implements HostedImportProviderAdapterInterface
     {
         return [
             'type' => 'google',
-            'category' => $this->stringValue($metadata, 'category'),
+            'category' => FontUtils::stringValue($metadata, 'category'),
             'variants' => $variants,
-            'lastModified' => $this->stringValue($metadata, 'lastModified'),
-            'version' => $this->stringValue($metadata, 'version'),
+            'lastModified' => FontUtils::stringValue($metadata, 'lastModified'),
+            'version' => FontUtils::stringValue($metadata, 'version'),
         ];
     }
 
@@ -252,8 +252,8 @@ final class GoogleImportService implements HostedImportProviderAdapterInterface
      */
     private function resolveProfileId(?array $family, string $deliveryMode, string $formatMode): string
     {
-        $existing = $this->findDeliveryProfile($family, 'google', $deliveryMode, $formatMode);
-        $existingId = $this->stringValue($existing ?? [], 'id');
+        $existing = FontUtils::findDeliveryProfile($family, 'google', $deliveryMode, $formatMode);
+        $existingId = FontUtils::stringValue($existing ?? [], 'id');
 
         if ($existingId !== '') {
             return $existingId;
@@ -273,77 +273,7 @@ final class GoogleImportService implements HostedImportProviderAdapterInterface
      */
     private function findLegacyProfileConflict(?array $family, string $provider, string $type): bool
     {
-        return $this->findDeliveryProfile($family, $provider, $type) !== null;
+        return FontUtils::findDeliveryProfile($family, $provider, $type) !== null;
     }
 
-    /**
-     * @param array<string, mixed>|null $family
-     * @return array<string, mixed>|null
-     */
-    private function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = ''): ?array
-    {
-        if (!is_array($family)) {
-            return null;
-        }
-
-        $provider = strtolower(trim($provider));
-        $type = strtolower(trim($type));
-
-        foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
-            $profile = $this->normalizeMap($profile);
-
-            if (
-                $profile === []
-                || strtolower($this->stringValue($profile, 'provider')) !== $provider
-                || strtolower($this->stringValue($profile, 'type')) !== $type
-            ) {
-                continue;
-            }
-
-            if ($formatMode !== '' && FontUtils::resolveProfileFormat($profile) !== $formatMode) {
-                continue;
-            }
-
-            return $profile;
-        }
-
-        return null;
-    }
-
-    /**
-     * @param mixed $value
-     * @return array<string, mixed>
-     */
-    private function normalizeMap(mixed $value): array
-    {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $key => $item) {
-            if (!is_string($key)) {
-                continue;
-            }
-
-            $normalized[$key] = $item;
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param array<int|string, mixed> $values
-     */
-    private function stringValue(array $values, string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values)) {
-            return $default;
-        }
-
-        $value = FontUtils::scalarStringValue($values[$key]);
-
-        return $value !== '' ? $value : $default;
-    }
 }

@@ -2014,19 +2014,19 @@ final class AdminController
         $libraryRoleUsageRoles = $this->roleUsageRolesFromView($view);
 
         ob_start();
-        $renderer->renderFamilyCardDetails(
-            $this->payloadMapValue($family),
-            $this->sanitizeRoleValues($this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['roles'] ?? null))),
-            $this->stringMapValue($view['familyFallbacks'] ?? []),
-            $this->stringMapValue($view['familyFontDisplays'] ?? []),
-            $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
-            $this->stringValue($view, 'previewText'),
-            $this->stringMapValue($view['categoryAliasOwners'] ?? []),
-            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['extendedVariableOptions'] ?? null)),
-            !empty($view['monospaceRoleEnabled']),
-            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['classOutputOptions'] ?? null)),
-            $libraryRoleUsageRoles
-        );
+        $renderer->renderFamilyCardDetails([
+            'family' => $this->payloadMapValue($family),
+            'roles' => $this->sanitizeRoleValues($this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['roles'] ?? null))),
+            'family_fallbacks' => $this->stringMapValue($view['familyFallbacks'] ?? []),
+            'family_font_displays' => $this->stringMapValue($view['familyFontDisplays'] ?? []),
+            'family_font_display_options' => $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
+            'preview_text' => $this->stringValue($view, 'previewText'),
+            'category_alias_owners' => $this->stringMapValue($view['categoryAliasOwners'] ?? []),
+            'extended_variable_options' => $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['extendedVariableOptions'] ?? null)),
+            'monospace_role_enabled' => !empty($view['monospaceRoleEnabled']),
+            'class_output_options' => $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['classOutputOptions'] ?? null)),
+            'role_usage_roles' => $libraryRoleUsageRoles,
+        ]);
 
         return (string) ob_get_clean();
     }

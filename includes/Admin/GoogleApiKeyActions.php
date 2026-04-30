@@ -16,6 +16,8 @@ use WP_Error;
  */
 final class GoogleApiKeyActions
 {
+    use ActionValueHelpers;
+
     private readonly GoogleApiKeyValidator $validator;
 
     public function __construct(
@@ -70,7 +72,7 @@ final class GoogleApiKeyActions
         if (is_wp_error($validation)) {
             $this->log->add(
                 __('Google Fonts API key validation failed.', 'tasty-fonts'),
-                $this->activityLogContext(
+                $this->logContext(
                     LogRepository::CATEGORY_SETTINGS,
                     'google_api_key_validation_failed',
                     [
@@ -91,7 +93,7 @@ final class GoogleApiKeyActions
         $this->googleClient->clearCatalogCache();
 
         $message = __('Google Fonts API key validated.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
+        $this->log->add($message, $this->logContext(
             LogRepository::CATEGORY_SETTINGS,
             'google_api_key_validated',
             [
@@ -110,42 +112,4 @@ final class GoogleApiKeyActions
         );
     }
 
-    /**
-     * @param array<string, mixed> $meta
-     * @return array<string, mixed>
-     */
-    private function activityLogContext(string $category, string $event, array $meta = []): array
-    {
-        return array_merge(
-            [
-                'category' => $category,
-                'event' => $event,
-            ],
-            $meta
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private function stringValue(array $values, int|string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values) || !is_scalar($values[$key])) {
-            return $default;
-        }
-
-        return (string) $values[$key];
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private function intValue(array $values, int|string $key, int $default = 0): int
-    {
-        if (!array_key_exists($key, $values) || !is_scalar($values[$key])) {
-            return $default;
-        }
-
-        return (int) $values[$key];
-    }
 }

@@ -595,6 +595,40 @@ final class FontUtils
     }
 
     /**
+     * @param array<string, mixed>|null $family
+     * @return array<string, mixed>|null
+     */
+    public static function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = ''): ?array
+    {
+        if (!is_array($family)) {
+            return null;
+        }
+
+        $provider = strtolower(trim($provider));
+        $type = strtolower(trim($type));
+
+        foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
+            $profile = self::normalizeStringKeyedMap($profile);
+
+            if (
+                $profile === []
+                || strtolower(self::stringValue($profile, 'provider')) !== $provider
+                || strtolower(self::stringValue($profile, 'type')) !== $type
+            ) {
+                continue;
+            }
+
+            if ($formatMode !== '' && self::resolveProfileFormat($profile) !== $formatMode) {
+                continue;
+            }
+
+            return $profile;
+        }
+
+        return null;
+    }
+
+    /**
      * @param mixed $value
      * @return array<string, mixed>
      */
@@ -674,6 +708,23 @@ final class FontUtils
     public static function scalarStringValue(mixed $value): string
     {
         return is_scalar($value) ? trim((string) $value) : '';
+    }
+
+    /**
+     * @return array<string, array<string, float|int|string>>
+     */
+    public static function normalizeAxesValue(mixed $axes): array
+    {
+        return is_array($axes) ? self::normalizeAxesMap($axes) : [];
+    }
+
+    /**
+     * @param array<string, array<string, float|int|string>> $axes
+     * @return VariationDefaults
+     */
+    public static function normalizeVariationDefaultsValue(mixed $variationDefaults, array $axes): array
+    {
+        return is_array($variationDefaults) ? self::normalizeVariationDefaults($variationDefaults, $axes) : [];
     }
 
     /**
@@ -1248,7 +1299,7 @@ final class FontUtils
     /**
      * @param array<int|string, mixed> $values
      */
-    private static function stringValue(array $values, string $key, string $default = ''): string
+    public static function stringValue(array $values, int|string $key, string $default = ''): string
     {
         if (!array_key_exists($key, $values)) {
             return $default;

@@ -65,7 +65,7 @@ final class HostedImportWorkflow
         $formatMode = $provider->normalizeFormatMode($request->formatMode);
         $requestedVariants = FontUtils::normalizeVariantTokens($request->variants);
         $existingFamily = $this->imports->getFamily($familySlug);
-        $existingProfile = $this->findDeliveryProfile(
+        $existingProfile = FontUtils::findDeliveryProfile(
             $existingFamily,
             $provider->providerKey(),
             $deliveryMode,
@@ -110,8 +110,8 @@ final class HostedImportWorkflow
             'existing_profile' => $existingProfile,
             'imported_variants' => $variantPlan['import'],
         ]);
-        $profile = $this->normalizeMap($draft['profile']);
-        $faceProvider = $this->normalizeMap($draft['face_provider']);
+        $profile = FontUtils::normalizeStringKeyedMap($draft['profile']);
+        $faceProvider = FontUtils::normalizeStringKeyedMap($draft['face_provider']);
 
         $result = $deliveryMode === 'cdn'
             ? $this->saveCdnProfile($familyName, $familySlug, $faces, $variantPlan, $existingFamily, $existingProfile, $profile, $faceProvider, $config)
@@ -125,40 +125,6 @@ final class HostedImportWorkflow
         $deliveryMode = strtolower(trim($deliveryMode));
 
         return in_array($deliveryMode, ['self_hosted', 'cdn'], true) ? $deliveryMode : 'self_hosted';
-    }
-
-    /**
-     * @param HostedFamily|null $family
-     * @return HostedProfile|null
-     */
-    private function findDeliveryProfile(?array $family, string $provider, string $type, string $formatMode = ''): ?array
-    {
-        if (!is_array($family)) {
-            return null;
-        }
-
-        $provider = strtolower(trim($provider));
-        $type = strtolower(trim($type));
-
-        foreach ((array) ($family['delivery_profiles'] ?? []) as $profile) {
-            $profile = $this->normalizeMap($profile);
-
-            if (
-                $profile === []
-                || strtolower($this->stringValue($profile, 'provider')) !== $provider
-                || strtolower($this->stringValue($profile, 'type')) !== $type
-            ) {
-                continue;
-            }
-
-            if ($formatMode !== '' && FontUtils::resolveProfileFormat($profile) !== $formatMode) {
-                continue;
-            }
-
-            return $profile;
-        }
-
-        return null;
     }
 
     /**
@@ -354,9 +320,9 @@ final class HostedImportWorkflow
             'family' => $familyName,
             'slug' => $familySlug,
             'source' => $source,
-            'weight' => $this->stringValue($face, 'weight', '400'),
-            'style' => $this->stringValue($face, 'style', 'normal'),
-            'unicode_range' => $this->stringValue($face, 'unicode_range'),
+            'weight' => FontUtils::stringValue($face, 'weight', '400'),
+            'style' => FontUtils::stringValue($face, 'style', 'normal'),
+            'unicode_range' => FontUtils::stringValue($face, 'unicode_range'),
             'files' => $files,
             'provider' => $provider,
             'is_variable' => !empty($face['is_variable']),
@@ -439,7 +405,7 @@ final class HostedImportWorkflow
             $familyName,
             $familySlug,
             $profile,
-            $existingFamily === null ? 'library_only' : $this->stringValue($existingFamily, 'publish_state', 'published'),
+            $existingFamily === null ? 'library_only' : FontUtils::stringValue($existingFamily, 'publish_state', 'published'),
             $existingFamily === null
         );
 
@@ -512,8 +478,8 @@ final class HostedImportWorkflow
             $message,
             $familyName,
             $this->arrayValue($persisted, 'family_record'),
-            $this->stringValue($profile, 'type', 'self_hosted'),
-            $this->stringValue($profile, 'id'),
+            FontUtils::stringValue($profile, 'type', 'self_hosted'),
+            FontUtils::stringValue($profile, 'id'),
             $faceCount,
             $fileCount,
             $persisted['variants'],
@@ -564,8 +530,8 @@ final class HostedImportWorkflow
             $message,
             $familyName,
             $this->arrayValue($persisted, 'family_record'),
-            $this->stringValue($profile, 'type', 'cdn'),
-            $this->stringValue($profile, 'id'),
+            FontUtils::stringValue($profile, 'type', 'cdn'),
+            FontUtils::stringValue($profile, 'id'),
             $faceCount,
             0,
             $persisted['variants'],
@@ -757,9 +723,9 @@ final class HostedImportWorkflow
 
     private function validateRemoteFontUrl(string $url, HostedImportProviderConfig $config): bool|WP_Error
     {
-        $parts = $this->normalizeMap(wp_parse_url($url));
-        $host = strtolower($this->stringValue($parts, 'host'));
-        $path = strtolower($this->stringValue($parts, 'path'));
+        $parts = FontUtils::normalizeStringKeyedMap(wp_parse_url($url));
+        $host = strtolower(FontUtils::stringValue($parts, 'host'));
+        $path = strtolower(FontUtils::stringValue($parts, 'path'));
 
         if ($host !== strtolower($config->expectedHost)) {
             return $this->error($config->invalidHostCode, $config->invalidHostMessage);
@@ -822,49 +788,12 @@ final class HostedImportWorkflow
     }
 
     /**
-     * @param mixed $value
-     * @return array<string, mixed>
-     */
-    private function normalizeMap(mixed $value): array
-    {
-        if (!is_array($value)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($value as $key => $item) {
-            if (!is_string($key)) {
-                continue;
-            }
-
-            $normalized[$key] = $item;
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param array<int|string, mixed> $values
-     */
-    private function stringValue(array $values, string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values)) {
-            return $default;
-        }
-
-        $value = FontUtils::scalarStringValue($values[$key]);
-
-        return $value !== '' ? $value : $default;
-    }
-
-    /**
      * @param array<int|string, mixed> $values
      * @return array<string, mixed>
      */
     private function arrayValue(array $values, string $key): array
     {
-        return $this->normalizeMap($values[$key] ?? []);
+        return FontUtils::normalizeStringKeyedMap($values[$key] ?? []);
     }
 
     /**

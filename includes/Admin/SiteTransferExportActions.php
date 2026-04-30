@@ -15,6 +15,8 @@ use WP_Error;
  */
 final class SiteTransferExportActions
 {
+    use ActionValueHelpers;
+
     public function __construct(
         private readonly SiteTransferService $siteTransfer,
         private readonly LogRepository $log
@@ -41,7 +43,7 @@ final class SiteTransferExportActions
         }
 
         $message = $this->stringValue($result, 'message', __('Export bundle renamed.', 'tasty-fonts'));
-        $this->log->add($message, $this->transferLogContext('site_transfer_export_renamed'));
+        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'site_transfer_export_renamed'));
 
         return [
             'message' => $message,
@@ -61,7 +63,7 @@ final class SiteTransferExportActions
         }
 
         $message = $this->stringValue($result, 'message', $protected ? __('Export bundle protected.', 'tasty-fonts') : __('Export bundle unprotected.', 'tasty-fonts'));
-        $this->log->add($message, $this->transferLogContext('site_transfer_export_protection_changed'));
+        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'site_transfer_export_protection_changed'));
 
         return [
             'message' => $message,
@@ -81,7 +83,7 @@ final class SiteTransferExportActions
         }
 
         $message = $this->stringValue($result, 'message', __('Export bundle deleted.', 'tasty-fonts'));
-        $this->log->add($message, $this->transferLogContext('site_transfer_export_deleted'));
+        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'site_transfer_export_deleted'));
 
         return [
             'message' => $message,
@@ -101,7 +103,7 @@ final class SiteTransferExportActions
         }
 
         $message = __('All site transfer export bundles deleted.', 'tasty-fonts');
-        $this->log->add($message, $this->transferLogContext('site_transfer_exports_deleted_all'));
+        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'site_transfer_exports_deleted_all'));
 
         return [
             'message' => $message,
@@ -111,42 +113,4 @@ final class SiteTransferExportActions
         ];
     }
 
-    /**
-     * @param array<string, mixed> $meta
-     * @return array<string, mixed>
-     */
-    private function transferLogContext(string $event, array $meta = []): array
-    {
-        return array_merge(
-            [
-                'category' => LogRepository::CATEGORY_TRANSFER,
-                'event' => $event,
-            ],
-            $meta
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private function stringValue(array $values, int|string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values) || !is_scalar($values[$key])) {
-            return $default;
-        }
-
-        return (string) $values[$key];
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private function intValue(array $values, int|string $key, int $default = 0): int
-    {
-        if (!array_key_exists($key, $values) || !is_scalar($values[$key])) {
-            return $default;
-        }
-
-        return (int) $values[$key];
-    }
 }

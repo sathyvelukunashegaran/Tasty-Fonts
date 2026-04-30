@@ -136,7 +136,7 @@ final class LocalCatalogScanner
      */
     private function buildLocalFace(string $familyName, string $familySlug, array $meta): array
     {
-        $axes = $this->normalizeAxes($meta['axes']);
+        $axes = FontUtils::normalizeAxesValue($meta['axes']);
 
         return [
             'family' => $familyName,
@@ -150,7 +150,7 @@ final class LocalCatalogScanner
             'provider' => ['type' => 'local'],
             'is_variable' => !empty($meta['is_variable']),
             'axes' => $axes,
-            'variation_defaults' => $this->normalizeVariationDefaults($meta['variation_defaults'], $axes),
+            'variation_defaults' => FontUtils::normalizeVariationDefaultsValue($meta['variation_defaults'], $axes),
         ];
     }
 
@@ -279,7 +279,7 @@ final class LocalCatalogScanner
             }
 
             $normalizedProfile = FontUtils::normalizeStringKeyedMap($profile);
-            $id = $this->stringValue($normalizedProfile, 'id', is_string($profileId) ? $profileId : '');
+            $id = FontUtils::stringValue($normalizedProfile, 'id', is_string($profileId) ? $profileId : '');
 
             if ($id === '') {
                 continue;
@@ -322,7 +322,7 @@ final class LocalCatalogScanner
                 continue;
             }
 
-            $normalizedValue = $this->scalarStringValue($value);
+            $normalizedValue = FontUtils::scalarStringValue($value);
 
             if ($normalizedValue === '') {
                 continue;
@@ -346,7 +346,7 @@ final class LocalCatalogScanner
         $normalized = [];
 
         foreach ($values as $value) {
-            $normalizedValue = $this->scalarStringValue($value);
+            $normalizedValue = FontUtils::scalarStringValue($value);
 
             if ($normalizedValue === '') {
                 continue;
@@ -358,43 +358,4 @@ final class LocalCatalogScanner
         return $normalized;
     }
 
-    /**
-     * @return array<string, array<string, float|int|string>>
-     */
-    private function normalizeAxes(mixed $axes): array
-    {
-        return is_array($axes) ? FontUtils::normalizeAxesMap($axes) : [];
-    }
-
-    /**
-     * @param array<string, array<string, float|int|string>> $axes
-     * @return VariationDefaults
-     */
-    private function normalizeVariationDefaults(mixed $variationDefaults, array $axes): array
-    {
-        return is_array($variationDefaults) ? FontUtils::normalizeVariationDefaults($variationDefaults, $axes) : [];
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private function stringValue(array $values, string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values)) {
-            return $default;
-        }
-
-        $value = $this->scalarStringValue($values[$key]);
-
-        return $value !== '' ? $value : $default;
-    }
-
-    private function scalarStringValue(mixed $value): string
-    {
-        if (!is_scalar($value)) {
-            return '';
-        }
-
-        return trim((string) $value);
-    }
 }

@@ -77,41 +77,34 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
     }
 
     /**
-     * @param CatalogFamily $family
-     * @param RoleSet $roles
-     * @param FamilyFallbackMap $familyFallbacks
-     * @param FamilyFontDisplayMap $familyFontDisplays
-     * @param FamilyFontDisplayOptions $familyFontDisplayOptions
-     * @param CategoryAliasOwners $categoryAliasOwners
-     * @param RendererFlagOptions $extendedVariableOptions
-     * @param RendererFlagOptions $classOutputOptions
-     * @param RoleSet|null $roleUsageRoles
+     * @param array{
+     *     family: CatalogFamily,
+     *     roles: RoleSet,
+     *     family_fallbacks: FamilyFallbackMap,
+     *     family_font_displays: FamilyFontDisplayMap,
+     *     family_font_display_options: FamilyFontDisplayOptions,
+     *     preview_text: string,
+     *     category_alias_owners?: CategoryAliasOwners,
+     *     extended_variable_options?: RendererFlagOptions,
+     *     monospace_role_enabled?: bool,
+     *     class_output_options?: RendererFlagOptions,
+     *     role_usage_roles?: RoleSet|null
+     * } $payload
      */
-    public function renderFamilyCardDetails(
-        array $family,
-        array $roles,
-        array $familyFallbacks,
-        array $familyFontDisplays,
-        array $familyFontDisplayOptions,
-        string $previewText,
-        array $categoryAliasOwners = [],
-        array $extendedVariableOptions = [],
-        bool $monospaceRoleEnabled = false,
-        array $classOutputOptions = [],
-        ?array $roleUsageRoles = null
-    ): void {
+    public function renderFamilyCardDetails(array $payload): void
+    {
         $view = $this->buildFamilyTemplateView(
-            $family,
-            $roles,
-            $familyFallbacks,
-            $familyFontDisplays,
-            $familyFontDisplayOptions,
-            $previewText,
-            $categoryAliasOwners,
-            $extendedVariableOptions,
-            $monospaceRoleEnabled,
-            $classOutputOptions,
-            $roleUsageRoles
+            $payload['family'],
+            $payload['roles'],
+            $payload['family_fallbacks'],
+            $payload['family_font_displays'],
+            $payload['family_font_display_options'],
+            $payload['preview_text'],
+            $payload['category_alias_owners'] ?? [],
+            $payload['extended_variable_options'] ?? [],
+            !empty($payload['monospace_role_enabled']),
+            $payload['class_output_options'] ?? [],
+            $payload['role_usage_roles'] ?? null
         );
         $view['includeDetails'] = true;
         $this->renderTemplate('family-card-details.php', $view);

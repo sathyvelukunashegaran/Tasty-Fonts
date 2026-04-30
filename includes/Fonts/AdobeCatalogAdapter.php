@@ -36,8 +36,8 @@ final class AdobeCatalogAdapter
         $families = [];
 
         foreach ($this->adobe->getConfiguredFamilies() as $family) {
-            $familyName = $this->stringValue($family, 'family');
-            $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
+            $familyName = FontUtils::stringValue($family, 'family');
+            $familySlug = FontUtils::stringValue($family, 'slug', FontUtils::slugify($familyName));
 
             if ($familyName === '' || $familySlug === '') {
                 continue;
@@ -46,21 +46,21 @@ final class AdobeCatalogAdapter
             $faces = [];
 
             foreach ($this->deliveryFaceList(['faces' => $family['faces'] ?? []]) as $face) {
-                $axes = $this->normalizeAxes($face['axes'] ?? []);
+                $axes = FontUtils::normalizeAxesValue($face['axes'] ?? []);
 
                 $faces[] = [
                     'family' => $familyName,
                     'slug' => $familySlug,
                     'source' => 'adobe',
-                    'weight' => FontUtils::normalizeWeight($this->stringValue($face, 'weight', '400')),
-                    'style' => FontUtils::normalizeStyle($this->stringValue($face, 'style', 'normal')),
+                    'weight' => FontUtils::normalizeWeight(FontUtils::stringValue($face, 'weight', '400')),
+                    'style' => FontUtils::normalizeStyle(FontUtils::stringValue($face, 'style', 'normal')),
                     'unicode_range' => '',
                     'files' => [],
                     'paths' => [],
                     'provider' => ['type' => 'adobe', 'project_id' => $projectId],
                     'is_variable' => !empty($face['is_variable']),
                     'axes' => $axes,
-                    'variation_defaults' => $this->normalizeVariationDefaults($face['variation_defaults'] ?? [], $axes),
+                    'variation_defaults' => FontUtils::normalizeVariationDefaultsValue($face['variation_defaults'] ?? [], $axes),
                 ];
             }
 
@@ -109,47 +109,4 @@ final class AdobeCatalogAdapter
         return FontUtils::normalizeFaceList($profile['faces'] ?? []);
     }
 
-    /**
-     * @return array<string, array<string, float|int|string>>
-     */
-    private function normalizeAxes(mixed $axes): array
-    {
-        return is_array($axes) ? FontUtils::normalizeAxesMap($axes) : [];
-    }
-
-    /**
-     * @param array<string, array<string, float|int|string>> $axes
-     * @return VariationDefaults
-     */
-    private function normalizeVariationDefaults(mixed $variationDefaults, array $axes): array
-    {
-        return is_array($variationDefaults) ? FontUtils::normalizeVariationDefaults($variationDefaults, $axes) : [];
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    private function stringValue(array $values, string $key, string $default = ''): string
-    {
-        if (!array_key_exists($key, $values)) {
-            return $default;
-        }
-
-        $value = self::scalarStringValue($values[$key]);
-
-        return $value !== '' ? $value : $default;
-    }
-
-    private static function scalarStringValue(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-
-        return $value === true ? '1' : '';
-    }
 }
