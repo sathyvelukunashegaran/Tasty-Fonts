@@ -17,6 +17,7 @@ use TastyFonts\CustomCss\CustomCssImportSnapshotService;
 use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CapabilityDisableCleanupService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
@@ -116,6 +117,7 @@ final class AdminController
         private readonly CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly LibraryService $library,
+        private readonly CapabilityDisableCleanupService $capabilityCleanup,
         private readonly LocalUploadService $localUpload,
         private readonly CssBuilder $cssBuilder,
         private readonly AdobeProjectClient $adobe,
@@ -226,9 +228,9 @@ final class AdminController
         $availableFamilies = $this->buildSelectableFamilyNames($catalog);
         $roles = $this->settings->getRoles($availableFamilies);
         $appliedRoles = $this->settings->getAppliedRoles($availableFamilies);
-        $applyEverywhere = !empty($settings['auto_apply_roles']);
         $googleApiStatus = $this->googleClient->getApiKeyStatus();
         $googleSearchEnabled = $this->googleClient->canSearch();
+        $runtimeState = $this->buildAdminRuntimeStatePayload($settings, $catalog, $availableFamilies, $roles, $appliedRoles);
         $variableFontsEnabled = !empty($settings['variable_fonts_enabled']);
 
         wp_enqueue_style(
@@ -281,21 +283,14 @@ final class AdminController
                 'restNonce' => wp_create_nonce('wp_rest'),
                 'routes' => RestController::routeMap(),
                 'googleApiEnabled' => $googleSearchEnabled,
-                'applyEverywhere' => $applyEverywhere,
+                'applyEverywhere' => $runtimeState['applyEverywhere'],
                 'currentPage' => $this->resolveRequestedPageType(),
                 'trainingWheelsOff' => !empty($settings['training_wheels_off']),
-                'monospaceRoleEnabled' => !empty($settings['monospace_role_enabled']),
-                'variableFontsEnabled' => $variableFontsEnabled,
-                'customCssUrlImportsEnabled' => !empty($settings['custom_css_url_imports_enabled']),
-                'roleFamilyCatalog' => $this->buildRoleFamilyCatalog($catalog),
-                'previewBootstrap' => [
-                    'roles' => $roles,
-                    'appliedRoles' => $appliedRoles,
-                    'baselineSource' => $applyEverywhere ? 'live_sitewide' : 'draft',
-                    'baselineLabel' => $applyEverywhere
-                        ? __('Live sitewide', 'tasty-fonts')
-                        : __('Current draft', 'tasty-fonts'),
-                ],
+                'monospaceRoleEnabled' => $runtimeState['monospaceRoleEnabled'],
+                'variableFontsEnabled' => $runtimeState['variableFontsEnabled'],
+                'customCssUrlImportsEnabled' => $runtimeState['customCssUrlImportsEnabled'],
+                'roleFamilyCatalog' => $runtimeState['roleFamilyCatalog'],
+                'previewBootstrap' => $runtimeState['previewBootstrap'],
                 'runtimeStrings' => [
                     'searchDisabled' => $this->buildSearchDisabledMessage($googleApiStatus),
                 ],
@@ -520,14 +515,8 @@ final class AdminController
 
         $limit = $this->normalizeSearchLimit($limit);
         $offset = $this->normalizeSearchOffset($offset);
-        $items = $this->bunnyClient->searchFamilies(sanitize_text_field($query), $limit + 1, $offset);
-        $hasMore = count($items) > $limit;
 
-        return [
-            'items' => array_slice($items, 0, $limit),
-            'has_more' => $hasMore,
-            'next_offset' => $offset + min(count($items), $limit),
-        ];
+        return $this->bunnyClient->searchFamilyPage(sanitize_text_field($query), $limit, $offset);
     }
 
     /**
@@ -1010,6 +999,50 @@ final class AdminController
             $settingsInput['extended_variable_role_weight_vars_enabled'] = true;
         }
 
+        $variableFontsDisabled =
+            !empty($previousSettings['variable_fonts_enabled'])
+            && array_key_exists('variable_fonts_enabled', $settingsInput)
+            && empty($settingsInput['variable_fonts_enabled']);
+        $monospaceRoleDisabled =
+            !empty($previousSettings['monospace_role_enabled'])
+            && array_key_exists('monospace_role_enabled', $settingsInput)
+            && empty($settingsInput['monospace_role_enabled']);
+        $capabilityCleanupRan = $variableFontsDisabled || $monospaceRoleDisabled;
+        $capabilityCleanupPayload = null;
+
+        if ($capabilityCleanupRan) {
+            $snapshot = $this->snapshots->createSnapshot('before_capability_disable');
+
+            if (is_wp_error($snapshot)) {
+                return $snapshot;
+            }
+
+            $capabilityCleanupPayload = [
+                'snapshot' => $snapshot,
+                'variable_fonts' => null,
+                'monospace_role' => null,
+            ];
+
+            if ($variableFontsDisabled) {
+                $variableCleanupResult = $this->capabilityCleanup->removeVariableFontData();
+
+                if (is_wp_error($variableCleanupResult)) {
+                    return $variableCleanupResult;
+                }
+
+                $capabilityCleanupPayload['variable_fonts'] = $variableCleanupResult;
+            }
+
+            if ($monospaceRoleDisabled) {
+                $capabilityCleanupPayload['monospace_role'] = ['role_data_cleared' => true];
+            }
+        }
+
+        $settingsInput = array_replace(
+            $settingsInput,
+            $this->capabilityCleanup->settingsOverrides($variableFontsDisabled, $monospaceRoleDisabled)
+        );
+
         $savedSettings = $this->settings->saveSettings($settingsInput);
         $variableFontsToggled = !empty($previousSettings['variable_fonts_enabled']) !== !empty($savedSettings['variable_fonts_enabled']);
 
@@ -1019,7 +1052,23 @@ final class AdminController
             $this->catalog->invalidate();
         }
 
-        if (($previousSettings['monospace_role_enabled'] ?? false) !== ($savedSettings['monospace_role_enabled'] ?? false)) {
+        if ($capabilityCleanupRan) {
+            $catalogAfterCleanup = $this->catalog->getCatalog();
+            $roleCleanupFamilies = $variableFontsDisabled
+                ? $catalogAfterCleanup
+                : $this->buildSelectableFamilyNames($catalogAfterCleanup);
+            $this->settings->clearDisabledCapabilityRoleData(
+                $variableFontsDisabled,
+                $monospaceRoleDisabled,
+                $roleCleanupFamilies
+            );
+            $savedSettings = $this->settings->getSettings();
+        }
+
+        if (
+            ($previousSettings['monospace_role_enabled'] ?? false) !== ($savedSettings['monospace_role_enabled'] ?? false)
+            || $capabilityCleanupRan
+        ) {
             $availableFamilies = $this->buildSelectableFamilyNames($this->catalog->getCatalog());
             $sitewideEnabled = !empty($savedSettings['auto_apply_roles']);
             $liveRoles = $sitewideEnabled ? $this->settings->getAppliedRoles($availableFamilies) : [];
@@ -1084,6 +1133,7 @@ final class AdminController
                 'settings' => $this->settings->getSettings(),
                 'reload_required' => $reloadRequired,
                 'output_panels' => $outputPanels,
+                'capability_cleanup' => $capabilityCleanupPayload,
             ];
         }
 
@@ -1121,6 +1171,7 @@ final class AdminController
                     'settings' => $this->settings->getSettings(),
                     'reload_required' => $reloadRequired,
                     'output_panels' => $outputPanels,
+                    'capability_cleanup' => $capabilityCleanupPayload,
                 ];
             }
 
@@ -1152,6 +1203,14 @@ final class AdminController
 
         $settingsMessage = $this->buildSettingsSavedMessage($previousSettings, $savedSettings);
 
+        if ($variableFontsDisabled) {
+            $settingsMessage .= ' ' . __('A rollback snapshot was created before variable font data was removed.', 'tasty-fonts');
+        }
+
+        if ($monospaceRoleDisabled) {
+            $settingsMessage .= ' ' . __('A rollback snapshot was created before monospace role data was cleared.', 'tasty-fonts');
+        }
+
         foreach ([$integrationMessage, $bricksIntegrationMessage] as $messagePart) {
             if ($messagePart !== '') {
                 $settingsMessage .= ' ' . $messagePart;
@@ -1180,6 +1239,7 @@ final class AdminController
             'settings' => $savedSettings,
             'reload_required' => $reloadRequired,
             'output_panels' => $outputPanels,
+            'capability_cleanup' => $capabilityCleanupPayload,
         ];
     }
 
@@ -1783,24 +1843,8 @@ final class AdminController
             );
         }
 
-        $context = array_merge(
-            $this->pageContextBuilder->build(),
-            ['current_page' => self::PAGE_LIBRARY]
-        );
-        $view = (new AdminPageViewBuilder($this->storage))->build($context);
-        $catalog = FontUtils::normalizeListOfStringKeyedMaps($view['catalog'] ?? []);
-        $family = null;
-
-        foreach ($catalog as $candidate) {
-            $candidateSlug = $this->stringValue($candidate, 'slug', $this->stringValue($candidate, 'family'));
-
-            if (FontUtils::slugify($candidateSlug) !== $familySlug) {
-                continue;
-            }
-
-            $family = $candidate;
-            break;
-        }
+        $view = $this->buildLibraryPageView();
+        $family = $this->findFamilyBySlugInView($view, $familySlug);
 
         if ($family === null) {
             return new WP_Error(
@@ -1809,17 +1853,170 @@ final class AdminController
             );
         }
 
+        return [
+            'family_slug' => $familySlug,
+            'html' => $this->renderFamilyCardDetailsHtml($family, $view),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return Payload
+     */
+    public function refreshLibraryView(array $input): array
+    {
+        $refreshAll = !empty($input['refresh_all']);
+        $requestedSlugs = [];
+
+        foreach (is_array($input['family_slugs'] ?? null) ? $input['family_slugs'] : [] as $slug) {
+            $normalizedSlug = FontUtils::slugify(FontUtils::scalarStringValue($slug));
+
+            if ($normalizedSlug !== '') {
+                $requestedSlugs[$normalizedSlug] = $normalizedSlug;
+            }
+        }
+
+        foreach (is_array($input['family_names'] ?? null) ? $input['family_names'] : [] as $familyName) {
+            $normalizedSlug = FontUtils::slugify(FontUtils::scalarStringValue($familyName));
+
+            if ($normalizedSlug !== '') {
+                $requestedSlugs[$normalizedSlug] = $normalizedSlug;
+            }
+        }
+
+        $expandedSlugs = [];
+
+        foreach (is_array($input['expanded_family_slugs'] ?? null) ? $input['expanded_family_slugs'] : [] as $slug) {
+            $normalizedSlug = FontUtils::slugify(FontUtils::scalarStringValue($slug));
+
+            if ($normalizedSlug !== '') {
+                $expandedSlugs[$normalizedSlug] = true;
+            }
+        }
+
+        $view = $this->buildLibraryPageView();
+        $catalog = FontUtils::normalizeListOfStringKeyedMaps($view['catalog'] ?? []);
+        $rows = [];
+        $libraryFamilySlugs = [];
+        $catalogBySlug = [];
+
+        foreach ($catalog as $family) {
+            $familySlug = FontUtils::slugify($this->stringValue($family, 'slug', $this->stringValue($family, 'family')));
+
+            if ($familySlug === '') {
+                continue;
+            }
+
+            $catalogBySlug[$familySlug] = $family;
+            $libraryFamilySlugs[] = $familySlug;
+        }
+
+        $targetSlugs = $refreshAll || $requestedSlugs === []
+            ? array_keys($catalogBySlug)
+            : array_values(array_intersect(array_keys($requestedSlugs), array_keys($catalogBySlug)));
+
+        $missingFamilySlugs = $refreshAll
+            ? []
+            : array_values(array_diff(array_keys($requestedSlugs), array_keys($catalogBySlug)));
+
+        foreach ($targetSlugs as $familySlug) {
+            $family = $catalogBySlug[$familySlug] ?? null;
+
+            if (!is_array($family)) {
+                continue;
+            }
+
+            $includeDetails = !empty($expandedSlugs[$familySlug]);
+            $rows[] = [
+                'family' => $this->stringValue($family, 'family'),
+                'family_slug' => $familySlug,
+                'html' => $this->renderFamilyRowHtml($family, $view, $includeDetails),
+                'details_included' => $includeDetails,
+            ];
+        }
+
+        $baseContext = $this->pageContextBuilder->build();
+        $settings = $this->settings->getSettings();
+        $catalogMap = $this->catalog->getCatalog();
+        $availableFamilies = $this->buildSelectableFamilyNames($catalogMap);
+        $roles = $this->settings->getRoles($availableFamilies);
+        $appliedRoles = $this->settings->getAppliedRoles($availableFamilies);
+        $runtimeState = $this->buildAdminRuntimeStatePayload($settings, $catalogMap, $availableFamilies, $roles, $appliedRoles);
+
+        return [
+            'status' => 'ok',
+            'rows' => $rows,
+            'missing_family_slugs' => $missingFamilySlugs,
+            'library_family_slugs' => $libraryFamilySlugs,
+            'available_family_options' => $this->normalizePayloadList($baseContext['available_family_options'] ?? []),
+            'role_family_catalog' => $runtimeState['roleFamilyCatalog'],
+            'preview_bootstrap' => $runtimeState['previewBootstrap'],
+            'apply_everywhere' => $runtimeState['applyEverywhere'],
+            'monospace_role_enabled' => $runtimeState['monospaceRoleEnabled'],
+            'variable_fonts_enabled' => $runtimeState['variableFontsEnabled'],
+            'counts' => $this->catalog->getCounts(),
+            'generated_css_panel' => $this->buildGeneratedCssPanelPayload($settings),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildLibraryPageView(): array
+    {
+        $context = array_merge(
+            $this->pageContextBuilder->build(),
+            ['current_page' => self::PAGE_LIBRARY]
+        );
+
+        return (new AdminPageViewBuilder($this->storage))->build($context);
+    }
+
+    /**
+     * @param array<string, mixed> $view
+     * @return array<string, mixed>|null
+     */
+    private function findFamilyBySlugInView(array $view, string $familySlug): ?array
+    {
+        $catalog = FontUtils::normalizeListOfStringKeyedMaps($view['catalog'] ?? []);
+
+        foreach ($catalog as $candidate) {
+            $candidateSlug = FontUtils::slugify($this->stringValue($candidate, 'slug', $this->stringValue($candidate, 'family')));
+
+            if ($candidateSlug !== $familySlug) {
+                continue;
+            }
+
+            return $candidate;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $view
+     */
+    private function buildFamilyCardRenderer(array $view): \TastyFonts\Admin\Renderer\FamilyCardRenderer
+    {
         $renderer = new \TastyFonts\Admin\Renderer\FamilyCardRenderer($this->storage);
         $renderer->setTrainingWheelsOff(!empty($view['trainingWheelsOff']));
 
-        $viewRoles = $this->sanitizeRoleValues(
-            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['roles'] ?? null))
-        );
+        return $renderer;
+    }
+
+    /**
+     * @param array<string, mixed> $family
+     * @param array<string, mixed> $view
+     */
+    private function renderFamilyCardDetailsHtml(array $family, array $view): string
+    {
+        $renderer = $this->buildFamilyCardRenderer($view);
+        $libraryRoleUsageRoles = $this->roleUsageRolesFromView($view);
 
         ob_start();
         $renderer->renderFamilyCardDetails(
             $this->payloadMapValue($family),
-            $viewRoles,
+            $this->sanitizeRoleValues($this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['roles'] ?? null))),
             $this->stringMapValue($view['familyFallbacks'] ?? []),
             $this->stringMapValue($view['familyFontDisplays'] ?? []),
             $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
@@ -1827,13 +2024,103 @@ final class AdminController
             $this->stringMapValue($view['categoryAliasOwners'] ?? []),
             $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['extendedVariableOptions'] ?? null)),
             !empty($view['monospaceRoleEnabled']),
-            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['classOutputOptions'] ?? null))
+            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['classOutputOptions'] ?? null)),
+            $libraryRoleUsageRoles
         );
-        $html = (string) ob_get_clean();
+
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, mixed> $family
+     * @param array<string, mixed> $view
+     */
+    private function renderFamilyRowHtml(array $family, array $view, bool $includeDetails): string
+    {
+        $renderer = $this->buildFamilyCardRenderer($view);
+        $libraryRoleUsageRoles = $this->roleUsageRolesFromView($view);
+
+        ob_start();
+
+        if ($includeDetails) {
+            $renderer->renderFamilyRow(
+                $this->payloadMapValue($family),
+                $this->sanitizeRoleValues($this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['roles'] ?? null))),
+                $this->stringMapValue($view['familyFallbacks'] ?? []),
+                $this->stringMapValue($view['familyFontDisplays'] ?? []),
+                $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
+                $this->stringValue($view, 'previewText'),
+                $this->stringMapValue($view['categoryAliasOwners'] ?? []),
+                $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['extendedVariableOptions'] ?? null)),
+                !empty($view['monospaceRoleEnabled']),
+                $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['classOutputOptions'] ?? null))
+            );
+
+            return (string) ob_get_clean();
+        }
+
+        $renderer->renderFamilySummaryRow(
+            $this->payloadMapValue($family),
+            $this->sanitizeRoleValues($this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['roles'] ?? null))),
+            $this->stringMapValue($view['familyFallbacks'] ?? []),
+            $this->stringMapValue($view['familyFontDisplays'] ?? []),
+            $this->normalizePayloadList($view['familyFontDisplayOptions'] ?? []),
+            $this->stringValue($view, 'previewText'),
+            $this->stringMapValue($view['categoryAliasOwners'] ?? []),
+            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['extendedVariableOptions'] ?? null)),
+            !empty($view['monospaceRoleEnabled']),
+            $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['classOutputOptions'] ?? null)),
+            $libraryRoleUsageRoles
+        );
+
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, mixed> $view
+     * @return RoleSet|null
+     */
+    private function roleUsageRolesFromView(array $view): ?array
+    {
+        $roleUsageRoles = $this->payloadMapValue(FontUtils::normalizeStringKeyedMap($view['libraryRoleUsageRoles'] ?? null));
+
+        return $roleUsageRoles === []
+            ? null
+            : $this->sanitizeRoleValues($roleUsageRoles);
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @param CatalogMap $catalog
+     * @param list<string> $availableFamilies
+     * @param RoleSet $roles
+     * @param RoleSet $appliedRoles
+     * @return array<string, mixed>
+     */
+    private function buildAdminRuntimeStatePayload(
+        array $settings,
+        array $catalog,
+        array $availableFamilies,
+        array $roles,
+        array $appliedRoles
+    ): array {
+        $applyEverywhere = !empty($settings['auto_apply_roles']);
 
         return [
-            'family_slug' => $familySlug,
-            'html' => $html,
+            'applyEverywhere' => $applyEverywhere,
+            'monospaceRoleEnabled' => !empty($settings['monospace_role_enabled']),
+            'variableFontsEnabled' => !empty($settings['variable_fonts_enabled']),
+            'customCssUrlImportsEnabled' => !empty($settings['custom_css_url_imports_enabled']),
+            'roleFamilyCatalog' => $this->buildRoleFamilyCatalog($catalog),
+            'previewBootstrap' => [
+                'roles' => $roles,
+                'appliedRoles' => $appliedRoles,
+                'baselineSource' => $applyEverywhere ? 'live_sitewide' : 'draft',
+                'baselineLabel' => $applyEverywhere
+                    ? __('Live sitewide', 'tasty-fonts')
+                    : __('Current draft', 'tasty-fonts'),
+            ],
+            'availableFamilies' => $availableFamilies,
         ];
     }
 
@@ -3829,9 +4116,38 @@ final class AdminController
 
         check_admin_referer('tasty_fonts_save_adobe_project');
 
+        $result = $this->saveAdobeProjectValue([
+            'action' => $isRemove ? 'remove' : ($isResync ? 'resync' : 'save'),
+            'project_id' => $this->getPostedText('adobe_project_id'),
+            'enabled' => !empty($_POST['adobe_enabled']),
+        ]);
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
+
+        $noticeKey = $this->stringValue($result, 'notice_key');
+
+        if ($noticeKey !== '') {
+            $this->redirectWithNoticeKey($noticeKey);
+        }
+
+        $this->redirectWithSuccess($this->stringValue($result, 'message'));
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return Payload|WP_Error
+     */
+    public function saveAdobeProjectValue(array $input): array|WP_Error
+    {
+        $action = strtolower(trim(FontUtils::scalarStringValue($input['action'] ?? 'save')));
+        $action = in_array($action, ['save', 'resync', 'remove'], true) ? $action : 'save';
+        $isRemove = $action === 'remove';
+        $isResync = $action === 'resync';
+
         if (!$isRemove && !$this->fontImportWorkflowEnabled('adobe')) {
-            $error = $this->fontImportWorkflowDisabledError('adobe');
-            $this->redirectWithError($error->get_error_message());
+            return $this->fontImportWorkflowDisabledError('adobe');
         }
 
         if ($isRemove) {
@@ -3840,19 +4156,31 @@ final class AdminController
             $this->settings->clearAdobeProject();
             $this->adobe->clearProjectCache($existingProjectId);
             $this->log->add(__('Adobe Fonts project removed.', 'tasty-fonts'));
-            $this->redirectWithNoticeKey('adobe_project_removed');
+
+            return [
+                'status' => 'removed',
+                'action' => 'remove',
+                'project_id' => '',
+                'enabled' => false,
+                'notice_key' => 'adobe_project_removed',
+                'message' => $this->buildNoticeMessage('adobe_project_removed'),
+            ];
         }
 
         $projectId = $isResync
             ? $this->settings->getAdobeProjectId()
-            : $this->normalizeAdobeProjectId($this->getPostedText('adobe_project_id'));
+            : $this->normalizeAdobeProjectId(FontUtils::scalarStringValue($input['project_id'] ?? ''));
         $enabled = $isResync
             ? $this->settings->isAdobeEnabled()
-            : !empty($_POST['adobe_enabled']);
+            : !empty($input['enabled']);
         $existingProjectId = $this->settings->getAdobeProjectId();
 
         if ($projectId !== '' && !$this->isValidAdobeProjectId($projectId)) {
-            $this->redirectWithError(__('Enter a valid Adobe Fonts project ID using 3 to 16 letters and numbers.', 'tasty-fonts'));
+            return new WP_Error(
+                'tasty_fonts_adobe_project_invalid',
+                __('Enter a valid Adobe Fonts project ID using 3 to 16 letters and numbers.', 'tasty-fonts'),
+                ['status' => 400]
+            );
         }
 
         if (!$isResync) {
@@ -3862,7 +4190,15 @@ final class AdminController
         if ($projectId === '') {
             $this->adobe->clearProjectCache($existingProjectId);
             $this->log->add(__('Adobe Fonts project cleared.', 'tasty-fonts'));
-            $this->redirectWithNoticeKey('adobe_project_removed');
+
+            return [
+                'status' => 'removed',
+                'action' => 'clear',
+                'project_id' => '',
+                'enabled' => false,
+                'notice_key' => 'adobe_project_removed',
+                'message' => $this->buildNoticeMessage('adobe_project_removed'),
+            ];
         }
 
         $this->adobe->clearProjectCache($projectId);
@@ -3874,14 +4210,25 @@ final class AdminController
         );
 
         if ($this->stringValue($validation, 'state') !== 'valid') {
+            $message = $this->stringValue($validation, 'message', __('Adobe Fonts project validation failed.', 'tasty-fonts'));
             $this->log->add(__('Adobe Fonts project validation failed.', 'tasty-fonts'));
-            $this->redirectWithError($this->stringValue($validation, 'message'));
+
+            return new WP_Error('tasty_fonts_adobe_project_validation_failed', $message, ['status' => 422]);
         }
 
+        $noticeKey = $isResync ? 'adobe_project_resynced' : 'adobe_project_saved';
         $this->log->add($isResync
             ? __('Adobe Fonts project resynced.', 'tasty-fonts')
             : __('Adobe Fonts project saved.', 'tasty-fonts'));
-        $this->redirectWithNoticeKey($isResync ? 'adobe_project_resynced' : 'adobe_project_saved');
+
+        return [
+            'status' => 'ok',
+            'action' => $isResync ? 'resync' : 'save',
+            'project_id' => $projectId,
+            'enabled' => $enabled,
+            'notice_key' => $noticeKey,
+            'message' => $this->buildNoticeMessage($noticeKey),
+        ];
     }
 
     /**

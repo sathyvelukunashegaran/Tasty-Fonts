@@ -13,7 +13,7 @@ defined('ABSPATH') || exit;
  *
  * @phpstan-type RuntimeDebugItem array{label: string, value: string, copyable: bool, kind: string, help: string}
  * @phpstan-type RuntimeDebugGroup array{slug: string, title: string, items: list<RuntimeDebugItem>}
- * @phpstan-type RuntimeDebugFamily array{family: string, provider: string, type: string, faces: int, variants: list<string>, missing_files: list<string>}
+ * @phpstan-type RuntimeDebugFamily array{family: string, provider: string, type: string, format: string, faces: int, variants: list<string>, axes: list<string>, missing_files: list<string>}
  * @phpstan-type RuntimeDebugDetails array{
  *     title: string,
  *     description: string,
@@ -225,8 +225,10 @@ final class RuntimeDebugDetailsPresenter
                 'family' => $familyName,
                 'provider' => $this->stringValue($family, 'provider', __('Local', 'tasty-fonts')),
                 'type' => $this->stringValue($family, 'type', __('Default', 'tasty-fonts')),
+                'format' => $this->stringValue($family, 'format'),
                 'faces' => $this->intValue($family, 'faces'),
                 'variants' => $this->stringListValue($family['variants'] ?? []),
+                'axes' => $this->stringListValue($family['axes'] ?? []),
                 'missing_files' => $this->stringListValue($family['missing_files'] ?? []),
             ];
         }

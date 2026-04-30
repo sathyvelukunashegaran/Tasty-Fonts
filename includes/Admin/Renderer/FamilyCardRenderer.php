@@ -376,6 +376,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
     {
         $provider = strtolower(trim($this->stringValue($profile, 'provider')));
         $variants = $this->normalizeStringList($profile['variants'] ?? []);
+        $profileLabel = $this->translateProfileLabel($this->stringValue($profile, 'label'));
         ?>
         <button
             type="button"
@@ -384,9 +385,10 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             data-migrate-provider="<?php echo esc_attr($provider); ?>"
             data-migrate-family="<?php echo esc_attr($familyName); ?>"
             data-migrate-variants="<?php echo esc_attr(implode(',', $variants)); ?>"
+            aria-label="<?php echo esc_attr(sprintf(__('Migrate %1$s delivery for %2$s to self-hosted.', 'tasty-fonts'), $profileLabel, $familyName)); ?>"
             title="<?php echo esc_attr__('Open the import panel with this CDN delivery pre-filled for self-hosting.', 'tasty-fonts'); ?>"
         >
-            <?php esc_html_e('Migrate to Self-hosted', 'tasty-fonts'); ?>
+            <?php esc_html_e('Self-host', 'tasty-fonts'); ?>
         </button>
         <?php
     }
@@ -409,6 +411,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $profileActionLabel = $profileActionLabel !== '' ? $profileActionLabel : $profileLabel;
         $profileIsActive = $profileId === $activeDeliveryId;
         $profileVariantCount = $this->countProfileVariants($profile);
+        $profileVariantLabel = sprintf(_n('%d variant', '%d variants', $profileVariantCount, 'tasty-fonts'), $profileVariantCount);
         $isCustomCssProfile = $this->isCustomCssProfile($profile);
         $customCssSourceUrl = $isCustomCssProfile ? $this->customCssSourceUrl($profile) : '';
         $customCssDeliveryModeLabel = $isCustomCssProfile ? $this->customCssDeliveryModeLabel($profile) : '';
@@ -418,29 +421,53 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $profileDeleteBlocked = $profileIsActive && $publishState === 'role_active'
             ? __('Switch the live delivery or remove this family from the active roles before deleting this delivery profile.', 'tasty-fonts')
             : '';
-        $fontTypeDescriptor = $this->buildFontTypeDescriptor($profile);
+        $fontTypeDescriptorEntry = $profile;
+        if (isset($profile['format']) && !isset($profile['formats'])) {
+            $profileFormat = FontUtils::resolveProfileFormat($profile);
+            $fontTypeDescriptorEntry['formats'] = [
+                $profileFormat => [
+                    'available' => true,
+                    'label' => ucfirst($profileFormat),
+                ],
+            ];
+        }
+        $fontTypeDescriptor = $this->buildFontTypeDescriptor($fontTypeDescriptorEntry);
         ?>
-        <article class="tasty-fonts-detail-card tasty-fonts-detail-card--delivery">
+        <article class="tasty-fonts-detail-card tasty-fonts-detail-card--delivery <?php echo $profileIsActive ? 'is-active-delivery' : ''; ?>" <?php echo $profileIsActive ? 'aria-current="true"' : ''; ?>>
             <div class="tasty-fonts-detail-card-head">
                 <div class="tasty-fonts-detail-card-copy">
                     <div class="tasty-fonts-detail-card-title-row">
                         <h5 class="tasty-fonts-detail-card-title"><?php echo esc_html($profileLabel); ?></h5>
                         <?php if ($profileIsActive): ?>
-                            <span class="tasty-fonts-badge is-success"><?php esc_html_e('Active delivery', 'tasty-fonts'); ?></span>
+                            <span class="tasty-fonts-badge is-role"><?php esc_html_e('Active delivery', 'tasty-fonts'); ?></span>
                         <?php endif; ?>
                         <span class="tasty-fonts-badge <?php echo esc_attr($this->stringValue($fontTypeDescriptor, 'badge_class')); ?>">
                             <?php echo esc_html($this->stringValue($fontTypeDescriptor, 'label')); ?>
                         </span>
+                        <span class="tasty-fonts-badge tasty-fonts-detail-card-count"><?php echo esc_html($profileVariantLabel); ?></span>
                     </div>
-                    <p class="tasty-fonts-detail-card-summary"><?php echo esc_html($this->buildProfileRequestSummary($profile)); ?></p>
+                    <p class="screen-reader-text tasty-fonts-detail-card-summary"><?php echo esc_html($this->buildProfileRequestSummary($profile)); ?></p>
                 </div>
                 <div class="tasty-fonts-detail-actions">
+                    <?php if (!$profileIsActive && $profileId !== '' && count($siblingProfiles) > 1): ?>
+                        <button
+                            type="button"
+                            class="button button-small tasty-fonts-delivery-choice-button"
+                            data-family-delivery-choice
+                            data-family-slug="<?php echo esc_attr($familySlug); ?>"
+                            data-delivery-id="<?php echo esc_attr($profileId); ?>"
+                            data-delivery-label="<?php echo esc_attr($profileActionLabel); ?>"
+                            aria-label="<?php echo esc_attr(sprintf(__('Use %1$s delivery for %2$s.', 'tasty-fonts'), $profileActionLabel, $familyName)); ?>"
+                        >
+                            <?php esc_html_e('Use', 'tasty-fonts'); ?>
+                        </button>
+                    <?php endif; ?>
                     <?php if ($this->isMigratableCdnProfile($profile)): ?>
                         <?php $this->renderMigrateDeliveryButton($familyName, $profile, 'button button-small'); ?>
                     <?php endif; ?>
                     <button
                         type="button"
-                        class="button button-small tasty-fonts-button-danger <?php echo $profileDeleteBlocked !== '' ? 'is-disabled' : ''; ?>"
+                        class="button button-small tasty-fonts-button-danger tasty-fonts-delivery-delete-button <?php echo $profileDeleteBlocked !== '' ? 'is-disabled' : ''; ?>"
                         data-delete-delivery-profile
                         data-family-slug="<?php echo esc_attr($familySlug); ?>"
                         data-family-name="<?php echo esc_attr($familyName); ?>"
@@ -452,14 +479,15 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                         <?php if ($profileDeleteBlocked !== '') : ?>
                             data-delete-blocked="<?php echo esc_attr($profileDeleteBlocked); ?>"
                         <?php endif; ?>
+                        aria-label="<?php echo esc_attr(sprintf(__('Delete %1$s delivery for %2$s.', 'tasty-fonts'), $profileActionLabel, $familyName)); ?>"
                     >
-                        <?php esc_html_e('Delete Delivery', 'tasty-fonts'); ?>
+                        <span class="screen-reader-text"><?php esc_html_e('Delete', 'tasty-fonts'); ?></span>
                     </button>
                 </div>
             </div>
 
-            <dl class="tasty-fonts-detail-meta tasty-fonts-detail-meta--delivery">
-                <?php if ($isCustomCssProfile): ?>
+            <?php if ($isCustomCssProfile): ?>
+                <dl class="tasty-fonts-detail-meta tasty-fonts-detail-meta--delivery">
                     <div class="tasty-fonts-detail-meta-item tasty-fonts-detail-meta-item--source-url">
                         <dt><?php esc_html_e('Source CSS URL', 'tasty-fonts'); ?></dt>
                         <dd>
@@ -480,12 +508,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                             <dd><time datetime="<?php echo esc_attr($customCssLastVerifiedAt); ?>"><?php echo esc_html($customCssLastVerifiedLabel); ?></time></dd>
                         </div>
                     <?php endif; ?>
-                <?php endif; ?>
-                <div class="tasty-fonts-detail-meta-item">
-                    <dt><?php esc_html_e('Variants', 'tasty-fonts'); ?></dt>
-                    <dd><?php echo esc_html(sprintf(_n('%d variant', '%d variants', $profileVariantCount, 'tasty-fonts'), $profileVariantCount)); ?></dd>
-                </div>
-            </dl>
+                </dl>
+            <?php endif; ?>
         </article>
         <?php
     }

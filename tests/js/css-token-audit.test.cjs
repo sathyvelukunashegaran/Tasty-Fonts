@@ -192,7 +192,10 @@ test('admin compact icon controls use 40px targets and help controls stay visual
   assert.match(tokensCss, /--tasty-icon-chrome-inset:\s*calc\(\(var\(--tasty-icon-button-size\) - var\(--tasty-icon-chrome-size\)\) \/ var\(--tasty-layout-2\)\);/);
   assert.match(tokensCss, /--tasty-help-button-size:\s*var\(--tasty-pill-height-compact\);/);
   assert.match(tokensCss, /--tasty-clear-button-size:\s*var\(--tasty-hit-target-min\);/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-select-clear:hover'), /background:\s*transparent;/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-select-clear > *'), /z-index:\s*var\(--tasty-layout-1\);/);
   assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-log-toggle.button::after'), /var\(--tasty-icon-chrome-inset\)/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-select-clear::after'), /var\(--tasty-icon-chrome-inset\)/);
   assert.match(cssBlockForSelector(adminCss, '#tasty-fonts-diagnostics-page .tasty-fonts-activity-toolbar .tasty-fonts-activity-clear-button::after'), /var\(--tasty-icon-chrome-inset\)/);
 
   for (const { selector, token } of targetContracts) {
@@ -202,6 +205,23 @@ test('admin compact icon controls use 40px targets and help controls stay visual
       `${selector} should consume ${token} for its effective hit target.`
     );
   }
+});
+
+test('admin toasts use compact status marks instead of full-panel tint overlays', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+  const toastBlock = cssBlocksForExactSelector(adminCss, '.tasty-fonts-toast').find((block) =>
+    block.includes('grid-template-columns')
+  );
+  const toastMarkBlock = cssBlockForSelector(adminCss, '.tasty-fonts-toast::before');
+
+  assert.ok(toastBlock, 'Missing layout block for .tasty-fonts-toast.');
+  assert.match(toastBlock, /grid-template-columns:\s*var\(--tasty-layout-26px\) minmax\(var\(--tasty-layout-0\), var\(--tasty-layout-1fr\)\) var\(--tasty-icon-button-size\);/);
+  assert.match(toastBlock, /background:\s*var\(--tasty-gradient-surface-card\);/);
+  assert.match(toastMarkBlock, /content:\s*"✓";/);
+  assert.match(toastMarkBlock, /background:\s*var\(--tasty-surface-accent-subtle\);/);
+  assert.doesNotMatch(toastMarkBlock, /position:\s*absolute;/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-toast.is-error::before'), /content:\s*"!";/);
+  assert.match(cssBlockForSelector(adminCss, '.tasty-fonts-toast.is-leaving'), /animation:\s*tasty-fonts-toast-exit var\(--tasty-motion-reveal\) var\(--tasty-easing-decel\) both;/);
 });
 
 test('admin CSS keeps the settings help icon as the canonical help trigger', () => {

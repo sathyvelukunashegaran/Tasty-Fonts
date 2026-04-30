@@ -84,10 +84,6 @@ trait LibraryRenderValueHelpers
         $familyName = trim($this->roleStringValue($roles, $roleKey));
         $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
 
-        if ($fallback !== '') {
-            return FontUtils::sanitizeFallback($fallback);
-        }
-
         if ($familyName !== '') {
             if (array_key_exists($familyName, $familyFallbacks)) {
                 $configuredFallback = trim((string) $familyFallbacks[$familyName]);
@@ -102,6 +98,10 @@ trait LibraryRenderValueHelpers
             if (is_array($family)) {
                 return FontUtils::defaultFallbackForCategory($this->resolveFamilyCategory($family));
             }
+        }
+
+        if ($fallback !== '') {
+            return FontUtils::sanitizeFallback($fallback);
         }
 
         return $default;

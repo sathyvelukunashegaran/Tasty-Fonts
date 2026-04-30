@@ -63,6 +63,11 @@ final class LibraryLiveRolePublishStateSynchronizer
 
             if ($storedFamily === null) {
                 $catalogFamily = $this->resolver->findFamilyBySlug($familySlug) ?? [];
+
+                if (!$this->catalogFamilyHasDeliveries($catalogFamily)) {
+                    continue;
+                }
+
                 $this->imports->ensureFamily(
                     $familyName,
                     $familySlug,
@@ -78,6 +83,7 @@ final class LibraryLiveRolePublishStateSynchronizer
             }
         }
 
+        $this->pruneUnavailableStoredFamilies();
         $this->catalog->invalidate();
     }
 
@@ -95,5 +101,53 @@ final class LibraryLiveRolePublishStateSynchronizer
         $publishState = strtolower(trim($this->resolver->stringValue($family, 'publish_state', 'published')));
 
         return in_array($publishState, self::MANUAL_PUBLISH_STATES, true) ? $publishState : 'published';
+    }
+
+    /**
+     * Remove placeholder library records that no longer have any real delivery backing.
+     *
+     * Empty records are useful only while a local/adobe catalog source still provides
+     * deliverable faces; once that backing disappears they render as "Unavailable"
+     * cards and should be removed from the plugin state.
+     */
+    private function pruneUnavailableStoredFamilies(): void
+    {
+        foreach ($this->imports->allFamilies() as $storedFamily) {
+            if (!$this->storedFamilyHasNoProfiles($storedFamily)) {
+                continue;
+            }
+
+            $familySlug = FontUtils::slugify($storedFamily['slug']);
+
+            if ($familySlug === '') {
+                continue;
+            }
+
+            $catalogFamily = $this->resolver->findFamilyBySlug($familySlug);
+
+            if ($catalogFamily !== null && $this->catalogFamilyHasDeliveries($catalogFamily)) {
+                continue;
+            }
+
+            $this->imports->deleteFamily($familySlug);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $family
+     */
+    private function catalogFamilyHasDeliveries(array $family): bool
+    {
+        return $this->resolver->availableDeliveries($family) !== [];
+    }
+
+    /**
+     * @param array<string, mixed> $family
+     */
+    private function storedFamilyHasNoProfiles(array $family): bool
+    {
+        $profiles = $family['delivery_profiles'] ?? [];
+
+        return !is_array($profiles) || $profiles === [];
     }
 }

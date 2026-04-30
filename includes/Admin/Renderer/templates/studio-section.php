@@ -167,7 +167,7 @@
                                 <div class="tasty-fonts-studio-section-summary tasty-fonts-role-selection-summary">
                                     <div class="tasty-fonts-studio-section-summary-copy tasty-fonts-role-selection-summary-copy">
                                         <span class="tasty-fonts-panel-kicker"><?php esc_html_e('Roles', 'tasty-fonts'); ?></span>
-                                        <h2 class="tasty-fonts-studio-section-title"><?php esc_html_e('Choose Families and Fallbacks.', 'tasty-fonts'); ?></h2>
+                                        <h2 class="tasty-fonts-studio-section-title"><?php esc_html_e('Choose Families.', 'tasty-fonts'); ?></h2>
                                     </div>
                                     <div class="tasty-fonts-role-selection-summary-meta">
                                         <div class="tasty-fonts-role-stacks tasty-fonts-role-stacks--selection">
@@ -237,6 +237,8 @@
                                                 ? sprintf(__('Heading family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $headingFamilyVariable, $headingVariable, $headingStack)
                                                 : sprintf(__('Heading uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $headingStack, $headingVariable),
                                             'description' => __('Choose a heading family or use the fallback stack directly.', 'tasty-fonts'),
+                                            'preview_text' => $previewText,
+                                            'preview_stack' => $headingStack,
                                             'family_input_name' => 'tasty_fonts_heading_font',
                                             'family_select_id' => 'tasty_fonts_heading_font',
                                             'clear_family_label' => __('Clear Heading Family', 'tasty-fonts'),
@@ -255,6 +257,8 @@
                                                 ? sprintf(__('Body family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $bodyFamilyVariable, $bodyVariable, $bodyStack)
                                                 : sprintf(__('Body uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $bodyStack, $bodyVariable),
                                             'description' => __('Choose a body family or use the fallback stack directly.', 'tasty-fonts'),
+                                            'preview_text' => $previewText,
+                                            'preview_stack' => $bodyStack,
                                             'family_input_name' => 'tasty_fonts_body_font',
                                             'family_select_id' => 'tasty_fonts_body_font',
                                             'clear_family_label' => __('Clear Body Family', 'tasty-fonts'),
@@ -276,6 +280,8 @@
                                                 ? sprintf(__('Monospace family variable: %1$s. Role alias: %2$s. Resolved stack: %3$s', 'tasty-fonts'), $monospaceFamilyVariable, $monospaceVariable, $monospaceStack)
                                                 : sprintf(__('Monospace uses the fallback stack directly: %1$s. Role alias: %2$s', 'tasty-fonts'), $monospaceStack, $monospaceVariable),
                                             'description' => __('Choose a monospace family or use the fallback stack directly.', 'tasty-fonts'),
+                                            'preview_text' => $previewText,
+                                            'preview_stack' => $monospaceStack,
                                             'family_input_name' => 'tasty_fonts_monospace_font',
                                             'family_select_id' => 'tasty_fonts_monospace_font',
                                             'clear_family_label' => __('Clear Monospace Family', 'tasty-fonts'),

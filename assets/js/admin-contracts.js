@@ -321,16 +321,16 @@
             ? options.roleFamilyCatalog
             : {};
 
-        if (explicitFallback !== '') {
-            return sanitizeFallback(explicitFallback, defaultFallback);
-        }
-
         if (familyName && familyCatalog[familyName] && typeof familyCatalog[familyName] === 'object') {
             const familyFallback = String(familyCatalog[familyName].fallback || '').trim();
 
             if (familyFallback !== '') {
                 return sanitizeFallback(familyFallback, defaultFallback);
             }
+        }
+
+        if (explicitFallback !== '') {
+            return sanitizeFallback(explicitFallback, defaultFallback);
         }
 
         return defaultFallback;
@@ -346,7 +346,11 @@
             monospace: monospaceRoleEnabled ? String(input.monospace || '').trim() : '',
             headingFallback: resolveRoleFallback('heading', input, options),
             bodyFallback: resolveRoleFallback('body', input, options),
-            monospaceFallback: resolveRoleFallback('monospace', input, options),
+            monospaceFallback: resolveRoleFallback(
+                'monospace',
+                monospaceRoleEnabled ? input : { ...input, monospace: '' },
+                options
+            ),
             headingWeight: normalizeRoleWeightValue(input.headingWeight || input.heading_weight),
             bodyWeight: normalizeRoleWeightValue(input.bodyWeight || input.body_weight),
             monospaceWeight: normalizeRoleWeightValue(input.monospaceWeight || input.monospace_weight),

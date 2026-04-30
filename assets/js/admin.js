@@ -136,6 +136,16 @@
     const roleHeadingFallback = document.getElementById('tasty_fonts_heading_fallback');
     const roleBodyFallback = document.getElementById('tasty_fonts_body_fallback');
     const roleMonospaceFallback = document.getElementById('tasty_fonts_monospace_fallback');
+    const roleFamilySelects = {
+        heading: roleHeading,
+        body: roleBody,
+        monospace: roleMonospace,
+    };
+    const roleFallbackInputs = {
+        heading: roleHeadingFallback,
+        body: roleBodyFallback,
+        monospace: roleMonospaceFallback,
+    };
     const roleForm = document.querySelector('[data-role-form]');
     const roleFormId = roleForm ? String(roleForm.getAttribute('id') || '') : '';
     const roleActionTypeInput = document.querySelector('[data-role-action-type]');
@@ -214,9 +224,36 @@
     };
     const previewTextInput = document.getElementById('tasty-fonts-preview-text');
     const previewSizeInput = document.getElementById('tasty-fonts-preview-size');
-    const roleHeadingPreviews = Array.from(document.querySelectorAll('[data-role-preview="heading"]'));
-    const roleBodyPreviews = Array.from(document.querySelectorAll('[data-role-preview="body"]'));
-    const roleMonospacePreviews = Array.from(document.querySelectorAll('[data-role-preview="monospace"]'));
+    const roleKeys = ['heading', 'body', 'monospace'];
+    const previewRoleSelector = (roleKey) => `[data-role-preview="${roleKey}"]:not([data-role-inline-preview-draft])`;
+    const roleHeadingPreviews = Array.from(document.querySelectorAll(previewRoleSelector('heading')));
+    const roleBodyPreviews = Array.from(document.querySelectorAll(previewRoleSelector('body')));
+    const roleMonospacePreviews = Array.from(document.querySelectorAll(previewRoleSelector('monospace')));
+    const roleInlinePreviewCards = {
+        heading: Array.from(document.querySelectorAll('[data-role-inline-preview-card="heading"]')),
+        body: Array.from(document.querySelectorAll('[data-role-inline-preview-card="body"]')),
+        monospace: Array.from(document.querySelectorAll('[data-role-inline-preview-card="monospace"]')),
+    };
+    const roleInlinePreviewDrafts = {
+        heading: Array.from(document.querySelectorAll('[data-role-inline-preview-draft="heading"]')),
+        body: Array.from(document.querySelectorAll('[data-role-inline-preview-draft="body"]')),
+        monospace: Array.from(document.querySelectorAll('[data-role-inline-preview-draft="monospace"]')),
+    };
+    const roleInlinePreviewLives = {
+        heading: Array.from(document.querySelectorAll('[data-role-inline-preview-live="heading"]')),
+        body: Array.from(document.querySelectorAll('[data-role-inline-preview-live="body"]')),
+        monospace: Array.from(document.querySelectorAll('[data-role-inline-preview-live="monospace"]')),
+    };
+    const roleInlinePreviewLiveRows = {
+        heading: Array.from(document.querySelectorAll('[data-role-live-preview-row="heading"]')),
+        body: Array.from(document.querySelectorAll('[data-role-live-preview-row="body"]')),
+        monospace: Array.from(document.querySelectorAll('[data-role-live-preview-row="monospace"]')),
+    };
+    const roleInlinePreviewLabels = {
+        heading: Array.from(document.querySelectorAll('[data-role-inline-preview-label="heading"]')),
+        body: Array.from(document.querySelectorAll('[data-role-inline-preview-label="body"]')),
+        monospace: Array.from(document.querySelectorAll('[data-role-inline-preview-label="monospace"]')),
+    };
     const roleHeadingPreviewNames = Array.from(document.querySelectorAll('[data-role-preview-name="heading"]'));
     const roleBodyPreviewNames = Array.from(document.querySelectorAll('[data-role-preview-name="body"]'));
     const roleMonospacePreviewNames = Array.from(document.querySelectorAll('[data-role-preview-name="monospace"]'));
@@ -233,6 +270,7 @@
     const googleSearch = document.getElementById('tasty-fonts-google-search');
     const bunnySearch = document.getElementById('tasty-fonts-bunny-search');
     const adobeProjectId = document.getElementById('tasty-fonts-adobe-project-id');
+    const adobeProjectForm = document.querySelector('[data-adobe-project-form]');
     const googleResults = document.getElementById('tasty-fonts-google-results');
     const bunnyResults = document.getElementById('tasty-fonts-bunny-results');
     const manualFamily = document.getElementById('tasty-fonts-manual-family');
@@ -390,6 +428,7 @@
     let defaultTrackedUiState = null;
     let pageReloadScheduled = false;
     let settingsNavigationInFlight = false;
+    let applyLibraryFilterState = () => {};
     const pendingUiStateKey = 'tastyFontsPendingUiState';
     const reloadQueryKey = 'tf_reload';
     const trackedUiQueryKeys = [
@@ -452,7 +491,9 @@
         bunnyImportSubmitting: __('Saving the selected Bunny delivery…', 'tasty-fonts'),
         bunnyImportPreviewEmpty: __('Choose a family to preview it.', 'tasty-fonts'),
         bunnyImportBusy: __('Importing Bunny Fonts…', 'tasty-fonts'),
-        bunnyImportSuccess: __('Bunny Fonts imported successfully. Reloading…', 'tasty-fonts'),
+        bunnyImportSuccess: __('Bunny Fonts imported successfully.', 'tasty-fonts'),
+        adobeProjectSaving: __('Saving Adobe project…', 'tasty-fonts'),
+        adobeProjectSaveError: __('The Adobe project could not be saved.', 'tasty-fonts'),
         importButtonIdle: __('Add to Library', 'tasty-fonts'),
         importButtonBusy: __('Importing…', 'tasty-fonts'),
         saveDeliverySelfHosted: __('Add Self-Hosted', 'tasty-fonts'),
@@ -464,7 +505,7 @@
         importSelectionSummaryAvailableVariable: __('%1$d of %2$d Styles Selected', 'tasty-fonts'),
         uploadSubmitting: __('Uploading font files…', 'tasty-fonts'),
         uploadProgress: __('Uploading files… %1$d%%', 'tasty-fonts'),
-        uploadSuccess: __('Upload complete. Refreshing the library…', 'tasty-fonts'),
+        uploadSuccess: __('Upload complete.', 'tasty-fonts'),
         uploadError: __('The font upload failed.', 'tasty-fonts'),
         uploadNoFile: __('No file chosen', 'tasty-fonts'),
         siteTransferNoFile: __('No bundle selected', 'tasty-fonts'),
@@ -486,7 +527,7 @@
         urlImportMissingSnapshot: __('Run a dry run before importing selected faces.', 'tasty-fonts'),
         urlImportNoSelection: __('Select at least one validated font face to import.', 'tasty-fonts'),
         urlImportSubmitting: __('Importing selected custom CSS faces…', 'tasty-fonts'),
-        urlImportSuccess: __('Import complete. Refreshing the library…', 'tasty-fonts'),
+        urlImportSuccess: __('Import complete.', 'tasty-fonts'),
         urlImportError: __('The custom CSS import failed.', 'tasty-fonts'),
         uploadButtonIdle: __('Upload to Library', 'tasty-fonts'),
         uploadButtonBusy: __('Uploading…', 'tasty-fonts'),
@@ -673,6 +714,74 @@
 
     function defaultRoleFallback(roleKey) {
         return contractDefaultRoleFallback(roleKey);
+    }
+
+    function roleFamilyValue(roleKey) {
+        return getElementValue(roleFamilySelects[roleKey], '');
+    }
+
+    function roleFallbackInput(roleKey) {
+        const input = roleFallbackInputs[roleKey];
+
+        return input instanceof HTMLInputElement ? input : null;
+    }
+
+    function roleFallbackValueForSave(roleKey) {
+        if (roleFamilyValue(roleKey) !== '') {
+            return '';
+        }
+
+        return getElementValue(roleFallbackInput(roleKey), defaultRoleFallback(roleKey));
+    }
+
+    function roleFallbackField(roleKey) {
+        return document.querySelector(`[data-role-fallback-field="${roleKey}"]`);
+    }
+
+    function syncRoleFallbackControl(roleKey) {
+        const field = roleFallbackField(roleKey);
+        const input = roleFallbackInput(roleKey);
+
+        if (!input) {
+            return;
+        }
+
+        if (!(field instanceof HTMLElement)) {
+            if (roleFamilyValue(roleKey) !== '') {
+                input.value = '';
+            } else {
+                input.value = String(input.dataset.roleFallbackStoredValue || input.value || input.dataset.roleFallbackDefault || defaultRoleFallback(roleKey));
+            }
+            return;
+        }
+
+        const fallbackOnly = roleFamilyValue(roleKey) === '';
+        const fallbackDefault = String(input.dataset.roleFallbackDefault || defaultRoleFallback(roleKey));
+
+        if (fallbackOnly) {
+            input.value = String(input.dataset.roleFallbackStoredValue || input.value || fallbackDefault);
+            field.hidden = false;
+            field.classList.remove('is-hidden');
+            return;
+        }
+
+        if (String(input.value || '').trim() !== '') {
+            input.dataset.roleFallbackStoredValue = input.value;
+        }
+
+        input.value = '';
+        field.hidden = true;
+        field.classList.add('is-hidden');
+    }
+
+    function syncRoleFallbackControls() {
+        ['heading', 'body', 'monospace'].forEach((roleKey) => {
+            if (roleKey === 'monospace' && !monospaceRoleEnabled) {
+                return;
+            }
+
+            syncRoleFallbackControl(roleKey);
+        });
     }
 
 
@@ -1270,6 +1379,10 @@
         outputMonoDependentInputs.forEach((input) => {
             input.disabled = !enabled;
 
+            if (!enabled && options.clearWhenDisabled) {
+                input.checked = false;
+            }
+
             const dependencyDescriptionId = String(input.dataset.settingsDependencyDescription || '').trim();
 
             if (!enabled && dependencyDescriptionId) {
@@ -1777,7 +1890,9 @@
 
         if (Object.prototype.hasOwnProperty.call(settings, 'monospace_role_enabled')) {
             monospaceRoleEnabled = !!settings.monospace_role_enabled && !!roleMonospace && !!roleMonospaceFallback;
-            syncMonoDependentControls(!!settings.monospace_role_enabled);
+            syncMonoDependentControls(!!settings.monospace_role_enabled, {
+                clearWhenDisabled: !settings.monospace_role_enabled,
+            });
         }
 
         syncOutputSettingsUi();
@@ -3086,12 +3201,402 @@
         }, delay);
     }
 
+    function libraryListContainer() {
+        return document.querySelector('[data-font-library-list]');
+    }
+
+    function hideLibraryEmptyStateAfterRowInsert() {
+        document.querySelectorAll('.tasty-fonts-empty-state--library').forEach((element) => {
+            element.hidden = true;
+            element.classList.add('is-hidden');
+        });
+    }
+
+    function expandedLibraryRowSlugs() {
+        const expanded = new Set();
+
+        document.querySelectorAll('[data-font-row]').forEach((row) => {
+            const slug = normalizeFamilyKey(row.getAttribute('data-font-slug') || familySlug(row.getAttribute('data-font-family') || ''));
+            const toggle = row.querySelector('[data-disclosure-toggle]');
+
+            if (!slug || !toggle || !isDisclosureExpanded(toggle)) {
+                return;
+            }
+
+            expanded.add(slug);
+        });
+
+        return expanded;
+    }
+
+    function syncRoleFamilyCatalogInPlace(nextCatalog) {
+        if (!nextCatalog || typeof nextCatalog !== 'object' || Array.isArray(nextCatalog)) {
+            return;
+        }
+
+        Object.keys(roleFamilyCatalog).forEach((key) => {
+            if (!Object.prototype.hasOwnProperty.call(nextCatalog, key)) {
+                delete roleFamilyCatalog[key];
+            }
+        });
+
+        Object.entries(nextCatalog).forEach(([family, entry]) => {
+            roleFamilyCatalog[family] = entry;
+        });
+    }
+
+    function setSelectOptionsPreservingValue(select, options, selectedValue) {
+        if (!(select instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        const currentValue = String(selectedValue || select.value || '');
+        const nextOptions = Array.isArray(options) ? options : [];
+        const existingEmptyOption = Array.from(select.options).find((option) => String(option.value || '') === '');
+        const existingSelectedOption = Array.from(select.options).find((option) => String(option.value || '') === currentValue);
+        const fallbackEmptyLabel = existingEmptyOption
+            ? String(existingEmptyOption.textContent || '').trim()
+            : 'Use Fallback Only';
+        const fallbackCurrentLabel = existingSelectedOption
+            ? String(existingSelectedOption.textContent || '').trim()
+            : currentValue;
+        const hasIncomingEmptyOption = nextOptions.some((option) => option && typeof option === 'object' && String(option.value || '') === '');
+
+        select.innerHTML = '';
+
+        if (!hasIncomingEmptyOption) {
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = fallbackEmptyLabel;
+            select.appendChild(emptyOption);
+        }
+
+        nextOptions.forEach((option) => {
+            if (!option || typeof option !== 'object') {
+                return;
+            }
+
+            const element = document.createElement('option');
+            element.value = String(option.value || '');
+            element.textContent = String(option.label || option.value || '');
+
+            if (element.value === currentValue) {
+                element.selected = true;
+            }
+
+            select.appendChild(element);
+        });
+
+        const hasCurrentValueOption = currentValue !== ''
+            && Array.from(select.options).some((option) => String(option.value || '') === currentValue);
+
+        if (currentValue !== '' && !hasCurrentValueOption) {
+            const transientOption = document.createElement('option');
+            transientOption.value = currentValue;
+            transientOption.textContent = fallbackCurrentLabel || currentValue;
+            transientOption.selected = true;
+            transientOption.dataset.transientSelection = '1';
+            select.appendChild(transientOption);
+        }
+
+        if (select.value !== currentValue) {
+            select.value = currentValue;
+        }
+    }
+
+    function resolveRoleFamilyOptionsForSelect(roleKey, optionsSource) {
+        if (Array.isArray(optionsSource)) {
+            return optionsSource;
+        }
+
+        if (optionsSource && typeof optionsSource === 'object') {
+            return Array.isArray(optionsSource[roleKey]) ? optionsSource[roleKey] : [];
+        }
+
+        return [];
+    }
+
+    function syncRoleFamilySelectOptions(optionsSource = {}) {
+        Object.entries(roleFamilySelects).forEach(([roleKey, select]) => {
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            setSelectOptionsPreservingValue(select, resolveRoleFamilyOptionsForSelect(roleKey, optionsSource), select.value);
+        });
+
+        Object.entries(previewRoleSelects).forEach(([roleKey, select]) => {
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            setSelectOptionsPreservingValue(select, resolveRoleFamilyOptionsForSelect(roleKey, optionsSource), select.value);
+        });
+    }
+
+    function rerenderHostedSearchLibraryBadges() {
+        if (googleResults && searchResults.length > 0) {
+            renderSearchResults(searchResults, { hasMore: googleSearchHasMore });
+        }
+
+        if (bunnyResults && bunnySearchResults.length > 0) {
+            renderBunnySearchResults(bunnySearchResults, { hasMore: bunnySearchHasMore });
+        }
+    }
+
+    function replaceLibraryRowsHtml(rowsHtml) {
+        const list = libraryListContainer();
+
+        if (!(list instanceof HTMLElement) || typeof rowsHtml !== 'string') {
+            return false;
+        }
+
+        const expandedSlugs = expandedLibraryRowSlugs();
+        list.innerHTML = rowsHtml;
+
+        bindFamilyFallbackControls(list);
+        bindFamilyFontDisplayControls(list);
+        bindFamilyDeliveryControls(list);
+        bindFamilyPublishStateControls(list);
+
+        expandedSlugs.forEach((slug) => {
+            const row = list.querySelector(`[data-font-row][data-font-slug="${CSS.escape(slug)}"]`);
+            const toggle = row ? row.querySelector('[data-disclosure-toggle]') : null;
+
+            if (toggle) {
+                setDisclosureState(toggle, true);
+            }
+        });
+
+        applyLibraryFilterState();
+
+        return true;
+    }
+
+    function rowElementFromHtml(html) {
+        if (typeof html !== 'string' || html.trim() === '') {
+            return null;
+        }
+
+        const template = document.createElement('template');
+        template.innerHTML = html.trim();
+        const firstElement = template.content.firstElementChild;
+
+        return firstElement && firstElement.hasAttribute('data-font-row') ? firstElement : null;
+    }
+
+    function applyLibraryRefreshRows(rows, missingFamilySlugs = [], requestedExpandedSlugs = new Set(), currentLibrarySlugs = null) {
+        const list = libraryListContainer();
+
+        if (!(list instanceof HTMLElement)) {
+            return false;
+        }
+
+        const rowPayloads = Array.isArray(rows) ? rows : [];
+        const missingSlugs = Array.isArray(missingFamilySlugs) ? missingFamilySlugs : [];
+        let expectedRows = rowPayloads.length > 0 || missingSlugs.length > 0;
+        let rowApplyFailed = false;
+
+        rowPayloads.forEach((rowPayload) => {
+            const slug = normalizeFamilyKey(rowPayload && rowPayload.family_slug ? rowPayload.family_slug : '');
+            const nextRow = rowElementFromHtml(rowPayload && rowPayload.html ? rowPayload.html : '');
+
+            if (!slug || !nextRow) {
+                rowApplyFailed = true;
+                return;
+            }
+
+            const existing = list.querySelector(`[data-font-row][data-font-slug="${CSS.escape(slug)}"]`);
+
+            if (existing) {
+                existing.replaceWith(nextRow);
+            } else {
+                list.appendChild(nextRow);
+            }
+
+            hideLibraryEmptyStateAfterRowInsert();
+
+            if (requestedExpandedSlugs.has(slug)) {
+                const toggle = nextRow.querySelector('[data-disclosure-toggle]');
+
+                if (toggle) {
+                    setDisclosureState(toggle, true);
+                }
+            }
+        });
+
+        missingSlugs.forEach((slugValue) => {
+            const slug = normalizeFamilyKey(slugValue);
+
+            if (!slug) {
+                return;
+            }
+
+            const row = list.querySelector(`[data-font-row][data-font-slug="${CSS.escape(slug)}"]`);
+
+            if (row) {
+                row.remove();
+            }
+        });
+
+        if (Array.isArray(currentLibrarySlugs)) {
+            const allowedSlugs = new Set(currentLibrarySlugs.map((slug) => normalizeFamilyKey(slug)).filter(Boolean));
+
+            list.querySelectorAll('[data-font-row]').forEach((row) => {
+                const slug = normalizeFamilyKey(row.getAttribute('data-font-slug') || '');
+
+                if (slug && !allowedSlugs.has(slug)) {
+                    row.remove();
+                }
+            });
+        }
+
+        bindFamilyFallbackControls(list);
+        bindFamilyFontDisplayControls(list);
+        bindFamilyDeliveryControls(list);
+        bindFamilyPublishStateControls(list);
+        applyLibraryFilterState();
+
+        return !(expectedRows && rowApplyFailed);
+    }
+
+    function normalizeAffectedFamilyNames(result = {}, fallbacks = []) {
+        const names = [];
+        const includeName = (value) => {
+            const next = String(value || '').trim();
+
+            if (!next || next === '[object Object]') {
+                return;
+            }
+
+            if (!names.some((item) => normalizeFamilyKey(item) === normalizeFamilyKey(next))) {
+                names.push(next);
+            }
+        };
+        const includeObjectName = (value) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+                includeName(value);
+                return;
+            }
+
+            const candidateKeys = ['family', 'family_name', 'name', 'slug', 'family_slug'];
+            let included = false;
+
+            candidateKeys.forEach((key) => {
+                if (included) {
+                    return;
+                }
+
+                const candidate = value[key];
+
+                if (candidate === undefined || candidate === null || typeof candidate === 'object') {
+                    return;
+                }
+
+                const next = String(candidate).trim();
+
+                if (!next) {
+                    return;
+                }
+
+                includeName(next);
+                included = true;
+            });
+        };
+
+        [
+            result.family,
+            result.family_name,
+            result.font_family,
+            result.import_family,
+            ...(Array.isArray(result.families) ? result.families : []),
+            ...(Array.isArray(fallbacks) ? fallbacks : [])
+        ].forEach(includeObjectName);
+
+        return names;
+    }
+
+    async function refreshLibraryViewAfterMutation(result = {}, options = {}) {
+        if (!hasRestConfig() || !window.fetch) {
+            return false;
+        }
+
+        try {
+            const fallbackFamilies = normalizeAffectedFamilyNames(result, options.families || []);
+            const expandedFamilySlugs = Array.from(expandedLibraryRowSlugs());
+            const shouldRefreshAll = fallbackFamilies.length === 0 && options.refreshAllWhenUntargeted === true;
+            const payload = await requestJson(getRoutePath('libraryRefresh', 'library/refresh'), {
+                method: 'POST',
+                body: {
+                    family_names: fallbackFamilies,
+                    expanded_family_slugs: expandedFamilySlugs,
+                    refresh_all: shouldRefreshAll,
+                },
+                fallbackMessage: getString('requestFailed', 'Request failed.')
+            });
+
+            syncRoleFamilyCatalogInPlace(payload.role_family_catalog || {});
+
+            if (payload.available_family_options && typeof payload.available_family_options === 'object') {
+                syncRoleFamilySelectOptions(payload.available_family_options);
+            }
+
+            const previewBootstrapState = payload.preview_bootstrap && typeof payload.preview_bootstrap === 'object'
+                ? payload.preview_bootstrap
+                : {};
+
+            syncPreviewBootstrapState({
+                roles: previewBootstrapState.roles || undefined,
+                appliedRoles: previewBootstrapState.appliedRoles || previewBootstrapState.applied_roles || undefined,
+                applyEverywhere: typeof payload.apply_everywhere === 'boolean'
+                    ? payload.apply_everywhere
+                    : config.applyEverywhere,
+                baselineSource: previewBootstrapState.baselineSource
+                    || previewBootstrapState.baseline_source
+                    || payload.preview_baseline_source
+                    || undefined,
+                baselineLabel: previewBootstrapState.baselineLabel
+                    || previewBootstrapState.baseline_label
+                    || payload.preview_baseline_label
+                    || undefined,
+            });
+
+            const rowsApplied = applyLibraryRefreshRows(
+                payload.rows,
+                payload.missing_family_slugs,
+                new Set(expandedFamilySlugs),
+                shouldRefreshAll ? payload.library_family_slugs : null
+            );
+
+            if (!rowsApplied) {
+                return false;
+            }
+
+            renderAllRoleWeightEditors();
+            renderAllRoleAxisEditors();
+            renderAllPreviewWeightEditors();
+            renderAllPreviewAxisEditors();
+            updateRoleOutputs();
+            rerenderHostedSearchLibraryBadges();
+
+            if (typeof options.highlightSlug === 'string' && options.highlightSlug.trim() !== '') {
+                highlightLibraryRow(options.highlightSlug);
+            }
+
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     function roleFieldSnapshot() {
+        syncRoleFallbackControls();
+
         const snapshot = {
             heading: getElementValue(roleHeading, ''),
             body: getElementValue(roleBody, ''),
-            headingFallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
-            bodyFallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
+            headingFallback: roleFallbackValueForSave('heading'),
+            bodyFallback: roleFallbackValueForSave('body'),
             headingWeight: getElementValue(roleWeightSelects.heading, ''),
             bodyWeight: getElementValue(roleWeightSelects.body, ''),
             headingAxes: roleAxisFieldValues('heading'),
@@ -3100,7 +3605,7 @@
 
         if (monospaceRoleEnabled) {
             snapshot.monospace = getElementValue(roleMonospace, '');
-            snapshot.monospaceFallback = getElementValue(roleMonospaceFallback, 'monospace');
+            snapshot.monospaceFallback = roleFallbackValueForSave('monospace');
             snapshot.monospaceWeight = getElementValue(roleWeightSelects.monospace, '');
             snapshot.monospaceAxes = roleAxisFieldValues('monospace');
         }
@@ -3139,6 +3644,7 @@
             roleMonospaceFallback.value = snapshot.monospaceFallback || 'monospace';
         }
 
+        syncRoleFallbackControls();
         renderAllRoleAxisEditors(snapshot);
     }
 
@@ -5161,7 +5667,7 @@
             if (toast.parentNode) {
                 toast.remove();
             }
-        }, 180);
+        }, 240);
     }
 
     function ensureToastStack() {
@@ -6112,13 +6618,15 @@
 
     // Role preview and output state
     function currentRoleData() {
+        syncRoleFallbackControls();
+
         return buildRoleDataFromValues({
             heading: getElementValue(roleHeading, ''),
             body: getElementValue(roleBody, ''),
             monospace: monospaceRoleEnabled ? getElementValue(roleMonospace, '') : '',
-            headingFallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
-            bodyFallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
-            monospaceFallback: monospaceRoleEnabled ? getElementValue(roleMonospaceFallback, 'monospace') : 'monospace',
+            headingFallback: roleFallbackValueForSave('heading'),
+            bodyFallback: roleFallbackValueForSave('body'),
+            monospaceFallback: monospaceRoleEnabled ? roleFallbackValueForSave('monospace') : 'monospace',
             headingWeight: getElementValue(roleWeightSelects.heading, ''),
             bodyWeight: getElementValue(roleWeightSelects.body, ''),
             monospaceWeight: monospaceRoleEnabled ? getElementValue(roleWeightSelects.monospace, '') : '',
@@ -6129,13 +6637,15 @@
     }
 
     function currentDraftRoleState() {
+        syncRoleFallbackControls();
+
         return normalizeRoleState({
             heading: getElementValue(roleHeading, ''),
             body: getElementValue(roleBody, ''),
             monospace: monospaceRoleEnabled ? getElementValue(roleMonospace, '') : '',
-            headingFallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
-            bodyFallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
-            monospaceFallback: monospaceRoleEnabled ? getElementValue(roleMonospaceFallback, 'monospace') : 'monospace',
+            headingFallback: roleFallbackValueForSave('heading'),
+            bodyFallback: roleFallbackValueForSave('body'),
+            monospaceFallback: monospaceRoleEnabled ? roleFallbackValueForSave('monospace') : 'monospace',
             headingWeight: getElementValue(roleWeightSelects.heading, ''),
             bodyWeight: getElementValue(roleWeightSelects.body, ''),
             monospaceWeight: monospaceRoleEnabled ? getElementValue(roleWeightSelects.monospace, '') : '',
@@ -6187,6 +6697,87 @@
 
     function roleStatesMatch(left = {}, right = {}) {
         return contractRoleStatesMatch(left, right, roleContractOptions());
+    }
+
+    function isolateRoleState(roleKey, state = {}) {
+        const normalized = normalizeRoleState(state);
+        const isolated = {};
+
+        roleKeys.forEach((key) => {
+            isolated[key] = key === roleKey ? normalized[key] : '';
+            isolated[`${key}Fallback`] = key === roleKey ? normalized[`${key}Fallback`] : defaultRoleFallback(key);
+            isolated[`${key}Weight`] = key === roleKey ? normalized[`${key}Weight`] : '';
+            isolated[`${key}Axes`] = key === roleKey ? normalized[`${key}Axes`] : {};
+        });
+
+        return normalizeRoleState(isolated);
+    }
+
+    function roleStateDiffersForKey(roleKey, left = {}, right = {}) {
+        return !roleStatesMatch(isolateRoleState(roleKey, left), isolateRoleState(roleKey, right));
+    }
+
+    function rolePreviewValue(data, roleKey, suffix, fallback = '') {
+        const value = data ? data[`${roleKey}${suffix}`] : '';
+
+        return value || fallback;
+    }
+
+    function rolePreviewWeight(data, roleKey) {
+        const explicitWeight = rolePreviewValue(data, roleKey, 'PreviewWeight');
+
+        if (explicitWeight) {
+            return explicitWeight;
+        }
+
+        return data && data.applyRoleWeights ? rolePreviewValue(data, roleKey, 'ResolvedWeight') : '';
+    }
+
+    function applyInlineRolePreviewStyle(elements, roleKey, data) {
+        const fallbackStack = defaultRoleFallback(roleKey);
+        const stack = rolePreviewValue(data, roleKey, 'Stack', fallbackStack);
+        const settings = rolePreviewValue(data, roleKey, 'Settings', 'normal');
+        const weight = rolePreviewWeight(data, roleKey);
+
+        elements.forEach((element) => {
+            element.style.fontFamily = stack;
+            element.style.fontVariationSettings = settings;
+            element.style.fontWeight = weight;
+        });
+    }
+
+    function updateRoleInlinePreviews(draftData = currentRoleData(), draftState = currentDraftRoleState()) {
+        const liveState = currentAppliedRoleState();
+        const liveData = buildRoleDataFromValues(liveState);
+
+        roleKeys.forEach((roleKey) => {
+            if (roleKey === 'monospace' && !monospaceRoleEnabled) {
+                return;
+            }
+
+            const isComparing = !!config.applyEverywhere && roleStateDiffersForKey(roleKey, draftState, liveState);
+            const defaultLabel = roleKey === 'monospace'
+                ? getString('roleInlinePreviewCodeLabel', 'Code Preview')
+                : getString('roleInlinePreviewLabel', 'Preview');
+            const label = isComparing
+                ? getString('roleInlinePreviewDraftLabel', 'Draft')
+                : defaultLabel;
+
+            roleInlinePreviewCards[roleKey].forEach((element) => {
+                element.classList.toggle('is-comparing', isComparing);
+            });
+
+            roleInlinePreviewLabels[roleKey].forEach((element) => {
+                element.textContent = label;
+            });
+
+            roleInlinePreviewLiveRows[roleKey].forEach((element) => {
+                element.hidden = !isComparing;
+            });
+
+            applyInlineRolePreviewStyle(roleInlinePreviewDrafts[roleKey], roleKey, draftData);
+            applyInlineRolePreviewStyle(roleInlinePreviewLives[roleKey], roleKey, liveData);
+        });
     }
 
     function syncDisabledRoleActionHelp(target, disabled, copy) {
@@ -6583,6 +7174,7 @@
             roleMonospaceFallback.value = state.monospaceFallback || 'monospace';
         }
 
+        syncRoleFallbackControls();
         renderAllRoleWeightEditors(state);
         renderAllRoleAxisEditors(state);
     }
@@ -6607,6 +7199,9 @@
 
     function updateRoleOutputs() {
         const data = currentRoleData();
+        const draftState = currentDraftRoleState();
+
+        updateRoleInlinePreviews(data, draftState);
 
         const setButtonLabel = (button, value) => {
             const label = button.querySelector('.tasty-fonts-role-box-copy-label');
@@ -6958,6 +7553,92 @@
         feedback.classList.toggle('is-saving', tone === 'saving');
     }
 
+    function setAdobeProjectFeedback(form, message, tone) {
+        const feedback = form ? form.querySelector('[data-adobe-project-feedback]') : null;
+
+        if (!feedback) {
+            return;
+        }
+
+        feedback.textContent = message || '';
+        feedback.hidden = !message;
+        feedback.classList.toggle('is-success', tone === 'success');
+        feedback.classList.toggle('is-error', tone === 'error');
+        feedback.classList.toggle('is-saving', tone === 'saving');
+    }
+
+    function resolveAdobeProjectAction(submitter) {
+        const action = submitter ? String(submitter.getAttribute('data-adobe-project-action') || '').trim().toLowerCase() : '';
+
+        return action === 'remove' || action === 'resync' ? action : 'save';
+    }
+
+    async function submitAdobeProjectForm(form, submitter) {
+        if (!form || !hasRestConfig() || !window.fetch) {
+            return false;
+        }
+
+        const action = resolveAdobeProjectAction(submitter);
+        const projectField = form.querySelector('input[name="adobe_project_id"]');
+        const enabledField = form.querySelector('input[name="adobe_enabled"]');
+        const buttons = Array.from(form.querySelectorAll('button[type="submit"]'));
+
+        form.setAttribute('aria-busy', 'true');
+        buttons.forEach((button) => {
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+        });
+        setAdobeProjectFeedback(form, getString('adobeProjectSaving', 'Saving Adobe project…'), 'saving');
+
+        try {
+            const result = await requestJson(getRoutePath('saveAdobeProject', 'adobe/project'), {
+                method: 'POST',
+                body: {
+                    action,
+                    project_id: projectField ? String(projectField.value || '').trim() : '',
+                    enabled: enabledField && enabledField.checked ? '1' : '0',
+                },
+                fallbackMessage: getString('adobeProjectSaveError', 'The Adobe project could not be saved.')
+            });
+            const message = getApiMessage(result, getString('adobeProjectSaveError', 'The Adobe project could not be saved.'));
+
+            if (projectField && typeof result.project_id === 'string') {
+                projectField.value = result.project_id;
+            }
+
+            if (enabledField && Object.prototype.hasOwnProperty.call(result, 'enabled')) {
+                enabledField.checked = !!result.enabled;
+            }
+
+            syncAdobeProjectActionButtons(form, result);
+
+            setAdobeProjectFeedback(form, message, 'success');
+            showToast(message, 'success');
+
+            const refreshed = await refreshLibraryViewAfterMutation(result, {
+                refreshAllWhenUntargeted: true,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(600);
+            }
+
+            return true;
+        } catch (error) {
+            const message = getErrorMessage(error, getString('adobeProjectSaveError', 'The Adobe project could not be saved.'));
+
+            setAdobeProjectFeedback(form, message, 'error');
+            showToast(message, 'error');
+            return false;
+        } finally {
+            form.removeAttribute('aria-busy');
+            buttons.forEach((button) => {
+                button.disabled = false;
+                button.removeAttribute('aria-busy');
+            });
+        }
+    }
+
     function syncFamilyFallbackSaveState(form) {
         if (!form) {
             return;
@@ -7091,6 +7772,19 @@
 
     function buildFamilyPublishStateErrorMessage(error) {
         return getErrorMessage(error, getString('familyPublishStateSaveError', 'The publish state could not be updated.'));
+    }
+
+    function familyNameForSlug(familySlug, fallback = '') {
+        const slug = normalizeFamilyKey(familySlug);
+
+        if (!slug) {
+            return String(fallback || '').trim();
+        }
+
+        const row = document.querySelector(`[data-font-row][data-font-slug="${CSS.escape(slug)}"]`);
+        const rowFamily = row ? String(row.getAttribute('data-font-family') || '').trim() : '';
+
+        return rowFamily || String(fallback || '').trim();
     }
 
     async function persistFamilyDelivery(familySlug, deliveryId) {
@@ -7352,7 +8046,14 @@
             syncFamilyDeliverySaveState(saveForm);
             setFamilyDeliveryFeedback(saveForm, message, 'success');
             showToast(message, 'success');
-            reloadPageSoon(600);
+            const refreshed = await refreshLibraryViewAfterMutation(result.payload || {}, {
+                families: [familyNameForSlug(familySlug)],
+                highlightSlug: familySlug,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(600);
+            }
             return true;
         } catch (error) {
             const message = buildFamilyDeliveryErrorMessage(error);
@@ -7406,7 +8107,14 @@
             syncFamilyPublishStateSaveState(saveForm);
             setFamilyPublishStateFeedback(saveForm, message, 'success');
             showToast(message, 'success');
-            reloadPageSoon(600);
+            const refreshed = await refreshLibraryViewAfterMutation(result.payload || {}, {
+                families: [familyNameForSlug(familySlug)],
+                highlightSlug: familySlug,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(600);
+            }
             return true;
         } catch (error) {
             const message = buildFamilyPublishStateErrorMessage(error);
@@ -7471,7 +8179,14 @@
             const message = payload.message || getString('familyDeliverySaved', 'Live delivery updated.');
 
             showToast(message, 'success');
-            reloadPageSoon(600);
+            const refreshed = await refreshLibraryViewAfterMutation(payload || {}, {
+                families: [familyName],
+                highlightSlug: familySlug,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(600);
+            }
             return true;
         } catch (error) {
             showToast(getErrorMessage(error, getString('deliveryDeleteError', 'The delivery profile could not be deleted.')), 'error');
@@ -7490,11 +8205,13 @@
         setRoleDraftSavingState(true);
 
         try {
+            syncRoleFallbackControls();
+
             const requestBody = {
                 heading: getElementValue(roleHeading, ''),
                 body: getElementValue(roleBody, ''),
-                heading_fallback: getElementValue(roleHeadingFallback, defaultRoleFallback('heading')),
-                body_fallback: getElementValue(roleBodyFallback, defaultRoleFallback('body')),
+                heading_fallback: roleFallbackValueForSave('heading'),
+                body_fallback: roleFallbackValueForSave('body'),
                 heading_weight: getElementValue(roleWeightSelects.heading, ''),
                 body_weight: getElementValue(roleWeightSelects.body, ''),
                 heading_axes: roleAxisFieldValues('heading'),
@@ -7503,7 +8220,7 @@
 
             if (monospaceRoleEnabled) {
                 requestBody.monospace = getElementValue(roleMonospace, '');
-                requestBody.monospace_fallback = getElementValue(roleMonospaceFallback, defaultRoleFallback('monospace'));
+                requestBody.monospace_fallback = roleFallbackValueForSave('monospace');
                 requestBody.monospace_weight = getElementValue(roleWeightSelects.monospace, '');
                 requestBody.monospace_axes = roleAxisFieldValues('monospace');
             }
@@ -7554,6 +8271,7 @@
                 roleMonospaceFallback.value = roles.monospace_fallback;
             }
 
+            syncRoleFallbackControls();
             renderAllRoleAxisEditors({
                 heading: typeof roles.heading === 'string' ? roles.heading : getElementValue(roleHeading, ''),
                 body: typeof roles.body === 'string' ? roles.body : getElementValue(roleBody, ''),
@@ -8323,7 +9041,7 @@
 
     function renderBunnySearchResults(items, options = {}) {
         if (!bunnyResults) {
-            return;
+            return { appendedCount: 0, totalCount: 0 };
         }
 
         const nextItems = Array.isArray(items) ? items : [];
@@ -8347,7 +9065,8 @@
         if (!bunnySearchResults.length) {
             updateBunnySearchPreviewStylesheet([]);
             renderEmptyState(bunnyResults, getString('bunnySearchEmpty', 'No Bunny Fonts families matched that search.'));
-            return;
+
+            return { appendedCount: 0, totalCount: 0 };
         }
 
         updateBunnySearchPreviewStylesheet(bunnySearchResults);
@@ -8424,6 +9143,11 @@
                 renderBunnyVariantOptions(matchedFamily.variants || [], matchedFamily.family || '');
             }
         }
+
+        return {
+            appendedCount: shouldAppend ? itemsToRender.length : bunnySearchResults.length,
+            totalCount: bunnySearchResults.length
+        };
     }
 
     function selectBunnySearchFamily(familyName) {
@@ -9337,10 +10061,18 @@
             const results = Array.isArray(payload.rows) ? payload.rows : [];
             applyUploadResults(rows, results);
 
-            setStatus(uploadStatus, payload.message || getString('uploadSuccess', 'Upload complete. Refreshing the library…'), 'success', 100);
+            setStatus(uploadStatus, payload.message || getString('uploadSuccess', 'Upload complete.'), 'success');
 
             if ((payload.summary && payload.summary.imported > 0) || (Array.isArray(payload.families) && payload.families.length > 0)) {
-                reloadPageSoon();
+                const refreshed = await refreshLibraryViewAfterMutation(payload, {
+                    families: Array.isArray(payload.families) ? payload.families : [],
+                    highlightSlug: normalizeImportFamilySlug(payload, ''),
+                    refreshAllWhenUntargeted: true,
+                });
+
+                if (!refreshed) {
+                    reloadPageSoon();
+                }
             }
         } catch (error) {
             const message = getErrorMessage(error, getString('uploadError', 'The font upload failed.'));
@@ -9495,7 +10227,7 @@
             bunnySearchNextOffset = normalizeSearchNextOffset(payload, items.length);
             renderBunnySearchResults(items, { hasMore: bunnySearchHasMore });
 
-            if (bunnySearchHasMore && shouldLoadMoreSearchResults(bunnyResults)) {
+            if (bunnySearchHasMore && bunnySearchNextOffset > 0 && shouldLoadMoreSearchResults(bunnyResults)) {
                 void loadMoreBunnySearchResults();
             }
         } catch (error) {
@@ -9530,10 +10262,22 @@
                 return;
             }
 
+            const previousOffset = bunnySearchNextOffset;
+            const previousResultCount = bunnySearchResults.length;
             const items = Array.isArray(payload.items) ? payload.items : [];
+
             bunnySearchHasMore = !!payload.has_more;
             bunnySearchNextOffset = normalizeSearchNextOffset(payload, bunnySearchNextOffset + items.length);
-            renderBunnySearchResults(items, { append: true, hasMore: bunnySearchHasMore });
+
+            const appendResult = renderBunnySearchResults(items, { append: true, hasMore: bunnySearchHasMore });
+            const noOffsetProgress = bunnySearchNextOffset <= previousOffset;
+            const noListProgress = appendResult.totalCount <= previousResultCount || appendResult.appendedCount === 0;
+
+            if (bunnySearchHasMore && (noOffsetProgress || noListProgress)) {
+                bunnySearchHasMore = false;
+                removeSearchLoadState(bunnyResults);
+            }
+
             shouldContinue = bunnySearchHasMore && shouldLoadMoreSearchResults(bunnyResults);
         } catch (error) {
             if (requestToken !== bunnySearchRequestToken) {
@@ -10217,14 +10961,14 @@
 
     function renderCustomCssFinalImportResult(form, result = {}) {
         const status = customCssFinalFormStatus(form);
-        const message = getApiMessage(result, getString('urlImportSuccess', 'Import complete. Refreshing the library…'));
+        const message = getApiMessage(result, getString('urlImportSuccess', 'Import complete.'));
         const summary = buildCustomCssImportSummary(result);
         const finalMessage = summary ? `${message} ${summary}.` : message;
         const type = String(result.status || '').trim() === 'partial' || String(result.status || '').trim() === 'skipped'
             ? 'warning'
             : 'success';
 
-        setStatus(status, finalMessage, type, 100);
+        setStatus(status, finalMessage, type);
         showToast(finalMessage, type === 'success' ? 'success' : 'error');
     }
 
@@ -10277,7 +11021,16 @@
 
             renderCustomCssFinalImportResult(form, result);
             latestCustomCssDryRunPlan = null;
-            reloadPageSoon(900);
+
+            const refreshed = await refreshLibraryViewAfterMutation(result, {
+                families: normalizeAffectedFamilyNames(result),
+                highlightSlug: normalizeImportFamilySlug(result, ''),
+                refreshAllWhenUntargeted: true,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(900);
+            }
         } catch (error) {
             const fallbackMessage = getString('urlImportError', 'The custom CSS import failed.');
             const payload = error && typeof error === 'object' && error.payload && typeof error.payload === 'object'
@@ -10405,22 +11158,29 @@
             const importedCount = Array.isArray(result.imported_variants) ? result.imported_variants.length : 0;
             const skippedCount = Array.isArray(result.skipped_variants) ? result.skipped_variants.length : 0;
             const summary = formatPluralMessage(
-                'Saved %1$d variant. %2$d skipped. Reloading…',
-                'Saved %1$d variants. %2$d skipped. Reloading…',
+                'Saved %1$d variant. %2$d skipped.',
+                'Saved %1$d variants. %2$d skipped.',
                 importedCount,
                 [importedCount, skippedCount]
             );
             const message = getApiMessage(result, summary);
             const tone = result.status === 'skipped' ? 'error' : 'success';
 
-            setStatus(importStatus, message, tone, tone === 'success' ? 100 : undefined);
+            setStatus(importStatus, message, tone);
             showToast(message, tone);
 
             if (tone === 'success') {
-                reloadPageSoon(900, {
-                    type: 'highlight-library-row',
-                    familySlug: normalizeImportFamilySlug(result, family)
+                const refreshed = await refreshLibraryViewAfterMutation(result, {
+                    families: [family],
+                    highlightSlug: normalizeImportFamilySlug(result, family)
                 });
+
+                if (!refreshed) {
+                    reloadPageSoon(900, {
+                        type: 'highlight-library-row',
+                        familySlug: normalizeImportFamilySlug(result, family)
+                    });
+                }
             }
         } catch (error) {
             const message = getErrorMessage(error, getString('importError', 'Import failed.'));
@@ -10472,17 +11232,24 @@
                 },
                 fallbackMessage: getString('bunnyImportError', 'The Bunny Fonts import failed.')
             });
-            const message = getApiMessage(result, getString('bunnyImportSuccess', 'Bunny Fonts imported successfully. Reloading…'));
+            const message = getApiMessage(result, getString('bunnyImportSuccess', 'Bunny Fonts imported successfully.'));
             const tone = result.status === 'imported' || result.status === 'saved' ? 'success' : 'error';
 
-            setStatus(bunnyImportStatus, message, tone, tone === 'success' ? 100 : undefined);
+            setStatus(bunnyImportStatus, message, tone);
             showToast(message, tone);
 
             if (tone === 'success') {
-                reloadPageSoon(900, {
-                    type: 'highlight-library-row',
-                    familySlug: normalizeImportFamilySlug(result, family)
+                const refreshed = await refreshLibraryViewAfterMutation(result, {
+                    families: [family],
+                    highlightSlug: normalizeImportFamilySlug(result, family)
                 });
+
+                if (!refreshed) {
+                    reloadPageSoon(900, {
+                        type: 'highlight-library-row',
+                        familySlug: normalizeImportFamilySlug(result, family)
+                    });
+                }
             }
         } catch (error) {
             const message = getErrorMessage(error, getString('bunnyImportError', 'The Bunny Fonts import failed.'));
@@ -10531,39 +11298,16 @@
     // Library filtering
     function initLibraryFiltering() {
         if (!librarySearch && !librarySourceFilter && !libraryCategoryFilter) {
+            applyLibraryFilterState = () => {};
             return;
         }
 
-        const libraryRows = Array.from(document.querySelectorAll('[data-font-row]'));
         activeLibrarySourceFilter = librarySourceFilter ? (librarySourceFilter.value || 'all') : 'all';
         activeLibraryCategoryFilter = libraryCategoryFilter ? (libraryCategoryFilter.value || 'all') : 'all';
 
-        function rowMatchesSource(row, sourceFilter) {
-            if (!row || !sourceFilter || sourceFilter === 'all') {
-                return true;
-            }
-
-            const sourceTokens = (row.getAttribute('data-font-sources') || '').split(/\s+/).filter(Boolean);
-
-            if (sourceFilter === 'published' && sourceTokens.includes('role_active')) {
-                return true;
-            }
-
-            return sourceTokens.includes(sourceFilter);
-        }
-
-        function rowMatchesCategory(row, categoryFilter) {
-            if (!row || !categoryFilter || categoryFilter === 'all') {
-                return true;
-            }
-
-            const categoryTokens = (row.getAttribute('data-font-categories') || '').split(/\s+/).filter(Boolean);
-
-            return categoryTokens.includes(categoryFilter);
-        }
-
-        const applyLibraryFilter = () => {
+        applyLibraryFilterState = () => {
             const query = librarySearch ? librarySearch.value.trim().toLowerCase() : '';
+            const libraryRows = Array.from(document.querySelectorAll('[data-font-row]'));
             let visibleCount = 0;
 
             libraryRows.forEach((row) => {
@@ -10603,25 +11347,25 @@
         };
 
         if (librarySearch) {
-            librarySearch.addEventListener('input', applyLibraryFilter);
-            librarySearch.addEventListener('search', applyLibraryFilter);
+            librarySearch.addEventListener('input', applyLibraryFilterState);
+            librarySearch.addEventListener('search', applyLibraryFilterState);
         }
 
         if (librarySourceFilter) {
             librarySourceFilter.addEventListener('change', () => {
                 activeLibrarySourceFilter = librarySourceFilter.value || 'all';
-                applyLibraryFilter();
+                applyLibraryFilterState();
             });
         }
 
         if (libraryCategoryFilter) {
             libraryCategoryFilter.addEventListener('change', () => {
                 activeLibraryCategoryFilter = libraryCategoryFilter.value || 'all';
-                applyLibraryFilter();
+                applyLibraryFilterState();
             });
         }
 
-        applyLibraryFilter();
+        applyLibraryFilterState();
     }
 
     function initLogFiltering() {
@@ -11216,6 +11960,7 @@
             roleMonospace.value = family;
         }
 
+        syncRoleFallbackControls();
         const nextRoleState = resolveAssignedRoleState(role, family, snapshotBeforeChange, [currentAppliedRoleState()]);
 
         renderAllRoleWeightEditors(nextRoleState);
@@ -11565,6 +12310,48 @@
         });
     }
 
+    function setDeliveryProfileChoiceBusyState(group, isBusy) {
+        if (!(group instanceof HTMLElement)) {
+            return;
+        }
+
+        const buttons = group.querySelectorAll('[data-family-delivery-choice], [data-migrate-delivery], [data-delete-delivery-profile]');
+
+        if (isBusy) {
+            group.classList.add('is-saving');
+            group.setAttribute('aria-busy', 'true');
+
+            buttons.forEach((button) => {
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                button.dataset.wasDisabled = button.disabled ? '1' : '0';
+                button.disabled = true;
+                button.setAttribute('aria-busy', 'true');
+            });
+            return;
+        }
+
+        if (!pageReloadScheduled) {
+            group.classList.remove('is-saving');
+            group.removeAttribute('aria-busy');
+        }
+
+        buttons.forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            if (!pageReloadScheduled) {
+                button.disabled = button.dataset.wasDisabled === '1';
+            }
+
+            delete button.dataset.wasDisabled;
+            button.removeAttribute('aria-busy');
+        });
+    }
+
     function syncHydratedFamilyDeliverySelector(row, familySlug, deliveryId) {
         if (!row || !familySlug || !deliveryId) {
             return;
@@ -11625,13 +12412,53 @@
 
             syncHydratedFamilyDeliverySelector(row, familySlug, targetDeliveryId);
             showToast(result.message, 'success');
-            reloadPageSoon(600);
+            const refreshed = await refreshLibraryViewAfterMutation(result.payload || {}, {
+                families: [familyNameForSlug(familySlug, row ? row.getAttribute('data-font-family') || '' : '')],
+                highlightSlug: familySlug,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(600);
+            }
             return true;
         } catch (error) {
             showToast(buildFamilyDeliveryErrorMessage(error), 'error');
             return false;
         } finally {
             setQuickFamilyActionsBusyState(row, false);
+        }
+    }
+
+    async function saveFamilyDeliveryChoice(button) {
+        const group = button.closest('.tasty-fonts-detail-group--profiles') || button.closest('[data-font-row]');
+        const familySlug = (button.getAttribute('data-family-slug') || '').trim();
+        const targetDeliveryId = (button.getAttribute('data-delivery-id') || '').trim();
+
+        if (!familySlug || !targetDeliveryId || !hasRestConfig()) {
+            showToast(getString('quickDeliveryUnavailable', 'Open Details to choose a delivery profile.'), 'error');
+            return false;
+        }
+
+        setDeliveryProfileChoiceBusyState(group, true);
+
+        try {
+            const result = await persistFamilyDelivery(familySlug, targetDeliveryId);
+
+            showToast(result.message, 'success');
+            const refreshed = await refreshLibraryViewAfterMutation(result.payload || {}, {
+                families: [familyNameForSlug(familySlug)],
+                highlightSlug: familySlug,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(600);
+            }
+            return true;
+        } catch (error) {
+            showToast(buildFamilyDeliveryErrorMessage(error), 'error');
+            return false;
+        } finally {
+            setDeliveryProfileChoiceBusyState(group, false);
         }
     }
 
@@ -11659,7 +12486,14 @@
 
             syncHydratedFamilyPublishStateSelector(row, familySlug, targetPublishState);
             showToast(result.message, 'success');
-            reloadPageSoon(600);
+            const refreshed = await refreshLibraryViewAfterMutation(result.payload || {}, {
+                families: [familyNameForSlug(familySlug, row ? row.getAttribute('data-font-family') || '' : '')],
+                highlightSlug: familySlug,
+            });
+
+            if (!refreshed) {
+                reloadPageSoon(600);
+            }
             return true;
         } catch (error) {
             showToast(buildFamilyPublishStateErrorMessage(error), 'error');
@@ -11690,6 +12524,18 @@
 
         event.preventDefault();
         void saveQuickFamilyDelivery(button);
+        return true;
+    }
+
+    function handleFamilyDeliveryChoiceClick(event) {
+        const button = event.target.closest('[data-family-delivery-choice]');
+
+        if (!button) {
+            return false;
+        }
+
+        event.preventDefault();
+        void saveFamilyDeliveryChoice(button);
         return true;
     }
 
@@ -11737,6 +12583,10 @@
             return;
         }
 
+        if (handleFamilyDeliveryChoiceClick(event)) {
+            return;
+        }
+
         if (handlePreviewWorkspaceClick(event)) {
             return;
         }
@@ -11774,6 +12624,39 @@
         }
 
         handleDetectedUploadClick(event);
+    }
+
+    function syncAdobeProjectActionButtons(form, result = {}) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const projectId = String(result.project_id || '').trim();
+        const hasProject = projectId !== '' && result.action !== 'remove' && result.action !== 'clear';
+
+        form.querySelectorAll('[data-adobe-project-action="resync"], [data-adobe-project-action="remove"]').forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            button.hidden = !hasProject;
+            button.disabled = !hasProject;
+        });
+    }
+
+    function bindAdobeProjectControls() {
+        if (!adobeProjectForm) {
+            return;
+        }
+
+        adobeProjectForm.addEventListener('submit', (event) => {
+            if (!hasRestConfig() || !window.fetch) {
+                return;
+            }
+
+            event.preventDefault();
+            void submitAdobeProjectForm(adobeProjectForm, event.submitter instanceof HTMLElement ? event.submitter : null);
+        });
     }
 
     function bindFamilyFallbackControls(root = document) {
@@ -11949,6 +12832,7 @@
         [roleHeading, roleBody, roleMonospace, roleHeadingFallback, roleBodyFallback, roleMonospaceFallback].forEach((element) => {
             if (element) {
                 element.addEventListener('change', () => {
+                    syncRoleFallbackControls();
                     renderAllRoleWeightEditors();
                     renderAllRoleAxisEditors();
                     updateRoleOutputs();
@@ -12800,7 +13684,10 @@
             input.addEventListener('change', () => {
                 monospaceRoleEnabled = !!input.checked && !!roleMonospace && !!roleMonospaceFallback;
                 syncCheckboxFields('monospace_role_enabled', !!input.checked);
-                syncMonoDependentControls(!!input.checked, { enableDefaults: !!input.checked });
+                syncMonoDependentControls(!!input.checked, {
+                    enableDefaults: !!input.checked,
+                    clearWhenDisabled: !input.checked,
+                });
                 syncOutputSettingsUi();
             });
         });
@@ -12959,7 +13846,9 @@
         const monospaceInput = monospaceRoleSettingInputs.find((input) => input instanceof HTMLInputElement && input.checked);
 
         monospaceRoleEnabled = !!monospaceInput && !!roleMonospace && !!roleMonospaceFallback;
-        syncMonoDependentControls(!!monospaceInput);
+        syncMonoDependentControls(!!monospaceInput, {
+            clearWhenDisabled: !monospaceInput,
+        });
         syncPillOptionUi();
         syncOutputSettingsUi();
         syncUnicodeRangeUi();
@@ -13353,6 +14242,7 @@
         });
         window.addEventListener('popstate', handleTrackedUiPopState);
 
+        bindAdobeProjectControls();
         bindFamilyFallbackControls();
         bindFamilyFontDisplayControls();
         bindFamilyDeliveryControls();
@@ -13379,6 +14269,7 @@
         initLogFiltering();
         initActivityDetailToggles();
         initActivityFiltering();
+        syncRoleFallbackControls();
         renderAllRoleWeightEditors();
         renderAllRoleAxisEditors();
         updatePreviewDynamicText();

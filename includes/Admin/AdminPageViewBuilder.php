@@ -40,7 +40,6 @@ final class AdminPageViewBuilder
         $currentPage = $this->stringValue($context, 'current_page', AdminController::PAGE_ROLES);
         $pageUrls = $this->stringMapValue($context, 'page_urls');
         $catalog = $this->catalogMapValue($context, 'catalog');
-        $libraryCategoryOptions = $this->buildLibraryCategoryOptions();
         $availableFamilies = $this->stringListValue($context, 'available_families', array_keys($catalog));
         $availableFamilyOptions = $this->selectorOptionListValue($context, 'available_family_options');
 
@@ -190,6 +189,7 @@ final class AdminPageViewBuilder
         $previewBaselineLabel = $this->stringValue($context, 'preview_baseline_label', $applyEverywhere ? __('Live sitewide', 'tasty-fonts') : __('Current draft', 'tasty-fonts'));
         $roleDeployment = $this->mapValue($context, 'role_deployment');
         $monospaceRoleEnabled = !empty($context['monospace_role_enabled']);
+        $libraryCategoryOptions = $this->buildLibraryCategoryOptions($variableFontsEnabled, $monospaceRoleEnabled);
         $previewRoles = $previewBaselineSource === 'live_sitewide' && $appliedRoles !== []
             ? $appliedRoles
             : $roles;

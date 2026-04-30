@@ -238,7 +238,9 @@
                                         $this->renderAddFontsSourceStatusCard(
                                             [
                                                 'title' => __('Bunny Fonts', 'tasty-fonts'),
-                                                'summary' => __('Import from Bunny, then host the selected files locally or serve them from Bunny CDN.', 'tasty-fonts'),
+                                                'summary' => $variableFontsEnabled
+                                                    ? __('Import from Bunny, then host the selected files locally or serve them from Bunny CDN. If you require variable fonts, use Google Fonts because Bunny\'s variable-font files are not optimized for variable font workflows.', 'tasty-fonts')
+                                                    : __('Import from Bunny, then host the selected files locally or serve them from Bunny CDN.', 'tasty-fonts'),
                                                 'enabled' => $bunnyFontImportsEnabled,
                                                 'enabled_badge_label' => __('No Key Needed', 'tasty-fonts'),
                                                 'enabled_badge_class' => 'is-success',
@@ -331,7 +333,7 @@
                                                     }
                                                     ?>
                                                     <div id="tasty-fonts-adobe-project-panel" class="tasty-fonts-google-access-panel" <?php echo $adobeAccessExpanded ? '' : 'hidden'; ?>>
-                                                        <form method="post" class="tasty-fonts-google-access-form">
+                                                        <form method="post" class="tasty-fonts-google-access-form" data-adobe-project-form>
                                                         <?php wp_nonce_field('tasty_fonts_save_adobe_project'); ?>
                                                         <input type="hidden" name="tasty_fonts_save_adobe_project" value="1">
                                                         <div class="tasty-fonts-google-access-grid">
@@ -355,11 +357,9 @@
 
                                                             <div class="tasty-fonts-google-access-footer">
                                                                 <div class="tasty-fonts-settings-buttons">
-                                                                    <button type="submit" class="button button-primary"><?php esc_html_e('Save Project', 'tasty-fonts'); ?></button>
-                                                                    <?php if ($adobeProjectSaved): ?>
-                                                                        <button type="submit" class="button" name="tasty_fonts_resync_adobe_project" value="1"><?php esc_html_e('Resync Project', 'tasty-fonts'); ?></button>
-                                                                        <button type="submit" class="button tasty-fonts-button-danger" name="tasty_fonts_remove_adobe_project" value="1"><?php esc_html_e('Remove Project', 'tasty-fonts'); ?></button>
-                                                                    <?php endif; ?>
+                                                                    <button type="submit" class="button button-primary" data-adobe-project-action="save"><?php esc_html_e('Save Project', 'tasty-fonts'); ?></button>
+                                                                    <button type="submit" class="button" name="tasty_fonts_resync_adobe_project" value="1" data-adobe-project-action="resync" <?php echo $adobeProjectSaved ? '' : 'hidden disabled'; ?>><?php esc_html_e('Resync Project', 'tasty-fonts'); ?></button>
+                                                                    <button type="submit" class="button tasty-fonts-button-danger" name="tasty_fonts_remove_adobe_project" value="1" data-adobe-project-action="remove" <?php echo $adobeProjectSaved ? '' : 'hidden disabled'; ?>><?php esc_html_e('Remove Project', 'tasty-fonts'); ?></button>
                                                                 </div>
                                                                 <div class="tasty-fonts-google-access-meta">
                                                                     <div class="tasty-fonts-access-note tasty-fonts-access-note--external">
@@ -369,6 +369,7 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
+                                                            <div class="tasty-fonts-inline-feedback" data-adobe-project-feedback hidden aria-live="polite" aria-atomic="true"></div>
                                                         </div>
                                                         </form>
                                                     </div>
@@ -460,22 +461,15 @@
                                         $this->renderAddFontsSourceStatusCard(
                                             [
                                                 'title' => __('Upload Files', 'tasty-fonts'),
-                                                'summary' => __('Upload one typeface per family and keep its faces together.', 'tasty-fonts'),
+                                                'summary' => $localFontUploadsEnabled
+                                                    ? (
+                                                        $showUploadVariableControls
+                                                            ? __('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Variable uploads can include axis ranges and defaults.', 'tasty-fonts')
+                                                            : __('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Enable variable fonts in Settings to configure axes.', 'tasty-fonts')
+                                                    )
+                                                    : __('Upload one typeface per family and keep its faces together.', 'tasty-fonts'),
                                                 'enabled' => $localFontUploadsEnabled,
                                                 'enabled_badge_label' => __('Auto-detect', 'tasty-fonts'),
-                                                'card_class' => 'tasty-fonts-upload-brief',
-                                                'row_class' => 'tasty-fonts-source-status-row--upload',
-                                                'body' => static function (bool $enabled) use ($showUploadVariableControls): void {
-                                                    if (!$enabled) {
-                                                        return;
-                                                    }
-                                                    ?>
-                                                    <div class="tasty-fonts-access-note tasty-fonts-access-note--external tasty-fonts-access-note--upload">
-                                                        <p class="tasty-fonts-muted"><?php esc_html_e('Clear filenames can prefill family, weight, and style.', 'tasty-fonts'); ?></p>
-                                                        <p class="tasty-fonts-muted"><?php echo $showUploadVariableControls ? esc_html__('Variable uploads can include axis ranges and defaults.', 'tasty-fonts') : esc_html__('Enable variable fonts in Settings to configure axes.', 'tasty-fonts'); ?></p>
-                                                    </div>
-                                                    <?php
-                                                },
                                             ]
                                         );
                                         ?>
@@ -533,9 +527,11 @@
                                 ]
                             );
                             ?>
+                            <div id="tasty-fonts-library-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty-state" hidden><?php esc_html_e('No fonts match the current filters.', 'tasty-fonts'); ?></div>
+                            <div class="tasty-fonts-library-grid" data-font-library-list></div>
                         <?php else: ?>
                             <div id="tasty-fonts-library-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty-state" hidden><?php esc_html_e('No fonts match the current filters.', 'tasty-fonts'); ?></div>
-                            <div class="tasty-fonts-library-grid">
+                            <div class="tasty-fonts-library-grid" data-font-library-list>
                                 <?php foreach ($catalog as $family): ?>
                                     <?php $familyCardRenderer->renderFamilySummaryRow($family, $roles, $familyFallbacks, $familyFontDisplays, $familyFontDisplayOptions, $previewText, $categoryAliasOwners, $extendedVariableOptions, $monospaceRoleEnabled, $classOutputOptions, $libraryRoleUsageRoles); ?>
                                 <?php endforeach; ?>

@@ -2601,6 +2601,64 @@ $tests['library_service_restores_library_only_state_when_a_live_family_is_remove
     );
 };
 
+$tests['library_service_prunes_unavailable_family_after_live_role_moves_away'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $profile = [
+        'id' => 'inter-self-hosted',
+        'label' => 'Self-hosted',
+        'provider' => 'local',
+        'type' => 'self_hosted',
+        'variants' => ['regular'],
+        'faces' => [[
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'source' => 'local',
+            'weight' => '400',
+            'style' => 'normal',
+            'unicode_range' => '',
+            'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+            'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+        ]],
+    ];
+
+    $services['imports']->ensureFamily('Alan Sans', 'alan-sans', 'role_active', '', 'library_only');
+    $services['imports']->saveProfile('Inter', 'inter', $profile, 'published', true);
+
+    assertSameValue(true, $services['imports']->getFamily('alan-sans') !== null, 'Fixture should start with an unavailable stored family record.');
+
+    $services['library']->syncLiveRolePublishStates(
+        [
+            'heading' => 'Inter',
+            'body' => 'Inter',
+        ],
+        true
+    );
+
+    assertSameValue(
+        null,
+        $services['imports']->getFamily('alan-sans'),
+        'Moving live roles away from an unavailable family should remove the stale library record instead of rendering an Unavailable card.'
+    );
+    assertSameValue(
+        'role_active',
+        (string) ($services['imports']->getFamily('inter')['publish_state'] ?? ''),
+        'The replacement live family should remain role_active.'
+    );
+
+    $catalogFamilies = array_map(
+        static fn (array $family): string => (string) ($family['family'] ?? ''),
+        $services['catalog']->getCatalog()
+    );
+
+    assertSameValue(
+        false,
+        in_array('Alan Sans', $catalogFamilies, true),
+        'The unavailable family should disappear from the rendered catalog once pruned.'
+    );
+};
+
 $tests['library_service_preserves_the_active_local_delivery_when_a_managed_delivery_is_added'] = static function (): void {
     resetTestState();
 
@@ -3334,4 +3392,194 @@ CSS,
 
     assertTrueValue(is_wp_error($result), 'BunnyImportService should return a WP_Error when wp_remote_get fails during font file download.');
     assertSameValue('http_request_failed', $result->get_error_code(), 'BunnyImportService should propagate the error code from the failed download response.');
+};
+
+$tests['capability_cleanup_service_removes_variable_only_family_profiles'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['variable_fonts_enabled' => '1']);
+    $services['storage']->ensureRootDirectory();
+    $relativePath = 'variable-only/VariableOnly-Variable.woff2';
+    $absolutePath = (string) $services['storage']->pathForRelativePath($relativePath);
+    $services['storage']->writeAbsoluteFile($absolutePath, 'font-data');
+
+    $services['imports']->saveProfile(
+        'Variable Only',
+        'variable-only',
+        [
+            'id' => 'local-variable',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Variable Only',
+                'weight' => '100..900',
+                'style' => 'normal',
+                'is_variable' => true,
+                'files' => ['woff2' => $relativePath],
+                'paths' => ['woff2' => $relativePath],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $result = $services['capability_cleanup']->removeVariableFontData();
+
+    assertFalseValue(is_wp_error($result), 'Capability cleanup should succeed when removing variable-only families.');
+    assertSameValue(null, $services['imports']->getFamily('variable-only'), 'Capability cleanup should remove families that only contain variable faces.');
+    assertSameValue(false, file_exists($absolutePath), 'Capability cleanup should remove managed variable font files from disk.');
+};
+
+$tests['capability_cleanup_service_keeps_static_data_in_mixed_profiles'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['variable_fonts_enabled' => '1']);
+    $services['storage']->ensureRootDirectory();
+    $staticPath = 'hybrid-family/Hybrid-400-normal.woff2';
+    $variablePath = 'hybrid-family/Hybrid-Variable.woff2';
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($staticPath), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($variablePath), 'font-data');
+
+    $services['imports']->saveProfile(
+        'Hybrid Family',
+        'hybrid-family',
+        [
+            'id' => 'local-mixed',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Hybrid Family',
+                    'weight' => '100..900',
+                    'style' => 'normal',
+                    'is_variable' => true,
+                    'files' => ['woff2' => $variablePath],
+                    'paths' => ['woff2' => $variablePath],
+                ],
+                [
+                    'family' => 'Hybrid Family',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => $staticPath],
+                    'paths' => ['woff2' => $staticPath],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $result = $services['capability_cleanup']->removeVariableFontData();
+    $saved = $services['imports']->getFamily('hybrid-family');
+    $profile = is_array($saved) ? (($saved['delivery_profiles']['local-mixed'] ?? null)) : null;
+
+    assertFalseValue(is_wp_error($result), 'Capability cleanup should succeed when mixed profiles include static faces.');
+    assertSameValue(true, is_array($profile), 'Capability cleanup should keep mixed delivery profiles with static faces.');
+    assertSameValue('static', (string) ($profile['format'] ?? ''), 'Capability cleanup should normalize mixed profiles to static format after variable faces are removed.');
+    assertSameValue(['regular'], (array) ($profile['variants'] ?? []), 'Capability cleanup should rebuild profile variants from remaining static faces.');
+};
+
+$tests['capability_cleanup_service_repoints_active_delivery_to_static_profile_when_variable_active_is_removed'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['variable_fonts_enabled' => '1']);
+    $services['storage']->ensureRootDirectory();
+    $staticPath = 'fallback-family/Fallback-400-normal.woff2';
+    $variablePath = 'fallback-family/Fallback-Variable.woff2';
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($staticPath), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($variablePath), 'font-data');
+
+    $services['imports']->saveProfile(
+        'Fallback Family',
+        'fallback-family',
+        [
+            'id' => 'local-variable',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Fallback Family',
+                'weight' => '100..900',
+                'style' => 'normal',
+                'is_variable' => true,
+                'files' => ['woff2' => $variablePath],
+                'paths' => ['woff2' => $variablePath],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Fallback Family',
+        'fallback-family',
+        [
+            'id' => 'local-static',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Fallback Family',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => $staticPath],
+                'paths' => ['woff2' => $staticPath],
+            ]],
+        ],
+        'published',
+        false
+    );
+
+    $result = $services['capability_cleanup']->removeVariableFontData();
+    $saved = $services['imports']->getFamily('fallback-family');
+
+    assertFalseValue(is_wp_error($result), 'Capability cleanup should succeed when variable active deliveries can fall back to static profiles.');
+    assertSameValue('local-static', (string) ($saved['active_delivery_id'] ?? ''), 'Capability cleanup should repoint active delivery ids to a same-family static profile when the variable active profile is removed.');
+};
+
+$tests['capability_cleanup_service_keeps_manifest_unchanged_when_file_deletion_fails'] = static function (): void {
+    resetTestState();
+
+    global $wpFilesystemShouldInit;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['variable_fonts_enabled' => '1']);
+    $services['storage']->ensureRootDirectory();
+    $relativePath = 'cleanup-failure/CleanupFailure-Variable.woff2';
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($relativePath), 'font-data');
+
+    $services['imports']->saveProfile(
+        'Cleanup Failure',
+        'cleanup-failure',
+        [
+            'id' => 'local-variable',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Cleanup Failure',
+                'weight' => '100..900',
+                'style' => 'normal',
+                'is_variable' => true,
+                'files' => ['woff2' => $relativePath],
+                'paths' => ['woff2' => $relativePath],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $before = $services['imports']->allFamilies();
+    $wpFilesystemShouldInit = false;
+    $result = $services['capability_cleanup']->removeVariableFontData();
+    $wpFilesystemShouldInit = true;
+    $after = $services['imports']->allFamilies();
+
+    assertTrueValue(is_wp_error($result), 'Capability cleanup should return a WP_Error when managed variable files cannot be deleted.');
+    assertSameValue('tasty_fonts_variable_cleanup_failed', $result->get_error_code(), 'Capability cleanup should use the variable cleanup error code when file deletion fails.');
+    assertSameValue($before, $after, 'Capability cleanup should leave the import manifest unchanged when file deletion fails.');
 };

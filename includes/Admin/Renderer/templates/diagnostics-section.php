@@ -537,6 +537,7 @@
                             'before_snapshot_restore' => __('Before snapshot restore', 'tasty-fonts'),
                             'before_reset_settings' => __('Before settings reset', 'tasty-fonts'),
                             'before_wipe_library' => __('Before library delete', 'tasty-fonts'),
+                            'before_capability_disable' => __('Before turning off font capabilities', 'tasty-fonts'),
                             default => ucwords(str_replace('_', ' ', $reason !== '' ? $reason : 'manual')),
                         };
                     };
@@ -834,9 +835,12 @@
 														$runtimeFamilyName = trim((string) ($runtimeFamily['family'] ?? ''));
 														$runtimeProvider = trim((string) ($runtimeFamily['provider'] ?? ''));
 														$runtimeType = trim((string) ($runtimeFamily['type'] ?? ''));
+									$runtimeFormat = strtolower(trim((string) ($runtimeFamily['format'] ?? '')));
 									$runtimeFaces = (int) ($runtimeFamily['faces'] ?? 0);
 									$runtimeVariants = is_array($runtimeFamily['variants'] ?? null) ? array_values(array_filter(array_map('strval', $runtimeFamily['variants']))) : [];
-									$runtimeHelp = __('This family is included in the frontend runtime plan. The row shows provider, source type, face count, and the first variants Tasty Fonts will serve.', 'tasty-fonts');
+									$runtimeAxes = is_array($runtimeFamily['axes'] ?? null) ? array_values(array_filter(array_map('strval', $runtimeFamily['axes']))) : [];
+									$runtimeIsVariable = $runtimeFormat === 'variable' || $runtimeAxes !== [];
+									$runtimeHelp = __('This family is included in the frontend runtime plan. The row shows provider, source type, font format, face count, and the active variants or variable axes Tasty Fonts will serve.', 'tasty-fonts');
 
 														if ($runtimeFamilyName === '') {
 															continue;
@@ -845,14 +849,25 @@
 														$runtimeMeta = [
 															$runtimeProvider !== '' ? $runtimeProvider : __('Local', 'tasty-fonts'),
 															$runtimeType !== '' ? $runtimeType : __('Default', 'tasty-fonts'),
-															sprintf(
+														];
+
+														if ($runtimeIsVariable) {
+															$runtimeMeta[] = __('Variable font', 'tasty-fonts');
+														}
+
+														$runtimeMeta[] = sprintf(
 																/* translators: %d: number of font faces */
 																_n('%d Face', '%d Faces', $runtimeFaces, 'tasty-fonts'),
 																$runtimeFaces
-															),
-														];
+															);
 
-														if ($runtimeVariants !== []) {
+														if ($runtimeAxes !== []) {
+															$runtimeMeta[] = sprintf(
+																/* translators: %s: comma-separated variable-axis labels */
+																__('Axes: %s', 'tasty-fonts'),
+																implode(', ', array_slice($runtimeAxes, 0, 6))
+															);
+														} elseif (!$runtimeIsVariable && $runtimeVariants !== []) {
 															$runtimeMeta[] = sprintf(
 																/* translators: %s: comma-separated font variant labels */
 																__('Variants: %s', 'tasty-fonts'),

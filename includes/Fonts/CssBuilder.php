@@ -1552,10 +1552,6 @@ final class CssBuilder
         $familyName = trim($this->roleStringValue($roles, $roleKey));
         $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
 
-        if ($fallback !== '') {
-            return FontUtils::sanitizeFallback($fallback);
-        }
-
         if ($familyName !== '') {
             $family = $this->findFamilyByName($familyName, $families);
 
@@ -1572,6 +1568,10 @@ final class CssBuilder
                     return FontUtils::sanitizeFallback($configuredFallback);
                 }
             }
+        }
+
+        if ($fallback !== '') {
+            return FontUtils::sanitizeFallback($fallback);
         }
 
         return $default;

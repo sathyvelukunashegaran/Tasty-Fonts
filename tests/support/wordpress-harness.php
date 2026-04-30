@@ -111,6 +111,7 @@ use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CapabilityDisableCleanupService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedImportSupport;
@@ -1982,6 +1983,7 @@ function makeServiceGraph(): array
     $assets = new AssetService($storage, $catalog, $settings, $cssBuilder, $planner, $log);
     $hostedImportWorkflow = new HostedImportWorkflow($storage, $imports, $assets, $log, new HostedImportVariantPlanner());
     $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings);
+    $capabilityCleanup = new CapabilityDisableCleanupService($storage, $imports, $catalog, $log);
     $localUpload = new LocalUploadService(
         $storage,
         $catalog,
@@ -2037,6 +2039,7 @@ function makeServiceGraph(): array
         $catalog,
         $assets,
         $library,
+        $capabilityCleanup,
         $localUpload,
         $cssBuilder,
         $adobe,
@@ -2071,6 +2074,7 @@ function makeServiceGraph(): array
         'assets' => $assets,
         'hosted_import_workflow' => $hostedImportWorkflow,
         'library' => $library,
+        'capability_cleanup' => $capabilityCleanup,
         'local_upload' => $localUpload,
         'adobe' => $adobe,
         'bunny' => $bunny,

@@ -958,8 +958,8 @@ final class GoogleFontsClient
         sort($axisTags, SORT_STRING);
         $includeItal = count($rows) > 1 || isset($rows['italic']);
         $axisList = $includeItal
-            ? array_merge(['ital'], array_map('strtolower', $axisTags))
-            : array_map('strtolower', $axisTags);
+            ? array_merge(['ital'], array_map([FontUtils::class, 'cssAxisTag'], $axisTags))
+            : array_map([FontUtils::class, 'cssAxisTag'], $axisTags);
         $serializedRows = [];
 
         foreach ($rows as $row) {

@@ -59,25 +59,7 @@ final class LibraryPathCollector
      */
     public function collectFaceRelativePaths(array $face): array
     {
-        $paths = [];
-
-        foreach (FontUtils::normalizeStringMap($face['paths'] ?? []) as $path) {
-            if (trim($path) === '') {
-                continue;
-            }
-
-            $paths[] = trim($path);
-        }
-
-        foreach (FontUtils::normalizeStringMap($face['files'] ?? []) as $file) {
-            if (trim($file) === '' || FontUtils::isRemoteUrl($file)) {
-                continue;
-            }
-
-            $paths[] = trim($file);
-        }
-
-        return array_values(array_unique($paths));
+        return FontUtils::collectFaceRelativePaths($face);
     }
 
     /**

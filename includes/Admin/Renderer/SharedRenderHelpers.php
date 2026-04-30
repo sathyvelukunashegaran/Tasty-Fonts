@@ -256,7 +256,9 @@ trait SharedRenderHelpers
                     data-toast-tone="<?php echo esc_attr($this->stringValue($toast, 'tone', 'success')); ?>"
                     role="<?php echo esc_attr($this->stringValue($toast, 'role', 'status')); ?>"
                 >
-                    <div class="tasty-fonts-toast-message"><?php echo esc_html($this->stringValue($toast, 'message')); ?></div>
+                    <div class="tasty-fonts-toast-body">
+                        <div class="tasty-fonts-toast-message"><?php echo esc_html($this->stringValue($toast, 'message')); ?></div>
+                    </div>
                     <button type="button" class="tasty-fonts-toast-dismiss" data-toast-dismiss aria-label="<?php esc_attr_e('Dismiss notification', 'tasty-fonts'); ?>">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -339,19 +341,29 @@ trait SharedRenderHelpers
     /**
      * @return list<array{value: string, label: string}>
      */
-    public function buildLibraryCategoryOptions(): array
+    public function buildLibraryCategoryOptions(bool $variableFontsEnabled = true, bool $monospaceRoleEnabled = true): array
     {
-        return [
+        $options = [
             ['value' => 'all', 'label' => __('All Types', 'tasty-fonts')],
-            ['value' => 'variable', 'label' => __('Variable', 'tasty-fonts')],
-            ['value' => 'sans-serif', 'label' => __('Sans-serif', 'tasty-fonts')],
-            ['value' => 'serif', 'label' => __('Serif', 'tasty-fonts')],
-            ['value' => 'monospace', 'label' => __('Monospace', 'tasty-fonts')],
-            ['value' => 'display', 'label' => __('Display', 'tasty-fonts')],
-            ['value' => 'script', 'label' => __('Cursive / Script', 'tasty-fonts')],
-            ['value' => 'slab-serif', 'label' => __('Slab Serif', 'tasty-fonts')],
-            ['value' => 'uncategorized', 'label' => __('Uncategorized', 'tasty-fonts')],
         ];
+
+        if ($variableFontsEnabled) {
+            $options[] = ['value' => 'variable', 'label' => __('Variable', 'tasty-fonts')];
+        }
+
+        $options[] = ['value' => 'sans-serif', 'label' => __('Sans-serif', 'tasty-fonts')];
+        $options[] = ['value' => 'serif', 'label' => __('Serif', 'tasty-fonts')];
+
+        if ($monospaceRoleEnabled) {
+            $options[] = ['value' => 'monospace', 'label' => __('Monospace', 'tasty-fonts')];
+        }
+
+        $options[] = ['value' => 'display', 'label' => __('Display', 'tasty-fonts')];
+        $options[] = ['value' => 'script', 'label' => __('Cursive / Script', 'tasty-fonts')];
+        $options[] = ['value' => 'slab-serif', 'label' => __('Slab Serif', 'tasty-fonts')];
+        $options[] = ['value' => 'uncategorized', 'label' => __('Uncategorized', 'tasty-fonts')];
+
+        return $options;
     }
 
     public function formatLibraryCategoryLabel(string $category): string
@@ -415,7 +427,7 @@ trait SharedRenderHelpers
         <?php
     }
 
-    public function renderSourceSetupCopy(string $title, string $summary): void
+    public function renderSourceSetupCopy(string $title, string $summary, string $disclaimer = ''): void
     {
         ?>
         <div class="tasty-fonts-source-status-copy">
@@ -424,6 +436,9 @@ trait SharedRenderHelpers
                 <h3><?php echo esc_html($title); ?></h3>
             </div>
             <p class="tasty-fonts-muted tasty-fonts-source-summary"><?php echo esc_html($summary); ?></p>
+            <?php if (trim($disclaimer) !== ''): ?>
+                <p class="tasty-fonts-muted tasty-fonts-source-disclaimer"><?php echo esc_html($disclaimer); ?></p>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -466,6 +481,7 @@ trait SharedRenderHelpers
         $rowClass = trim($this->stringValue($config, 'row_class'));
         $enabledActions = $config['enabled_actions'] ?? null;
         $body = $config['body'] ?? null;
+        $disclaimer = $this->stringValue($config, 'disclaimer');
 
         $sectionClass = 'tasty-fonts-source-card tasty-fonts-source-card--status';
 
@@ -484,7 +500,7 @@ trait SharedRenderHelpers
         ?>
         <section class="<?php echo esc_attr($sectionClass); ?>">
             <div class="<?php echo esc_attr($statusRowClass); ?>">
-                <?php $this->renderSourceSetupCopy($title, $summary); ?>
+                <?php $this->renderSourceSetupCopy($title, $summary, $disclaimer); ?>
                 <div class="tasty-fonts-source-status-actions">
                     <span class="tasty-fonts-badge<?php echo $badgeClass !== '' ? ' ' . esc_attr($badgeClass) : ''; ?>"><?php echo esc_html($badgeLabel); ?></span>
                     <?php if ($enabled && is_callable($enabledActions)): ?>
@@ -931,7 +947,16 @@ trait SharedRenderHelpers
     {
         $roleKey = $this->stringValue($config, 'role_key');
         $fallbackInputId = 'tasty_fonts_' . $roleKey . '_fallback';
+        $selectedFamily = $this->scalarStringValue($roles[$roleKey] ?? '');
         $fallbackValue = $this->scalarStringValue($roles[$roleKey . '_fallback'] ?? '', $this->defaultRoleFallback($roleKey));
+        $usesMonospacePreview = $roleKey === 'monospace';
+        $previewLabel = $usesMonospacePreview ? __('Code Preview', 'tasty-fonts') : __('Preview', 'tasty-fonts');
+        $previewText = $this->buildRoleCardPreviewText(
+            $this->stringValue($config, 'preview_text'),
+            $selectedFamily,
+            $usesMonospacePreview
+        );
+        $previewStack = $this->stringValue($config, 'preview_stack', $this->defaultRoleFallback($roleKey));
         ?>
         <section class="tasty-fonts-studio-card tasty-fonts-role-box" data-role-box="<?php echo esc_attr($roleKey); ?>">
             <div class="tasty-fonts-studio-card-head tasty-fonts-role-box-head">
@@ -956,6 +981,30 @@ trait SharedRenderHelpers
                 </div>
             </div>
             <p class="tasty-fonts-studio-card-copy tasty-fonts-role-box-description"><?php echo esc_html($this->stringValue($config, 'description')); ?></p>
+            <div
+                class="tasty-fonts-font-inline-preview tasty-fonts-role-inline-preview <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>"
+                data-role-inline-preview-card="<?php echo esc_attr($roleKey); ?>"
+                role="group"
+                aria-label="<?php echo esc_attr(sprintf(__('Preview for %s role', 'tasty-fonts'), $this->stringValue($config, 'title'))); ?>"
+            >
+                <div class="tasty-fonts-role-inline-preview-row tasty-fonts-role-inline-preview-row--live" data-role-live-preview-row="<?php echo esc_attr($roleKey); ?>" hidden>
+                    <span class="tasty-fonts-font-inline-preview-label"><?php esc_html_e('Live now', 'tasty-fonts'); ?></span>
+                    <div
+                        class="tasty-fonts-font-inline-preview-text tasty-fonts-role-inline-preview-text tasty-fonts-role-inline-preview-text--live <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>"
+                        data-role-inline-preview-live="<?php echo esc_attr($roleKey); ?>"
+                        style="font-family:<?php echo esc_attr($previewStack); ?>;"
+                    ><?php echo esc_html($previewText); ?></div>
+                </div>
+                <div class="tasty-fonts-role-inline-preview-row tasty-fonts-role-inline-preview-row--draft">
+                    <span class="tasty-fonts-font-inline-preview-label" data-role-inline-preview-label="<?php echo esc_attr($roleKey); ?>"><?php echo esc_html($previewLabel); ?></span>
+                    <div
+                        class="tasty-fonts-font-inline-preview-text tasty-fonts-role-inline-preview-text <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>"
+                        data-role-preview="<?php echo esc_attr($roleKey); ?>"
+                        data-role-inline-preview-draft="<?php echo esc_attr($roleKey); ?>"
+                        style="font-family:<?php echo esc_attr($previewStack); ?>;"
+                    ><?php echo esc_html($previewText); ?></div>
+                </div>
+            </div>
             <div class="tasty-fonts-role-fields">
                 <div class="tasty-fonts-stack-field">
                     <span class="tasty-fonts-field-label-row">
@@ -968,29 +1017,23 @@ trait SharedRenderHelpers
                         >?</button>
                     </span>
                     <span class="tasty-fonts-select-field tasty-fonts-select-field--clearable">
-                        <select name="<?php echo esc_attr($this->stringValue($config, 'family_input_name')); ?>" id="<?php echo esc_attr($this->stringValue($config, 'family_select_id')); ?>" form="<?php echo esc_attr($roleFormId); ?>">
+                        <select name="<?php echo esc_attr($this->stringValue($config, 'family_input_name')); ?>" id="<?php echo esc_attr($this->stringValue($config, 'family_select_id')); ?>" form="<?php echo esc_attr($roleFormId); ?>" data-role-family-select="<?php echo esc_attr($roleKey); ?>">
                             <option value="" <?php selected($roles[$roleKey] ?? '', ''); ?>><?php esc_html_e('Use Fallback Only', 'tasty-fonts'); ?></option>
-                            <?php $this->renderRoleFamilyOptions($availableFamilyOptions, $this->scalarStringValue($roles[$roleKey] ?? '')); ?>
+                            <?php $this->renderRoleFamilyOptions($availableFamilyOptions, $selectedFamily); ?>
                         </select>
                         <?php $this->renderClearSelectButton($this->stringValue($config, 'clear_family_label'), $this->stringValue($config, 'family_select_id')); ?>
                     </span>
                 </div>
-                <label class="tasty-fonts-stack-field">
-                    <?php $this->renderFieldLabel(__('Fallback', 'tasty-fonts')); ?>
-                    <?php
-                    $this->renderFallbackInput(
-                        $fallbackInputId,
-                        $fallbackValue,
-                        [
-                            'id' => $fallbackInputId,
-                            'form' => $roleFormId,
-                            'clear_value' => $this->defaultRoleFallback($roleKey),
-                            'clear_label' => sprintf(__('Reset %s fallback', 'tasty-fonts'), $this->stringValue($config, 'title')),
-                            'placeholder' => __('Example: system-ui, sans-serif', 'tasty-fonts'),
-                        ]
-                    );
-                    ?>
-                </label>
+                <input
+                    type="hidden"
+                    name="<?php echo esc_attr($fallbackInputId); ?>"
+                    id="<?php echo esc_attr($fallbackInputId); ?>"
+                    value="<?php echo esc_attr($fallbackValue); ?>"
+                    form="<?php echo esc_attr($roleFormId); ?>"
+                    data-role-fallback-input="<?php echo esc_attr($roleKey); ?>"
+                    data-role-fallback-default="<?php echo esc_attr($this->defaultRoleFallback($roleKey)); ?>"
+                    data-role-fallback-stored-value="<?php echo esc_attr($fallbackValue); ?>"
+                >
                 <div class="tasty-fonts-role-weight-editor" data-role-weight-editor="<?php echo esc_attr($roleKey); ?>" hidden>
                     <label class="tasty-fonts-stack-field tasty-fonts-role-weight-field">
                         <?php $this->renderFieldLabel(__('Role Weight', 'tasty-fonts')); ?>
@@ -1006,13 +1049,13 @@ trait SharedRenderHelpers
                         </span>
                     </label>
                 </div>
-            </div>
-            <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="<?php echo esc_attr($roleKey); ?>" hidden>
-                <div class="tasty-fonts-role-axis-head">
-                    <span class="tasty-fonts-field-label-text" data-role-axis-heading="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
-                    <span class="tasty-fonts-muted" data-role-axis-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
+                <div class="tasty-fonts-role-axis-editor" data-role-axis-editor="<?php echo esc_attr($roleKey); ?>" hidden>
+                    <div class="tasty-fonts-field-label-row tasty-fonts-role-axis-head">
+                        <span class="tasty-fonts-field-label-text" data-role-axis-heading="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Variable Axes', 'tasty-fonts'); ?></span>
+                        <span class="tasty-fonts-muted" data-role-axis-summary="<?php echo esc_attr($roleKey); ?>"><?php esc_html_e('Assign axis values when the selected family supports variable fonts.', 'tasty-fonts'); ?></span>
+                    </div>
+                    <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="<?php echo esc_attr($roleKey); ?>"></div>
                 </div>
-                <div class="tasty-fonts-role-axis-fields" data-role-axis-fields="<?php echo esc_attr($roleKey); ?>"></div>
             </div>
         </section>
         <?php
@@ -1035,6 +1078,25 @@ trait SharedRenderHelpers
     private function defaultRoleFallback(string $roleKey): string
     {
         return $roleKey === 'monospace' ? 'monospace' : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
+    }
+
+    private function buildRoleCardPreviewText(string $previewText, string $familyName, bool $isMonospace): string
+    {
+        if ($isMonospace) {
+            $familyName = trim($familyName) !== '' ? trim($familyName) : 'Monospace';
+            $literal = str_replace(['\\', '"'], ['\\\\', '\\"'], $familyName);
+
+            return sprintf('const font = "%s";', $literal);
+        }
+
+        $normalized = preg_replace('/\s+/', ' ', trim($previewText));
+        $normalized = is_string($normalized) ? $normalized : '';
+
+        if ($normalized === '') {
+            return __('The quick brown fox…', 'tasty-fonts');
+        }
+
+        return wp_trim_words($normalized, 9, '…');
     }
 
     /**

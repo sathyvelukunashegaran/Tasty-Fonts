@@ -173,6 +173,8 @@ final class CatalogService
             $this->mergeSyntheticFamily($families, $family, 'published');
         }
 
+        $families = $this->pruneUndeliverableFamilies($families, true);
+
         ksort($families, SORT_NATURAL | SORT_FLAG_CASE);
 
         $counts = self::DEFAULT_COUNTS;
@@ -874,7 +876,10 @@ final class CatalogService
             }
         }
 
-        $this->catalog = $this->normalizeCatalogMap($cached['families']);
+        $this->catalog = $this->pruneUndeliverableFamilies(
+            $this->normalizeCatalogMap($cached['families']),
+            true
+        );
         $this->counts = $this->countCatalogFamilies($this->catalog);
 
         return true;
@@ -1145,6 +1150,47 @@ final class CatalogService
         }
 
         return $normalized;
+    }
+
+    /**
+     * Remove families that have no usable delivery data. These records otherwise
+     * render as ambiguous "Unavailable" library cards after capability cleanup or
+     * live-role changes have removed their last profile.
+     *
+     * @param CatalogMap $families
+     * @return CatalogMap
+     */
+    private function pruneUndeliverableFamilies(array $families, bool $deleteStoredRecord): array
+    {
+        foreach ($families as $familyName => $family) {
+            if ($this->familyHasDeliveryProfiles($family)) {
+                continue;
+            }
+
+            if ($deleteStoredRecord) {
+                $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($this->stringValue($family, 'family')));
+
+                if ($familySlug !== '') {
+                    $this->imports->deleteFamily($familySlug);
+                }
+            }
+
+            unset($families[$familyName]);
+        }
+
+        return $families;
+    }
+
+    /**
+     * @param CatalogFamily $family
+     */
+    private function familyHasDeliveryProfiles(array $family): bool
+    {
+        if ($this->deliveryProfiles($family['delivery_profiles'] ?? []) !== []) {
+            return true;
+        }
+
+        return FontUtils::normalizeFaceList($family['available_deliveries'] ?? []) !== [];
     }
 
     /**

@@ -568,6 +568,33 @@ final class FontUtils
     }
 
     /**
+     * @param array<string, mixed> $face
+     * @return list<string>
+     */
+    public static function collectFaceRelativePaths(array $face): array
+    {
+        $paths = [];
+
+        foreach (self::normalizeStringMap($face['paths'] ?? []) as $path) {
+            if (trim($path) === '') {
+                continue;
+            }
+
+            $paths[] = trim($path);
+        }
+
+        foreach (self::normalizeStringMap($face['files'] ?? []) as $file) {
+            if (trim($file) === '' || self::isRemoteUrl($file)) {
+                continue;
+            }
+
+            $paths[] = trim($file);
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    /**
      * @param mixed $value
      * @return array<string, mixed>
      */

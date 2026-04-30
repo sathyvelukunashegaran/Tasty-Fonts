@@ -699,6 +699,40 @@ final class SettingsRepository
     }
 
     /**
+     * @param array<int|string, mixed> $catalog
+     * @return array{roles: RoleSet, applied_roles: RoleSet}
+     */
+    public function clearDisabledCapabilityRoleData(
+        bool $clearVariableAxes,
+        bool $clearMonospaceRole,
+        array $catalog
+    ): array {
+        $availableFamilies = $this->normalizeAvailableRoleFamilies($catalog);
+        $roles = $this->normalizeRoleSet(
+            $this->getOptionArray(self::OPTION_ROLES),
+            $availableFamilies
+        );
+        $settings = $this->getSettings();
+        $appliedRolesInput = is_array($settings['applied_roles'] ?? null)
+            ? $this->normalizeInputMap($settings['applied_roles'])
+            : [];
+        $appliedRoles = $this->normalizeRoleSet($appliedRolesInput, $availableFamilies);
+
+        $roles = $this->clearCapabilityRoleSet($roles, $clearVariableAxes, $clearMonospaceRole, $availableFamilies);
+        $appliedRoles = $this->clearCapabilityRoleSet($appliedRoles, $clearVariableAxes, $clearMonospaceRole, $availableFamilies);
+
+        update_option(self::OPTION_ROLES, $roles, false);
+
+        $settings['applied_roles'] = $appliedRoles;
+        $this->persistSettings($settings);
+
+        return [
+            'roles' => $roles,
+            'applied_roles' => $appliedRoles,
+        ];
+    }
+
+    /**
      * @return NormalizedSettings
      */
     public function setAutoApplyRoles(bool $enabled): array
@@ -1058,6 +1092,79 @@ final class SettingsRepository
             'body_axes' => [],
             'monospace_axes' => [],
         ];
+    }
+
+    /**
+     * @param array<int|string, mixed> $catalog
+     * @return list<string>
+     */
+    private function normalizeAvailableRoleFamilies(array $catalog): array
+    {
+        $families = [];
+
+        foreach ($catalog as $key => $entry) {
+            if (is_array($entry)) {
+                $family = $this->sanitizeTextValue($entry['family'] ?? ($entry['name'] ?? ''));
+
+                if ($family === '' && is_string($key)) {
+                    $family = $this->sanitizeTextValue($key);
+                }
+            } elseif (is_string($entry)) {
+                $family = $this->sanitizeTextValue($entry);
+            } else {
+                $family = is_string($key) ? $this->sanitizeTextValue($key) : '';
+            }
+
+            if ($family === '') {
+                continue;
+            }
+
+            $families[$family] = $family;
+        }
+
+        return array_values($families);
+    }
+
+    /**
+     * @param RoleSet $roles
+     * @param list<string> $availableFamilies
+     * @return RoleSet
+     */
+    private function clearCapabilityRoleSet(
+        array $roles,
+        bool $clearVariableAxes,
+        bool $clearMonospaceRole,
+        array $availableFamilies
+    ): array {
+        if ($clearVariableAxes) {
+            $roles['heading_axes'] = [];
+            $roles['body_axes'] = [];
+            $roles['monospace_axes'] = [];
+        }
+
+        if ($clearMonospaceRole) {
+            $roles['monospace'] = '';
+            $roles['monospace_fallback'] = 'monospace';
+            $roles['monospace_weight'] = '';
+            $roles['monospace_axes'] = [];
+        }
+
+        $availableMap = array_fill_keys($availableFamilies, true);
+
+        foreach (self::ROLE_FAMILY_KEYS as $roleKey) {
+            $selectedFamily = $this->sanitizeTextValue($roles[$roleKey]);
+
+            if ($selectedFamily !== '' && !isset($availableMap[$selectedFamily])) {
+                $roles[$roleKey] = '';
+
+                if ($roleKey === 'monospace') {
+                    $roles['monospace_weight'] = '';
+                    $roles['monospace_axes'] = [];
+                }
+            }
+        }
+
+        return $roles;
     }
 
     /**

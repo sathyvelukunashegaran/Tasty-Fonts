@@ -1,7 +1,7 @@
                 <div class="tasty-fonts-family-details-grid">
                     <div class="tasty-fonts-family-details-primary">
                         <div class="tasty-fonts-font-sidebar">
-                            <div class="tasty-fonts-family-meta">
+                            <div class="tasty-fonts-family-meta <?php echo $supportsFontDisplayOverride ? 'has-font-display-control' : ''; ?>">
                                 <form method="post" class="tasty-fonts-family-publish-state-form" data-family-publish-state-form>
                                     <div class="tasty-fonts-inline-field-row">
                                         <label class="tasty-fonts-inline-field tasty-fonts-inline-field--select">
@@ -36,36 +36,6 @@
                                     </div>
                                     <p class="tasty-fonts-family-publish-state-feedback" data-family-publish-state-feedback aria-live="polite" hidden></p>
                                 </form>
-
-                                <?php if (count($availableDeliveries) > 1): ?>
-                                    <form method="post" class="tasty-fonts-family-delivery-form" data-family-delivery-form>
-                                        <div class="tasty-fonts-inline-field-row">
-                                            <label class="tasty-fonts-inline-field tasty-fonts-inline-field--select">
-                                                <span class="tasty-fonts-field-label"><?php esc_html_e('Active Delivery', 'tasty-fonts'); ?></span>
-                                                <span class="tasty-fonts-select-field">
-                                                    <select
-                                                        class="tasty-fonts-family-delivery-selector"
-                                                        data-family-slug="<?php echo esc_attr($familySlug); ?>"
-                                                        data-saved-value="<?php echo esc_attr($activeDeliveryId); ?>"
-                                                    >
-                                                        <?php foreach ($availableDeliveries as $profile): ?>
-                                                            <?php if (!is_array($profile)) { continue; } ?>
-                                                            <option value="<?php echo esc_attr((string) ($profile['id'] ?? '')); ?>" <?php selected($activeDeliveryId, (string) ($profile['id'] ?? '')); ?>><?php echo esc_html($this->buildDeliveryProfileDisplayLabel($profile, $availableDeliveries)); ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </span>
-                                            </label>
-                                            <button
-                                                type="submit"
-                                                class="button tasty-fonts-family-delivery-save"
-                                                data-family-delivery-save
-                                            >
-                                                <?php esc_html_e('Switch', 'tasty-fonts'); ?>
-                                            </button>
-                                        </div>
-                                        <p class="tasty-fonts-family-delivery-feedback" data-family-delivery-feedback aria-live="polite" hidden></p>
-                                    </form>
-                                <?php endif; ?>
 
                                 <form method="post" class="tasty-fonts-family-fallback-form" data-family-fallback-form>
                                     <?php wp_nonce_field('tasty_fonts_save_family_fallback'); ?>

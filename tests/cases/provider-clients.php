@@ -32,6 +32,28 @@ $tests['google_fonts_client_builds_variable_css2_urls_when_axes_are_available'] 
     );
 };
 
+$tests['google_fonts_client_preserves_custom_axis_case_in_variable_css2_urls'] = static function (): void {
+    $settings = new SettingsRepository();
+    $client = new GoogleFontsClient($settings);
+
+    assertSameValue(
+        'https://fonts.googleapis.com/css2?family=AR+One+Sans:ARRR,wght@10..60,400..700&display=swap',
+        $client->buildCssUrl(
+            'AR One Sans',
+            ['regular'],
+            'swap',
+            [
+                'axes' => [
+                    'ARRR' => ['min' => '10', 'default' => '10', 'max' => '60'],
+                    'WGHT' => ['min' => '400', 'default' => '400', 'max' => '700'],
+                ],
+            ],
+            'variable'
+        ),
+        'Google variable CSS URLs should keep custom axes uppercase while mapping registered axes to lowercase.'
+    );
+};
+
 $tests['bunny_fonts_client_builds_css2_urls'] = static function (): void {
     $client = new BunnyFontsClient();
 
@@ -101,6 +123,81 @@ HTML,
         $first['variants'] ?? [],
         'Bunny search should normalize public variant tokens into the plugin token format.'
     );
+};
+
+$tests['bunny_fonts_client_search_family_page_sets_has_more_without_hydrating_probe_row'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteGetResponses;
+
+    $client = new BunnyFontsClient();
+    $remoteGetResponses['https://fonts.bunny.net/sitemap.xml'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'application/xml'],
+        'body' => <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://fonts.bunny.net/family/inter</loc></url>
+  <url><loc>https://fonts.bunny.net/family/ibm-plex-sans</loc></url>
+</urlset>
+XML,
+    ];
+    $remoteGetResponses['https://fonts.bunny.net/family/inter'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/html'],
+        'body' => <<<'HTML'
+<!doctype html>
+<html>
+<head>
+    <title>Inter | Bunny Fonts</title>
+</head>
+<body>
+    <div class="family"><h3>Sans Serif</h3></div>
+    <div class="styles">18 styles</div>
+    <div class="card-main"><h1>Inter</h1></div>
+    <link href="https://fonts.bunny.net/css?family=inter:100,400,700,400i,700i," rel="stylesheet" />
+</body>
+</html>
+HTML,
+    ];
+
+    $page = $client->searchFamilyPage('i', 1, 0);
+
+    assertSameValue(true, !empty($page['has_more']), 'Bunny page search should expose has_more when additional catalog matches remain.');
+    assertSameValue(1, (int) ($page['next_offset'] ?? 0), 'Bunny page search should advance next_offset by hydrated items only.');
+    assertSameValue(1, count($page['items'] ?? []), 'Bunny page search should hydrate only the requested page size.');
+    $requestedUrls = array_values(array_map(static fn (array $call): string => (string) ($call['url'] ?? ''), $remoteGetCalls));
+
+    assertSameValue('https://fonts.bunny.net/sitemap.xml', (string) ($requestedUrls[0] ?? ''), 'Bunny page search should fetch the catalog first.');
+    assertSameValue(2, count($requestedUrls), 'Bunny page search should avoid hydrating an extra hidden probe row for has_more checks.');
+    assertSameValue(true, str_starts_with((string) ($requestedUrls[1] ?? ''), 'https://fonts.bunny.net/family/'), 'Bunny page search should hydrate only one family page for the visible result row.');
+};
+
+$tests['bunny_fonts_client_search_family_page_returns_empty_without_hydration_for_zero_limit'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteGetResponses;
+
+    $client = new BunnyFontsClient();
+    $remoteGetResponses['https://fonts.bunny.net/sitemap.xml'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'application/xml'],
+        'body' => <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://fonts.bunny.net/family/inter</loc></url>
+</urlset>
+XML,
+    ];
+
+    $page = $client->searchFamilyPage('i', 0, 3);
+
+    assertSameValue([], $page['items'] ?? null, 'Bunny page search should return no items when limit is non-positive.');
+    assertSameValue(false, !empty($page['has_more']), 'Bunny page search should not expose has_more when limit is non-positive.');
+    assertSameValue(3, (int) ($page['next_offset'] ?? 0), 'Bunny page search should preserve the normalized offset when limit is non-positive.');
+    assertSameValue([], $remoteGetCalls, 'Bunny page search should avoid catalog/family hydration when limit is non-positive.');
 };
 
 $tests['bunny_fonts_client_get_family_parses_public_variant_tokens'] = static function (): void {

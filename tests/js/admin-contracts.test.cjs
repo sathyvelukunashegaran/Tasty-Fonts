@@ -241,7 +241,8 @@ test('admin contracts normalize role state using monospace, variable, and family
     );
 
     assert.equal(resolveRoleFallback('heading', { heading: 'Inter' }, options), 'Inter fallback, sans-serif');
-    assert.equal(resolveRoleFallback('heading', { heading: 'Inter', headingFallback: 'serif' }, options), 'serif');
+    assert.equal(resolveRoleFallback('heading', { heading: 'Inter', headingFallback: 'serif' }, options), 'Inter fallback, sans-serif');
+    assert.equal(resolveRoleFallback('heading', { heading: '', headingFallback: 'serif' }, options), 'serif');
     assert.equal(defaultRoleFallback('monospace'), 'monospace');
 });
 
@@ -937,7 +938,7 @@ test('admin contracts detect pending live changes when saved role axes differ', 
     );
 });
 
-test('admin contracts prefer explicit role fallbacks over family catalog fallbacks', () => {
+test('admin contracts prefer family catalog fallbacks for selected families', () => {
     assert.equal(
         roleStatesMatch(
             {
@@ -958,7 +959,7 @@ test('admin contracts prefer explicit role fallbacks over family catalog fallbac
                 },
             }
         ),
-        false
+        true
     );
 });
 
@@ -1265,6 +1266,53 @@ test('admin runtime keeps family row quick action hooks wired', () => {
     }
 });
 
+test('admin runtime keeps library refresh orchestration hooks wired for import/upload success paths', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        "getRoutePath('libraryRefresh', 'library/refresh')",
+        'refreshLibraryViewAfterMutation',
+        '[data-font-library-list]',
+        'family_names',
+        'expanded_family_slugs',
+        'refresh_all',
+        'payload.rows',
+        'missing_family_slugs',
+        'hideLibraryEmptyStateAfterRowInsert',
+        "['family', 'family_name', 'name', 'slug', 'family_slug']",
+        'role_family_catalog',
+        'available_family_options',
+        'resolveRoleFamilyOptionsForSelect',
+        'Array.isArray(optionsSource)',
+        'preview_bootstrap',
+        'appliedRoles',
+        'applied_roles',
+        'baselineSource',
+        'baseline_source',
+        'baselineLabel',
+        'baseline_label',
+        'apply_everywhere',
+        'rerenderHostedSearchLibraryBadges',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+});
+
+test('admin runtime keeps Adobe project form REST hooks wired for in-place library refresh', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        '[data-adobe-project-form]',
+        'data-adobe-project-action',
+        '[data-adobe-project-feedback]',
+        "getRoutePath('saveAdobeProject', 'adobe/project')",
+        'refreshAllWhenUntargeted: true',
+        'bindAdobeProjectControls',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+});
+
 test('admin contracts normalizeAxisTag normalizes lowercase, uppercase, and non-4-char tags', () => {
     // via hasVariableFontMetadata which calls normalizeAxisTag internally
     // A valid lowercase 4-char tag must be treated as a valid axis tag.
@@ -1279,8 +1327,7 @@ test('admin contracts normalizeAxisTag normalizes lowercase, uppercase, and non-
     assert.equal(hasVariableFontMetadata({ variation_axes: { '': {} } }), false);
 });
 
-test('admin contracts resolveRoleFallback only uses catalog-driven fallback when role fallback is absent', () => {
-    // Explicit role fallbacks are role-specific and should not be hidden by the family catalog.
+test('admin contracts resolveRoleFallback scopes explicit fallback to fallback-only roles', () => {
     const stateWithCatalog = roleStatesMatch(
         { heading: 'Inter', headingFallback: 'serif' },
         { heading: 'Inter', headingFallback: 'sans-serif' },
@@ -1290,9 +1337,19 @@ test('admin contracts resolveRoleFallback only uses catalog-driven fallback when
             },
         }
     );
-    assert.equal(stateWithCatalog, false);
+    assert.equal(stateWithCatalog, true);
 
-    // Legacy states without a role fallback can still fall back to family catalog metadata.
+    const fallbackOnlyState = roleStatesMatch(
+        { heading: '', headingFallback: 'serif' },
+        { heading: '', headingFallback: 'sans-serif' },
+        {
+            roleFamilyCatalog: {
+                Inter: { fallback: 'sans-serif' },
+            },
+        }
+    );
+    assert.equal(fallbackOnlyState, false);
+
     const legacyCatalogFallback = roleStatesMatch(
         { heading: 'Inter' },
         { heading: 'Inter' },
@@ -1303,6 +1360,17 @@ test('admin contracts resolveRoleFallback only uses catalog-driven fallback when
         }
     );
     assert.equal(legacyCatalogFallback, true);
+
+    const preserveExplicitFallbackWithoutCatalogEntry = roleStatesMatch(
+        { heading: 'Inter', headingFallback: 'serif' },
+        { heading: 'Inter', headingFallback: 'sans-serif' },
+        {
+            roleFamilyCatalog: {
+                Roboto: { fallback: 'sans-serif' },
+            },
+        }
+    );
+    assert.equal(preserveExplicitFallbackWithoutCatalogEntry, false);
 });
 
 test('admin contracts canDisableOutputLayer returns true when another output layer remains enabled', () => {

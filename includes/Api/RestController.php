@@ -32,6 +32,7 @@ final class RestController
         'bunnyFamily' => 'bunny/family',
         'importGoogle' => 'google/import',
         'importBunny' => 'bunny/import',
+        'saveAdobeProject' => 'adobe/project',
         'customCssDryRun' => 'custom-css/dry-run',
         'customCssImport' => 'custom-css/import',
         'validateSiteTransfer' => 'transfer/validate',
@@ -43,6 +44,7 @@ final class RestController
         'saveFamilyPublishState' => 'families/publish-state',
         'deleteDeliveryProfile' => 'families/delivery-profile',
         'familyCard' => 'families/card',
+        'libraryRefresh' => 'library/refresh',
         'toolsHealth' => 'tools/health',
         'toolsRuntimeManifest' => 'tools/runtime-manifest',
         'toolsAction' => 'tools/action',
@@ -86,6 +88,11 @@ final class RestController
         ]);
         $this->registerRoute(self::ROUTES['importGoogle'], 'POST', [$this, 'importGoogleFamily'], $this->hostedImportArgs());
         $this->registerRoute(self::ROUTES['importBunny'], 'POST', [$this, 'importBunnyFamily'], $this->hostedImportArgs());
+        $this->registerRoute(self::ROUTES['saveAdobeProject'], 'POST', [$this, 'saveAdobeProject'], [
+            'action' => $this->buildTextArg(false, ['save', 'resync', 'remove']),
+            'project_id' => $this->buildTextArg(),
+            'enabled' => $this->buildToggleArg(),
+        ]);
         $this->registerRoute(self::ROUTES['customCssDryRun'], 'POST', [$this, 'dryRunCustomCssUrl'], [
             'url' => $this->buildTextArg(true),
         ]);
@@ -125,6 +132,12 @@ final class RestController
         ]);
         $this->registerRoute(self::ROUTES['familyCard'], 'GET', [$this, 'renderFamilyCard'], [
             'family_slug' => $this->buildTextArg(true),
+        ]);
+        $this->registerRoute(self::ROUTES['libraryRefresh'], 'POST', [$this, 'refreshLibrary'], [
+            'family_slugs' => $this->buildStringArrayArg(),
+            'family_names' => $this->buildStringArrayArg(),
+            'expanded_family_slugs' => $this->buildStringArrayArg(),
+            'refresh_all' => $this->buildToggleArg(),
         ]);
         $this->registerRoute(self::ROUTES['toolsHealth'], 'GET', [$this, 'toolsHealth']);
         $this->registerRoute(self::ROUTES['toolsRuntimeManifest'], 'GET', [$this, 'toolsRuntimeManifest']);
@@ -211,6 +224,13 @@ final class RestController
                 $this->getVariantTokens($request),
                 $this->getTextParam($request, 'delivery_mode', 'self_hosted')
             )
+        );
+    }
+
+    public function saveAdobeProject(WP_REST_Request $request): mixed
+    {
+        return $this->restResult(
+            $this->admin->saveAdobeProjectValue($request->get_params())
         );
     }
 
@@ -319,6 +339,13 @@ final class RestController
                 $this->getTextParam($request, 'family_slug')
             ),
             404
+        );
+    }
+
+    public function refreshLibrary(WP_REST_Request $request): mixed
+    {
+        return $this->restResult(
+            $this->admin->refreshLibraryView($request->get_params())
         );
     }
 

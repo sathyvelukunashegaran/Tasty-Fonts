@@ -142,6 +142,11 @@ $tests['rest_controller_route_reference_builds_full_api_paths_and_ignores_unknow
         'Site transfer validation should expose a dedicated REST route reference.'
     );
     assertSameValue(
+        '/tasty-fonts/v1/adobe/project',
+        RestController::routeReference('saveAdobeProject'),
+        'Adobe project saves should expose a dedicated REST route reference.'
+    );
+    assertSameValue(
         '/tasty-fonts/v1/custom-css/dry-run',
         RestController::routeReference('customCssDryRun'),
         'Custom CSS URL dry runs should expose a dedicated REST route reference.'
@@ -150,6 +155,11 @@ $tests['rest_controller_route_reference_builds_full_api_paths_and_ignores_unknow
         '/tasty-fonts/v1/custom-css/import',
         RestController::routeReference('customCssImport'),
         'Custom CSS final imports should expose a dedicated REST route reference.'
+    );
+    assertSameValue(
+        '/tasty-fonts/v1/library/refresh',
+        RestController::routeReference('libraryRefresh'),
+        'Library refresh requests should expose a dedicated REST route reference.'
     );
 };
 
@@ -544,6 +554,61 @@ $tests['admin_controller_returns_a_not_found_error_for_unknown_family_card_fragm
     $result = $services['controller']->renderFamilyCardFragment('missing-family');
 
     assertWpErrorCode('tasty_fonts_family_not_found', $result, 'Unknown family slugs should return the shared not-found error for lazy family-card fragments.');
+};
+
+$tests['admin_controller_refresh_library_view_returns_row_html_and_runtime_state'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Inter',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'source' => 'local',
+                    'files' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                    'paths' => ['woff2' => 'inter/Inter-400-normal.woff2'],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $result = $services['controller']->refreshLibraryView([
+        'family_slugs' => ['inter'],
+        'expanded_family_slugs' => ['inter'],
+    ]);
+
+    assertSameValue(false, is_wp_error($result), 'Library refresh should return a payload for known families.');
+    assertSameValue('ok', (string) ($result['status'] ?? ''), 'Library refresh should return an ok status.');
+    assertContainsValue('data-font-row', (string) ($result['rows'][0]['html'] ?? ''), 'Library refresh should return full family row HTML.');
+    assertContainsValue('Delivery Profiles', (string) ($result['rows'][0]['html'] ?? ''), 'Expanded refresh rows should include hydrated detail markup.');
+    assertSameValue(true, !empty($result['rows'][0]['details_included']), 'Expanded refresh rows should mark details as included.');
+    assertSameValue(true, is_array($result['role_family_catalog'] ?? null), 'Library refresh should return role-family catalog runtime state.');
+    assertSameValue(true, is_array($result['available_family_options'] ?? null), 'Library refresh should return selectable family options.');
+    assertSameValue(true, is_array($result['preview_bootstrap'] ?? null), 'Library refresh should return preview bootstrap runtime state.');
+};
+
+$tests['admin_controller_refresh_library_view_reports_missing_requested_family_slugs'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $result = $services['controller']->refreshLibraryView([
+        'family_slugs' => ['missing-family'],
+    ]);
+
+    assertSameValue(false, is_wp_error($result), 'Library refresh should return a payload even when requested families are missing.');
+    assertSameValue(['missing-family'], $result['missing_family_slugs'] ?? null, 'Library refresh should report requested missing family slugs.');
 };
 
 $tests['admin_controller_builds_specific_settings_saved_message'] = static function (): void {
@@ -2009,6 +2074,7 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/bunny/family' => 'GET',
         'tasty-fonts/v1/google/import' => 'POST',
         'tasty-fonts/v1/bunny/import' => 'POST',
+        'tasty-fonts/v1/adobe/project' => 'POST',
         'tasty-fonts/v1/custom-css/dry-run' => 'POST',
         'tasty-fonts/v1/custom-css/import' => 'POST',
         'tasty-fonts/v1/transfer/validate' => 'POST',
@@ -2020,6 +2086,7 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/families/publish-state' => 'PATCH',
         'tasty-fonts/v1/families/delivery-profile' => 'DELETE',
         'tasty-fonts/v1/families/card' => 'GET',
+        'tasty-fonts/v1/library/refresh' => 'POST',
         'tasty-fonts/v1/tools/health' => 'GET',
         'tasty-fonts/v1/tools/runtime-manifest' => 'GET',
         'tasty-fonts/v1/tools/action' => 'POST',
@@ -2119,6 +2186,156 @@ $tests['rest_controller_returns_native_payloads_for_write_routes'] = static func
     assertSameValue(true, $response instanceof WP_REST_Response, 'REST write routes should return a native REST response object.');
     assertSameValue('Inter', (string) ($response->get_data()['family'] ?? ''), 'REST write routes should return the saved family in the response body.');
     assertSameValue('serif', (string) ($response->get_data()['fallback'] ?? ''), 'REST write routes should return the saved fallback in the response body.');
+};
+
+$tests['rest_controller_adobe_project_rest_save_returns_payload_for_in_place_refresh'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['adobe_font_imports_enabled' => '1']);
+    $remoteGetResponses['https://use.typekit.net/abc1234.css'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: "mr-eaves-xl-modern";
+  font-style: normal;
+  font-weight: 400;
+  src: url("https://use.typekit.net/af/def456/000000000000000000000000/30/l?primer=1") format("woff2");
+}
+CSS,
+    ];
+
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/adobe/project');
+    $request->set_body_params([
+        'action' => 'save',
+        'project_id' => 'abc1234',
+        'enabled' => '1',
+    ]);
+    $response = $services['rest']->saveAdobeProject($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Adobe project saves should return a REST response payload.');
+    assertSameValue('ok', (string) ($data['status'] ?? ''), 'Adobe project saves should report an ok status.');
+    assertSameValue('save', (string) ($data['action'] ?? ''), 'Adobe project saves should report the action key for JS refresh routing.');
+    assertSameValue('abc1234', (string) ($data['project_id'] ?? ''), 'Adobe project saves should return the normalized project ID.');
+    assertSameValue(true, !empty($data['enabled']), 'Adobe project saves should return the enabled flag.');
+    assertSameValue(true, (string) ($data['message'] ?? '') !== '', 'Adobe project saves should return a user-facing message.');
+};
+
+$tests['rest_controller_adobe_project_rest_rejects_invalid_project_ids'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['adobe_font_imports_enabled' => '1']);
+
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/adobe/project');
+    $request->set_body_params([
+        'action' => 'save',
+        'project_id' => 'ab',
+        'enabled' => '1',
+    ]);
+    $response = $services['rest']->saveAdobeProject($request);
+
+    assertSameValue(true, is_wp_error($response), 'Invalid Adobe project IDs should return a WP_Error payload.');
+    assertSameValue('tasty_fonts_adobe_project_invalid', $response->get_error_code(), 'Invalid Adobe project IDs should use the expected validation error code.');
+    assertSameValue(400, (int) (($response->get_error_data()['status'] ?? 0)), 'Invalid Adobe project IDs should surface an HTTP 400 status.');
+};
+
+$tests['rest_controller_adobe_project_rest_remove_clears_saved_project'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['adobe_font_imports_enabled' => '1']);
+    $remoteGetResponses['https://use.typekit.net/abc1234.css'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => <<<'CSS'
+@font-face {
+  font-family: "mr-eaves-xl-modern";
+  font-style: normal;
+  font-weight: 400;
+  src: url("https://use.typekit.net/af/def456/000000000000000000000000/30/l?primer=1") format("woff2");
+}
+CSS,
+    ];
+
+    $saveRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/adobe/project');
+    $saveRequest->set_body_params([
+        'action' => 'save',
+        'project_id' => 'abc1234',
+        'enabled' => '1',
+    ]);
+    $services['rest']->saveAdobeProject($saveRequest);
+
+    $removeRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/adobe/project');
+    $removeRequest->set_body_params(['action' => 'remove']);
+    $response = $services['rest']->saveAdobeProject($removeRequest);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Adobe project removes should return a REST response payload.');
+    assertSameValue('removed', (string) ($data['status'] ?? ''), 'Adobe project removes should report a removed status.');
+    assertSameValue('remove', (string) ($data['action'] ?? ''), 'Adobe project removes should report the remove action key.');
+    assertSameValue('', (string) ($services['settings']->getAdobeProjectId() ?? ''), 'Adobe project removes should clear the saved project ID.');
+};
+
+$tests['rest_controller_bunny_search_returns_paged_shape_without_probe_padding'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['bunny_font_imports_enabled' => '1']);
+    $remoteGetResponses['https://fonts.bunny.net/sitemap.xml'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'application/xml'],
+        'body' => <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://fonts.bunny.net/family/inter</loc></url>
+  <url><loc>https://fonts.bunny.net/family/ibm-plex-sans</loc></url>
+</urlset>
+XML,
+    ];
+    $remoteGetResponses['https://fonts.bunny.net/family/inter'] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/html'],
+        'body' => <<<'HTML'
+<!doctype html>
+<html>
+<head>
+    <title>Inter | Bunny Fonts</title>
+</head>
+<body>
+    <div class="family"><h3>Sans Serif</h3></div>
+    <div class="styles">18 styles</div>
+    <div class="card-main"><h1>Inter</h1></div>
+    <link href="https://fonts.bunny.net/css?family=inter:100,400,700,400i,700i," rel="stylesheet" />
+</body>
+</html>
+HTML,
+    ];
+
+    $request = new WP_REST_Request('GET', '/' . RestController::API_NAMESPACE . '/bunny/search');
+    $request->set_query_params([
+        'query' => 'i',
+        'limit' => 1,
+        'offset' => 0,
+    ]);
+    $response = $services['rest']->searchBunny($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Bunny search should return a REST response payload when the workflow is enabled.');
+    assertSameValue(true, array_key_exists('items', $data), 'Bunny search responses should keep the items field.');
+    assertSameValue(true, array_key_exists('has_more', $data), 'Bunny search responses should keep the has_more field.');
+    assertSameValue(true, array_key_exists('next_offset', $data), 'Bunny search responses should keep the next_offset field.');
+    assertSameValue(true, !empty($data['has_more']), 'Bunny search responses should report has_more when matching families remain.');
+    assertSameValue(1, (int) ($data['next_offset'] ?? 0), 'Bunny search responses should advance next_offset by visible page results.');
+    assertSameValue(1, count($data['items'] ?? []), 'Bunny search responses should return only the requested page size.');
 };
 
 $tests['rest_controller_font_import_workflow_gates_reject_disabled_provider_and_upload_routes'] = static function (): void {
@@ -2874,9 +3091,9 @@ $tests['rest_controller_family_fallback_returns_refreshed_generated_css_panel'] 
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'Family fallback saves should return a native REST response.');
     assertSameValue('generated', (string) ($panel['key'] ?? ''), 'Family fallback saves should include the refreshed Generated CSS diagnostics panel.');
-    assertContainsValue('"Inter",sans-serif', (string) ($panel['value'] ?? ''), 'Generated CSS should keep the explicit role fallback when a family fallback changes.');
-    assertContainsValue('"Inter",sans-serif', (string) ($panel['readable_display_value'] ?? ''), 'The readable Generated CSS panel should also keep the explicit role fallback.');
-    assertNotContainsValue('"Inter",serif', (string) ($panel['value'] ?? ''), 'Family fallback changes should not override an explicit role fallback stack.');
+    assertContainsValue('"Inter",serif', (string) ($panel['value'] ?? ''), 'Generated CSS should inherit the family fallback when a family fallback changes.');
+    assertContainsValue('"Inter",serif', (string) ($panel['readable_display_value'] ?? ''), 'The readable Generated CSS panel should also inherit the family fallback.');
+    assertNotContainsValue('"Inter",sans-serif', (string) ($panel['value'] ?? ''), 'Role fallback stacks should not override a selected family fallback.');
 };
 
 $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): void {
@@ -4957,4 +5174,260 @@ $tests['handle_admin_actions_records_failed_site_transfer_imports_and_queues_inl
     assertSameValue('tasty_fonts_transfer_missing_upload', (string) ($status['code'] ?? ''), 'The inline import status should keep the exact WP_Error code.');
     assertContainsValue('Choose a Tasty Fonts transfer bundle before importing.', (string) ($status['message'] ?? ''), 'The inline import status should keep the user-facing failure message.');
     assertSameValue(false, empty($redirectLocation), 'Failed site transfer imports should still redirect back to the admin page.');
+};
+
+$tests['rest_controller_settings_disabling_variable_fonts_creates_snapshot_and_cleans_variable_data'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['variable_fonts_enabled' => '1']);
+    $services['storage']->ensureRootDirectory();
+    $variablePath = 'inter-variable/Inter-Variable.woff2';
+    $staticPath = 'inter-variable/Inter-400.woff2';
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($variablePath), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($staticPath), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter Variable',
+        'inter-variable',
+        [
+            'id' => 'local-variable',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter Variable',
+                'weight' => '100..900',
+                'style' => 'normal',
+                'is_variable' => true,
+                'axes' => ['WGHT' => ['min' => '100', 'default' => '400', 'max' => '900']],
+                'files' => ['woff2' => $variablePath],
+                'paths' => ['woff2' => $variablePath],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Inter Variable',
+        'inter-variable',
+        [
+            'id' => 'local-static',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter Variable',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => $staticPath],
+                'paths' => ['woff2' => $staticPath],
+            ]],
+        ],
+        'published',
+        false
+    );
+
+    $services['settings']->saveRoles([
+        'heading' => 'Inter Variable',
+        'body' => 'Inter Variable',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'heading_axes' => ['WGHT' => '700'],
+        'body_axes' => ['WGHT' => '500'],
+    ], ['Inter Variable']);
+    $services['settings']->saveAppliedRoles([
+        'heading' => 'Inter Variable',
+        'body' => 'Inter Variable',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'heading_axes' => ['WGHT' => '700'],
+        'body_axes' => ['WGHT' => '500'],
+    ], ['Inter Variable']);
+
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params(['variable_fonts_enabled' => '0']);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+    $snapshots = $services['snapshots']->listSnapshots();
+    $family = $services['imports']->getFamily('inter-variable');
+    $roles = $services['settings']->getRoles(['Inter Variable']);
+    $appliedRoles = $services['settings']->getAppliedRoles(['Inter Variable']);
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Disabling variable fonts through the settings route should return a native REST response.');
+    assertSameValue(1, count($snapshots), 'Disabling variable fonts should create one rollback snapshot before cleanup.');
+    assertSameValue('before_capability_disable', (string) ($snapshots[0]['reason'] ?? ''), 'Capability-disable snapshots should use the expected reason slug.');
+    assertSameValue(false, !empty($data['settings']['variable_fonts_enabled']), 'Disabling variable fonts should persist the disabled setting value.');
+    assertSameValue([], (array) ($roles['heading_axes'] ?? []), 'Disabling variable fonts should clear draft role axis values.');
+    assertSameValue([], (array) ($roles['body_axes'] ?? []), 'Disabling variable fonts should clear draft body axis values.');
+    assertSameValue([], (array) ($appliedRoles['heading_axes'] ?? []), 'Disabling variable fonts should clear applied role axis values.');
+    assertSameValue([], (array) ($appliedRoles['body_axes'] ?? []), 'Disabling variable fonts should clear applied body axis values.');
+    assertSameValue('local-static', (string) ($family['active_delivery_id'] ?? ''), 'Disabling variable fonts should switch active delivery to the remaining static profile.');
+    assertSameValue(false, isset($family['delivery_profiles']['local-variable']), 'Disabling variable fonts should remove variable-only delivery profiles from the import manifest.');
+    assertSameValue(false, file_exists((string) $services['storage']->pathForRelativePath($variablePath)), 'Disabling variable fonts should remove managed variable files.');
+};
+
+$tests['rest_controller_settings_disabling_variable_only_live_body_reverts_to_fallback'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'variable_fonts_enabled' => '1',
+        'auto_apply_roles' => '1',
+    ]);
+    $services['storage']->ensureRootDirectory();
+    $variablePath = 'alan-sans/AlanSans-Variable.woff2';
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($variablePath), 'font-data');
+    $services['imports']->saveProfile(
+        'Alan Sans',
+        'alan-sans',
+        [
+            'id' => 'local-variable',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Alan Sans',
+                'weight' => '100..900',
+                'style' => 'normal',
+                'is_variable' => true,
+                'axes' => ['WGHT' => ['min' => '100', 'default' => '400', 'max' => '900']],
+                'files' => ['woff2' => $variablePath],
+                'paths' => ['woff2' => $variablePath],
+            ]],
+        ],
+        'role_active',
+        true
+    );
+    $services['settings']->saveRoles([
+        'heading' => '',
+        'body' => 'Alan Sans',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'body_axes' => ['WGHT' => '500'],
+    ], ['Alan Sans']);
+    $services['settings']->saveAppliedRoles([
+        'heading' => '',
+        'body' => 'Alan Sans',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'body_axes' => ['WGHT' => '500'],
+    ], ['Alan Sans']);
+
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params(['variable_fonts_enabled' => '0']);
+
+    $response = $services['rest']->saveSettings($request);
+    $roles = $services['settings']->getRoles([]);
+    $appliedRoles = $services['settings']->getAppliedRoles([]);
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Disabling variable fonts should succeed for a variable-only live body family.');
+    assertSameValue(null, $services['imports']->getFamily('alan-sans'), 'Variable-only families with no static delivery should be removed from the library.');
+    assertSameValue('', (string) ($roles['body'] ?? ''), 'Draft body should revert to its fallback when the live variable-only family is removed.');
+    assertSameValue('', (string) ($appliedRoles['body'] ?? ''), 'Applied body should revert to its fallback when the live variable-only family is removed.');
+    assertSameValue('sans-serif', (string) ($roles['body_fallback'] ?? ''), 'Draft body fallback should remain available after variable-only cleanup.');
+    assertSameValue('sans-serif', (string) ($appliedRoles['body_fallback'] ?? ''), 'Applied body fallback should remain available after variable-only cleanup.');
+    assertSameValue(false, file_exists((string) $services['storage']->pathForRelativePath($variablePath)), 'Variable-only cleanup should delete the managed variable file.');
+};
+
+$tests['rest_controller_settings_disabling_monospace_creates_snapshot_and_clears_role_fields'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'monospace_role_enabled' => '1',
+        'class_output_role_monospace_enabled' => '1',
+        'class_output_role_alias_code_enabled' => '1',
+        'class_output_category_mono_enabled' => '1',
+        'extended_variable_category_mono_enabled' => '1',
+    ]);
+    $services['settings']->saveRoles([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ], ['Inter', 'JetBrains Mono']);
+    $services['settings']->saveAppliedRoles([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ], ['Inter', 'JetBrains Mono']);
+
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params(['monospace_role_enabled' => '0']);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+    $snapshots = $services['snapshots']->listSnapshots();
+    $settings = $services['settings']->getSettings();
+    $roles = $services['settings']->getRoles(['Inter', 'JetBrains Mono']);
+    $appliedRoles = $services['settings']->getAppliedRoles(['Inter', 'JetBrains Mono']);
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Disabling the monospace role through the settings route should return a native REST response.');
+    assertSameValue(1, count($snapshots), 'Disabling the monospace role should create one rollback snapshot before cleanup.');
+    assertSameValue('before_capability_disable', (string) ($snapshots[0]['reason'] ?? ''), 'Monospace capability disable snapshots should use the expected reason slug.');
+    assertSameValue(false, !empty($settings['monospace_role_enabled']), 'Disabling monospace should persist the disabled setting value.');
+    assertSameValue(false, !empty($settings['class_output_role_monospace_enabled']), 'Disabling monospace should force-disable monospace class output controls.');
+    assertSameValue(false, !empty($settings['class_output_role_alias_code_enabled']), 'Disabling monospace should force-disable code alias output controls.');
+    assertSameValue(false, !empty($settings['class_output_category_mono_enabled']), 'Disabling monospace should force-disable mono category output controls.');
+    assertSameValue(false, !empty($settings['extended_variable_category_mono_enabled']), 'Disabling monospace should force-disable mono extended variable controls.');
+    assertSameValue('', (string) ($roles['monospace'] ?? ''), 'Disabling monospace should clear draft monospace role families.');
+    assertSameValue('', (string) ($appliedRoles['monospace'] ?? ''), 'Disabling monospace should clear applied monospace role families.');
+    assertSameValue('Inter', (string) ($roles['heading'] ?? ''), 'Disabling monospace should preserve heading role assignments.');
+    assertSameValue('Inter', (string) ($roles['body'] ?? ''), 'Disabling monospace should preserve body role assignments.');
+    assertSameValue(true, !empty($data['capability_cleanup']['monospace_role']['role_data_cleared']), 'Disabling monospace should report role cleanup in the settings response payload.');
+};
+
+$tests['rest_controller_settings_disabling_variable_and_monospace_capabilities_uses_one_snapshot'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'variable_fonts_enabled' => '1',
+        'monospace_role_enabled' => '1',
+    ]);
+    $services['storage']->ensureRootDirectory();
+    $relativePath = 'both-disable/BothDisable-Variable.woff2';
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath($relativePath), 'font-data');
+    $services['imports']->saveProfile(
+        'Both Disable Variable',
+        'both-disable-variable',
+        [
+            'id' => 'local-variable',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Both Disable Variable',
+                'weight' => '100..900',
+                'style' => 'normal',
+                'is_variable' => true,
+                'files' => ['woff2' => $relativePath],
+                'paths' => ['woff2' => $relativePath],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'variable_fonts_enabled' => '0',
+        'monospace_role_enabled' => '0',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+    $snapshots = $services['snapshots']->listSnapshots();
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Disabling both capabilities should return a native REST response.');
+    assertSameValue(1, count($snapshots), 'Disabling both capabilities in one save should create only one rollback snapshot.');
+    assertSameValue('before_capability_disable', (string) ($snapshots[0]['reason'] ?? ''), 'Combined capability disable should use the capability-disable snapshot reason.');
+    assertSameValue(true, is_array($data['capability_cleanup']['variable_fonts'] ?? null), 'Combined capability disable should report variable cleanup details in the settings response payload.');
+    assertSameValue(true, !empty($data['capability_cleanup']['monospace_role']['role_data_cleared']), 'Combined capability disable should report monospace cleanup details in the settings response payload.');
 };

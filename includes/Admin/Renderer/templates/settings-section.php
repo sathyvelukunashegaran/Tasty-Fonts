@@ -1319,25 +1319,29 @@
                                             <span class="tasty-fonts-health-group-count"><?php esc_html_e('Roles & Axes', 'tasty-fonts'); ?></span>
                                         </div>
                                         <div class="tasty-fonts-output-settings-list tasty-fonts-settings-board-list tasty-fonts-settings-behavior-stack">
+                                        <?php
+                                        $monospaceDisableWarning = __('Turning this off creates a rollback snapshot, clears monospace role assignments and monospace output choices, and removes monospace runtime CSS.', 'tasty-fonts');
+                                        $variableDisableWarning = __('Turning this off creates a rollback snapshot, removes variable font deliveries/files, and clears saved axis settings.', 'tasty-fonts');
+                                        ?>
                                         <input type="hidden" name="monospace_role_enabled" value="0">
-                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output<?php echo $monospaceRoleEnabled ? ' is-risky' : ''; ?>" data-settings-help-tooltip="<?php echo esc_attr($monospaceRoleEnabled ? $monospaceDisableWarning : __('Adds a monospace role for code and pre.', 'tasty-fonts')); ?>">
                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="monospace_role_enabled" value="1" <?php checked($monospaceRoleEnabled); ?>>
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">
                                                 <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Monospace Role', 'tasty-fonts'); ?></span>
                                                 <?php if ($showSettingsDescriptions): ?>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Adds a monospace role for code and pre.', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-toggle-description"><?php echo esc_html($monospaceRoleEnabled ? $monospaceDisableWarning : __('Adds a monospace role for code and pre.', 'tasty-fonts')); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                         </label>
                                         <input type="hidden" name="variable_fonts_enabled" value="0">
-                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output">
+                                        <label class="tasty-fonts-toggle-field tasty-fonts-toggle-field--output<?php echo !empty($variableFontsEnabled) ? ' is-risky' : ''; ?>" data-settings-help-tooltip="<?php echo esc_attr(!empty($variableFontsEnabled) ? $variableDisableWarning : __('Allows variable font uploads and axis controls.', 'tasty-fonts')); ?>">
                                             <input type="checkbox" class="tasty-fonts-toggle-input" name="variable_fonts_enabled" value="1" <?php checked(!empty($variableFontsEnabled)); ?>>
                                             <span class="tasty-fonts-toggle-switch" aria-hidden="true"></span>
                                             <span class="tasty-fonts-toggle-copy">
                                                 <span class="tasty-fonts-toggle-title"><?php esc_html_e('Enable Variable Fonts', 'tasty-fonts'); ?></span>
                                                 <?php if ($showSettingsDescriptions): ?>
-                                                    <span class="tasty-fonts-toggle-description"><?php esc_html_e('Allows variable font uploads and axis controls.', 'tasty-fonts'); ?></span>
+                                                    <span class="tasty-fonts-toggle-description"><?php echo esc_html(!empty($variableFontsEnabled) ? $variableDisableWarning : __('Allows variable font uploads and axis controls.', 'tasty-fonts')); ?></span>
                                                 <?php endif; ?>
                                             </span>
                                         </label>

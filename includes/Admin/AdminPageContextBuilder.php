@@ -574,6 +574,7 @@ final class AdminPageContextBuilder
                 'faces' => count($faces),
                 'missing_files' => $missingFiles,
                 'preloadable_woff2_files' => $this->countWoff2Faces($faces),
+                'axes' => $this->buildRuntimeFamilyAxisLabels($faces),
                 'variants' => array_values(array_filter(array_map(
                     static fn (mixed $variant): string => is_scalar($variant) ? trim((string) $variant) : '',
                     is_array($activeDelivery['variants'] ?? null) ? $activeDelivery['variants'] : []
@@ -582,6 +583,68 @@ final class AdminPageContextBuilder
         }
 
         return $matrix;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $faces
+     * @return list<string>
+     */
+    private function buildRuntimeFamilyAxisLabels(array $faces): array
+    {
+        $axes = [];
+
+        foreach ($faces as $face) {
+            foreach (FontUtils::normalizeAxesMap($face['axes'] ?? []) as $tag => $definition) {
+                if (!isset($axes[$tag])) {
+                    $axes[$tag] = $definition;
+                    continue;
+                }
+
+                $axes[$tag]['min'] = (string) min((float) $axes[$tag]['min'], (float) $definition['min']);
+                $axes[$tag]['max'] = (string) max((float) $axes[$tag]['max'], (float) $definition['max']);
+
+                if (isset($definition['default']) && (float) $definition['default'] !== (float) ($axes[$tag]['default'] ?? $definition['default'])) {
+                    unset($axes[$tag]['default']);
+                }
+            }
+        }
+
+        ksort($axes, SORT_STRING);
+
+        return array_values(array_filter(array_map(
+            fn (string $tag, array $definition): string => $this->formatRuntimeAxisLabel($tag, $definition),
+            array_keys($axes),
+            $axes
+        )));
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function formatRuntimeAxisLabel(string $tag, array $definition): string
+    {
+        $label = FontUtils::cssAxisTag($tag);
+        $min = FontUtils::normalizeAxisValue($definition['min'] ?? '');
+        $max = FontUtils::normalizeAxisValue($definition['max'] ?? '');
+        $default = FontUtils::normalizeAxisValue($definition['default'] ?? '');
+
+        if ($min !== '' && $max !== '' && $min !== $max) {
+            return $label . ' ' . $min . '-' . $max;
+        }
+
+        if ($default !== '') {
+            return $label . ' ' . $default;
+        }
+
+        if ($min !== '') {
+            return $label . ' ' . $min;
+        }
+
+        if ($max !== '') {
+            return $label . ' ' . $max;
+        }
+
+        return $label;
     }
 
     /**
@@ -2867,10 +2930,6 @@ final class AdminPageContextBuilder
         $familyName = trim($this->roleStringValue($roles, $roleKey));
         $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
 
-        if ($fallback !== '') {
-            return FontUtils::sanitizeFallback($fallback);
-        }
-
         if ($familyName !== '') {
                 $familyFallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
 
@@ -2887,6 +2946,10 @@ final class AdminPageContextBuilder
             if (is_array($family)) {
                 return FontUtils::defaultFallbackForCategory($this->resolveFamilyCategory($family));
             }
+        }
+
+        if ($fallback !== '') {
+            return FontUtils::sanitizeFallback($fallback);
         }
 
         return $default;

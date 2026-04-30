@@ -6,38 +6,44 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added an Advanced Tools Health triage model with Action Needed, Worth Reviewing, and Checks Passed groups so diagnostics separate urgent recovery work from advisory and passing checks.
-- Added an Advanced Tools Debug Details panel with runtime CSS paths, URLs, file facts, runtime family counts, generated CSS status, and copy-friendly support values.
-- Added live/draft role usage chips to Font Library family cards so Heading, Body, and Monospace assignments show whether they are published sitewide or only staged in draft roles.
+- Added in-place Font Library refresh after uploads, hosted imports, custom CSS URL imports, delivery changes, publish-state changes, and Adobe project saves so successful actions update the affected rows without a full admin reload when possible.
+- Added REST endpoints for refreshing Font Library rows and saving, resyncing, or removing Adobe Fonts projects, including payloads that keep role selectors, preview state, family options, and generated CSS diagnostics in sync.
+- Added rollback-protected cleanup when disabling variable fonts or the monospace role: variable font files/profiles and saved axis data are removed safely, monospace assignments/output options are cleared, and the settings response reports what changed.
+- Added live/draft role usage chips and inline role previews so Heading, Body, and Monospace assignments show whether they are published sitewide or only staged as draft changes.
+- Added an Advanced Tools Health triage model with Action Needed, Worth Reviewing, and Checks Passed groups, plus a Debug Details panel for runtime CSS paths, URLs, file facts, runtime family counts, generated CSS status, and copy-friendly support values.
+- Added Advanced Tools bulk cleanup actions for deleting rollback snapshots and retained site-transfer export bundles, with confirmation phrases, activity logs, and guardrails that preserve locked export bundles.
 - Added update-channel option labels that include the latest available Stable, Beta, or Nightly version in the Advanced Tools Developer release rail.
-- Added hosted import workflow, generated CSS seam, library mutation, and admin action regression coverage for the extracted service modules.
-- Added Advanced Tools bulk cleanup actions for deleting all rollback snapshots and all retained site-transfer export bundles, with confirmation phrases, admin POST handlers, activity logs, and guardrails that block export deletion while any bundle is locked.
 - Added a URL Import source filter for the Font Library so custom CSS URL import families can be isolated in library views while still retaining their self-hosted or external-request delivery filters.
+- Added hosted import workflow, generated CSS seam, library mutation, admin action, capability cleanup, provider paging, and JS contract regression coverage for the extracted service modules and refreshed admin flows.
 
 ### Changed
 
 - Reworked the Advanced Tools overview around collapsible health triage, focused primary actions, clearer status labels, and a separate Debug Details surface instead of mixing runtime facts into the health checklist.
-- Refined Settings rows with changed-state indicators, clearer dependency-disabled states, Compact Mode wording, safer save/reset shell behavior, and better guidance for Sitewide Delivery, integrations, and transfer actions.
+- Refined Settings rows with changed-state indicators, clearer dependency-disabled states, Compact Mode wording, safer save/reset shell behavior, capability-disable warnings, and better guidance for Sitewide Delivery, integrations, and transfer actions.
 - Clarified sitewide role deployment states and publish controls so Off, Live, and Pending Publish states describe whether saved role assignments are draft-only or served to visitors and integrations.
-- Updated Font Library card actions, source chips, role controls, and delete guardrails so live role usage and staged role changes stay visually distinct.
+- Updated Font Library card actions, source chips, role controls, delivery-profile rows, delete guardrails, and quick-switch delivery actions so live usage, staged role changes, and active delivery choices stay visually distinct.
+- Changed selected-family fallback resolution so role CSS and previews inherit the selected family fallback; explicit role fallback stacks are now reserved for fallback-only roles.
 - Tightened integration/runtime behavior so Block Editor Font Library sync, Etch canvas loading, Bricks integration output, and monospace role CSS respect their saved settings and Sitewide Delivery dependencies.
-- Refreshed admin CSS tokens, row-board styling, health surfaces, preview/snippet controls, and final documentation screenshots for the latest calmer Settings, Library, and Advanced Tools layouts.
-- Refactored generated CSS handling behind the existing AssetService façade into focused cache, canonical stylesheet, regeneration queue, delivery, and inline nonce services.
+- Refreshed admin CSS tokens, row-board styling, health surfaces, toast styling, preview/snippet controls, role-card controls, delivery-profile cards, and final documentation screenshots for the latest calmer Settings, Library, and Advanced Tools layouts.
+- Refactored generated CSS handling behind the existing AssetService facade into focused cache, canonical stylesheet, regeneration queue, delivery, and inline nonce services.
 - Replaced the shared hosted-provider import trait with a reusable hosted import workflow, request/config/provider adapter layer, and shared variant planner for Google and Bunny imports.
-- Split library catalog discovery, delivery/profile mutations, publish-state changes, role protection checks, and admin maintenance actions into focused service modules while preserving the existing public controller/service entry points.
+- Split library catalog discovery, delivery/profile mutations, publish-state changes, role protection checks, capability cleanup, Adobe project persistence, and admin maintenance actions into focused service modules while preserving the existing public controller/service entry points.
 - Moved font import workflow controls into Settings > Behavior, keeping Google Fonts, Bunny Fonts, and custom uploads enabled by default while Adobe Fonts and URL imports remain opt-in.
 - Moved Show Onboarding Hints and Show Activity Log into the Advanced Tools Developer tab so Settings > Behavior focuses on import workflows, font capabilities, cleanup, and access.
 - Simplified Advanced Tools developer controls so the release rail appears first and saves channel changes immediately without a separate save button.
 - Refined Advanced Tools transfer/activity surfaces, hidden activity-log messaging, destructive tool summaries, and snapshot rows so retained exports, locked exports, font files, and storage files are easier to understand.
-- Polished admin masthead, top-panel rails, transfer actions, select clears, log toggles, copy/download buttons, and compact icon chrome using shared design tokens.
+- Polished admin masthead, top-panel rails, transfer actions, select clears, log toggles, copy/download buttons, search/import status copy, and compact icon chrome using shared design tokens.
 - Bumped the catalog cache transient namespace and tagged custom CSS URL import delivery profiles with URL Import filter tokens.
 
 ### Fixed
 
 - Fixed Advanced Tools health output so runtime reference data no longer dilutes the actionable checklist and passing diagnostics are labeled as OK rather than over-claiming verification.
-- Fixed settings save/reset handling for compact mode, monospace role support, and integration toggles so persisted behavior matches the current Settings UI.
-- Fixed generated CSS, preview, Block Editor, and integration runtime paths to honor disabled sitewide delivery and monospace role state consistently.
+- Fixed settings save/reset handling for compact mode, monospace role support, variable font support, and integration toggles so persisted behavior matches the current Settings UI.
+- Fixed generated CSS, preview, Block Editor, and integration runtime paths to honor disabled sitewide delivery, selected-family fallback stacks, and monospace role state consistently.
 - Fixed Font Library role badges and delete blocking so draft role assignments are not mistaken for live sitewide usage.
+- Fixed stale or undeliverable library records so capability cleanup and live-role changes remove unavailable families instead of rendering ambiguous Unavailable cards.
+- Fixed Bunny Fonts search pagination so `has_more` is calculated without hydrating an extra hidden family page and infinite load-more loops stop when the result set makes no progress.
+- Fixed Google variable CSS2 URL generation so custom axis tags keep their required uppercase form while registered axes are serialized with CSS-compatible casing.
 - Added end-to-end workflow gating so disabled font import workflows are reflected in Add Fonts UI panels and rejected consistently by REST/admin actions.
 - Fixed hydrated family details so fallback, display, delivery, and publish-state controls bind only once while still initializing correctly after AJAX replacement.
 - Fixed bulk export deletion paths so locked site-transfer bundles are preserved and blocked actions expose disabled-state messaging to both the UI and controller responses.

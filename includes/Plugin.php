@@ -21,6 +21,7 @@ use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CapabilityDisableCleanupService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedImportVariantPlanner;
@@ -67,6 +68,7 @@ final class Plugin
     private readonly AssetService $assets;
     private readonly HostedImportWorkflow $hostedImportWorkflow;
     private readonly LibraryService $library;
+    private readonly CapabilityDisableCleanupService $capabilityCleanup;
     private readonly LocalUploadService $localUpload;
     private readonly AdobeProjectClient $adobe;
     private readonly BunnyFontsClient $bunnyClient;
@@ -141,6 +143,12 @@ final class Plugin
             $this->assets,
             $this->log,
             $this->settings
+        );
+        $this->capabilityCleanup = new CapabilityDisableCleanupService(
+            $this->storage,
+            $this->imports,
+            $this->catalog,
+            $this->log
         );
         $this->localUpload = new LocalUploadService(
             $this->storage,
@@ -231,6 +239,7 @@ final class Plugin
             $this->catalog,
             $this->assets,
             $this->library,
+            $this->capabilityCleanup,
             $this->localUpload,
             $this->cssBuilder,
             $this->adobe,

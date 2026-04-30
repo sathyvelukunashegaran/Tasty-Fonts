@@ -2758,6 +2758,58 @@ $tests['admin_page_context_builder_does_not_report_hydrated_self_hosted_urls_as_
     assertSameValue('ok', (string) ($checksBySlug['self_hosted_files']['severity'] ?? ''), 'The self-hosted files health check should pass when the hydrated public URL points at an existing managed file.');
 };
 
+$tests['admin_page_context_builder_includes_variable_axis_debug_metadata'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Noto Sans',
+        'noto-sans',
+        [
+            'id' => 'google-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'google',
+            'type' => 'self_hosted',
+            'format' => 'variable',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Noto Sans',
+                'slug' => 'noto-sans',
+                'source' => 'google',
+                'weight' => '100..900',
+                'style' => 'normal',
+                'is_variable' => true,
+                'axes' => ['WGHT' => ['min' => '100', 'default' => '400', 'max' => '900']],
+                'files' => ['woff2' => 'google/noto-sans/NotoSans-Variable.woff2'],
+                'paths' => ['woff2' => 'google/noto-sans/NotoSans-Variable.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+    $context = $builder->build();
+    $advancedTools = is_array($context['advanced_tools'] ?? null) ? $context['advanced_tools'] : [];
+    $manifest = is_array($advancedTools['runtime_manifest'] ?? null) ? $advancedTools['runtime_manifest'] : [];
+    $families = is_array($manifest['families'] ?? null) ? $manifest['families'] : [];
+
+    assertSameValue('variable', (string) ($families[0]['format'] ?? ''), 'Runtime debug family metadata should preserve the active delivery format.');
+    assertSameValue(['wght 100-900'], (array) ($families[0]['axes'] ?? []), 'Runtime debug family metadata should expose variable axis ranges from active faces.');
+};
+
 $tests['admin_page_context_builder_resolves_self_hosted_upload_urls_without_paths_before_reporting_missing_files'] = static function (): void {
     resetTestState();
 

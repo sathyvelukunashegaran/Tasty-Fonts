@@ -15,6 +15,7 @@ use WP_Error;
  * @phpstan-type CatalogEntryList list<CatalogEntry>
  * @phpstan-type FamilyRecord array<string, mixed>
  * @phpstan-type FamilySearchResultList list<FamilyRecord>
+ * @phpstan-type FamilySearchPage array{items: FamilySearchResultList, has_more: bool, next_offset: int}
  * @phpstan-type VariantTokenList list<string>
  * @phpstan-type HttpArgs array{
  *   method?: string,
@@ -43,50 +44,40 @@ final class BunnyFontsClient
      */
     public function searchFamilies(string $query, int $limit = 20, int $offset = 0): array
     {
+        return $this->searchFamilyPage($query, $limit, $offset)['items'];
+    }
+
+    /**
+     * @return FamilySearchPage
+     */
+    public function searchFamilyPage(string $query, int $limit = 20, int $offset = 0): array
+    {
         $query = strtolower(trim($query));
         $offset = max(0, $offset);
 
-        if ($query === '') {
-            return [];
+        if ($query === '' || $limit <= 0) {
+            return [
+                'items' => [],
+                'has_more' => false,
+                'next_offset' => $offset,
+            ];
         }
 
-        $results = [];
-
-        foreach ($this->fetchCatalogEntries() as $item) {
-            if (!$this->matchesSearchQuery($item, $query)) {
-                continue;
-            }
-
-            $results[] = $item;
-        }
-
-        usort(
-            $results,
-            static function (array $left, array $right) use ($query): int {
-                $leftFamily = strtolower($left['family']);
-                $rightFamily = strtolower($right['family']);
-                $leftSlug = strtolower($left['slug']);
-                $rightSlug = strtolower($right['slug']);
-                $leftStarts = str_starts_with($leftFamily, $query) || str_starts_with($leftSlug, $query);
-                $rightStarts = str_starts_with($rightFamily, $query) || str_starts_with($rightSlug, $query);
-
-                if ($leftStarts !== $rightStarts) {
-                    return $leftStarts ? -1 : 1;
-                }
-
-                return strcmp($left['family'], $right['family']);
-            }
-        );
-
+        $matches = $this->findCatalogMatches($query);
+        $pageEntries = array_slice($matches, $offset, $limit);
         $items = [];
 
-        foreach (array_slice($results, $offset, $limit) as $item) {
+        foreach ($pageEntries as $item) {
             $slug = $item['slug'];
             $family = $slug !== '' ? $this->fetchFamilyBySlug($slug) : null;
             $items[] = $family ?? $this->buildFallbackFamilyRecord($slug, $item['family']);
         }
 
-        return $items;
+        return [
+            'items' => $items,
+            'has_more' => count($matches) > ($offset + count($pageEntries)),
+            'next_offset' => $offset + count($items),
+        ];
     }
 
     /**
@@ -591,6 +582,42 @@ final class BunnyFontsClient
         );
 
         return $words !== [] ? implode(' ', $words) : 'Bunny Font';
+    }
+
+    /**
+     * @return CatalogEntryList
+     */
+    private function findCatalogMatches(string $query): array
+    {
+        $matches = [];
+
+        foreach ($this->fetchCatalogEntries() as $item) {
+            if (!$this->matchesSearchQuery($item, $query)) {
+                continue;
+            }
+
+            $matches[] = $item;
+        }
+
+        usort(
+            $matches,
+            static function (array $left, array $right) use ($query): int {
+                $leftFamily = strtolower($left['family']);
+                $rightFamily = strtolower($right['family']);
+                $leftSlug = strtolower($left['slug']);
+                $rightSlug = strtolower($right['slug']);
+                $leftStarts = str_starts_with($leftFamily, $query) || str_starts_with($leftSlug, $query);
+                $rightStarts = str_starts_with($rightFamily, $query) || str_starts_with($rightSlug, $query);
+
+                if ($leftStarts !== $rightStarts) {
+                    return $leftStarts ? -1 : 1;
+                }
+
+                return strcmp($left['family'], $right['family']);
+            }
+        );
+
+        return $matches;
     }
 
     /**

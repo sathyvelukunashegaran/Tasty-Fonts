@@ -333,7 +333,7 @@ $tests['css_builder_includes_role_class_output_in_generated_css_when_enabled'] =
     $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertContainsValue('@font-face', $css, 'Generated CSS should continue to include font faces when role class output is enabled.');
-    assertContainsValue(".font-heading {\n  font-family: \"Inter\", serif;\n}", $css, 'Generated CSS should append the heading role class using the explicit role fallback when role class output mode is enabled.');
+    assertContainsValue(".font-heading {\n  font-family: \"Inter\", sans-serif;\n}", $css, 'Generated CSS should append the heading role class using the family fallback when role class output mode is enabled.');
     assertContainsValue(".font-body {\n  font-family: sans-serif;\n}", $css, 'Generated CSS should append the body role class when role class output mode is enabled.');
 };
 
@@ -412,7 +412,7 @@ $tests['css_builder_emits_global_weight_tokens_and_semantic_font_aliases_when_en
     $css = $builder->build([], $roles, $settings, $catalog);
 
     assertContainsValue('--font-inter: "Inter", system-ui, sans-serif;', $css, 'Family variables should respect the saved per-family fallback.');
-    assertContainsValue('--font-body: "Inter", serif;', $css, 'Role variables should respect the explicit role fallback rather than the saved per-family fallback.');
+    assertContainsValue('--font-body: "Inter", system-ui, sans-serif;', $css, 'Role variables should inherit the saved per-family fallback.');
     assertContainsValue('--font-sans: var(--font-inter);', $css, 'Extended output should expose the active sans family alias.');
     assertContainsValue('--font-serif: var(--font-lora);', $css, 'Extended output should expose the active serif family alias.');
     assertContainsValue('--font-interface: var(--font-body);', $css, 'Extended output should expose the interface alias.');
@@ -555,7 +555,7 @@ $tests['css_builder_minimal_output_preset_emits_only_heading_and_body_variables'
 
     $css = $builder->build([], $roles, $settings, $catalog);
 
-    assertContainsValue('--font-heading: "Inter", serif;', $css, 'Minimal output should still emit the heading role variable using the explicit role fallback.');
+    assertContainsValue('--font-heading: "Inter", sans-serif;', $css, 'Minimal output should still emit the heading role variable using the selected family fallback.');
     assertContainsValue('--font-body: sans-serif;', $css, 'Minimal output should emit the body role variable as a fallback-only stack when needed.');
     assertContainsValue('--font-heading-settings: normal;', $css, 'Minimal output should still emit the heading variation-settings variable.');
     assertContainsValue('--font-body-settings: normal;', $css, 'Minimal output should still emit the body variation-settings variable.');
@@ -1234,7 +1234,7 @@ $tests['css_builder_builds_role_variable_declarations_without_root_wrapper'] = s
     assertNotContainsValue(':root', $snippet, 'Variable declarations should omit the root selector wrapper.');
 };
 
-$tests['css_builder_role_stack_snippet_uses_explicit_role_fallbacks'] = static function (): void {
+$tests['css_builder_role_stack_snippet_inherits_family_fallbacks_for_selected_families'] = static function (): void {
     $builder = new CssBuilder();
     $roles = [
         'heading' => 'Lora',
@@ -1254,8 +1254,8 @@ $tests['css_builder_role_stack_snippet_uses_explicit_role_fallbacks'] = static f
 
     $snippet = $builder->buildRoleStackSnippet($roles, false, $settings, $catalog);
 
-    assertContainsValue('"Inter", system-ui, sans-serif', $snippet, 'Font Stacks snippets should keep the role fallback selected in the role editor.');
-    assertNotContainsValue('"Inter", sans-serif', $snippet, 'Font Stacks snippets should not collapse role fallbacks to the family fallback.');
+    assertContainsValue('"Inter", sans-serif', $snippet, 'Font Stacks snippets should inherit the Font Library fallback for selected families.');
+    assertNotContainsValue('"Inter", system-ui, sans-serif', $snippet, 'Font Stacks snippets should not keep a role fallback override when a family is selected.');
 };
 
 $tests['css_builder_can_add_readable_comments_to_admin_role_snippets_only'] = static function (): void {
@@ -1508,6 +1508,18 @@ $tests['catalog_service_applies_catalog_filter_before_returning_results'] = stat
 
     assertSameValue(false, isset($catalog['Inter']), 'Catalog filters should be able to remove families before getCatalog() returns.');
     assertSameValue(0, (int) ($counts['families'] ?? -1), 'Catalog counts should reflect the filtered catalog payload.');
+};
+
+$tests['catalog_service_prunes_stored_families_without_delivery_profiles'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->ensureFamily('Alan Sans', 'alan-sans', 'library_only', '', 'library_only');
+
+    $catalog = $services['catalog']->getCatalog();
+
+    assertSameValue(false, isset($catalog['Alan Sans']), 'Catalog output should not include families with no delivery profiles.');
+    assertSameValue(null, $services['imports']->getFamily('alan-sans'), 'Building the catalog should delete stale no-delivery family records from storage.');
 };
 
 $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static function (): void {
