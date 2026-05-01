@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.16.0-beta.1] - 2026-05-02
+
 ### Added
 
 - Added per-toggle "View CSS" previews in Output Settings so each class and variable option can show its generated CSS, empty-state copy, and dependency-aware guidance before saving.
