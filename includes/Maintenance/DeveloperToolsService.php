@@ -155,6 +155,46 @@ HTACCESS;
         return $settings;
     }
 
+    /**
+     * @return NormalizedSettings|WP_Error
+     */
+    public function resetFamilyFallbacksToGlobal(): array|WP_Error
+    {
+        $previousSettings = $this->settings->getSettings();
+
+        do_action('tasty_fonts_before_reset_family_fallbacks_to_global', $previousSettings);
+
+        $settings = $this->settings->resetFamilyFallbacks();
+
+        if (!$this->clearPluginCachesAndRegenerateAssetsInternal($previousSettings)) {
+            return $this->maintenanceError(__('Family fallback overrides were reset, but generated assets could not be rebuilt.', 'tasty-fonts'));
+        }
+
+        do_action('tasty_fonts_after_reset_family_fallbacks_to_global', $settings, $previousSettings);
+
+        return $this->settings->getSettings();
+    }
+
+    /**
+     * @return NormalizedSettings|WP_Error
+     */
+    public function resetAllFallbacksToDefaults(): array|WP_Error
+    {
+        $previousSettings = $this->settings->getSettings();
+
+        do_action('tasty_fonts_before_reset_all_fallbacks_to_defaults', $previousSettings);
+
+        $settings = $this->settings->resetAllFallbacksToDefaults();
+
+        if (!$this->clearPluginCachesAndRegenerateAssetsInternal($previousSettings)) {
+            return $this->maintenanceError(__('Fallback defaults were restored, but generated assets could not be rebuilt.', 'tasty-fonts'));
+        }
+
+        do_action('tasty_fonts_after_reset_all_fallbacks_to_defaults', $settings, $previousSettings);
+
+        return $this->settings->getSettings();
+    }
+
     public function clearPluginCachesAndRegenerateAssets(): bool
     {
         $settings = $this->settings->getSettings();

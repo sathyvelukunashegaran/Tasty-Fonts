@@ -116,6 +116,7 @@ trait FamilyCardRendererSupport
      * @param RoleSet $roles
      * @param CategoryAliasOwners $categoryAliasOwners
      * @param RendererFlagOptions $extendedVariableOptions
+     * @param array<string, string> $roleStacks
      * @return SnippetMap
      */
     protected function buildFamilyCssVariableSnippets(
@@ -125,7 +126,8 @@ trait FamilyCardRendererSupport
         array $roles,
         string $fontCategory,
         array $categoryAliasOwners = [],
-        array $extendedVariableOptions = []
+        array $extendedVariableOptions = [],
+        array $roleStacks = []
     ): array {
         $snippets = [];
         $familyVariable = FontUtils::fontVariableName($familyName);
@@ -136,22 +138,25 @@ trait FamilyCardRendererSupport
         }
 
         if (in_array('heading', $assignedRoleKeys, true)) {
-            $snippets['Heading Variable'] = '--font-heading: ' . $defaultStack . ';';
+            $snippets['Heading Variable'] = '--font-heading: ' . ($roleStacks['heading'] ?? $defaultStack) . ';';
         }
 
         if (in_array('body', $assignedRoleKeys, true)) {
-            $snippets['Body Variable'] = '--font-body: ' . $defaultStack . ';';
+            $snippets['Body Variable'] = '--font-body: ' . ($roleStacks['body'] ?? $defaultStack) . ';';
 
-            if ($this->extendedVariableRoleAliasesEnabled($extendedVariableOptions)) {
+            if ($this->extendedVariableRoleAliasEnabled($extendedVariableOptions, 'interface')) {
                 $snippets['Interface Alias'] = '--font-interface: var(--font-body);';
+            }
+
+            if ($this->extendedVariableRoleAliasEnabled($extendedVariableOptions, 'ui')) {
                 $snippets['UI Alias'] = '--font-ui: var(--font-body);';
             }
         }
 
         if (in_array('monospace', $assignedRoleKeys, true)) {
-            $snippets['Monospace Variable'] = '--font-monospace: ' . $defaultStack . ';';
+            $snippets['Monospace Variable'] = '--font-monospace: ' . ($roleStacks['monospace'] ?? $defaultStack) . ';';
 
-            if ($this->extendedVariableRoleAliasesEnabled($extendedVariableOptions)) {
+            if ($this->extendedVariableRoleAliasEnabled($extendedVariableOptions, 'code')) {
                 $snippets['Code Alias'] = '--font-code: var(--font-monospace);';
             }
         }
@@ -281,6 +286,33 @@ trait FamilyCardRendererSupport
     {
         return $this->extendedVariableOutputEnabled($options)
             && (!array_key_exists('role_aliases', $options) || !empty($options['role_aliases']));
+    }
+
+    /**
+     * @param RendererFlagOptions $options
+     */
+    protected function extendedVariableRoleAliasEnabled(array $options, string $aliasKey): bool
+    {
+        if (!$this->extendedVariableOutputEnabled($options)) {
+            return false;
+        }
+
+        $field = match ($aliasKey) {
+            'interface' => 'role_alias_interface',
+            'ui' => 'role_alias_ui',
+            'code' => 'role_alias_code',
+            default => '',
+        };
+
+        if ($field === '') {
+            return false;
+        }
+
+        if (array_key_exists($field, $options)) {
+            return !empty($options[$field]);
+        }
+
+        return $this->extendedVariableRoleAliasesEnabled($options);
     }
 
     /**

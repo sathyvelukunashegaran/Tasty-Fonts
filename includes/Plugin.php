@@ -29,6 +29,7 @@ use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Fonts\NativeUploadedFileValidator;
+use TastyFonts\Fonts\RoleFamilyCatalogBuilder;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleCssParser;
@@ -172,6 +173,7 @@ final class Plugin
         $this->acssIntegration = new AcssIntegrationService();
         $this->bricksIntegration = new BricksIntegrationService();
         $this->oxygenIntegration = new OxygenIntegrationService();
+        $roleFamilyCatalogBuilder = new RoleFamilyCatalogBuilder();
         $this->runtime = new RuntimeService(
             $this->planner,
             $this->assets,
@@ -180,7 +182,10 @@ final class Plugin
             $this->settings,
             $this->acssIntegration,
             $this->bricksIntegration,
-            $this->oxygenIntegration
+            $this->oxygenIntegration,
+            $this->catalog,
+            $roleFamilyCatalogBuilder,
+            $this->adminAccess
         );
         $this->blockEditorFontLibrary = new BlockEditorFontLibraryService(
             $this->storage,
@@ -259,7 +264,14 @@ final class Plugin
             $this->planner,
             $this->customCssImport,
             $this->customCssSnapshots,
-            $this->customCssFinalImport
+            $this->customCssFinalImport,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            $roleFamilyCatalogBuilder
         );
         $this->rest = new RestController($this->admin, $this->adminAccess);
     }

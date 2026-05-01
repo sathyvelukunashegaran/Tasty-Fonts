@@ -2687,7 +2687,6 @@ h3.tasty-fonts-section-title {
 
 .tasty-fonts-toggle-field--output.is-disabled {
     opacity: var(--tasty-layout-0-5);
-    pointer-events: none;
 }
 
 .tasty-fonts-toggle-field--output .tasty-fonts-toggle-copy {
@@ -9959,6 +9958,20 @@ h3.tasty-fonts-section-title {
     flex-wrap: wrap;
 }
 
+#tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack .tasty-fonts-toggle-title-line {
+    display: flex;
+    align-items: center;
+    gap: var(--tasty-space-2);
+    min-width: var(--tasty-layout-0);
+    flex-wrap: wrap;
+}
+
+#tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack .tasty-fonts-toggle-title-line .tasty-fonts-badge {
+    min-height: var(--tasty-layout-20px);
+    padding: var(--tasty-layout-0) var(--tasty-layout-8px);
+    font-size: var(--tasty-type-label-dense-size);
+}
+
 #tasty-fonts-settings-page .tasty-fonts-toggle-field--integration .tasty-fonts-badge {
     flex: var(--tasty-layout-0) var(--tasty-layout-0) auto;
     margin-top: var(--tasty-layout-0);
@@ -9987,7 +10000,7 @@ h3.tasty-fonts-section-title {
 
 #tasty-fonts-settings-page .tasty-fonts-output-settings-submenu-list--integration {
     display: grid;
-    grid-template-columns: repeat(var(--tasty-layout-2), minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)));
+    grid-template-columns: minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
     gap: var(--tasty-space-2-5);
 }
 
@@ -10034,6 +10047,46 @@ h3.tasty-fonts-section-title {
 
 #tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-card > .tasty-fonts-toggle-field--integration {
     padding: var(--tasty-layout-11px) var(--tasty-layout-0);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--tasty-status-dot-column) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) auto auto;
+    align-items: flex-start;
+    gap: var(--tasty-settings-board-row-gap);
+    min-height: var(--tasty-settings-board-row-min-height);
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-settings-board-row-padding-block) var(--tasty-layout-0);
+    border-top: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
+    background: transparent;
+    transition: background-color var(--tasty-duration-subtle) var(--tasty-easing-base);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested:first-child {
+    border-top: var(--tasty-layout-0);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested:hover,
+#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested:focus-within {
+    background: var(--tasty-surface-accent-subtle);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested > .tasty-fonts-toggle-field--integration {
+    display: contents;
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested > .tasty-fonts-toggle-field--integration > .tasty-fonts-toggle-copy {
+    grid-column: var(--tasty-layout-2);
+    grid-row: var(--tasty-layout-1);
+    min-width: var(--tasty-layout-0);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested > .tasty-fonts-toggle-field--integration > .tasty-fonts-toggle-switch {
+    grid-column: var(--tasty-layout-4);
+    grid-row: var(--tasty-layout-1);
+    align-self: center;
+    justify-self: end;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-integration-group {
@@ -10308,6 +10361,12 @@ h3.tasty-fonts-section-title {
     word-break: break-word;
 }
 
+#tasty-fonts-settings-page .tasty-fonts-integration-code.is-out-of-sync {
+    border-color: var(--tasty-border-warning-soft);
+    background: var(--tasty-surface-warning);
+    color: var(--tasty-warning-text);
+}
+
 #tasty-fonts-settings-page .tasty-fonts-integration-mapping {
     display: grid;
     gap: var(--tasty-layout-0);
@@ -10318,10 +10377,45 @@ h3.tasty-fonts-section-title {
     overflow: hidden;
 }
 
+#tasty-fonts-settings-page .tasty-fonts-integration-mapping.is-out-of-sync {
+    border-color: var(--tasty-border-warning-soft);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-integration-mapping-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--tasty-space-3);
+    padding: var(--tasty-space-3);
+    border-bottom: var(--tasty-layout-1px) solid var(--tasty-border-warning-soft);
+    background: var(--tasty-surface-warning);
+    color: var(--tasty-warning-text);
+    font-size: var(--tasty-type-body-size);
+    line-height: var(--tasty-line-height-relaxed);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-integration-mapping-notice-copy {
+    min-width: var(--tasty-layout-0);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-integration-reapply-button {
+    flex: var(--tasty-layout-0) var(--tasty-layout-0) auto;
+    border-color: var(--tasty-border-warning-soft);
+    background: var(--tasty-surface);
+    color: var(--tasty-warning-text);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-integration-reapply-button:hover,
+#tasty-fonts-settings-page .tasty-fonts-integration-reapply-button:focus-visible {
+    border-color: var(--tasty-border-amber-strong);
+    background: var(--tasty-surface-warning);
+    color: var(--tasty-warning-text);
+}
+
 #tasty-fonts-settings-page .tasty-fonts-integration-mapping-head,
 #tasty-fonts-settings-page .tasty-fonts-integration-mapping-row {
     display: grid;
-    grid-template-columns: minmax(var(--tasty-layout-120px), auto) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
+    grid-template-columns: minmax(var(--tasty-layout-120px), var(--tasty-layout-0-75fr)) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
     align-items: center;
     gap: var(--tasty-space-3);
 }
@@ -10337,7 +10431,7 @@ h3.tasty-fonts-section-title {
     line-height: var(--tasty-line-height-tight);
 }
 
-#tasty-fonts-settings-page .tasty-fonts-integration-mapping-head > span:last-child {
+#tasty-fonts-settings-page .tasty-fonts-integration-mapping-head > span:not(:first-child) {
     justify-self: end;
     color: var(--tasty-text-muted);
     font-weight: var(--tasty-font-weight-semibold);
@@ -10352,6 +10446,10 @@ h3.tasty-fonts-section-title {
     min-height: var(--tasty-layout-48px);
     padding: var(--tasty-space-2) var(--tasty-space-3);
     border-top: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-integration-mapping-row.is-out-of-sync {
+    background: rgba(var(--tasty-warning-rgb), var(--tasty-alpha-04));
 }
 
 #tasty-fonts-settings-page .tasty-fonts-integration-mapping-row:first-child {
@@ -11406,6 +11504,12 @@ h3.tasty-fonts-section-title {
     overflow: hidden;
 }
 
+#tasty-fonts-settings-page .tasty-fonts-settings-board:has(.tasty-fonts-combobox-field),
+#tasty-fonts-settings-page .tasty-fonts-settings-board .tasty-fonts-health-group:has(.tasty-fonts-combobox-field),
+#tasty-fonts-settings-page .tasty-fonts-settings-board-list:has(.tasty-fonts-combobox-field) {
+    overflow: visible;
+}
+
 #tasty-fonts-settings-page .tasty-fonts-settings-board-list,
 #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack,
 #tasty-fonts-settings-page .tasty-fonts-integrations-form,
@@ -11580,6 +11684,7 @@ h3.tasty-fonts-section-title {
 }
 
 #tasty-fonts-settings-page .tasty-fonts-output-settings-choice > .tasty-fonts-settings-row-select,
+#tasty-fonts-settings-page .tasty-fonts-output-settings-text-field > .tasty-fonts-settings-row-select,
 #tasty-fonts-settings-page .tasty-fonts-output-settings-textarea,
 #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch,
 #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch {
@@ -11599,12 +11704,331 @@ h3.tasty-fonts-section-title {
     max-width: var(--tasty-settings-board-control-max-width);
 }
 
+#tasty-fonts-settings-page .tasty-fonts-output-settings-text-field:has(.tasty-fonts-combobox-field.is-open) {
+    z-index: var(--tasty-z-overlay);
+}
+
 #tasty-fonts-settings-page .tasty-fonts-settings-row-select select {
     width: var(--tasty-layout-100pct);
     min-height: var(--tasty-control-height-regular);
     color: var(--tasty-text);
     font-size: var(--tasty-type-control-size);
     font-weight: var(--tasty-font-weight-semibold);
+}
+
+.tasty-fonts-combobox-field {
+    position: relative;
+    display: inline-grid;
+    width: min(var(--tasty-layout-100pct), var(--tasty-settings-board-control-max-width));
+    min-width: var(--tasty-settings-board-control-min-width);
+    max-width: var(--tasty-settings-board-control-max-width);
+}
+
+.tasty-fonts-combobox-control {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) var(--tasty-control-height-regular);
+    align-items: stretch;
+    min-height: var(--tasty-control-height-regular);
+    overflow: hidden;
+    border: var(--tasty-layout-1px) solid var(--tasty-control-border);
+    border-radius: var(--tasty-radius-control);
+    background: var(--tasty-control-surface);
+    box-shadow: var(--tasty-shadow-flat);
+    transition: var(--tasty-transition-control);
+}
+
+.tasty-fonts-combobox-field:focus-within .tasty-fonts-combobox-control {
+    border-color: var(--tasty-accent);
+    box-shadow: var(--tasty-shadow-focus);
+}
+
+.tasty-fonts-combobox-control .tasty-fonts-text-control {
+    width: var(--tasty-layout-100pct);
+    min-width: var(--tasty-layout-0);
+    min-height: calc(var(--tasty-control-height-regular) - var(--tasty-layout-2px));
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-space-2) var(--tasty-space-3);
+    border: var(--tasty-layout-0);
+    border-radius: var(--tasty-layout-0);
+    background: transparent;
+    color: var(--tasty-text);
+    font-size: var(--tasty-type-control-size);
+    font-weight: var(--tasty-font-weight-semibold);
+    line-height: var(--tasty-line-height-tight);
+    box-shadow: none;
+}
+
+.tasty-fonts-combobox-control .tasty-fonts-text-control:focus {
+    border-color: transparent;
+    box-shadow: none;
+    outline: none;
+}
+
+.tasty-fonts-combobox-toggle {
+    display: grid;
+    place-items: center;
+    width: var(--tasty-control-height-regular);
+    min-height: calc(var(--tasty-control-height-regular) - var(--tasty-layout-2px));
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-layout-0);
+    border: var(--tasty-layout-0);
+    border-inline-start: var(--tasty-layout-1px) solid var(--tasty-control-border);
+    border-radius: var(--tasty-layout-0);
+    background: transparent;
+    color: var(--tasty-text-muted);
+    cursor: pointer;
+    transition: var(--tasty-transition-control);
+}
+
+.tasty-fonts-combobox-toggle:hover,
+.tasty-fonts-combobox-toggle:focus-visible,
+.tasty-fonts-combobox-field.is-open .tasty-fonts-combobox-toggle {
+    background: var(--tasty-surface-muted);
+    color: var(--tasty-text-strong);
+}
+
+.tasty-fonts-combobox-toggle span {
+    width: var(--tasty-space-2);
+    height: var(--tasty-space-2);
+    border-right: var(--tasty-layout-2px) solid currentColor;
+    border-bottom: var(--tasty-layout-2px) solid currentColor;
+    transform: translateY(var(--tasty-layout-neg-1px)) rotate(var(--tasty-layout-45deg));
+}
+
+.tasty-fonts-combobox-menu {
+    position: absolute;
+    z-index: var(--tasty-z-overlay);
+    inset-inline: var(--tasty-layout-0);
+    top: calc(var(--tasty-layout-100pct) + var(--tasty-space-1));
+    display: grid;
+    gap: var(--tasty-space-1);
+    max-height: var(--tasty-layout-260px);
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-space-1);
+    overflow: auto;
+    list-style: none;
+    border: var(--tasty-layout-1px) solid var(--tasty-control-border-strong);
+    border-radius: var(--tasty-radius-control);
+    background: var(--tasty-surface-card);
+    box-shadow: var(--tasty-shadow-popover);
+}
+
+.tasty-fonts-has-open-dropdown {
+    overflow: visible !important;
+}
+
+.tasty-fonts-combobox-field.is-open-above .tasty-fonts-combobox-menu {
+    top: auto;
+    bottom: calc(var(--tasty-layout-100pct) + var(--tasty-space-1));
+}
+
+.tasty-fonts-combobox-menu[hidden] {
+    display: none;
+}
+
+.tasty-fonts-combobox-option {
+    display: block;
+    width: var(--tasty-layout-100pct);
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-space-2) var(--tasty-space-3);
+    border: var(--tasty-layout-0);
+    border-radius: var(--tasty-radius-control);
+    background: transparent;
+    color: var(--tasty-text);
+    font: inherit;
+    font-size: var(--tasty-type-control-size);
+    font-weight: var(--tasty-font-weight-semibold);
+    line-height: var(--tasty-line-height-tight);
+    text-align: left;
+    cursor: pointer;
+}
+
+.tasty-fonts-combobox-option:hover,
+.tasty-fonts-combobox-option:focus-visible,
+.tasty-fonts-combobox-option.is-active {
+    background: var(--tasty-surface-muted);
+    color: var(--tasty-accent-hover);
+    outline: none;
+}
+
+.tasty-fonts-native-select-hidden {
+    position: absolute !important;
+    inline-size: var(--tasty-layout-1px) !important;
+    block-size: var(--tasty-layout-1px) !important;
+    min-inline-size: var(--tasty-layout-1px) !important;
+    min-block-size: var(--tasty-layout-1px) !important;
+    margin: var(--tasty-layout-0) !important;
+    padding: var(--tasty-layout-0) !important;
+    border: var(--tasty-layout-0) !important;
+    opacity: var(--tasty-layout-0) !important;
+    pointer-events: none !important;
+}
+
+.tasty-fonts-select-field.is-enhanced::after {
+    display: none;
+}
+
+.tasty-fonts-custom-select {
+    position: relative;
+    display: block;
+    width: var(--tasty-layout-100pct);
+    min-width: var(--tasty-layout-0);
+}
+
+.tasty-fonts-custom-select-toggle {
+    display: grid;
+    grid-template-columns: minmax(var(--tasty-layout-0), var(--tasty-layout-1fr)) var(--tasty-control-height-regular);
+    align-items: stretch;
+    width: var(--tasty-layout-100pct);
+    min-height: var(--tasty-control-height-regular);
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-layout-0);
+    overflow: hidden;
+    border: var(--tasty-layout-1px) solid var(--tasty-control-border);
+    border-radius: var(--tasty-radius-control);
+    background: var(--tasty-control-surface);
+    color: var(--tasty-text);
+    box-shadow: var(--tasty-shadow-flat);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: var(--tasty-transition-control);
+}
+
+.tasty-fonts-custom-select-toggle:hover,
+.tasty-fonts-custom-select.is-open .tasty-fonts-custom-select-toggle {
+    border-color: var(--tasty-control-border-strong);
+    background: var(--tasty-control-surface-hover);
+}
+
+.tasty-fonts-custom-select-toggle:focus-visible {
+    border-color: var(--tasty-accent);
+    background: var(--tasty-control-surface-focus);
+    box-shadow: var(--tasty-shadow-focus);
+    outline: none;
+}
+
+.tasty-fonts-custom-select.is-disabled .tasty-fonts-custom-select-toggle,
+.tasty-fonts-custom-select-toggle:disabled {
+    background: var(--tasty-control-surface-muted);
+    border-color: var(--tasty-border-subtle-strong);
+    box-shadow: none;
+    color: var(--tasty-control-text-muted);
+    cursor: not-allowed;
+}
+
+.tasty-fonts-custom-select-value {
+    min-width: var(--tasty-layout-0);
+    padding: var(--tasty-space-2) var(--tasty-space-3);
+    overflow: hidden;
+    color: inherit;
+    font-size: var(--tasty-type-control-size);
+    font-weight: var(--tasty-font-weight-semibold);
+    line-height: var(--tasty-line-height-tight);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tasty-fonts-select-field--clearable .tasty-fonts-custom-select-value {
+    padding-right: calc(var(--tasty-space-3) + var(--tasty-clear-button-size) + var(--tasty-space-4));
+}
+
+.tasty-fonts-custom-select-icon {
+    display: grid;
+    place-items: center;
+    min-height: calc(var(--tasty-control-height-regular) - var(--tasty-layout-2px));
+    border-inline-start: var(--tasty-layout-1px) solid var(--tasty-control-border);
+    color: var(--tasty-text-muted);
+    transition: var(--tasty-transition-control);
+}
+
+.tasty-fonts-custom-select-icon::before {
+    content: "";
+    width: var(--tasty-space-2);
+    height: var(--tasty-space-2);
+    border-right: var(--tasty-layout-2px) solid currentColor;
+    border-bottom: var(--tasty-layout-2px) solid currentColor;
+    transform: translateY(var(--tasty-layout-neg-1px)) rotate(var(--tasty-layout-45deg));
+}
+
+.tasty-fonts-custom-select-toggle:hover .tasty-fonts-custom-select-icon,
+.tasty-fonts-custom-select-toggle:focus-visible .tasty-fonts-custom-select-icon,
+.tasty-fonts-custom-select.is-open .tasty-fonts-custom-select-icon {
+    background: var(--tasty-surface-muted);
+    color: var(--tasty-text-strong);
+}
+
+.tasty-fonts-custom-select-menu {
+    position: absolute;
+    z-index: var(--tasty-z-overlay);
+    inset-inline: var(--tasty-layout-0);
+    top: calc(var(--tasty-layout-100pct) + var(--tasty-space-1));
+    display: grid;
+    gap: var(--tasty-space-1);
+    max-height: var(--tasty-layout-260px);
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-space-1);
+    overflow: auto;
+    list-style: none;
+    border: var(--tasty-layout-1px) solid var(--tasty-control-border-strong);
+    border-radius: var(--tasty-radius-control);
+    background: var(--tasty-surface-card);
+    box-shadow: var(--tasty-shadow-popover);
+}
+
+.tasty-fonts-custom-select.is-open-above .tasty-fonts-custom-select-menu {
+    top: auto;
+    bottom: calc(var(--tasty-layout-100pct) + var(--tasty-space-1));
+}
+
+.tasty-fonts-custom-select-menu[hidden] {
+    display: none;
+}
+
+.tasty-fonts-custom-select-option {
+    display: grid;
+    grid-template-columns: var(--tasty-space-4) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
+    align-items: center;
+    column-gap: var(--tasty-space-2);
+    width: var(--tasty-layout-100pct);
+    margin: var(--tasty-layout-0);
+    padding: var(--tasty-space-2) var(--tasty-space-3);
+    border: var(--tasty-layout-0);
+    border-radius: var(--tasty-radius-control);
+    background: transparent;
+    color: var(--tasty-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--tasty-type-control-size);
+    font-weight: var(--tasty-font-weight-semibold);
+    line-height: var(--tasty-line-height-tight);
+    text-align: left;
+}
+
+.tasty-fonts-custom-select-option::before {
+    content: "";
+    color: currentColor;
+    font-weight: var(--tasty-font-weight-bold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+.tasty-fonts-custom-select-option.is-selected::before {
+    content: "✓";
+}
+
+.tasty-fonts-custom-select-option:hover,
+.tasty-fonts-custom-select-option:focus-visible,
+.tasty-fonts-custom-select-option.is-active {
+    background: var(--tasty-surface-muted);
+    color: var(--tasty-accent-hover);
+    outline: none;
+}
+
+.tasty-fonts-custom-select-option:disabled {
+    color: var(--tasty-control-text-muted);
+    cursor: not-allowed;
+    opacity: var(--tasty-alpha-70);
 }
 
 #tasty-fonts-settings-page .tasty-fonts-output-settings-choice > .tasty-fonts-output-quick-notice {
@@ -11639,6 +12063,7 @@ h3.tasty-fonts-section-title {
 }
 
 #tasty-fonts-settings-page .tasty-fonts-output-settings-choice > .tasty-fonts-settings-row-select,
+#tasty-fonts-settings-page .tasty-fonts-output-settings-text-field > .tasty-fonts-settings-row-select,
 #tasty-fonts-settings-page .tasty-fonts-output-settings-textarea,
 #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch,
 #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch,
@@ -11861,6 +12286,7 @@ h3.tasty-fonts-section-title {
     justify-content: space-between;
     gap: var(--tasty-space-3);
     min-height: var(--tasty-layout-36px);
+    margin-inline: var(--tasty-settings-board-row-padding-inline);
     padding: var(--tasty-space-2) var(--tasty-layout-0);
     border-bottom: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
     background: transparent;
@@ -11970,6 +12396,113 @@ h3.tasty-fonts-section-title {
 
 #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > input[type="hidden"]:first-child + .tasty-fonts-toggle-field--output {
     border-top: var(--tasty-layout-0);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview {
+    --tasty-output-preview-action-offset: calc(var(--tasty-settings-board-row-padding-inline) + var(--tasty-toggle-width) + var(--tasty-icon-button-size) + (var(--tasty-settings-board-row-gap) * var(--tasty-layout-2)));
+    display: block;
+    position: relative;
+    margin-block: var(--tasty-layout-0);
+    margin-inline-start: calc(var(--tasty-settings-board-row-padding-inline) + var(--tasty-status-dot-column) + var(--tasty-settings-board-row-gap));
+    margin-inline-end: var(--tasty-settings-board-row-padding-inline);
+    color: var(--tasty-text);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview[hidden],
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview [hidden] {
+    display: none;
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: var(--tasty-layout-28px);
+    padding: var(--tasty-space-1) calc(var(--tasty-space-3) + var(--tasty-layout-16px)) var(--tasty-space-1) var(--tasty-layout-0);
+    cursor: pointer;
+    color: var(--tasty-text-muted);
+    list-style: none;
+    transition: color var(--tasty-duration-subtle) var(--tasty-easing-base);
+}
+
+@media (min-width: 783px) {
+    #tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary {
+        position: absolute;
+        top: calc((var(--tasty-settings-board-row-min-height) * var(--tasty-layout-neg-1)) + ((var(--tasty-settings-board-row-min-height) - var(--tasty-layout-28px)) / var(--tasty-layout-2)));
+        right: var(--tasty-output-preview-action-offset);
+        min-width: max-content;
+        z-index: var(--tasty-layout-1);
+    }
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary::marker {
+    content: "";
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary::-webkit-details-marker {
+    display: none;
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary::after {
+    content: "";
+    position: absolute;
+    top: var(--tasty-layout-50pct);
+    right: var(--tasty-layout-0);
+    width: var(--tasty-layout-7px);
+    height: var(--tasty-layout-7px);
+    border-right: var(--tasty-layout-1px) solid currentColor;
+    border-bottom: var(--tasty-layout-1px) solid currentColor;
+    transform: translateY(var(--tasty-layout-neg-60pct)) rotate(var(--tasty-layout-45deg));
+    transition: transform var(--tasty-duration-subtle) var(--tasty-easing-base);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary:hover,
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary:focus-visible,
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview[open] > .tasty-fonts-output-toggle-preview-summary {
+    color: var(--tasty-text);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview[open] > .tasty-fonts-output-toggle-preview-summary::after {
+    transform: translateY(var(--tasty-layout-neg-35pct)) rotate(var(--tasty-layout-225deg));
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary:focus-visible {
+    outline: var(--tasty-layout-0);
+    border-radius: var(--tasty-radius-control);
+    box-shadow: var(--tasty-shadow-focus);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-title {
+    flex: var(--tasty-layout-0) var(--tasty-layout-0) auto;
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-caption-size);
+    font-weight: var(--tasty-font-weight-semibold);
+    line-height: var(--tasty-line-height-tight);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-body {
+    display: grid;
+    gap: var(--tasty-space-2);
+    padding-block: var(--tasty-layout-0) var(--tasty-space-3);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-empty {
+    margin: var(--tasty-layout-0);
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-caption-size);
+    line-height: var(--tasty-line-height-relaxed);
+}
+
+#tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-code-surface {
+    min-height: var(--tasty-layout-0);
+    max-height: var(--tasty-layout-240px);
+    padding: var(--tasty-space-3);
+    border: var(--tasty-layout-1px) solid var(--tasty-border-subtle-faint);
+    border-radius: var(--tasty-radius-control);
+    background: var(--tasty-surface);
+    color: var(--tasty-syntax-text);
+    overflow: auto;
 }
 
 #tasty-fonts-settings-page .tasty-fonts-admin-access-panel {
@@ -12135,14 +12668,17 @@ h3.tasty-fonts-section-title {
     #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output,
     #tasty-fonts-settings-page .tasty-fonts-integrations-panel > .tasty-fonts-settings-board .tasty-fonts-integration-row--readonly,
     #tasty-fonts-settings-page .tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration,
+    #tasty-fonts-settings-page .tasty-fonts-output-settings-submenu-list--integration > .tasty-fonts-output-settings-detail-group--integration-nested,
     #tasty-fonts-settings-page .tasty-fonts-admin-access-mode-toggle {
         grid-template-columns: var(--tasty-status-dot-column) minmax(var(--tasty-layout-0), var(--tasty-layout-1fr));
     }
 
     #tasty-fonts-settings-page .tasty-fonts-output-settings-choice > .tasty-fonts-settings-row-select,
+    #tasty-fonts-settings-page .tasty-fonts-output-settings-text-field > .tasty-fonts-settings-row-select,
     #tasty-fonts-settings-page .tasty-fonts-output-settings-textarea,
     #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch,
     #tasty-fonts-settings-page .tasty-fonts-settings-behavior-stack > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch,
+    #tasty-fonts-settings-page .tasty-fonts-output-settings-detail-group--integration-nested > .tasty-fonts-toggle-field--integration > .tasty-fonts-toggle-switch,
     #tasty-fonts-settings-page .tasty-fonts-admin-access-mode-toggle .tasty-fonts-toggle-switch {
         grid-column: var(--tasty-layout-2);
         grid-row: var(--tasty-layout-2);
@@ -12173,6 +12709,15 @@ h3.tasty-fonts-section-title {
     #tasty-fonts-settings-page .tasty-fonts-admin-access-summary-bar,
     #tasty-fonts-settings-page [data-admin-access-managed] {
         padding-inline-start: var(--tasty-settings-board-row-padding-inline);
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-output-toggle-preview {
+        margin-inline: var(--tasty-settings-board-row-padding-inline);
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-output-toggle-preview-summary {
+        align-items: center;
+        flex-direction: row;
     }
 }
 
@@ -15695,7 +16240,8 @@ h3.tasty-fonts-section-title {
 #tasty-fonts-settings-page .tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration,
 #tasty-fonts-settings-page .tasty-fonts-admin-access-mode-toggle,
 #tasty-fonts-settings-page .tasty-fonts-output-settings-advanced-panel > .tasty-fonts-output-settings-detail-group > .tasty-fonts-toggle-field--output,
-#tasty-fonts-settings-page .tasty-fonts-output-settings-details-body > .tasty-fonts-toggle-field--nested {
+#tasty-fonts-settings-page .tasty-fonts-output-settings-details-body > .tasty-fonts-toggle-field--nested,
+#tasty-fonts-settings-page .tasty-fonts-output-settings-submenu-list--integration > .tasty-fonts-output-settings-detail-group--integration-nested {
     --tasty-status-dot-column: var(--tasty-layout-0);
 }
 
@@ -15822,6 +16368,7 @@ h3.tasty-fonts-section-title {
     }
 
     #tasty-fonts-settings-page .tasty-fonts-output-settings-choice > .tasty-fonts-settings-row-select,
+    #tasty-fonts-settings-page .tasty-fonts-output-settings-text-field > .tasty-fonts-settings-row-select,
     #tasty-fonts-settings-page .tasty-fonts-output-settings-choice > .tasty-fonts-output-quick-options,
     #tasty-fonts-settings-page .tasty-fonts-output-settings-textarea {
         grid-column: var(--tasty-layout-2);
@@ -15842,6 +16389,39 @@ h3.tasty-fonts-section-title {
         width: var(--tasty-layout-100pct);
         min-width: var(--tasty-layout-0);
         max-width: var(--tasty-layout-100pct);
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-integration-mapping-notice {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-integration-reapply-button {
+        justify-content: center;
+        width: var(--tasty-layout-100pct);
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-integration-mapping-head {
+        display: none;
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-integration-mapping-row {
+        grid-template-columns: var(--tasty-layout-1fr);
+        align-items: stretch;
+        gap: var(--tasty-space-2);
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-integration-mapping-row .tasty-fonts-integration-mapping-values {
+        justify-content: flex-start;
+    }
+
+    #tasty-fonts-settings-page .tasty-fonts-integration-mapping-row .tasty-fonts-integration-mapping-values::before {
+        content: attr(data-mobile-label);
+        flex: var(--tasty-layout-0) var(--tasty-layout-0) var(--tasty-layout-100pct);
+        color: var(--tasty-text-muted);
+        font-size: var(--tasty-type-label-size);
+        font-weight: var(--tasty-font-weight-semibold);
+        line-height: var(--tasty-line-height-tight);
     }
 
     #tasty-fonts-settings-page .tasty-fonts-settings-board-list > .tasty-fonts-toggle-field--output > .tasty-fonts-toggle-switch,

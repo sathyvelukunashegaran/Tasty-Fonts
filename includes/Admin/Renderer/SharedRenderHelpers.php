@@ -542,6 +542,7 @@ trait SharedRenderHelpers
         $clearValue = null;
         $clearLabel = '';
         $inputId = '';
+        $comboboxId = '';
 
         if (!empty($attributes['class']) && is_string($attributes['class'])) {
             $className .= ' ' . trim($attributes['class']);
@@ -566,6 +567,13 @@ trait SharedRenderHelpers
             $inputId = trim($attributes['id']);
         }
 
+        if ($inputId === '') {
+            $inputId = wp_unique_id('tasty-fonts-fallback-');
+            $attributes['id'] = $inputId;
+        }
+
+        $comboboxId = $inputId . '-options';
+
         if ($clearLabel !== '') {
             $wrapperClassName .= ' tasty-fonts-combobox-field--clearable';
         }
@@ -573,12 +581,13 @@ trait SharedRenderHelpers
         $inputAttributes = array_merge(
             [
                 'type' => 'text',
-                'list' => 'tasty-fonts-fallback-options',
                 'value' => FontUtils::sanitizeFallback($value),
                 'class' => $className,
                 'spellcheck' => 'false',
                 'autocomplete' => 'off',
                 'aria-autocomplete' => 'list',
+                'aria-controls' => $comboboxId,
+                'aria-expanded' => 'false',
             ],
             $attributes
         );
@@ -587,7 +596,8 @@ trait SharedRenderHelpers
             $inputAttributes['name'] = $name;
         }
 
-        echo '<span class="' . esc_attr($wrapperClassName) . '">';
+        echo '<span class="' . esc_attr($wrapperClassName) . '" data-fallback-combobox>';
+        echo '<span class="tasty-fonts-combobox-control">';
         echo '<input';
 
         foreach ($inputAttributes as $key => $attributeValue) {
@@ -604,8 +614,36 @@ trait SharedRenderHelpers
         }
 
         echo '>';
+        ?>
+        <button
+            type="button"
+            class="tasty-fonts-combobox-toggle"
+            data-fallback-combobox-toggle
+            aria-label="<?php esc_attr_e('Show fallback suggestions', 'tasty-fonts'); ?>"
+            aria-controls="<?php echo esc_attr($comboboxId); ?>"
+            aria-expanded="false"
+        >
+            <span aria-hidden="true"></span>
+        </button>
+        </span>
+        <ul
+            class="tasty-fonts-combobox-menu"
+            id="<?php echo esc_attr($comboboxId); ?>"
+            data-fallback-combobox-menu
+            role="listbox"
+            hidden
+        >
+            <?php foreach (array_values(array_unique(FontUtils::FALLBACK_SUGGESTIONS)) as $fallback): ?>
+                <li role="option">
+                    <button type="button" class="tasty-fonts-combobox-option" data-fallback-value="<?php echo esc_attr($fallback); ?>">
+                        <?php echo esc_html($fallback); ?>
+                    </button>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+        <?php
 
-        if ($clearLabel !== '' && $inputId !== '') {
+        if ($clearLabel !== '') {
             $this->renderClearSelectButton($clearLabel, $inputId, (string) $clearValue);
         }
 

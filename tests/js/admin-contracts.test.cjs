@@ -127,6 +127,18 @@ test('settings help hydration uses the canonical compact help trigger class', ()
     );
 });
 
+test('admin runtime wires dependency-aware output controls', () => {
+    const source = readAdminRuntimeSource();
+
+    assert.match(source, /const outputDependencyControls = Array\.from\(document\.querySelectorAll\('\[data-output-dependency-control\]'\)\);/, 'Runtime should collect dependency-aware output controls.');
+    assert.match(source, /function syncOutputDependencyControls\(\)/, 'Runtime should include dependency sync for output controls.');
+    assert.match(source, /hidden\.value = input\.checked \? '1' : '0';/, 'Disabled dependency controls should preserve the visible checkbox preference in the hidden field.');
+    assert.match(source, /input\.checked = false;\s*input\.disabled = true;/, 'Unavailable dependency controls should become visibly off and disabled.');
+    assert.match(source, /input\.checked = hidden\.value === '1';\s*hidden\.value = '0';/, 'Available dependency controls should restore the saved hidden preference.');
+    assert.match(source, /activeOutputClassFlags\(\)\.map/, 'Quick-mode derivation should continue to read active class flags.');
+    assert.match(source, /filter\(\(input\) => !input\.disabled\)/, 'Quick-mode derivation should ignore disabled dependency controls.');
+});
+
 test('admin contracts strictly normalize axis tags, values, and variation settings', () => {
     assert.equal(normalizeAxisTag(' wght '), 'WGHT');
     assert.equal(normalizeAxisTag('WEIGHT'), '');
@@ -180,8 +192,8 @@ test('admin contracts normalize role state using monospace, variable, and family
         monospaceRoleEnabled: true,
         variableFontsEnabled: true,
         roleFamilyCatalog: {
-            Inter: { fallback: 'Inter fallback, sans-serif' },
-            Mono: { fallback: 'Mono fallback, monospace' },
+            Inter: { fallback: 'Inter fallback, sans-serif', fallbackIsCustom: true },
+            Mono: { fallback: 'Mono fallback, monospace', fallbackIsCustom: true },
         },
     };
 
@@ -241,9 +253,13 @@ test('admin contracts normalize role state using monospace, variable, and family
     );
 
     assert.equal(resolveRoleFallback('heading', { heading: 'Inter' }, options), 'Inter fallback, sans-serif');
+    assert.equal(resolveRoleFallback('heading', { heading: 'Body Sans' }, {
+        ...options,
+        globalFallbacks: { heading: 'system-ui, sans-serif' },
+    }), 'system-ui, sans-serif');
     assert.equal(resolveRoleFallback('heading', { heading: 'Inter', headingFallback: 'serif' }, options), 'Inter fallback, sans-serif');
     assert.equal(resolveRoleFallback('heading', { heading: '', headingFallback: 'serif' }, options), 'serif');
-    assert.equal(defaultRoleFallback('monospace'), 'monospace');
+    assert.equal(defaultRoleFallback('monospace'), 'ui-monospace, monospace');
 });
 
 test('admin contracts slugify values into stable font slugs', () => {
@@ -992,7 +1008,7 @@ test('admin contracts restore live weight and axes when a role is reassigned bac
             monospace: '',
             headingFallback: 'system-ui, sans-serif',
             bodyFallback: 'system-ui, sans-serif',
-            monospaceFallback: 'monospace',
+            monospaceFallback: 'ui-monospace, monospace',
             headingWeight: '700',
             bodyWeight: '',
             monospaceWeight: '',
@@ -1033,7 +1049,7 @@ test('admin contracts derive exact output quick modes from explicit output shape
             roleUsageFontWeightEnabled: false,
             variableFlags: [false, true, true, true, true],
         }),
-        'custom'
+        'variables'
     );
     assert.equal(
         deriveExactOutputQuickMode({
@@ -1053,11 +1069,22 @@ test('admin contracts derive exact output quick modes from explicit output shape
             roleUsageFontWeightEnabled: true,
             variableFlags: [true, true, true, true, true],
         }),
+        'variables'
+    );
+    assert.equal(
+        deriveExactOutputQuickMode({
+            minimalEnabled: false,
+            classOutputEnabled: true,
+            variableOutputEnabled: true,
+            roleUsageFontWeightEnabled: false,
+            classFlags: [false, true, true],
+            variableFlags: [false, true, true],
+        }),
         'custom'
     );
 });
 
-test('admin contracts keep custom sticky and coerce stale non-custom preferences', () => {
+test('admin contracts derive quick-mode preference from output layers', () => {
     const variableOnlyState = {
         minimalEnabled: false,
         classOutputEnabled: false,
@@ -1068,11 +1095,18 @@ test('admin contracts keep custom sticky and coerce stale non-custom preferences
 
     assert.equal(normalizeOutputQuickModePreference('', variableOnlyState), 'variables');
     assert.equal(normalizeOutputQuickModePreference('variables', variableOnlyState), 'variables');
-    assert.equal(normalizeOutputQuickModePreference('custom', variableOnlyState), 'custom');
+    assert.equal(normalizeOutputQuickModePreference('custom', variableOnlyState), 'variables');
     assert.equal(
         normalizeOutputQuickModePreference('variables', {
             ...variableOnlyState,
             variableFlags: [true, false, true, true, true],
+        }),
+        'variables'
+    );
+    assert.equal(
+        normalizeOutputQuickModePreference('variables', {
+            ...variableOnlyState,
+            classOutputEnabled: true,
         }),
         'custom'
     );
@@ -1179,6 +1213,21 @@ test('admin runtime keeps settings dirty state wired to changed row data attribu
         'settingsPendingSave',
         'data-has-unsaved-changes',
         'data-settings-group-changed',
+    ]) {
+        assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
+    }
+});
+
+test('admin runtime keeps output toggle preview refresh hooks wired', () => {
+    const source = readAdminRuntimeSource();
+
+    for (const hook of [
+        '[data-output-toggle-preview]',
+        '[data-output-toggle-preview-code]',
+        'function applyOutputTogglePreviewsState',
+        'function applyLiveOutputPayloadState',
+        'renderHighlightedSnippet(css)',
+        'output_toggle_previews',
     ]) {
         assert.equal(source.includes(hook), true, `${hook} should stay wired in admin.js`);
     }
@@ -1333,7 +1382,7 @@ test('admin contracts resolveRoleFallback scopes explicit fallback to fallback-o
         { heading: 'Inter', headingFallback: 'sans-serif' },
         {
             roleFamilyCatalog: {
-                Inter: { fallback: 'sans-serif' },
+                Inter: { fallback: 'sans-serif', fallbackIsCustom: true },
             },
         }
     );
@@ -1344,7 +1393,7 @@ test('admin contracts resolveRoleFallback scopes explicit fallback to fallback-o
         { heading: '', headingFallback: 'sans-serif' },
         {
             roleFamilyCatalog: {
-                Inter: { fallback: 'sans-serif' },
+                Inter: { fallback: 'sans-serif', fallbackIsCustom: true },
             },
         }
     );
@@ -1355,7 +1404,7 @@ test('admin contracts resolveRoleFallback scopes explicit fallback to fallback-o
         { heading: 'Inter' },
         {
             roleFamilyCatalog: {
-                Inter: { fallback: 'sans-serif' },
+                Inter: { fallback: 'sans-serif', fallbackIsCustom: true },
             },
         }
     );

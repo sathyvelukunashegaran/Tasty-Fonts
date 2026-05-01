@@ -4,9 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added per-toggle "View CSS" previews in Output Settings so each class and variable option can show its generated CSS, empty-state copy, and dependency-aware guidance before saving.
+- Added syntax-highlighted CSS/code rendering for preview, snippets, diagnostics, and output-toggle preview surfaces.
+- Added family-level fallback stack controls in the Font Library, plus bulk maintenance actions to reset custom family fallbacks or global fallback stacks.
+- Added an optional Etch Canvas Bridge quick role panel with in-canvas Heading, Body, and Monospace assignment controls and publish-to-sitewide refresh behavior.
+
 ### Changed
 
 - Updated the plugin and repository license metadata from GPLv2-or-later to GPLv3-or-later.
+- Refined Output Settings so dependency-limited class and variable controls stay visible, explain what unlocks them, and preserve saved preferences while their source role, family, or category is unavailable.
+- Reworked Output Settings with clearer section copy, nested integration controls, live payload updates, and CSS previews that stay aligned with the generated runtime CSS.
+- Reordered Role Classes before Role Styling and disabled "Role Weights in Classes" until Heading Class and Body Class are enabled, making the class-weight relationship clearer.
+- Split role alias variable output into independent Interface, UI, and Code alias controls, with generated CSS only emitting aliases when the relevant Body or Monospace family exists.
+- Simplified Output Preset detection so Minimal, Variables, Classes, and Custom follow the active output layers instead of requiring every granular subgroup to match a preset baseline.
+- Locked role weight variable output on while Automatic.css role sync is enabled, including the saved setting and visible Settings control.
+- Centralized fallback resolution and role-family catalog payloads so admin previews, builder integrations, generated CSS, and runtime planning use the same family fallback, weight, axis, delivery, and publish-state metadata.
+- Refined Etch canvas loading so published role changes can refresh generated CSS inside accessible iframes without a full builder reload.
+- Added a local artifact cleanup helper and wired the pre-commit hook to remove Playwright screenshots, temporary output, prompt exports, `.DS_Store` files, and generated duplicate-scan reports before commits complete.
+
+### Fixed
+
+- Preserved monospace class and variable output preferences while the Monospace role is disabled so saved choices resume when the role becomes available again.
+- Prevented hidden sitewide role weight output from staying enabled outside Custom output mode.
+- Fixed misleading output previews when required roles, aliases, monospace support, or published family dependencies are unavailable.
+- Fixed fallback output consistency so per-family overrides, global role defaults, and category defaults resolve the same way across generated CSS, previews, and runtime assets.
+- Added regression coverage for dependency-aware output controls, independent role alias variables, Automatic.css weight-variable locking, quick-mode normalization, monospace output preference preservation, fallback reset handling, output preview rendering, Etch canvas contracts, and runtime refresh behavior.
 
 ## [1.15.0] - 2026-04-30
 

@@ -287,6 +287,19 @@ test('admin CSS keeps settings group headers in title case', () => {
   assert.match(block, /text-transform:\s*none;/);
 });
 
+test('admin CSS keeps output group headers inset from board edges', () => {
+  const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
+  const blocks = cssBlocksForExactSelector(
+    adminCss,
+    '#tasty-fonts-settings-page .tasty-fonts-output-settings-submenu > .tasty-fonts-output-settings-submenu-copy'
+  );
+
+  assert.ok(
+    blocks.some((block) => /margin-inline:\s*var\(--tasty-settings-board-row-padding-inline\);/.test(block)),
+    'Output group header containers should keep their own box inset from board edges.'
+  );
+});
+
 test('admin CSS keeps settings pending-toggle styles scoped and tokenized', () => {
   const adminCss = fs.readFileSync(path.join(cssDir, 'admin.css'), 'utf8');
 

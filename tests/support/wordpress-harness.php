@@ -119,6 +119,7 @@ use TastyFonts\Fonts\HostedImportVariantPlanner;
 use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\LocalUploadService;
+use TastyFonts\Fonts\RoleFamilyCatalogBuilder;
 use TastyFonts\Fonts\UploadedFileValidatorInterface;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Fonts\RuntimeService;
@@ -2031,6 +2032,7 @@ function makeServiceGraph(): array
     );
     $supportBundles = new SupportBundleService($storage, $settings, $imports, $log);
     $adminAccess = new AdminAccessService($settings);
+    $roleFamilyCatalogBuilder = new RoleFamilyCatalogBuilder();
     $updater = new GitHubUpdater($settings, $adminAccess);
     $controller = new AdminController(
         $storage,
@@ -2059,10 +2061,29 @@ function makeServiceGraph(): array
         $planner,
         $customCssImport,
         $customCssSnapshots,
-        $customCssFinalImport
+        $customCssFinalImport,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        $roleFamilyCatalogBuilder
     );
     $rest = new RestController($controller, $adminAccess);
-    $runtime = new RuntimeService($planner, $assets, $cssBuilder, $adobe, $settings, $acssIntegration, $bricksIntegration, $oxygenIntegration);
+    $runtime = new RuntimeService(
+        $planner,
+        $assets,
+        $cssBuilder,
+        $adobe,
+        $settings,
+        $acssIntegration,
+        $bricksIntegration,
+        $oxygenIntegration,
+        $catalog,
+        $roleFamilyCatalogBuilder,
+        $adminAccess
+    );
 
     return [
         'storage' => $storage,
@@ -2093,6 +2114,7 @@ function makeServiceGraph(): array
         'snapshots' => $snapshots,
         'support_bundles' => $supportBundles,
         'admin_access' => $adminAccess,
+        'role_family_catalog_builder' => $roleFamilyCatalogBuilder,
         'updater' => $updater,
         'controller' => $controller,
         'rest' => $rest,

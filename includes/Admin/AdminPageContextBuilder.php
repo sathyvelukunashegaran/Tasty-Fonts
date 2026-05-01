@@ -12,6 +12,7 @@ use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
+use TastyFonts\Fonts\FallbackResolver;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Integrations\AcssIntegrationService;
@@ -42,6 +43,7 @@ use TastyFonts\Updates\GitHubUpdater;
  * @phpstan-type UpdateChannelStatus array<string, mixed>
  * @phpstan-type OverviewMetric array<string, mixed>
  * @phpstan-type OutputPanel array<string, mixed>
+ * @phpstan-import-type OutputTogglePreviewMap from OutputTogglePreviewBuilder
  * @phpstan-type GeneratedCssPanel array<string, mixed>
  * @phpstan-type PreviewPanel array<string, mixed>
  * @phpstan-type NoticeToast array<string, mixed>
@@ -106,6 +108,7 @@ final class AdminPageContextBuilder
         $bricksIntegration = $this->buildBricksIntegrationContext($settings);
         $oxygenIntegration = $this->buildOxygenIntegrationContext($settings);
         $updateChannel = $this->stringValue($settings, 'update_channel', SettingsRepository::UPDATE_CHANNEL_STABLE);
+        $experimentalFontImportWorkflowsAvailable = $this->experimentalFontImportWorkflowsAvailable($updateChannel);
         $updateChannelStatus = $this->buildUpdateChannelStatus($updateChannel);
         $adminAccessCustomEnabled = !empty($settings['admin_access_custom_enabled']);
         $adminAccessRoleSlugs = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
@@ -203,6 +206,9 @@ final class AdminPageContextBuilder
             'font_display_options' => $this->buildFontDisplayOptions(),
             'unicode_range_mode' => $this->stringValue($settings, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF),
             'unicode_range_custom_value' => $this->stringValue($settings, 'unicode_range_custom_value'),
+            'fallback_heading' => $this->stringValue($settings, 'fallback_heading', FontUtils::DEFAULT_ROLE_SANS_FALLBACK),
+            'fallback_body' => $this->stringValue($settings, 'fallback_body', FontUtils::DEFAULT_ROLE_SANS_FALLBACK),
+            'fallback_monospace' => $this->stringValue($settings, 'fallback_monospace', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK),
             'unicode_range_mode_options' => $this->buildUnicodeRangeModeOptions(),
             'unicode_range_custom_visible' => FontUtils::normalizeUnicodeRangeMode($this->stringValue($settings, 'unicode_range_mode')) === FontUtils::UNICODE_RANGE_MODE_CUSTOM,
             'output_quick_mode_preference' => $this->stringValue($settings, 'output_quick_mode_preference', 'minimal'),
@@ -225,6 +231,9 @@ final class AdminPageContextBuilder
             'extended_variable_role_weight_vars_enabled' => !empty($settings['extended_variable_role_weight_vars_enabled']),
             'extended_variable_weight_tokens_enabled' => !empty($settings['extended_variable_weight_tokens_enabled']),
             'extended_variable_role_aliases_enabled' => !empty($settings['extended_variable_role_aliases_enabled']),
+            'extended_variable_role_alias_interface_enabled' => !empty($settings['extended_variable_role_alias_interface_enabled']),
+            'extended_variable_role_alias_ui_enabled' => !empty($settings['extended_variable_role_alias_ui_enabled']),
+            'extended_variable_role_alias_code_enabled' => !empty($settings['extended_variable_role_alias_code_enabled']),
             'extended_variable_category_sans_enabled' => !empty($settings['extended_variable_category_sans_enabled']),
             'extended_variable_category_serif_enabled' => !empty($settings['extended_variable_category_serif_enabled']),
             'extended_variable_category_mono_enabled' => !empty($settings['extended_variable_category_mono_enabled']),
@@ -249,12 +258,14 @@ final class AdminPageContextBuilder
             'bunny_font_imports_enabled' => !empty($settings['bunny_font_imports_enabled']),
             'adobe_font_imports_enabled' => !empty($settings['adobe_font_imports_enabled']),
             'local_font_uploads_enabled' => !empty($settings['local_font_uploads_enabled']),
-            'custom_css_url_imports_enabled' => !empty($settings['custom_css_url_imports_enabled']),
+            'custom_css_url_imports_available' => $experimentalFontImportWorkflowsAvailable,
+            'custom_css_url_imports_enabled' => $experimentalFontImportWorkflowsAvailable && !empty($settings['custom_css_url_imports_enabled']),
             'delete_uploaded_files_on_uninstall' => !empty($settings['delete_uploaded_files_on_uninstall']),
             'advanced_tools' => $advancedTools,
             'diagnostic_items' => $diagnosticItems,
             'overview_metrics' => $overviewMetrics,
             'output_panels' => $this->buildOutputPanels($roles, $settings, $catalog, $appliedRoles),
+            'output_toggle_previews' => $this->buildOutputTogglePreviews($roles, $settings, $catalog, $appliedRoles),
             'generated_css_panel' => $generatedCssPanel,
             'preview_panels' => $this->buildPreviewPanels(),
             'local_environment_notice' => $localEnvironmentNotice,
@@ -359,6 +370,22 @@ final class AdminPageContextBuilder
                 'kind' => 'maintenance',
                 'label' => __('Restore notices', 'tasty-fonts'),
                 'confirm_phrase' => '',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'reset_family_fallbacks_to_global',
+                'kind' => 'maintenance',
+                'label' => __('Reset custom fallbacks to global', 'tasty-fonts'),
+                'confirm_phrase' => 'RESET FALLBACKS',
+                'blocks_when_dirty' => true,
+                'dry_run_supported' => false,
+            ],
+            [
+                'id' => 'reset_fallbacks_to_plugin_defaults',
+                'kind' => 'maintenance',
+                'label' => __('Reset fallbacks to plugin default', 'tasty-fonts'),
+                'confirm_phrase' => 'RESET DEFAULTS',
                 'blocks_when_dirty' => true,
                 'dry_run_supported' => false,
             ],
@@ -962,6 +989,18 @@ final class AdminPageContextBuilder
         };
     }
 
+    private function experimentalFontImportWorkflowsAvailable(string $updateChannel): bool
+    {
+        return in_array(
+            $updateChannel,
+            [
+                SettingsRepository::UPDATE_CHANNEL_BETA,
+                SettingsRepository::UPDATE_CHANNEL_NIGHTLY,
+            ],
+            true
+        );
+    }
+
     private function latestUpdateChannelVersionLabel(string $channel): string
     {
         if (!$this->updater instanceof GitHubUpdater) {
@@ -1154,6 +1193,22 @@ final class AdminPageContextBuilder
                 'active' => false,
             ],
         ];
+    }
+
+    /**
+     * @param RoleSet $roles
+     * @param NormalizedSettings $settings
+     * @param CatalogMap $catalog
+     * @param RoleSet|array{} $appliedRoles
+     * @return OutputTogglePreviewMap
+     */
+    public function buildOutputTogglePreviews(
+        array $roles,
+        array $settings,
+        array $catalog = [],
+        array $appliedRoles = []
+    ): array {
+        return (new OutputTogglePreviewBuilder($this->cssBuilder))->build($roles, $settings, $catalog, $appliedRoles);
     }
 
     /**
@@ -1885,6 +1940,10 @@ final class AdminPageContextBuilder
                 'disabled' => __('Etch canvas loading is off. Turn it on to load Tasty fonts inside Etch canvas previews.', 'tasty-fonts'),
                 default => __('Available automatically when Etch is active.', 'tasty-fonts'),
             },
+            'quick_panel_enabled' => !empty($settings['etch_quick_roles_panel_enabled']),
+            'quick_panel_disabled' => !$enabled,
+            'quick_panel_title' => __('Quick role panel', 'tasty-fonts'),
+            'quick_panel_description' => __('Shows the Tasty Fonts Aa panel in Etch’s left toolbar for immediate Heading, Body, and Monospace changes.', 'tasty-fonts'),
             'status_label' => $this->buildBuilderIntegrationStatusLabel($status),
             'status_copy' => match ($status) {
                 'active' => __('Configured. Etch canvas previews receive Tasty Fonts runtime assets.', 'tasty-fonts'),
@@ -2403,6 +2462,14 @@ final class AdminPageContextBuilder
                 'summary' => '',
                 'last_run' => '',
             ],
+            'reset_family_fallbacks_to_global' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
+            'reset_fallbacks_to_plugin_defaults' => [
+                'summary' => '',
+                'last_run' => '',
+            ],
             'wipe_managed_font_library' => [
                 'summary' => sprintf(
                     /* translators: %d: number of managed font families */
@@ -2443,6 +2510,8 @@ final class AdminPageContextBuilder
             'rescan_font_library' => __('Fonts rescanned.', 'tasty-fonts'),
             'repair_storage_scaffold' => __('Storage scaffold repaired.', 'tasty-fonts'),
             'reset_plugin_settings' => __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts'),
+            'reset_family_fallbacks_to_global' => __('Family fallback overrides reset to the current global fallback settings.', 'tasty-fonts'),
+            'reset_fallbacks_to_plugin_defaults' => __('Fallback fonts reset to plugin defaults.', 'tasty-fonts'),
             'wipe_managed_font_library' => __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts'),
             'delete_all_snapshots' => __('All rollback snapshots deleted.', 'tasty-fonts'),
             'delete_all_exports' => __('All site transfer export bundles deleted.', 'tasty-fonts'),
@@ -2926,66 +2995,7 @@ final class AdminPageContextBuilder
      */
     private function resolveEffectiveRoleFallback(string $roleKey, array $roles, array $catalog, array $settings): string
     {
-        $default = $this->defaultRoleFallback($roleKey);
-        $familyName = trim($this->roleStringValue($roles, $roleKey));
-        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
-
-        if ($familyName !== '') {
-                $familyFallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
-
-                if (array_key_exists($familyName, $familyFallbacks)) {
-                    $configuredFallback = trim($familyFallbacks[$familyName]);
-
-                    if ($configuredFallback !== '') {
-                        return FontUtils::sanitizeFallback($configuredFallback);
-                    }
-                }
-
-            $family = $this->findCatalogFamilyByName($familyName, $catalog);
-
-            if (is_array($family)) {
-                return FontUtils::defaultFallbackForCategory($this->resolveFamilyCategory($family));
-            }
-        }
-
-        if ($fallback !== '') {
-            return FontUtils::sanitizeFallback($fallback);
-        }
-
-        return $default;
-    }
-
-    /**
-     * @param CatalogMap $catalog
-     * @return CatalogFamily|null
-     */
-    private function findCatalogFamilyByName(string $familyName, array $catalog): ?array
-    {
-        if (is_array($catalog[$familyName] ?? null)) {
-            return $catalog[$familyName];
-        }
-
-        foreach ($catalog as $family) {
-            if ($this->stringValue($family, 'family') === $familyName) {
-                return $family;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param CatalogFamily $family
-     */
-    private function resolveFamilyCategory(array $family): string
-    {
-        $category = $this->stringValue($family, 'font_category');
-
-        if ($category === '' && is_array($family['active_delivery'] ?? null) && is_array($family['active_delivery']['meta'] ?? null)) {
-            $category = $this->stringValue($family['active_delivery']['meta'], 'category');
-        }
-
-        return $category;
+        return FallbackResolver::roleFallback($roleKey, $roles, $settings, $catalog);
     }
 
     /**
@@ -3002,11 +3012,6 @@ final class AdminPageContextBuilder
         }
 
         return $keys;
-    }
-
-    private function defaultRoleFallback(string $roleKey): string
-    {
-        return $roleKey === 'monospace' ? 'monospace' : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
     }
 
     /**

@@ -214,6 +214,22 @@ $tests['settings_repository_tracks_acss_font_sync_state'] = static function (): 
 
     assertSameValue(true, $saved['acss_font_role_sync_enabled'], 'Saving the Automatic.css sync toggle should persist an explicit enabled state.');
 
+    $saved = $settings->saveSettings(['extended_variable_role_weight_vars_enabled' => '0']);
+    assertSameValue(true, $saved['extended_variable_role_weight_vars_enabled'], 'Automatic.css sync should keep role weight variable output enabled even when a form submits the locked control as off.');
+
+    resetTestState();
+    global $optionStore;
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'acss_font_role_sync_enabled' => true,
+        'minimal_output_preset_enabled' => false,
+        'class_output_enabled' => false,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_role_weight_vars_enabled' => false,
+    ];
+    $settings = new SettingsRepository();
+    $loaded = $settings->getSettings();
+    assertSameValue(true, $loaded['extended_variable_role_weight_vars_enabled'], 'Stored settings should normalize role weight variables on while Automatic.css sync is enabled.');
+
     $saved = $settings->saveAcssFontRoleSyncState(true, true, 'Inter, sans-serif', 'system-ui, sans-serif', '700', '400');
 
     assertSameValue(true, $saved['acss_font_role_sync_applied'], 'Automatic.css sync state should record when the managed ACSS values are currently applied.');
@@ -1724,6 +1740,9 @@ $tests['settings_repository_defaults_and_persists_class_output_settings'] = stat
     assertSameValue(true, $defaults['class_output_role_heading_enabled'], 'Granular class output flags should default to enabled for new installs.');
     assertSameValue(true, $defaults['class_output_role_alias_interface_enabled'], 'Role alias class flags should default to enabled for new installs.');
     assertSameValue(true, $defaults['class_output_category_sans_enabled'], 'Category class flags should default to enabled for new installs.');
+    assertSameValue(true, $defaults['class_output_role_monospace_enabled'], 'Monospace class output preference should default to enabled even while the dependency-disabled UI is visually off.');
+    assertSameValue(true, $defaults['class_output_role_alias_code_enabled'], 'Code alias class output preference should default to enabled even while the dependency-disabled UI is visually off.');
+    assertSameValue(true, $defaults['class_output_category_mono_enabled'], 'Mono category class output preference should default to enabled even while the dependency-disabled UI is visually off.');
     assertSameValue(true, $defaults['class_output_families_enabled'], 'Family class flags should default to enabled for new installs.');
 
     $saved = $settings->saveSettings([
@@ -1763,9 +1782,12 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_weight_vars_enabled']), 'Role weight variables should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_weight_tokens_enabled']), 'Extended weight tokens should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_aliases_enabled']), 'Extended role aliases should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_alias_interface_enabled']), 'Interface alias variables should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_alias_ui_enabled']), 'UI alias variables should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_role_alias_code_enabled']), 'Code alias variables should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_sans_enabled']), 'Extended sans category alias should default to enabled.');
     assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_serif_enabled']), 'Extended serif category alias should default to enabled.');
-    assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_mono_enabled']), 'Extended mono category alias should default to enabled.');
+    assertSameValue(true, !empty($settings->getSettings()['extended_variable_category_mono_enabled']), 'Extended mono category alias preference should default to enabled even while the dependency-disabled UI is visually off.');
 
     $settings->saveSettings(['per_variant_font_variables_enabled' => '0']);
     assertSameValue(
@@ -1783,9 +1805,9 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
 
     $settings->saveSettings(['role_usage_font_weight_enabled' => '1']);
     assertSameValue(
-        true,
+        false,
         !empty($settings->getSettings()['role_usage_font_weight_enabled']),
-        'Settings should persist enabled role usage font-weight output.'
+        'Minimal output should force hidden role usage font-weight output off.'
     );
 
     $settings->saveSettings(['extended_variable_role_weight_vars_enabled' => '0']);
@@ -1814,6 +1836,9 @@ $tests['settings_repository_enables_per_variant_font_variables_by_default_and_pe
     assertSameValue(true, $saved['extended_variable_role_weight_vars_enabled'], 'Minimal output preset should keep role weight variables enabled.');
     assertSameValue(false, $saved['extended_variable_weight_tokens_enabled'], 'Settings should persist disabled extended weight tokens.');
     assertSameValue(false, $saved['extended_variable_role_aliases_enabled'], 'Settings should persist disabled extended role aliases.');
+    assertSameValue(false, $saved['extended_variable_role_alias_interface_enabled'], 'Legacy disabled extended role aliases should disable interface aliases.');
+    assertSameValue(false, $saved['extended_variable_role_alias_ui_enabled'], 'Legacy disabled extended role aliases should disable UI aliases.');
+    assertSameValue(false, $saved['extended_variable_role_alias_code_enabled'], 'Legacy disabled extended role aliases should disable code aliases.');
     assertSameValue(false, $saved['extended_variable_category_sans_enabled'], 'Settings should persist disabled extended sans aliases.');
     assertSameValue(false, $saved['extended_variable_category_serif_enabled'], 'Settings should persist disabled extended serif aliases.');
     assertSameValue(false, $saved['extended_variable_category_mono_enabled'], 'Settings should persist disabled extended mono aliases.');
@@ -1840,7 +1865,49 @@ $tests['settings_repository_preserves_custom_output_modes_when_minimal_flag_is_m
     assertSameValue('custom', (string) ($normalized['output_quick_mode_preference'] ?? ''), 'Mixed output settings should derive a custom quick-mode preference when no explicit preference was stored.');
 };
 
-$tests['settings_repository_keeps_custom_output_quick_mode_sticky_and_coerces_stale_presets'] = static function (): void {
+$tests['settings_repository_normalizes_legacy_role_usage_weight_output_outside_custom'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'minimal_output_preset_enabled' => false,
+        'output_quick_mode_preference' => 'custom',
+        'class_output_enabled' => false,
+        'per_variant_font_variables_enabled' => true,
+        'role_usage_font_weight_enabled' => true,
+        'extended_variable_role_weight_vars_enabled' => true,
+    ];
+
+    $settings = new SettingsRepository();
+    $normalized = $settings->getSettings();
+
+    assertSameValue('variables', (string) ($normalized['output_quick_mode_preference'] ?? ''), 'Legacy custom preference with variables-only layers should derive Variables only.');
+    assertSameValue(false, !empty($normalized['role_usage_font_weight_enabled']), 'Variables-only normalization should force hidden sitewide role weights off.');
+};
+
+$tests['settings_repository_disables_role_usage_weight_output_when_layers_change_without_quick_mode'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $settings->saveSettings([
+        'minimal_output_preset_enabled' => '0',
+        'output_quick_mode_preference' => 'custom',
+        'class_output_enabled' => '1',
+        'per_variant_font_variables_enabled' => '1',
+        'role_usage_font_weight_enabled' => '1',
+    ]);
+
+    $saved = $settings->saveSettings([
+        'class_output_enabled' => '0',
+        'per_variant_font_variables_enabled' => '1',
+    ]);
+
+    assertSameValue('variables', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Layer-only saves should derive Variables only without a quick-mode field.');
+    assertSameValue(false, !empty($saved['role_usage_font_weight_enabled']), 'Layer-only saves should force sitewide role weights off outside Custom.');
+};
+
+$tests['settings_repository_applies_output_quick_mode_layers'] = static function (): void {
     resetTestState();
 
     $settings = new SettingsRepository();
@@ -1858,14 +1925,16 @@ $tests['settings_repository_keeps_custom_output_quick_mode_sticky_and_coerces_st
         'extended_variable_category_mono_enabled' => '1',
     ]);
 
-    assertSameValue('custom', (string) ($saved['output_quick_mode_preference'] ?? ''), 'An explicit custom quick-mode preference should remain sticky even when the saved booleans match variables-only.');
+    assertSameValue('custom', (string) ($saved['output_quick_mode_preference'] ?? ''), 'An explicit custom quick-mode preference should enable the combined variable and class layers.');
+    assertSameValue(true, !empty($saved['class_output_enabled']), 'Custom should force class output on.');
+    assertSameValue(true, !empty($saved['per_variant_font_variables_enabled']), 'Custom should keep variable output on.');
 
     $saved = $settings->saveSettings([
         'output_quick_mode_preference' => 'variables',
         'extended_variable_category_serif_enabled' => '0',
     ]);
 
-    assertSameValue('custom', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Stale non-custom quick-mode preferences should normalize to custom when the saved booleans no longer match the preset shape.');
+    assertSameValue('variables', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Variables-only should stay selected when a variable subgroup is disabled.');
 };
 
 $tests['settings_repository_persists_variables_and_classes_quick_modes_when_settings_match_presets'] = static function (): void {
@@ -1886,7 +1955,7 @@ $tests['settings_repository_persists_variables_and_classes_quick_modes_when_sett
         'extended_variable_category_mono_enabled' => '1',
     ]);
 
-    assertSameValue('variables', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Variables-only should remain selected when the saved booleans still match the preset.');
+    assertSameValue('variables', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Variables-only should remain selected from the variable layer shape.');
     assertSameValue(false, !empty($saved['class_output_enabled']), 'Variables-only should keep class output disabled.');
     assertSameValue(true, !empty($saved['per_variant_font_variables_enabled']), 'Variables-only should keep variable output enabled.');
     assertSameValue(false, !empty($saved['role_usage_font_weight_enabled']), 'Variables-only should keep role font-weight output disabled.');
@@ -1909,10 +1978,11 @@ $tests['settings_repository_persists_variables_and_classes_quick_modes_when_sett
         'role_usage_font_weight_enabled' => '0',
     ]);
 
-    assertSameValue('classes', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Classes-only should remain selected when the saved booleans still match the preset.');
+    assertSameValue('classes', (string) ($saved['output_quick_mode_preference'] ?? ''), 'Classes-only should remain selected from the class layer shape.');
     assertSameValue(true, !empty($saved['class_output_enabled']), 'Classes-only should keep class output enabled.');
     assertSameValue(false, !empty($saved['per_variant_font_variables_enabled']), 'Classes-only should keep variable output disabled.');
     assertSameValue(false, !empty($saved['role_usage_font_weight_enabled']), 'Classes-only should keep role font-weight output disabled.');
+    assertSameValue(true, !empty($saved['class_output_role_styles_enabled']), 'Selecting Classes only should default role class styles on when the field is absent.');
 
     $saved = $settings->saveSettings([
         'minimal_output_preset_enabled' => '0',
@@ -2100,7 +2170,7 @@ $tests['settings_repository_keeps_boolean_output_settings_when_fields_are_absent
     $saved = $settings->getSettings();
 
     assertSameValue(false, $saved['minify_css_output'], 'Saving unrelated settings should not re-enable CSS minification.');
-    assertSameValue(true, $saved['role_usage_font_weight_enabled'], 'Saving unrelated settings should not disable role usage font-weight output.');
+    assertSameValue(false, $saved['role_usage_font_weight_enabled'], 'Saving unrelated settings should keep hidden role usage font-weight output off outside Custom.');
     assertSameValue(true, $saved['class_output_enabled'], 'Saving unrelated settings should not disable class output.');
     assertSameValue(false, $saved['class_output_role_monospace_enabled'], 'Saving unrelated settings should not re-enable disabled class subsettings.');
     assertSameValue(false, $saved['class_output_role_alias_code_enabled'], 'Saving unrelated settings should not re-enable disabled alias class subsettings.');
@@ -2133,7 +2203,7 @@ $tests['settings_repository_defaults_and_persists_optional_monospace_role_settin
     assertSameValue('system-ui, sans-serif', $defaultRoles['heading_fallback'], 'Draft roles should default the heading fallback stack to a modern system sans stack.');
     assertSameValue('system-ui, sans-serif', $defaultRoles['body_fallback'], 'Draft roles should default the body fallback stack to a modern system sans stack.');
     assertSameValue('', $defaultRoles['monospace'], 'Draft roles should default the monospace family to fallback-only mode.');
-    assertSameValue('monospace', $defaultRoles['monospace_fallback'], 'Draft roles should default the monospace fallback stack to the generic monospace keyword.');
+    assertSameValue('ui-monospace, monospace', $defaultRoles['monospace_fallback'], 'Draft roles should default the monospace fallback stack to the modern monospace stack.');
 
     $settings->saveSettings(['monospace_role_enabled' => '1']);
     $savedRoles = $settings->saveRoles(
@@ -2150,19 +2220,30 @@ $tests['settings_repository_defaults_and_persists_optional_monospace_role_settin
 
     assertSameValue(true, $settings->getSettings()['monospace_role_enabled'], 'The monospace role toggle should persist in plugin settings.');
     assertSameValue('', $savedRoles['monospace'], 'Saving monospace roles should not force a family selection when fallback-only mode is chosen.');
-    assertSameValue('monospace', $savedRoles['monospace_fallback'], 'Blank monospace fallback input should normalize back to the generic monospace fallback.');
+    assertSameValue('ui-monospace, monospace', $savedRoles['monospace_fallback'], 'Blank monospace fallback input should normalize back to the modern monospace fallback.');
 };
 
-$tests['settings_repository_reenables_monospace_class_outputs_when_the_role_is_first_enabled'] = static function (): void {
+$tests['settings_repository_preserves_monospace_output_choices_with_the_role'] = static function (): void {
     resetTestState();
 
+    global $optionStore;
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'monospace_role_enabled' => false,
+        'class_output_role_monospace_enabled' => true,
+        'class_output_role_alias_code_enabled' => true,
+        'class_output_category_mono_enabled' => true,
+        'extended_variable_role_alias_code_enabled' => true,
+        'extended_variable_category_mono_enabled' => true,
+    ];
+
     $settings = new SettingsRepository();
-    $settings->saveSettings([
-        'class_output_enabled' => '1',
-        'class_output_role_monospace_enabled' => '0',
-        'class_output_role_alias_code_enabled' => '0',
-        'class_output_category_mono_enabled' => '0',
-    ]);
+    $loaded = $settings->getSettings();
+
+    assertSameValue(true, !empty($loaded['class_output_role_monospace_enabled']), 'Stored monospace class output preference should remain saved while the role is disabled.');
+    assertSameValue(true, !empty($loaded['class_output_role_alias_code_enabled']), 'Stored code alias output preference should remain saved while the role is disabled.');
+    assertSameValue(true, !empty($loaded['class_output_category_mono_enabled']), 'Stored mono category output preference should remain saved while the role is disabled.');
+    assertSameValue(true, !empty($loaded['extended_variable_role_alias_code_enabled']), 'Stored code variable alias preference should remain saved while the role is disabled.');
+    assertSameValue(true, !empty($loaded['extended_variable_category_mono_enabled']), 'Stored mono variable alias output preference should remain saved while the role is disabled.');
 
     $saved = $settings->saveSettings([
         'monospace_role_enabled' => '1',
@@ -2172,6 +2253,34 @@ $tests['settings_repository_reenables_monospace_class_outputs_when_the_role_is_f
     assertSameValue(true, !empty($saved['class_output_role_monospace_enabled']), 'Enabling the monospace role should restore the monospace class output.');
     assertSameValue(true, !empty($saved['class_output_role_alias_code_enabled']), 'Enabling the monospace role should restore the code alias output.');
     assertSameValue(true, !empty($saved['class_output_category_mono_enabled']), 'Enabling the monospace role should restore the mono category output.');
+    assertSameValue(true, !empty($saved['extended_variable_role_alias_code_enabled']), 'Enabling the monospace role should restore the code variable alias output.');
+    assertSameValue(true, !empty($saved['extended_variable_category_mono_enabled']), 'Enabling the monospace role should restore the mono variable alias output.');
+
+    $saved = $settings->saveSettings([
+        'monospace_role_enabled' => '1',
+        'extended_variable_category_mono_enabled' => '0',
+    ]);
+    assertSameValue(false, !empty($saved['extended_variable_category_mono_enabled']), 'User-disabled mono variable output should persist while monospace remains enabled.');
+
+    $saved = $settings->saveSettings(['preview_sentence' => 'Monospace still enabled']);
+    assertSameValue(false, !empty($saved['extended_variable_category_mono_enabled']), 'Saving unrelated settings should not re-enable mono variable output after first enable.');
+
+    $saved = $settings->saveSettings(['monospace_role_enabled' => '0']);
+    assertSameValue(false, !empty($saved['monospace_role_enabled']), 'Disabling the monospace role should persist the setting.');
+    assertSameValue(true, !empty($saved['class_output_role_monospace_enabled']), 'Disabling the monospace role should preserve monospace class output preference.');
+    assertSameValue(true, !empty($saved['class_output_role_alias_code_enabled']), 'Disabling the monospace role should preserve code alias output preference.');
+    assertSameValue(true, !empty($saved['class_output_category_mono_enabled']), 'Disabling the monospace role should preserve mono category output preference.');
+    assertSameValue(false, !empty($saved['extended_variable_category_mono_enabled']), 'Disabling the monospace role should preserve the saved disabled mono variable alias preference.');
+
+    $saved = $settings->saveSettings([
+        'monospace_role_enabled' => '1',
+        'class_output_role_alias_code_enabled' => '0',
+        'extended_variable_category_mono_enabled' => '0',
+    ]);
+    assertSameValue(true, !empty($saved['class_output_role_monospace_enabled']), 'Re-enabling should keep the saved monospace class output preference.');
+    assertSameValue(false, !empty($saved['class_output_role_alias_code_enabled']), 'First enable should preserve an explicitly disabled code alias output.');
+    assertSameValue(true, !empty($saved['class_output_category_mono_enabled']), 'Re-enabling should keep the saved mono category output preference.');
+    assertSameValue(false, !empty($saved['extended_variable_category_mono_enabled']), 'First enable should preserve an explicitly disabled mono variable alias output.');
 };
 
 $tests['settings_repository_defaults_and_persists_variable_font_feature_settings'] = static function (): void {
@@ -3334,6 +3443,48 @@ $tests['admin_controller_does_not_reenable_explicitly_disabled_acss_sync_after_r
     assertSameValue('', (string) ($automaticCssSettings['text-font-family'] ?? ''), 'Initialization should leave restored Automatic.css body defaults untouched after an explicit opt-out.');
 };
 
+$tests['admin_controller_recovers_legacy_acss_drift_disabled_state_without_reapplying'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        'heading-font-family' => '',
+        'text-font-family' => AcssIntegrationService::DESIRED_TEXT_VALUE,
+        'heading-weight' => AcssIntegrationService::DESIRED_HEADING_WEIGHT_VALUE,
+        'text-font-weight' => AcssIntegrationService::DESIRED_TEXT_WEIGHT_VALUE,
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveAcssFontRoleSyncState(false, false, 'Inter, sans-serif', 'system-ui, sans-serif', '700', '400');
+
+    invokePrivateMethod($services['controller'], 'initializeDetectedIntegrations');
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+    $context = $builder->build();
+    $saved = $services['settings']->getSettings();
+
+    assertSameValue(true, (bool) ($saved['acss_font_role_sync_enabled'] ?? false), 'Legacy drift-disabled ACSS sync should be restored to enabled when the user did not opt out.');
+    assertSameValue(true, (bool) ($saved['acss_font_role_sync_applied'] ?? false), 'Legacy drift-disabled ACSS sync should be restored to applied so drift remains visible.');
+    assertSameValue('', (string) ($automaticCssSettings['heading-font-family'] ?? 'unexpected'), 'Legacy recovery should not overwrite the current ACSS heading value.');
+    assertSameValue('out_of_sync', (string) ($context['acss_integration']['status'] ?? ''), 'Legacy recovery should surface the drift as Needs reapply.');
+};
+
 $tests['admin_controller_preserves_unavailable_integration_detection_state_on_settings_save'] = static function (): void {
     resetTestState();
 
@@ -3470,7 +3621,7 @@ $tests['admin_controller_restores_previous_acss_font_values_when_sitewide_roles_
     assertContainsValue('restored to its previous font settings', (string) $result, 'The runtime sync helper should explain that ACSS was restored after sitewide roles were turned off.');
 };
 
-$tests['admin_controller_turns_off_acss_sync_when_acss_drifts_outside_tasty_fonts'] = static function (): void {
+$tests['admin_controller_keeps_acss_sync_enabled_when_acss_drifts_outside_tasty_fonts'] = static function (): void {
     resetTestState();
 
     global $automaticCssSettings;
@@ -3492,9 +3643,27 @@ $tests['admin_controller_turns_off_acss_sync_when_acss_drifts_outside_tasty_font
 
     $saved = $services['settings']->getSettings();
 
-    assertSameValue(false, (bool) ($saved['acss_font_role_sync_enabled'] ?? true), 'Managed Automatic.css sync should turn itself off when ACSS no longer matches the Tasty Fonts mapping.');
-    assertSameValue(false, (bool) ($saved['acss_font_role_sync_applied'] ?? true), 'Managed Automatic.css sync should clear its applied flag after drift is detected.');
-    assertSameValue('Inter, sans-serif', (string) ($saved['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'Drift detection should preserve the last backed-up heading value so re-enabling can still restore cleanly.');
+    assertSameValue(true, (bool) ($saved['acss_font_role_sync_enabled'] ?? false), 'Managed Automatic.css sync should stay enabled when ACSS no longer matches the Tasty Fonts mapping.');
+    assertSameValue(true, (bool) ($saved['acss_font_role_sync_applied'] ?? false), 'Managed Automatic.css sync should keep its applied flag so the integration can render Needs reapply.');
+    assertSameValue('Inter, sans-serif', (string) ($saved['acss_font_role_sync_previous_heading_font_family'] ?? ''), 'Drift detection should preserve the last backed-up heading value so disabling sync can still restore cleanly.');
+
+    $builder = new AdminPageContextBuilder(
+        $services['storage'],
+        $services['settings'],
+        $services['log'],
+        $services['catalog'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['google'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration']
+    );
+    $context = $builder->build();
+
+    assertSameValue('out_of_sync', (string) ($context['acss_integration']['status'] ?? ''), 'Drifted Automatic.css settings should stay visible as Needs reapply.');
+    assertSameValue('Needs reapply', (string) ($context['acss_integration']['status_label'] ?? ''), 'Drifted Automatic.css settings should render the Needs reapply badge.');
 };
 
 $tests['asset_service_debounces_background_css_regeneration_events'] = static function (): void {
@@ -3765,6 +3934,115 @@ $tests['runtime_service_exposes_acss_runtime_stylesheet_to_etch_canvas_when_sync
         in_array('https://example.test/wp-content/uploads/automatic-css/automatic.css', $canvasStylesheetUrls, true),
         'Etch canvas runtime data should mirror the live Automatic.css runtime stylesheet even when Tasty ACSS sync is off.'
     );
+};
+
+$tests['runtime_service_localizes_quick_roles_for_authorized_etch_canvas'] = static function (): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $currentUserRoles;
+    global $enqueuedScripts;
+    global $enqueuedStyles;
+    global $localizedScripts;
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $currentUserCapabilities['edit_posts'] = true;
+    $currentUserRoles = ['administrator'];
+    $services['settings']->saveSettings([
+        'etch_quick_roles_panel_enabled' => '1',
+    ]);
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Inter',
+                'slug' => 'inter',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'inter/Inter-400.woff2'],
+                'paths' => ['woff2' => 'inter/Inter-400.woff2'],
+            ]],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Draft Only',
+        'draft-only',
+        [
+            'id' => 'draft-only-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Draft Only',
+                'slug' => 'draft-only',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'draft-only/DraftOnly-400.woff2'],
+                'paths' => ['woff2' => 'draft-only/DraftOnly-400.woff2'],
+            ]],
+        ],
+        'library_only',
+        true
+    );
+    $_GET['etch'] = '1';
+
+    $services['runtime']->enqueueFrontend();
+
+    $quickRoles = (array) ($localizedScripts['tasty-fonts-canvas']['data']['quickRoles'] ?? []);
+    $roleFamilyCatalog = (array) ($quickRoles['roleFamilyCatalog'] ?? []);
+
+    assertSameValue(true, isset($enqueuedScripts['tasty-fonts-admin-contracts']), 'Etch quick roles should load the shared admin role contracts.');
+    assertSameValue(
+        ['tasty-fonts-canvas-contracts', 'tasty-fonts-admin-contracts'],
+        $enqueuedScripts['tasty-fonts-canvas']['deps'] ?? [],
+        'The Etch canvas script should depend on both canvas and admin contracts.'
+    );
+    assertSameValue(true, isset($enqueuedStyles['tasty-fonts-canvas']), 'Etch quick roles should enqueue the scoped canvas panel stylesheet.');
+    assertSameValue(true, (bool) ($quickRoles['enabled'] ?? false), 'Authorized Etch canvas users should receive quick-role panel data.');
+    assertSameValue('https://example.test/wp-json/tasty-fonts/v1/', (string) ($quickRoles['restUrl'] ?? ''), 'Quick roles should include the Tasty Fonts REST root.');
+    assertSameValue('roles/draft', (string) (($quickRoles['routes'] ?? [])['saveRoleDraft'] ?? ''), 'Quick roles should reuse the existing role draft route.');
+    assertSameValue('roles/publish', (string) (($quickRoles['routes'] ?? [])['publishRoleDraft'] ?? ''), 'Quick roles should include the publish route for live sitewide updates.');
+    assertSameValue('https://example.test/wp-admin/admin.php?page=tasty-custom-fonts', (string) ($quickRoles['adminUrl'] ?? ''), 'Quick roles should include a new-tab URL for the main Tasty Fonts admin page.');
+    assertSameValue(true, array_key_exists('Inter', $roleFamilyCatalog), 'Published families should be available in the Etch quick role picker.');
+    assertSameValue(true, array_key_exists('Draft Only', $roleFamilyCatalog), 'Library-only families should be offered as Etch quick role choices.');
+};
+
+$tests['runtime_service_omits_quick_roles_when_etch_panel_toggle_is_off'] = static function (): void {
+    resetTestState();
+
+    global $currentUserCapabilities;
+    global $currentUserRoles;
+    global $enqueuedScripts;
+    global $enqueuedStyles;
+    global $localizedScripts;
+
+    add_filter('tasty_fonts_etch_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $currentUserCapabilities['edit_posts'] = true;
+    $currentUserRoles = ['administrator'];
+    $_GET['etch'] = '1';
+
+    $services['runtime']->enqueueFrontend();
+
+    $quickRoles = (array) ($localizedScripts['tasty-fonts-canvas']['data']['quickRoles'] ?? []);
+
+    assertSameValue(true, isset($enqueuedScripts['tasty-fonts-canvas']), 'Etch canvas runtime assets may still load for font previews while the quick panel setting is off.');
+    assertSameValue(false, (bool) ($quickRoles['enabled'] ?? false), 'The Etch quick role panel payload should stay disabled while its setting is off.');
+    assertSameValue(false, isset($enqueuedStyles['tasty-fonts-canvas']), 'The scoped Etch quick-role panel stylesheet should stay unloaded while the panel setting is off.');
 };
 
 $tests['runtime_service_ignores_public_etch_query_parameters_without_editor_access'] = static function (): void {
@@ -4624,9 +4902,9 @@ $tests['runtime_asset_planner_uses_category_aware_fallbacks_for_editor_font_fami
     $families = $services['planner']->getEditorFontFamilies();
 
     assertContainsValue(
-        '"JetBrains Mono", monospace',
+        '"JetBrains Mono", ui-monospace, monospace',
         (string) ($families[0]['fontFamily'] ?? ''),
-        'Editor font family payloads should default monospace families to the monospace generic fallback when no explicit family fallback is saved.'
+        'Editor font family payloads should default monospace families to the global monospace fallback when no explicit family fallback is saved.'
     );
 };
 
@@ -4853,6 +5131,7 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
     $defaults = $settings->getSettings();
 
     assertSameValue(null, $defaults['etch_integration_enabled'], 'Etch integration should start unconfigured so supported sites can default on once detected.');
+    assertSameValue(false, $defaults['etch_quick_roles_panel_enabled'], 'The Etch quick role panel should default off until the user opts into the inline editor control.');
     assertSameValue(null, $defaults['bricks_integration_enabled'], 'Bricks integration should start unconfigured so supported sites can default on once detected.');
     assertSameValue(null, $defaults['oxygen_integration_enabled'], 'Oxygen integration should start unconfigured so supported sites can default on once detected.');
     assertSameValue(false, $defaults['bricks_theme_styles_sync_enabled'], 'Bricks Theme Style sync should default off until the user opts into deeper integration.');
@@ -4862,6 +5141,7 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
 
     $saved = $settings->saveSettings([
         'etch_integration_enabled' => '0',
+        'etch_quick_roles_panel_enabled' => '1',
         'bricks_integration_enabled' => '1',
         'bricks_theme_styles_sync_enabled' => '1',
         'bricks_theme_style_target_mode' => 'selected',
@@ -4871,6 +5151,7 @@ $tests['settings_repository_tracks_builder_integration_state'] = static function
     ]);
 
     assertSameValue(false, $saved['etch_integration_enabled'], 'Saving the Etch integration toggle should persist an explicit disabled state.');
+    assertSameValue(true, $saved['etch_quick_roles_panel_enabled'], 'Saving the Etch quick role panel toggle should persist an explicit enabled state.');
     assertSameValue(true, $saved['bricks_integration_enabled'], 'Saving the Bricks integration toggle should persist an explicit enabled state.');
     assertSameValue(true, $saved['bricks_theme_styles_sync_enabled'], 'Saving Bricks Theme Style sync should persist an explicit enabled state.');
     assertSameValue('selected', $saved['bricks_theme_style_target_mode'], 'Saving the Bricks Theme Style mode should persist the selected targeting strategy.');
@@ -6300,6 +6581,83 @@ $tests['runtime_service_inject_editor_font_presets_preserves_existing_schema_ver
         $result->get_data()['version'] ?? null,
         'injectEditorFontPresets() should preserve an existing non-default theme JSON schema version.'
     );
+};
+
+$tests['settings_repository_persists_global_fallback_defaults_and_resets_overrides'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $defaults = $settings->getSettings();
+
+    assertSameValue(FontUtils::DEFAULT_ROLE_SANS_FALLBACK, $defaults['fallback_heading'], 'Heading global fallback should use the modern plugin default.');
+    assertSameValue(FontUtils::DEFAULT_ROLE_SANS_FALLBACK, $defaults['fallback_body'], 'Body global fallback should use the modern plugin default.');
+    assertSameValue(FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK, $defaults['fallback_monospace'], 'Monospace global fallback should use the modern plugin default.');
+
+    $saved = $settings->saveSettings([
+        'fallback_heading' => 'Georgia, serif',
+        'fallback_body' => 'Arial, sans-serif',
+        'fallback_monospace' => 'ui-monospace, monospace',
+    ]);
+
+    assertSameValue('Georgia, serif', $saved['fallback_heading'], 'Heading global fallback should be editable.');
+    assertSameValue('Arial, sans-serif', $saved['fallback_body'], 'Body global fallback should be editable.');
+    assertSameValue('ui-monospace, monospace', $saved['fallback_monospace'], 'Monospace global fallback should be editable.');
+
+    $settings->saveFamilyFallback('Inter', 'Verdana, sans-serif');
+    assertSameValue(['Inter' => 'Verdana, sans-serif'], $settings->getSettings()['family_fallbacks'], 'Fixture should have a custom family fallback before reset.');
+
+    $resetFamilies = $settings->resetFamilyFallbacks();
+    assertSameValue([], $resetFamilies['family_fallbacks'], 'Resetting family fallbacks should clear per-family overrides.');
+    assertSameValue('Georgia, serif', $resetFamilies['fallback_heading'], 'Resetting family fallbacks should preserve current global heading fallback.');
+
+    $settings->saveFamilyFallback('Inter', 'Verdana, sans-serif');
+    $resetAll = $settings->resetAllFallbacksToDefaults();
+    assertSameValue([], $resetAll['family_fallbacks'], 'Resetting to plugin defaults should clear per-family overrides.');
+    assertSameValue(FontUtils::DEFAULT_ROLE_SANS_FALLBACK, $resetAll['fallback_heading'], 'Resetting to plugin defaults should restore heading fallback.');
+    assertSameValue(FontUtils::DEFAULT_ROLE_SANS_FALLBACK, $resetAll['fallback_body'], 'Resetting to plugin defaults should restore body fallback.');
+    assertSameValue(FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK, $resetAll['fallback_monospace'], 'Resetting to plugin defaults should restore monospace fallback.');
+};
+
+$tests['css_builder_uses_global_fallback_for_role_output_and_custom_family_override_first'] = static function (): void {
+    $builder = new CssBuilder();
+    $families = [
+        'Lora' => [
+            'family' => 'Lora',
+            'font_category' => 'serif',
+        ],
+    ];
+    $roles = [
+        'heading' => 'Lora',
+        'body' => '',
+        'monospace' => '',
+        'heading_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+        'body_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+        'monospace_fallback' => FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK,
+    ];
+    $settings = [
+        'fallback_heading' => 'Georgia, serif',
+        'fallback_body' => 'Arial, sans-serif',
+        'fallback_monospace' => FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK,
+        'family_fallbacks' => [],
+        'minimal_output_preset_enabled' => false,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_category_serif_enabled' => true,
+        'class_output_enabled' => true,
+        'class_output_families_enabled' => true,
+        'class_output_role_heading_enabled' => true,
+        'class_output_role_styles_enabled' => true,
+    ];
+
+    $roleVariables = $builder->buildRoleVariableSnippet($roles, false, $families, $settings);
+    assertTrueValue(str_contains($roleVariables, '--font-heading: "Lora", Georgia, serif;'), 'Role variables should use the global heading fallback.');
+
+    $familyVariables = $builder->buildFamilyClassSnippet(array_values($families), $settings);
+    assertTrueValue(str_contains($familyVariables, 'font-family: "Lora", Georgia, serif;'), 'Family class output should inherit the global heading fallback when no per-family override exists.');
+
+    $settings['family_fallbacks'] = ['Lora' => 'Times New Roman, serif'];
+    $roleVariables = $builder->buildRoleVariableSnippet($roles, false, $families, $settings);
+    assertTrueValue(str_contains($roleVariables, '--font-heading: "Lora", Times New Roman, serif;'), 'Per-family fallback overrides should take precedence over global role fallbacks.');
 };
 
 $tests['runtime_service_inject_editor_font_presets_does_not_force_legacy_schema_version_when_missing'] = static function (): void {

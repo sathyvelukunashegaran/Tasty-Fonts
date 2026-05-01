@@ -19,6 +19,51 @@
             : (config.inlineCss ? [config.inlineCss] : []);
     }
 
+    function normalizeQuickRoleConfig(config) {
+        if (!config || typeof config !== 'object' || config.enabled !== true) {
+            return { enabled: false };
+        }
+
+        const routes = config.routes && typeof config.routes === 'object' ? config.routes : {};
+        const saveRoute = String(routes.saveRoleDraft || '').trim();
+        const publishRoute = String(routes.publishRoleDraft || '').trim();
+        const restUrl = String(config.restUrl || '').trim();
+        const restNonce = String(config.restNonce || '').trim();
+        const adminUrl = String(config.adminUrl || '').trim();
+
+        if (!saveRoute || !restUrl || !restNonce) {
+            return { enabled: false };
+        }
+
+        return {
+            enabled: true,
+            restUrl,
+            restNonce,
+            adminUrl,
+            routes: { ...routes, saveRoleDraft: saveRoute, publishRoleDraft: publishRoute },
+            roles: config.roles && typeof config.roles === 'object' ? config.roles : {},
+            appliedRoles: config.appliedRoles && typeof config.appliedRoles === 'object' ? config.appliedRoles : {},
+            applyEverywhere: !!config.applyEverywhere,
+            monospaceRoleEnabled: !!config.monospaceRoleEnabled,
+            variableFontsEnabled: !!config.variableFontsEnabled,
+            roleFamilyCatalog: config.roleFamilyCatalog && typeof config.roleFamilyCatalog === 'object'
+                ? config.roleFamilyCatalog
+                : {},
+            strings: config.strings && typeof config.strings === 'object' ? config.strings : {},
+        };
+    }
+
+    function getQuickRoleKeys(monospaceRoleEnabled) {
+        return monospaceRoleEnabled ? ['heading', 'body', 'monospace'] : ['heading', 'body'];
+    }
+
+    function buildQuickRoleRouteUrl(restUrl, route) {
+        const base = String(restUrl || '').trim().replace(/\/+$/, '');
+        const path = String(route || '').trim().replace(/^\/+/, '');
+
+        return base && path ? `${base}/${path}` : '';
+    }
+
     function getIframeDocument(iframe) {
         if (!iframe || !iframe.contentDocument || !iframe.contentDocument.head) {
             return null;
@@ -60,6 +105,7 @@
             stylesheet.hash = '';
             stylesheet.searchParams.delete('ver');
             stylesheet.searchParams.delete('etch_rand');
+            stylesheet.searchParams.delete('tasty_fonts_canvas_refresh');
 
             return stylesheet.toString();
         } catch (error) {
@@ -89,13 +135,17 @@
         return false;
     }
 
-    function syncIframeStylesheets(doc, stylesheetUrls) {
+    function syncIframeStylesheets(doc, stylesheetUrls, options = {}) {
         const claimedIndexes = new Set();
+        const forceRefreshIndexes = Array.isArray(options.forceRefreshIndexes)
+            ? options.forceRefreshIndexes.map((index) => String(index))
+            : [];
 
         for (const [index, stylesheetUrl] of stylesheetUrls.entries()) {
             const current = doc.querySelector(`link[data-tasty-fonts-runtime="1"][data-tasty-fonts-runtime-index="${index}"]`);
+            const forceRefresh = options.forceRefresh === true || forceRefreshIndexes.includes(String(index));
 
-            if (iframeAlreadyHasStylesheet(doc, stylesheetUrl, current)) {
+            if (!forceRefresh && iframeAlreadyHasStylesheet(doc, stylesheetUrl, current)) {
                 if (current && current.parentNode) {
                     current.parentNode.removeChild(current);
                 }
@@ -172,8 +222,11 @@
     }
 
     return {
+        buildQuickRoleRouteUrl,
         getIframeDocument,
+        getQuickRoleKeys,
         normalizeInlineCssBlocks,
+        normalizeQuickRoleConfig,
         normalizeStylesheetUrls,
         requiresCrossOriginStylesheetAccess,
         syncIframeInlineStyles,

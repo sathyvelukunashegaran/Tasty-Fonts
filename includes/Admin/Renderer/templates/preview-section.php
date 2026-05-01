@@ -64,7 +64,7 @@
                                             aria-labelledby="<?php echo esc_attr($buttonId); ?>"
                                             <?php echo !empty($panel['active']) ? '' : 'hidden'; ?>
                                         >
-                                            <?php $this->renderPreviewScene((string) $panel['key'], $previewText, $previewRoles, $monospaceRoleEnabled, $availableFamilyLabels); ?>
+                                            <?php $this->renderPreviewScene((string) $panel['key'], $previewText, $previewRoles, $monospaceRoleEnabled, $availableFamilyLabels, $globalFallbackSettings); ?>
                                         </section>
                                     <?php endforeach; ?>
 
@@ -100,10 +100,10 @@
                                             </div>
                                         </div>
                                         <div class="tasty-fonts-preview-tray-grid">
-                                            <?php $this->renderPreviewRolePicker('heading', __('Heading', 'tasty-fonts'), $availableFamilyOptions, $previewRoles, $roles, true); ?>
-                                            <?php $this->renderPreviewRolePicker('body', __('Body', 'tasty-fonts'), $availableFamilyOptions, $previewRoles, $roles, true); ?>
+                                            <?php $this->renderPreviewRolePicker('heading', __('Heading', 'tasty-fonts'), $availableFamilyOptions, $previewRoles, $roles, true, $globalFallbackSettings); ?>
+                                            <?php $this->renderPreviewRolePicker('body', __('Body', 'tasty-fonts'), $availableFamilyOptions, $previewRoles, $roles, true, $globalFallbackSettings); ?>
                                             <?php if ($monospaceRoleEnabled): ?>
-                                                <?php $this->renderPreviewRolePicker('monospace', __('Monospace', 'tasty-fonts'), $availableFamilyOptions, $previewRoles, $roles, true); ?>
+                                                <?php $this->renderPreviewRolePicker('monospace', __('Monospace', 'tasty-fonts'), $availableFamilyOptions, $previewRoles, $roles, true, $globalFallbackSettings); ?>
                                             <?php endif; ?>
                                         </div>
                                     </div>

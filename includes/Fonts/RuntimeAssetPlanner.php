@@ -233,20 +233,7 @@ final class RuntimeAssetPlanner
      */
     private function resolveFamilyFallback(array $family): string
     {
-        $familyName = trim($this->familyStringValue($family, 'family'));
-
-        if ($familyName === '') {
-            return 'sans-serif';
-        }
-
-        $settings = $this->settings->getSettings();
-        $savedFallbacks = is_array($settings['family_fallbacks'] ?? null) ? $settings['family_fallbacks'] : [];
-
-        if (array_key_exists($familyName, $savedFallbacks) && is_scalar($savedFallbacks[$familyName])) {
-            return FontUtils::sanitizeFallback((string) $savedFallbacks[$familyName]);
-        }
-
-        return FontUtils::defaultFallbackForCategory($this->familyStringValue($family, 'font_category'));
+        return FallbackResolver::familyFallback($family, $this->settings->getSettings());
     }
 
     /**

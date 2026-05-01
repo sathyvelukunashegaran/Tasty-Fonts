@@ -7,6 +7,7 @@ namespace TastyFonts\Admin\Renderer;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Admin\DeliveryProfileLabelHelper;
+use TastyFonts\Fonts\FallbackResolver;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Support\FontUtils;
 
@@ -88,7 +89,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      *     extended_variable_options?: RendererFlagOptions,
      *     monospace_role_enabled?: bool,
      *     class_output_options?: RendererFlagOptions,
-     *     role_usage_roles?: RoleSet|null
+     *     role_usage_roles?: RoleSet|null,
+     *     global_fallback_settings?: array<string, string>
      * } $payload
      */
     public function renderFamilyCardDetails(array $payload): void
@@ -104,7 +106,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $payload['extended_variable_options'] ?? [],
             !empty($payload['monospace_role_enabled']),
             $payload['class_output_options'] ?? [],
-            $payload['role_usage_roles'] ?? null
+            $payload['role_usage_roles'] ?? null,
+            $payload['global_fallback_settings'] ?? []
         );
         $view['includeDetails'] = true;
         $this->renderTemplate('family-card-details.php', $view);
@@ -120,6 +123,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      * @param RendererFlagOptions $extendedVariableOptions
      * @param RendererFlagOptions $classOutputOptions
      * @param RoleSet|null $roleUsageRoles
+     * @param array<string, string> $globalFallbackSettings
      */
     public function renderFamilySummaryRow(
         array $family,
@@ -132,7 +136,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         array $extendedVariableOptions = [],
         bool $monospaceRoleEnabled = false,
         array $classOutputOptions = [],
-        ?array $roleUsageRoles = null
+        ?array $roleUsageRoles = null,
+        array $globalFallbackSettings = []
     ): void {
         $view = $this->buildFamilyTemplateView(
             $family,
@@ -145,7 +150,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $extendedVariableOptions,
             $monospaceRoleEnabled,
             $classOutputOptions,
-            $roleUsageRoles
+            $roleUsageRoles,
+            $globalFallbackSettings
         );
         $view['trainingWheelsOff'] = $this->trainingWheelsOff;
         $view['includeDetails'] = false;
@@ -162,6 +168,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      * @param CategoryAliasOwners $categoryAliasOwners
      * @param RendererFlagOptions $extendedVariableOptions
      * @param RendererFlagOptions $classOutputOptions
+     * @param array<string, string> $globalFallbackSettings
      */
     public function renderFamilyRow(
         array $family,
@@ -173,7 +180,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         array $categoryAliasOwners = [],
         array $extendedVariableOptions = [],
         bool $monospaceRoleEnabled = false,
-        array $classOutputOptions = []
+        array $classOutputOptions = [],
+        array $globalFallbackSettings = []
     ): void {
         $templateView = $this->buildFamilyTemplateView(
             $family,
@@ -185,7 +193,9 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $categoryAliasOwners,
             $extendedVariableOptions,
             $monospaceRoleEnabled,
-            $classOutputOptions
+            $classOutputOptions,
+            null,
+            $globalFallbackSettings
         );
         $templateView['trainingWheelsOff'] = $this->trainingWheelsOff;
         $templateView['includeDetails'] = true;
@@ -203,6 +213,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
      * @param RendererFlagOptions $extendedVariableOptions
      * @param RendererFlagOptions $classOutputOptions
      * @param RoleSet|null $roleUsageRoles
+     * @param array<string, string> $globalFallbackSettings
      * @return FamilyCardView
      */
     private function buildFamilyTemplateView(
@@ -216,7 +227,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         array $extendedVariableOptions = [],
         bool $monospaceRoleEnabled = false,
         array $classOutputOptions = [],
-        ?array $roleUsageRoles = null
+        ?array $roleUsageRoles = null,
+        array $globalFallbackSettings = []
     ): array {
         $familyName = $this->stringValue($family, 'family');
         $familySlug = $this->stringValue($family, 'slug', FontUtils::slugify($familyName));
@@ -280,9 +292,10 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $deleteBlockedMessages[$this->buildRoleSelectionKey($selection)] = $this->buildDeleteBlockedMessage($familyName, $selection);
         }
 
-        $savedFallback = array_key_exists($familyName, $familyFallbacks)
-            ? FontUtils::sanitizeFallback($familyFallbacks[$familyName])
-            : FontUtils::defaultFallbackForCategory($this->stringValue($family, 'font_category'));
+        $savedFallback = FallbackResolver::familyFallback($family, array_merge(
+            $globalFallbackSettings,
+            ['family_fallbacks' => $familyFallbacks]
+        ));
         $savedFontDisplay = array_key_exists($familyName, $familyFontDisplays) ? $familyFontDisplays[$familyName] : '';
         $currentFontDisplay = $savedFontDisplay !== '' ? $savedFontDisplay : 'inherit';
         $publishState = $this->stringValue($family, 'publish_state', 'published');
@@ -298,6 +311,19 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $activeDeliveryLabel = $activeDeliveryLabel !== '' ? $activeDeliveryLabel : __('Unavailable', 'tasty-fonts');
         $supportsFontDisplayOverride = strtolower(trim($this->stringValue($activeDelivery, 'provider'))) !== 'adobe';
         $defaultStack = FontUtils::buildFontStack($familyName, $savedFallback);
+        $fallbackSettings = array_merge(
+            $globalFallbackSettings,
+            ['family_fallbacks' => $familyFallbacks]
+        );
+        $roleStacks = [];
+
+        foreach ($assignedRoleKeys as $assignedRoleKey) {
+            $roleStacks[$assignedRoleKey] = FontUtils::buildFontStack(
+                $familyName,
+                FallbackResolver::roleFallback($assignedRoleKey, $roles, $fallbackSettings, [$familyName => $family])
+            );
+        }
+
         $previewLabel = $usesMonospacePreview ? __('Code Preview', 'tasty-fonts') : __('Preview', 'tasty-fonts');
         $inlinePreviewText = $this->buildFacePreviewText($previewText, $familyName, $usesMonospacePreview, false);
         $facePreviewText = $this->buildFacePreviewText($previewText, $familyName, $usesMonospacePreview, true);
@@ -314,7 +340,8 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
             $roles,
             $this->stringValue($family, 'font_category'),
             $categoryAliasOwners,
-            $extendedVariableOptions
+            $extendedVariableOptions,
+            $roleStacks
         );
         $familyCssClassSnippets = $this->buildFamilyCssClassSnippets(
             $familyName,

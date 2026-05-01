@@ -389,6 +389,372 @@ final class CssBuilder
     }
 
     /**
+     * Builds readable CSS snippets keyed by the output setting field that controls them.
+     *
+     * @param array<int|string, mixed> $roles
+     * @param CatalogMap|array<int|string, CatalogFamily> $families
+     * @param NormalizedSettings $settings
+     * @return array<string, string>
+     */
+    public function buildOutputTogglePreviewSnippets(
+        array $roles,
+        bool $includeMonospace = false,
+        array $families = [],
+        array $settings = []
+    ): array {
+        $classSettings = $this->settingsForOutputTogglePreviews($settings);
+        $variableSettings = $classSettings;
+        $variableSettings['per_variant_font_variables_enabled'] = true;
+        $usageSettings = $settings;
+        $usageSettings['minimal_output_preset_enabled'] = false;
+        $usageSettings['role_usage_font_weight_enabled'] = true;
+        $usageSettings['minify_css_output'] = false;
+
+        return [
+            'role_usage_font_weight_enabled' => $this->buildRoleUsageFontWeightContributionSnippet($roles, $includeMonospace, $usageSettings),
+            'class_output_role_heading_enabled' => $this->buildRoleClassSnippet(
+                $roles,
+                $includeMonospace,
+                $this->settingsForSingleClassToggle($classSettings, 'class_output_role_heading_enabled'),
+                $families
+            ),
+            'class_output_role_body_enabled' => $this->buildRoleClassSnippet(
+                $roles,
+                $includeMonospace,
+                $this->settingsForSingleClassToggle($classSettings, 'class_output_role_body_enabled'),
+                $families
+            ),
+            'class_output_role_monospace_enabled' => $includeMonospace
+                ? $this->buildRoleClassSnippet(
+                    $roles,
+                    true,
+                    $this->settingsForSingleClassToggle($classSettings, 'class_output_role_monospace_enabled'),
+                    $families
+                )
+                : '',
+            'class_output_role_styles_enabled' => $this->buildRoleClassStyleContributionSnippet(
+                $roles,
+                $includeMonospace,
+                $classSettings
+            ),
+            'class_output_role_alias_interface_enabled' => $this->buildRoleAliasClassSnippet(
+                $roles,
+                $includeMonospace,
+                $this->settingsForSingleClassToggle($classSettings, 'class_output_role_alias_interface_enabled'),
+                $families
+            ),
+            'class_output_role_alias_ui_enabled' => $this->buildRoleAliasClassSnippet(
+                $roles,
+                $includeMonospace,
+                $this->settingsForSingleClassToggle($classSettings, 'class_output_role_alias_ui_enabled'),
+                $families
+            ),
+            'class_output_role_alias_code_enabled' => $includeMonospace
+                ? $this->buildRoleAliasClassSnippet(
+                    $roles,
+                    true,
+                    $this->settingsForSingleClassToggle($classSettings, 'class_output_role_alias_code_enabled'),
+                    $families
+                )
+                : '',
+            'class_output_category_sans_enabled' => $this->buildCategoryAliasClassSnippet(
+                $roles,
+                $includeMonospace,
+                $families,
+                $this->settingsForSingleClassToggle($classSettings, 'class_output_category_sans_enabled')
+            ),
+            'class_output_category_serif_enabled' => $this->buildCategoryAliasClassSnippet(
+                $roles,
+                $includeMonospace,
+                $families,
+                $this->settingsForSingleClassToggle($classSettings, 'class_output_category_serif_enabled')
+            ),
+            'class_output_category_mono_enabled' => $includeMonospace
+                ? $this->buildCategoryAliasClassSnippet(
+                    $roles,
+                    true,
+                    $families,
+                    $this->settingsForSingleClassToggle($classSettings, 'class_output_category_mono_enabled')
+                )
+                : '',
+            'class_output_families_enabled' => $this->buildFamilyClassSnippet($families, $classSettings),
+            'extended_variable_role_weight_vars_enabled' => $this->buildRoleWeightVariablePreviewSnippet($roles, $includeMonospace),
+            'extended_variable_weight_tokens_enabled' => $this->buildDeclarationListSnippet($this->buildWeightVariableDeclarations($families)),
+            'extended_variable_role_alias_interface_enabled' => $this->buildDeclarationListSnippet(
+                $this->buildRoleAliasVariablePreviewDeclarations($roles, $includeMonospace, 'interface')
+            ),
+            'extended_variable_role_alias_ui_enabled' => $this->buildDeclarationListSnippet(
+                $this->buildRoleAliasVariablePreviewDeclarations($roles, $includeMonospace, 'ui')
+            ),
+            'extended_variable_role_alias_code_enabled' => $includeMonospace
+                ? $this->buildDeclarationListSnippet($this->buildRoleAliasVariablePreviewDeclarations($roles, true, 'code'))
+                : '',
+            'extended_variable_category_sans_enabled' => $this->buildDeclarationListSnippet(
+                $this->buildCategoryAliasDeclarations(
+                    $roles,
+                    $includeMonospace,
+                    $families,
+                    $this->settingsForSingleVariableToggle($variableSettings, 'extended_variable_category_sans_enabled')
+                )
+            ),
+            'extended_variable_category_serif_enabled' => $this->buildDeclarationListSnippet(
+                $this->buildCategoryAliasDeclarations(
+                    $roles,
+                    $includeMonospace,
+                    $families,
+                    $this->settingsForSingleVariableToggle($variableSettings, 'extended_variable_category_serif_enabled')
+                )
+            ),
+            'extended_variable_category_mono_enabled' => $includeMonospace
+                ? $this->buildDeclarationListSnippet(
+                    $this->buildCategoryAliasDeclarations(
+                        $roles,
+                        true,
+                        $families,
+                        $this->settingsForSingleVariableToggle($variableSettings, 'extended_variable_category_mono_enabled')
+                    )
+                )
+                : '',
+        ];
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     * @param NormalizedSettings $settings
+     */
+    private function buildRoleUsageFontWeightContributionSnippet(array $roles, bool $includeMonospace, array $settings): string
+    {
+        $includeExtendedVariables = $this->extendedVariableOutputEnabled($settings);
+        $includeWeightTokens = $this->extendedVariableWeightTokensEnabled($settings);
+        $blocks = [
+            [
+                'selector' => 'body',
+                'role' => 'body',
+            ],
+            [
+                'selector' => 'h1, h2, h3, h4, h5, h6',
+                'role' => 'heading',
+            ],
+        ];
+
+        if ($includeMonospace) {
+            $blocks[] = [
+                'selector' => 'code, pre',
+                'role' => 'monospace',
+            ];
+        }
+
+        $snippets = [];
+
+        foreach ($blocks as $block) {
+            $role = $block['role'];
+            $weightDeclaration = $this->buildRoleWeightDeclaration(
+                $this->resolveRoleUsageWeightValue($roles, $role),
+                $includeWeightTokens,
+                $includeExtendedVariables,
+                $this->roleUsageWeightComesFromAxis($roles, $role)
+            );
+
+            if ($weightDeclaration === '') {
+                continue;
+            }
+
+            $snippets[] = $block['selector'] . " {\n  font-weight: " . $weightDeclaration . ";\n}";
+        }
+
+        return implode("\n\n", $snippets);
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    private function buildRoleWeightVariablePreviewSnippet(array $roles, bool $includeMonospace): string
+    {
+        return $this->buildDeclarationListSnippet(
+            $this->buildRoleWeightVariablePreviewDeclarations($roles, $includeMonospace)
+        );
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     * @return DeclarationMap
+     */
+    private function buildRoleWeightVariablePreviewDeclarations(array $roles, bool $includeMonospace): array
+    {
+        $declarations = [
+            '--font-heading-weight' => $this->resolveRoleUsageWeightValue($roles, 'heading'),
+            '--font-body-weight' => $this->resolveRoleUsageWeightValue($roles, 'body'),
+        ];
+
+        if ($includeMonospace) {
+            $declarations['--font-monospace-weight'] = $this->resolveRoleUsageWeightValue($roles, 'monospace');
+        }
+
+        return $declarations;
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     * @return DeclarationMap
+     */
+    private function buildRoleAliasVariablePreviewDeclarations(array $roles, bool $includeMonospace, string $aliasKey): array
+    {
+        $bodyFamily = trim($this->roleStringValue($roles, 'body'));
+        $monospaceFamily = trim($this->roleStringValue($roles, 'monospace'));
+
+        return match ($aliasKey) {
+            'interface' => $bodyFamily !== '' ? ['--font-interface' => 'var(--font-body)'] : [],
+            'ui' => $bodyFamily !== '' ? ['--font-ui' => 'var(--font-body)'] : [],
+            'code' => $includeMonospace && $monospaceFamily !== '' ? ['--font-code' => 'var(--font-monospace)'] : [],
+            default => [],
+        };
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
+    private function settingsForOutputTogglePreviews(array $settings): array
+    {
+        $settings['minimal_output_preset_enabled'] = false;
+        $settings['class_output_enabled'] = true;
+        $settings['per_variant_font_variables_enabled'] = true;
+        $settings['minify_css_output'] = false;
+
+        return $settings;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
+    private function settingsForSingleClassToggle(array $settings, string $field): array
+    {
+        foreach (
+            [
+                'class_output_role_heading_enabled',
+                'class_output_role_body_enabled',
+                'class_output_role_monospace_enabled',
+                'class_output_role_alias_interface_enabled',
+                'class_output_role_alias_ui_enabled',
+                'class_output_role_alias_code_enabled',
+                'class_output_category_sans_enabled',
+                'class_output_category_serif_enabled',
+                'class_output_category_mono_enabled',
+                'class_output_families_enabled',
+            ] as $toggleField
+        ) {
+            $settings[$toggleField] = $toggleField === $field;
+        }
+
+        $settings['class_output_role_styles_enabled'] = !empty($settings['class_output_role_styles_enabled']);
+
+        return $settings;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
+    private function settingsForSingleVariableToggle(array $settings, string $field): array
+    {
+        foreach (
+            [
+                'extended_variable_role_weight_vars_enabled',
+                'extended_variable_weight_tokens_enabled',
+                'extended_variable_role_aliases_enabled',
+                'extended_variable_role_alias_interface_enabled',
+                'extended_variable_role_alias_ui_enabled',
+                'extended_variable_role_alias_code_enabled',
+                'extended_variable_category_sans_enabled',
+                'extended_variable_category_serif_enabled',
+                'extended_variable_category_mono_enabled',
+            ] as $toggleField
+        ) {
+            $settings[$toggleField] = $toggleField === $field;
+        }
+
+        return $settings;
+    }
+
+    /**
+     * @param DeclarationMap $declarations
+     */
+    private function buildDeclarationListSnippet(array $declarations): string
+    {
+        $lines = [];
+
+        foreach ($declarations as $property => $value) {
+            if ($property === '') {
+                continue;
+            }
+
+            $lines[] = "  {$property}: {$value};";
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     * @param NormalizedSettings $settings
+     */
+    private function buildRoleClassStyleContributionSnippet(array $roles, bool $includeMonospace, array $settings): string
+    {
+        $blocks = [];
+
+        if ($this->classOutputRoleEnabled($settings, 'heading')) {
+            $blocks[] = $this->buildRoleClassStyleContributionRule('.font-heading', 'heading', $roles);
+        }
+
+        if ($this->classOutputRoleEnabled($settings, 'body')) {
+            $blocks[] = $this->buildRoleClassStyleContributionRule('.font-body', 'body', $roles);
+        }
+
+        if ($includeMonospace && $this->classOutputRoleEnabled($settings, 'monospace')) {
+            $blocks[] = $this->buildRoleClassStyleContributionRule('.font-monospace', 'monospace', $roles);
+        }
+
+        $bodyFamily = trim($this->roleStringValue($roles, 'body'));
+
+        if ($bodyFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'interface')) {
+            $blocks[] = $this->buildRoleClassStyleContributionRule('.font-interface', 'body', $roles);
+        }
+
+        if ($bodyFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'ui')) {
+            $blocks[] = $this->buildRoleClassStyleContributionRule('.font-ui', 'body', $roles);
+        }
+
+        $monospaceFamily = trim($this->roleStringValue($roles, 'monospace'));
+
+        if ($includeMonospace && $monospaceFamily !== '' && $this->classOutputRoleAliasEnabled($settings, 'code')) {
+            $blocks[] = $this->buildRoleClassStyleContributionRule('.font-code', 'monospace', $roles);
+        }
+
+        return implode("\n\n", array_filter($blocks, static fn (string $block): bool => $block !== ''));
+    }
+
+    /**
+     * @param array<int|string, mixed> $roles
+     */
+    private function buildRoleClassStyleContributionRule(string $selector, string $roleKey, array $roles): string
+    {
+        $lines = [$selector . ' {'];
+        $weight = $this->resolveRoleUsageWeightValue($roles, $roleKey);
+        $preferRawWeight = $this->roleUsageWeightComesFromAxis($roles, $roleKey);
+        $weightDeclaration = $this->buildRoleWeightDeclaration($weight, false, false, $preferRawWeight);
+
+        if ($weightDeclaration !== '') {
+            $lines[] = '  font-weight: ' . $weightDeclaration . ';';
+        }
+
+        $lines[] = '  font-variation-settings: var(--font-' . $roleKey . '-settings);';
+        $lines[] = '}';
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * @param array<int|string, mixed> $roles
      * @param CatalogMap|array<int|string, CatalogFamily> $families
      * @param NormalizedSettings $settings
@@ -828,15 +1194,22 @@ final class CssBuilder
             $this->appendRoleVariationDeclarations($variationDeclarations, $roles, 'monospace');
         }
 
-        if ($this->extendedVariableRoleAliasesEnabled($settings)) {
-            if ($bodyFamily !== '') {
+        if ($bodyFamily !== '') {
+            if ($this->extendedVariableRoleAliasEnabled($settings, 'interface')) {
                 $roleAliasDeclarations['--font-interface'] = 'var(--font-body)';
-                $roleAliasDeclarations['--font-ui'] = 'var(--font-body)';
             }
 
-            if ($includeMonospace && trim($this->roleStringValue($roles, 'monospace')) !== '') {
-                $roleAliasDeclarations['--font-code'] = 'var(--font-monospace)';
+            if ($this->extendedVariableRoleAliasEnabled($settings, 'ui')) {
+                $roleAliasDeclarations['--font-ui'] = 'var(--font-body)';
             }
+        }
+
+        if (
+            $includeMonospace
+            && $monospaceFamily !== ''
+            && $this->extendedVariableRoleAliasEnabled($settings, 'code')
+        ) {
+            $roleAliasDeclarations['--font-code'] = 'var(--font-monospace)';
         }
 
         if ($this->extendedVariableWeightTokensEnabled($settings)) {
@@ -1480,6 +1853,33 @@ final class CssBuilder
     /**
      * @param NormalizedSettings $settings
      */
+    private function extendedVariableRoleAliasEnabled(array $settings, string $aliasKey): bool
+    {
+        if (!$this->extendedVariableOutputEnabled($settings)) {
+            return false;
+        }
+
+        $field = match ($aliasKey) {
+            'interface' => 'extended_variable_role_alias_interface_enabled',
+            'ui' => 'extended_variable_role_alias_ui_enabled',
+            'code' => 'extended_variable_role_alias_code_enabled',
+            default => '',
+        };
+
+        if ($field === '') {
+            return false;
+        }
+
+        if (array_key_exists($field, $settings)) {
+            return !empty($settings[$field]);
+        }
+
+        return $this->extendedVariableRoleAliasesEnabled($settings);
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     */
     private function extendedVariableCategoryAliasEnabled(array $settings, string $categoryKey): bool
     {
         if (!$this->extendedVariableOutputEnabled($settings)) {
@@ -1548,54 +1948,7 @@ final class CssBuilder
      */
     private function resolveRoleFallback(string $roleKey, array $roles, array $settings, array $families = []): string
     {
-        $default = $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
-        $familyName = trim($this->roleStringValue($roles, $roleKey));
-        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
-
-        if ($familyName !== '') {
-            $family = $this->findFamilyByName($familyName, $families);
-
-            if ($family !== null) {
-                return $this->resolveFamilyFallback($family, $settings);
-            }
-
-            $fallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
-
-            if (array_key_exists($familyName, $fallbacks)) {
-                $configuredFallback = trim($fallbacks[$familyName]);
-
-                if ($configuredFallback !== '') {
-                    return FontUtils::sanitizeFallback($configuredFallback);
-                }
-            }
-        }
-
-        if ($fallback !== '') {
-            return FontUtils::sanitizeFallback($fallback);
-        }
-
-        return $default;
-    }
-
-    /**
-     * @param CatalogMap|array<int|string, CatalogFamily> $families
-     * @return CatalogFamily|null
-     */
-    private function findFamilyByName(string $familyName, array $families): ?array
-    {
-        $exactFamily = $families[$familyName] ?? null;
-
-        if ($exactFamily !== null) {
-            return $exactFamily;
-        }
-
-        foreach ($families as $family) {
-            if (trim($this->stringValue($family, 'family')) === $familyName) {
-                return $family;
-            }
-        }
-
-        return null;
+        return FallbackResolver::roleFallback($roleKey, $roles, $settings, $families);
     }
 
     /**
@@ -1604,20 +1957,7 @@ final class CssBuilder
      */
     private function resolveFamilyFallback(array $family, array $settings): string
     {
-        $familyName = trim($this->stringValue($family, 'family'));
-        $fallbacks = FontUtils::normalizeStringMap($settings['family_fallbacks'] ?? []);
-
-        if ($familyName !== '' && array_key_exists($familyName, $fallbacks)) {
-            return FontUtils::sanitizeFallback($fallbacks[$familyName]);
-        }
-
-        $category = strtolower(trim($this->stringValue($family, 'font_category')));
-
-        if ($category === '' && is_array($family['active_delivery'] ?? null) && is_array($family['active_delivery']['meta'] ?? null)) {
-            $category = strtolower(trim(FontUtils::scalarStringValue($family['active_delivery']['meta']['category'] ?? '')));
-        }
-
-        return FontUtils::defaultFallbackForCategory($category);
+        return FallbackResolver::familyFallback($family, $settings);
     }
 
     /**

@@ -533,7 +533,7 @@
                             <div id="tasty-fonts-library-empty-filtered" class="tasty-fonts-empty tasty-fonts-empty-state" hidden><?php esc_html_e('No fonts match the current filters.', 'tasty-fonts'); ?></div>
                             <div class="tasty-fonts-library-grid" data-font-library-list>
                                 <?php foreach ($catalog as $family): ?>
-                                    <?php $familyCardRenderer->renderFamilySummaryRow($family, $roles, $familyFallbacks, $familyFontDisplays, $familyFontDisplayOptions, $previewText, $categoryAliasOwners, $extendedVariableOptions, $monospaceRoleEnabled, $classOutputOptions, $libraryRoleUsageRoles); ?>
+                                    <?php $familyCardRenderer->renderFamilySummaryRow($family, $roles, $familyFallbacks, $familyFontDisplays, $familyFontDisplayOptions, $previewText, $categoryAliasOwners, $extendedVariableOptions, $monospaceRoleEnabled, $classOutputOptions, $libraryRoleUsageRoles, $globalFallbackSettings); ?>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>

@@ -70,6 +70,82 @@ final class MaintenanceActions
     /**
      * @return Payload|WP_Error
      */
+    public function resetFamilyFallbacksToGlobal(): array|WP_Error
+    {
+        $snapshot = $this->snapshots->createSnapshot('before_reset_family_fallbacks');
+
+        if (is_wp_error($snapshot)) {
+            return $snapshot;
+        }
+
+        $settings = $this->developerTools->resetFamilyFallbacksToGlobal();
+
+        if (is_wp_error($settings)) {
+            return $settings;
+        }
+
+        $message = __('Family fallback overrides reset to the current global fallback settings.', 'tasty-fonts');
+        $this->log->add($message, $this->activityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'family_fallbacks_reset_to_global',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Reset', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Reset', 'tasty-fonts'), 'value' => __('Per-family fallback overrides', 'tasty-fonts')],
+                    ['label' => __('Preserved', 'tasty-fonts'), 'value' => __('Global Heading, Body, and Monospace fallback settings', 'tasty-fonts')],
+                ],
+            ]
+        ));
+
+        return [
+            'message' => $message,
+            'settings' => $settings,
+        ];
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
+    public function resetFallbacksToPluginDefaults(): array|WP_Error
+    {
+        $snapshot = $this->snapshots->createSnapshot('before_reset_fallback_defaults');
+
+        if (is_wp_error($snapshot)) {
+            return $snapshot;
+        }
+
+        $settings = $this->developerTools->resetAllFallbacksToDefaults();
+
+        if (is_wp_error($settings)) {
+            return $settings;
+        }
+
+        $message = __('Fallback fonts reset to plugin defaults.', 'tasty-fonts');
+        $this->log->add($message, $this->activityLogContext(
+            LogRepository::CATEGORY_MAINTENANCE,
+            'fallbacks_reset_to_plugin_defaults',
+            [
+                'outcome' => 'success',
+                'status_label' => __('Reset', 'tasty-fonts'),
+                'source' => __('Developer', 'tasty-fonts'),
+                'details' => [
+                    ['label' => __('Reset', 'tasty-fonts'), 'value' => __('Global fallback settings and per-family fallback overrides', 'tasty-fonts')],
+                    ['label' => __('Default', 'tasty-fonts'), 'value' => __('Modern system UI fallback stacks', 'tasty-fonts')],
+                ],
+            ]
+        ));
+
+        return [
+            'message' => $message,
+            'settings' => $settings,
+        ];
+    }
+
+    /**
+     * @return Payload|WP_Error
+     */
     public function wipeManagedFontLibrary(): array|WP_Error
     {
         $snapshot = $this->snapshots->createSnapshot('before_wipe_library');
@@ -333,6 +409,8 @@ final class MaintenanceActions
             'repair_storage_scaffold' => $this->repairStorageScaffold(),
             'reset_integration_detection_state' => $this->resetIntegrationDetectionState(),
             'reset_suppressed_notices' => $this->resetSuppressedNotices(),
+            'reset_family_fallbacks_to_global' => $this->resetFamilyFallbacksToGlobal(),
+            'reset_fallbacks_to_plugin_defaults' => $this->resetFallbacksToPluginDefaults(),
             default => new WP_Error(
                 'tasty_fonts_invalid_tools_action',
                 __('Unknown advanced tools action.', 'tasty-fonts')

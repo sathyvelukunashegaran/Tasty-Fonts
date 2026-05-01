@@ -177,10 +177,6 @@ final class CapabilityDisableCleanupService
 
         if ($disableMonospaceRole) {
             $overrides['monospace_role_enabled'] = false;
-            $overrides['class_output_role_monospace_enabled'] = false;
-            $overrides['class_output_role_alias_code_enabled'] = false;
-            $overrides['class_output_category_mono_enabled'] = false;
-            $overrides['extended_variable_category_mono_enabled'] = false;
         }
 
         return $overrides;

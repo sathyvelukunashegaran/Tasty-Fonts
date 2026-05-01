@@ -1,0 +1,229 @@
+.tasty-fonts-canvas-shell {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147483000;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  color: var(--etch-text-primary, var(--builder-text, #f4f6f8));
+  font-family: var(--etch-font-family, var(--builder-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif));
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.tasty-fonts-canvas-shell * {
+  box-sizing: border-box;
+}
+
+.tasty-fonts-canvas-shell--toolbar {
+  position: relative;
+  inset: auto;
+  z-index: 1;
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin-top: 8px;
+}
+
+.tasty-fonts-canvas-toggle {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--etch-border-color, rgba(255, 255, 255, 0.14));
+  border-radius: var(--etch-radius-sm, 8px);
+  background: var(--etch-panel-background, var(--etch-surface-2, #1b1d22));
+  color: var(--etch-text-primary, #f4f6f8);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  font: 650 13px/1 var(--etch-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.tasty-fonts-canvas-shell--toolbar .tasty-fonts-canvas-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--etch-radius-sm, 4px);
+  box-shadow: none;
+  font-size: 11px;
+}
+
+.tasty-fonts-canvas-toggle:hover,
+.tasty-fonts-canvas-toggle[aria-expanded="true"] {
+  background: var(--etch-surface-hover, #24272e);
+  border-color: var(--etch-accent, rgba(120, 162, 255, 0.55));
+}
+
+.tasty-fonts-canvas-toggle:focus-visible,
+.tasty-fonts-canvas-close:focus-visible,
+.tasty-fonts-canvas-field select:focus-visible {
+  outline: 2px solid var(--etch-focus-color, #7aa2ff);
+  outline-offset: 2px;
+}
+
+.tasty-fonts-canvas-panel {
+  width: min(280px, calc(100vw - 36px));
+  padding: 12px;
+  border: 1px solid var(--etch-border-color, rgba(255, 255, 255, 0.13));
+  border-radius: var(--etch-radius-md, 10px);
+  background: var(--etch-panel-background, var(--etch-surface, #17191f));
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
+}
+
+.tasty-fonts-canvas-shell--toolbar .tasty-fonts-canvas-panel {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 0;
+}
+
+.tasty-fonts-canvas-panel[hidden] {
+  display: none;
+}
+
+.tasty-fonts-canvas-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--etch-border-color, rgba(255, 255, 255, 0.1));
+}
+
+.tasty-fonts-canvas-panel__header-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.tasty-fonts-canvas-panel__header strong {
+  color: var(--etch-text-primary, #f4f6f8);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.tasty-fonts-canvas-close {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -3px -4px 0 0;
+  border: 1px solid transparent;
+  border-radius: var(--etch-radius-sm, 6px);
+  background: transparent;
+  color: var(--etch-text-secondary, rgba(244, 246, 248, 0.68));
+  cursor: pointer;
+  font: 600 18px/1 var(--etch-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.tasty-fonts-canvas-close:hover {
+  background: var(--etch-surface-hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--etch-border-color, rgba(255, 255, 255, 0.12));
+  color: var(--etch-text-primary, #f4f6f8);
+}
+
+.tasty-fonts-canvas-panel__header span,
+.tasty-fonts-canvas-field span,
+.tasty-fonts-canvas-status {
+  color: var(--etch-text-secondary, rgba(244, 246, 248, 0.68));
+  font-size: 11px;
+}
+
+.tasty-fonts-canvas-panel__fields {
+  display: grid;
+  gap: 9px;
+  padding-top: 10px;
+}
+
+.tasty-fonts-canvas-field {
+  display: grid;
+  gap: 5px;
+}
+
+.tasty-fonts-canvas-field select {
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid var(--etch-border-color, rgba(255, 255, 255, 0.14));
+  border-radius: var(--etch-radius-sm, 7px);
+  background: var(--etch-input-background, var(--etch-surface-2, #101217));
+  color: var(--etch-text-primary, #f4f6f8);
+  font: 500 12px/1.2 var(--etch-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  padding: 5px 8px;
+}
+
+.tasty-fonts-canvas-field select:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.tasty-fonts-canvas-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--etch-border-color, rgba(255, 255, 255, 0.1));
+}
+
+.tasty-fonts-canvas-publish {
+  appearance: none;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid var(--etch-accent, rgba(120, 162, 255, 0.55));
+  border-radius: var(--etch-radius-sm, 7px);
+  background: var(--etch-accent, #7aa2ff);
+  color: var(--etch-accent-contrast, #101217);
+  cursor: pointer;
+  font: 650 11px/1.2 var(--etch-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.tasty-fonts-canvas-publish:hover:not(:disabled) {
+  background: var(--etch-accent-hover, #9bb8ff);
+}
+
+.tasty-fonts-canvas-publish:focus-visible,
+.tasty-fonts-canvas-admin-link:focus-visible {
+  outline: 2px solid var(--etch-focus-color, #7aa2ff);
+  outline-offset: 2px;
+}
+
+.tasty-fonts-canvas-publish:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.tasty-fonts-canvas-admin-link {
+  color: var(--etch-text-secondary, rgba(244, 246, 248, 0.72));
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tasty-fonts-canvas-admin-link:hover {
+  color: var(--etch-text-primary, #f4f6f8);
+  text-decoration: underline;
+}
+
+.tasty-fonts-canvas-status {
+  margin-top: 10px;
+}
+
+.tasty-fonts-canvas-status[hidden] {
+  display: none;
+}
+
+.tasty-fonts-canvas-status[data-state="saving"] {
+  color: var(--etch-text-secondary, rgba(244, 246, 248, 0.72));
+}
+
+.tasty-fonts-canvas-status[data-state="saved"] {
+  color: var(--etch-accent, #9bb8ff);
+}
+
+.tasty-fonts-canvas-status[data-state="error"] {
+  color: var(--etch-warning-color, #f5c06b);
+}

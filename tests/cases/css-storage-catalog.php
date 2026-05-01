@@ -53,7 +53,7 @@ $tests['css_builder_generates_font_face_and_role_variables'] = static function (
 
     assertContainsValue('@font-face', $css, 'CSS builder should emit @font-face rules.');
     assertContainsValue('font-family:"Inter"', $css, 'CSS builder should include the family name.');
-    assertContainsValue('--font-inter: "Inter", sans-serif;', $css, 'CSS builder should emit the family variable stack.');
+    assertContainsValue('--font-inter: "Inter", system-ui, sans-serif;', $css, 'CSS builder should emit the family variable stack from the global fallback.');
     assertContainsValue('--font-heading', $css, 'CSS builder should emit the heading role variable.');
     assertContainsValue('font-family: var(--font-body);', $css, 'CSS builder should emit the body usage rule.');
     assertNotContainsValue('font-weight: var(--weight-regular);', $css, 'Role usage rules should omit font-weight declarations unless the dedicated setting is enabled.');
@@ -128,9 +128,9 @@ $tests['css_builder_builds_role_class_snippets_when_class_output_is_enabled'] = 
 
     $css = $builder->buildRoleClassSnippet($roles, true, $settings);
 
-    assertContainsValue(".font-heading {\n  font-family: \"Inter\", serif;\n}", $css, 'Role class output should emit the heading class with the resolved font stack.');
-    assertContainsValue(".font-body {\n  font-family: sans-serif;\n}", $css, 'Role class output should emit fallback-only body classes when no family is selected.');
-    assertContainsValue(".font-monospace {\n  font-family: monospace;\n}", $css, 'Role class output should emit the optional monospace class when the feature is enabled.');
+    assertContainsValue(".font-heading {\n  font-family: \"Inter\", system-ui, sans-serif;\n}", $css, 'Role class output should emit the heading class with the resolved font stack.');
+    assertContainsValue(".font-body {\n  font-family: system-ui, sans-serif;\n}", $css, 'Role class output should emit fallback-only body classes from the global fallback when no family is selected.');
+    assertContainsValue(".font-monospace {\n  font-family: ui-monospace, monospace;\n}", $css, 'Role class output should emit the optional monospace class from the global fallback when the feature is enabled.');
 };
 
 $tests['css_builder_emits_role_class_snippets_from_draft_roles_when_apply_sitewide_is_off'] = static function (): void {
@@ -173,7 +173,7 @@ $tests['css_builder_builds_family_class_snippets_for_runtime_visible_families'] 
     $css = $builder->buildFamilyClassSnippet($families, $settings);
 
     assertContainsValue(".font-inter {\n  font-family: \"Inter\", system-ui, sans-serif;\n}", $css, 'Family class output should use saved per-family fallbacks.');
-    assertContainsValue(".font-jetbrains-mono {\n  font-family: \"JetBrains Mono\", monospace;\n}", $css, 'Family class output should infer category-aware fallback stacks.');
+    assertContainsValue(".font-jetbrains-mono {\n  font-family: \"JetBrains Mono\", ui-monospace, monospace;\n}", $css, 'Family class output should inherit the global monospace fallback stack.');
     assertSameValue(1, substr_count($css, '.font-inter {'), 'Family class output should avoid duplicate selectors when slugs collide.');
 };
 
@@ -220,6 +220,91 @@ $tests['css_builder_builds_combined_class_output_snippets'] = static function ()
     assertNotContainsValue('.font-interface', $emptyAliasCss, 'Combined class output should skip the interface alias when no body family is assigned.');
     assertNotContainsValue('.font-ui', $emptyAliasCss, 'Combined class output should skip the UI alias when no body family is assigned.');
     assertNotContainsValue('.font-code', $emptyAliasCss, 'Combined class output should skip the code alias when no monospace family is assigned.');
+};
+
+$tests['css_builder_builds_exact_output_toggle_preview_snippets'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Lora',
+        'body' => 'Inter',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+        'heading_weight' => '700',
+        'body_weight' => '400',
+        'monospace_weight' => '500',
+    ];
+    $families = [
+        'Inter' => [
+            'family' => 'Inter',
+            'font_category' => 'sans-serif',
+            'faces' => [
+                ['family' => 'Inter', 'weight' => '400', 'style' => 'normal'],
+                ['family' => 'Inter', 'weight' => '500', 'style' => 'normal'],
+            ],
+        ],
+        'Lora' => [
+            'family' => 'Lora',
+            'font_category' => 'serif',
+            'faces' => [
+                ['family' => 'Lora', 'weight' => '700', 'style' => 'normal'],
+            ],
+        ],
+        'JetBrains Mono' => [
+            'family' => 'JetBrains Mono',
+            'font_category' => 'monospace',
+            'faces' => [
+                ['family' => 'JetBrains Mono', 'weight' => '500', 'style' => 'normal'],
+            ],
+        ],
+    ];
+    $settings = [
+        'minimal_output_preset_enabled' => true,
+        'class_output_enabled' => false,
+        'class_output_role_styles_enabled' => true,
+        'per_variant_font_variables_enabled' => false,
+    ];
+
+    $snippets = $builder->buildOutputTogglePreviewSnippets($roles, true, $families, $settings);
+
+    assertContainsValue("body {\n  font-weight: 400;\n}", $snippets['role_usage_font_weight_enabled'] ?? '', 'Sitewide role weight preview should show the body font-weight contribution.');
+    assertContainsValue("h1, h2, h3, h4, h5, h6 {\n  font-weight: 700;\n}", $snippets['role_usage_font_weight_enabled'] ?? '', 'Sitewide role weight preview should show the heading font-weight contribution.');
+    assertContainsValue(".font-heading {\n  font-family: \"Lora\", system-ui, sans-serif;\n  font-weight: 700;\n  font-variation-settings: var(--font-heading-settings);\n}", $snippets['class_output_role_heading_enabled'] ?? '', 'Heading class preview should force class output on and include role-style declarations when that modifier is enabled.');
+    assertContainsValue(".font-interface {\n  font-family: \"Inter\", system-ui, sans-serif;", $snippets['class_output_role_alias_interface_enabled'] ?? '', 'Interface alias class preview should use the body role family.');
+    assertContainsValue(".font-code {\n  font-family: \"JetBrains Mono\", ui-monospace, monospace;", $snippets['class_output_role_alias_code_enabled'] ?? '', 'Code alias class preview should use the monospace role family when enabled.');
+    assertContainsValue(".font-sans {\n  font-family: \"Inter\", system-ui, sans-serif;\n}", $snippets['class_output_category_sans_enabled'] ?? '', 'Sans category class preview should use the runtime sans family with the global fallback.');
+    assertContainsValue('.font-jetbrains-mono', $snippets['class_output_families_enabled'] ?? '', 'Family class preview should include runtime family selectors.');
+    assertContainsValue(".font-heading {\n  font-weight: 700;\n  font-variation-settings: var(--font-heading-settings);\n}", $snippets['class_output_role_styles_enabled'] ?? '', 'Role style preview should show only the declarations contributed by the style toggle under affected selectors.');
+    assertContainsValue('  --font-heading-weight: 700;', $snippets['extended_variable_role_weight_vars_enabled'] ?? '', 'Role weight variable preview should include the heading weight declaration.');
+    assertContainsValue('  --weight-500: 500;', $snippets['extended_variable_weight_tokens_enabled'] ?? '', 'Weight token preview should include dynamic imported concrete weights.');
+    assertContainsValue('  --weight-medium: var(--weight-500);', $snippets['extended_variable_weight_tokens_enabled'] ?? '', 'Weight token preview should include semantic aliases for dynamic weights.');
+    assertSameValue('  --font-sans: var(--font-inter);', $snippets['extended_variable_category_sans_enabled'] ?? '', 'Category variable preview should return only the selected declaration list line.');
+};
+
+$tests['css_builder_returns_empty_output_toggle_previews_for_unavailable_dependencies'] = static function (): void {
+    $builder = new CssBuilder();
+    $roles = [
+        'heading' => 'Inter',
+        'body' => '',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $families = [
+        'Inter' => [
+            'family' => 'Inter',
+            'font_category' => 'sans-serif',
+        ],
+    ];
+
+    $snippets = $builder->buildOutputTogglePreviewSnippets($roles, false, $families, []);
+
+    assertSameValue('', $snippets['class_output_role_alias_interface_enabled'] ?? 'missing', 'Body alias class previews should be empty until a body family is assigned.');
+    assertSameValue('', $snippets['extended_variable_role_alias_ui_enabled'] ?? 'missing', 'Body alias variable previews should be empty until a body family is assigned.');
+    assertSameValue('', $snippets['class_output_role_monospace_enabled'] ?? 'missing', 'Monospace class previews should be empty while monospace support is disabled.');
+    assertSameValue('', $snippets['extended_variable_category_mono_enabled'] ?? 'missing', 'Mono category variable previews should be empty while monospace support is disabled.');
 };
 
 $tests['css_builder_can_add_readable_comments_to_class_output_snippets_only'] = static function (): void {
@@ -300,7 +385,7 @@ $tests['css_builder_includes_class_output_in_generated_css_when_enabled'] = stat
     $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertContainsValue('@font-face', $css, 'Generated CSS should continue to include font faces when class output is enabled.');
-    assertContainsValue(".font-inter {\n  font-family: \"Inter\", sans-serif;\n}", $css, 'Generated CSS should append family classes when class output mode enables them.');
+    assertContainsValue(".font-inter {\n  font-family: \"Inter\", system-ui, sans-serif;\n}", $css, 'Generated CSS should append family classes when class output mode enables them.');
 };
 
 $tests['css_builder_includes_role_class_output_in_generated_css_when_enabled'] = static function (): void {
@@ -333,8 +418,8 @@ $tests['css_builder_includes_role_class_output_in_generated_css_when_enabled'] =
     $css = $builder->build($catalog, $roles, $settings, $catalog);
 
     assertContainsValue('@font-face', $css, 'Generated CSS should continue to include font faces when role class output is enabled.');
-    assertContainsValue(".font-heading {\n  font-family: \"Inter\", sans-serif;\n}", $css, 'Generated CSS should append the heading role class using the family fallback when role class output mode is enabled.');
-    assertContainsValue(".font-body {\n  font-family: sans-serif;\n}", $css, 'Generated CSS should append the body role class when role class output mode is enabled.');
+    assertContainsValue(".font-heading {\n  font-family: \"Inter\", system-ui, sans-serif;\n}", $css, 'Generated CSS should append the heading role class using the global fallback when role class output mode is enabled.');
+    assertContainsValue(".font-body {\n  font-family: system-ui, sans-serif;\n}", $css, 'Generated CSS should append the body role class from the global fallback when role class output mode is enabled.');
 };
 
 $tests['css_builder_omits_class_output_in_generated_css_when_disabled'] = static function (): void {
@@ -500,7 +585,7 @@ $tests['css_builder_can_disable_extended_variable_emission'] = static function (
 
     $css = $builder->build([], $roles, $settings, $catalog);
 
-    assertContainsValue('--font-inter: "Inter", sans-serif;', $css, 'Family variables should still be emitted when extended output is disabled.');
+    assertContainsValue('--font-inter: "Inter", system-ui, sans-serif;', $css, 'Family variables should still be emitted with the global fallback when extended output is disabled.');
     assertNotContainsValue('--font-sans', $css, 'Disabling extended output should suppress semantic family aliases.');
     assertNotContainsValue('--font-interface', $css, 'Disabling extended output should suppress role alias variables.');
     assertNotContainsValue('--weight-400', $css, 'Disabling extended output should suppress global numeric weight tokens.');
@@ -555,12 +640,12 @@ $tests['css_builder_minimal_output_preset_emits_only_heading_and_body_variables'
 
     $css = $builder->build([], $roles, $settings, $catalog);
 
-    assertContainsValue('--font-heading: "Inter", sans-serif;', $css, 'Minimal output should still emit the heading role variable using the selected family fallback.');
-    assertContainsValue('--font-body: sans-serif;', $css, 'Minimal output should emit the body role variable as a fallback-only stack when needed.');
+    assertContainsValue('--font-heading: "Inter", system-ui, sans-serif;', $css, 'Minimal output should still emit the heading role variable using the selected family fallback.');
+    assertContainsValue('--font-body: system-ui, sans-serif;', $css, 'Minimal output should emit the body role variable from the global fallback when no family is selected.');
     assertContainsValue('--font-heading-settings: normal;', $css, 'Minimal output should still emit the heading variation-settings variable.');
     assertContainsValue('--font-body-settings: normal;', $css, 'Minimal output should still emit the body variation-settings variable.');
     assertNotContainsValue('--font-inter', $css, 'Minimal output should suppress family variables.');
-    assertContainsValue('--font-monospace: "JetBrains Mono", monospace;', $css, 'Minimal output should still emit the monospace role variable when the monospace role is enabled.');
+    assertContainsValue('--font-monospace: "JetBrains Mono", ui-monospace, monospace;', $css, 'Minimal output should still emit the monospace role variable when the monospace role is enabled.');
     assertContainsValue('--font-monospace-settings: normal;', $css, 'Minimal output should still emit the monospace variation-settings variable when the monospace role is enabled.');
     assertNotContainsValue('--font-interface', $css, 'Minimal output should suppress role alias variables.');
     assertNotContainsValue('--weight-400', $css, 'Minimal output should suppress weight tokens.');
@@ -629,6 +714,67 @@ $tests['css_builder_can_granularly_disable_selected_extended_variable_groups'] =
     assertNotContainsValue('--font-sans: var(--font-inter);', $css, 'Disabled category aliases should suppress only their own alias variable.');
     assertContainsValue("body {\n  font-family: var(--font-body);\n  font-variation-settings: var(--font-body-settings);\n  font-weight: 400;\n}", $css, 'When weight tokens are disabled but extended output stays on, body usage should fall back to raw numeric weights.');
     assertContainsValue("h1, h2, h3, h4, h5, h6 {\n  font-family: var(--font-heading);\n  font-variation-settings: var(--font-heading-settings);\n  font-weight: 700;\n}", $css, 'When weight tokens are disabled but extended output stays on, heading usage should fall back to raw numeric weights.');
+};
+
+$tests['css_builder_can_control_role_alias_variables_independently'] = static function (): void {
+    $builder = new CssBuilder();
+    $catalog = [
+        'Inter' => [
+            'family' => 'Inter',
+            'slug' => 'inter',
+            'font_category' => 'sans-serif',
+            'faces' => [],
+        ],
+        'JetBrains Mono' => [
+            'family' => 'JetBrains Mono',
+            'slug' => 'jetbrains-mono',
+            'font_category' => 'monospace',
+            'faces' => [],
+        ],
+    ];
+    $roles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'monospace' => 'JetBrains Mono',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
+    ];
+    $settings = [
+        'auto_apply_roles' => true,
+        'monospace_role_enabled' => true,
+        'minify_css_output' => false,
+        'minimal_output_preset_enabled' => false,
+        'per_variant_font_variables_enabled' => true,
+        'extended_variable_role_alias_interface_enabled' => false,
+        'extended_variable_role_alias_ui_enabled' => true,
+        'extended_variable_role_alias_code_enabled' => false,
+        'extended_variable_weight_tokens_enabled' => false,
+    ];
+
+    $css = $builder->build([], $roles, $settings, $catalog);
+
+    assertNotContainsValue('--font-interface', $css, 'Interface alias variables should follow their independent output flag.');
+    assertContainsValue('--font-ui: var(--font-body);', $css, 'UI alias variables should follow their independent output flag.');
+    assertNotContainsValue('--font-code', $css, 'Code alias variables should follow their independent output flag.');
+
+    $settings['extended_variable_role_alias_interface_enabled'] = true;
+    $settings['extended_variable_role_alias_code_enabled'] = true;
+    $rolesWithoutBody = $roles;
+    $rolesWithoutBody['body'] = '';
+    $css = $builder->build([], $rolesWithoutBody, $settings, $catalog);
+
+    assertNotContainsValue('--font-interface', $css, 'Missing Body family should suppress only body-dependent interface aliases.');
+    assertNotContainsValue('--font-ui', $css, 'Missing Body family should suppress only body-dependent UI aliases.');
+    assertContainsValue('--font-code: var(--font-monospace);', $css, 'Missing Body family should not suppress code aliases.');
+
+    $rolesWithoutMono = $roles;
+    $rolesWithoutMono['monospace'] = '';
+    $css = $builder->build([], $rolesWithoutMono, $settings, $catalog);
+
+    assertContainsValue('--font-interface: var(--font-body);', $css, 'Missing Monospace family should not suppress body-dependent aliases.');
+    assertContainsValue('--font-ui: var(--font-body);', $css, 'Missing Monospace family should not suppress body-dependent aliases.');
+    assertNotContainsValue('--font-code', $css, 'Missing Monospace family should suppress code aliases even when the saved preference is on.');
 };
 
 $tests['css_builder_keeps_role_font_weights_when_variable_output_is_disabled'] = static function (): void {
@@ -703,9 +849,9 @@ $tests['css_builder_emits_role_variables_for_fallback_only_roles_when_variable_o
         'heading' => '',
         'body' => '',
         'monospace' => '',
-        'heading_fallback' => 'system-ui, sans-serif',
-        'body_fallback' => 'Georgia, serif',
-        'monospace_fallback' => 'ui-monospace',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+        'monospace_fallback' => 'monospace',
     ];
     $settings = [
         'auto_apply_roles' => true,
@@ -713,13 +859,16 @@ $tests['css_builder_emits_role_variables_for_fallback_only_roles_when_variable_o
         'minimal_output_preset_enabled' => false,
         'monospace_role_enabled' => true,
         'per_variant_font_variables_enabled' => true,
+        'fallback_heading' => 'system-ui, sans-serif',
+        'fallback_body' => 'Georgia, serif',
+        'fallback_monospace' => 'ui-monospace, monospace',
     ];
 
     $css = $builder->build([], $roles, $settings, []);
 
-    assertContainsValue('--font-heading: system-ui, sans-serif;', $css, 'Fallback-only heading roles should still define the heading role variable when variable output is enabled.');
-    assertContainsValue('--font-body: Georgia, serif;', $css, 'Fallback-only body roles should still define the body role variable when variable output is enabled.');
-    assertContainsValue('--font-monospace: ui-monospace;', $css, 'Fallback-only monospace roles should continue to define the monospace role variable when variable output is enabled.');
+    assertContainsValue('--font-heading: system-ui, sans-serif;', $css, 'Fallback-only heading roles should define the heading role variable from the global fallback.');
+    assertContainsValue('--font-body: Georgia, serif;', $css, 'Fallback-only body roles should define the body role variable from the global fallback.');
+    assertContainsValue('--font-monospace: ui-monospace, monospace;', $css, 'Fallback-only monospace roles should define the monospace role variable from the global fallback.');
 };
 
 $tests['css_builder_infers_family_variable_fallbacks_from_catalog_category'] = static function (): void {
@@ -752,7 +901,7 @@ $tests['css_builder_infers_family_variable_fallbacks_from_catalog_category'] = s
 
     $css = $builder->build([], $roles, $settings, $catalog);
 
-    assertContainsValue('--font-jetbrains-mono: "JetBrains Mono", monospace;', $css, 'Monospace family variables should default to the monospace generic fallback when no explicit family fallback is saved.');
+    assertContainsValue('--font-jetbrains-mono: "JetBrains Mono", ui-monospace, monospace;', $css, 'Monospace family variables should default to the global monospace fallback when no explicit family fallback is saved.');
 };
 
 $tests['css_builder_skips_variable_weight_ranges_when_emitting_global_weight_tokens'] = static function (): void {
@@ -957,7 +1106,7 @@ $tests['css_builder_emits_optional_monospace_role_css_when_enabled'] = static fu
 
     $css = $builder->build($catalog, $roles, $settings, $catalog);
 
-    assertContainsValue('--font-monospace: monospace;', $css, 'Enabled monospace support should emit a fallback-only monospace variable when no family is selected.');
+    assertContainsValue('--font-monospace: ui-monospace, monospace;', $css, 'Enabled monospace support should emit a fallback-only monospace variable from the global fallback when no family is selected.');
     assertContainsValue("code, pre {\n  font-family: var(--font-monospace);\n  font-variation-settings: var(--font-monospace-settings);\n}", $css, 'Enabled monospace support should emit the code/pre usage rule.');
     assertNotContainsValue('--font-monospace: var(--font-', $css, 'Fallback-only monospace output should not point the role variable at a synthetic family variable.');
 };
@@ -1183,8 +1332,8 @@ $tests['css_builder_minifies_generated_css_without_leaving_layout_whitespace'] =
     assertSameValue(false, str_contains($css, "\t"), 'Minified CSS should not leave tab characters in the generated output.');
     assertContainsValue('@font-face{font-family:"Inter";font-weight:400;font-style:normal;', $css, 'Minified CSS should collapse @font-face declarations into a compact form.');
     assertContainsValue('body{font-family:var(--font-body);font-variation-settings:var(--font-body-settings);font-weight:var(--weight-regular)}', $css, 'Minified CSS should collapse role usage rules into a compact form.');
-    assertContainsValue('.font-heading{font-family:"Inter",sans-serif}', $css, 'Minified CSS should collapse emitted role class utilities into a compact form.');
-    assertContainsValue('.font-inter{font-family:"Inter",sans-serif}', $css, 'Minified CSS should collapse emitted family class utilities into a compact form.');
+    assertContainsValue('.font-heading{font-family:"Inter",system-ui,sans-serif}', $css, 'Minified CSS should collapse emitted role class utilities into a compact form.');
+    assertContainsValue('.font-inter{font-family:"Inter",system-ui,sans-serif}', $css, 'Minified CSS should collapse emitted family class utilities into a compact form.');
 };
 
 $tests['css_builder_omits_role_font_weights_by_default_even_when_weight_tokens_exist'] = static function (): void {
@@ -1229,8 +1378,8 @@ $tests['css_builder_builds_role_variable_declarations_without_root_wrapper'] = s
 
     $snippet = $builder->buildRoleVariableDeclarationsSnippet($roles, false, [], []);
 
-    assertContainsValue('--font-heading: "Lora", serif;', $snippet, 'Variable declarations should include the heading role stack.');
-    assertContainsValue('--font-body: "Inter", sans-serif;', $snippet, 'Variable declarations should include the body role stack.');
+    assertContainsValue('--font-heading: "Lora", system-ui, sans-serif;', $snippet, 'Variable declarations should include the heading role stack.');
+    assertContainsValue('--font-body: "Inter", system-ui, sans-serif;', $snippet, 'Variable declarations should include the body role stack.');
     assertNotContainsValue(':root', $snippet, 'Variable declarations should omit the root selector wrapper.');
 };
 

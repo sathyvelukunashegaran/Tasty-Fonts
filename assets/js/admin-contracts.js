@@ -310,7 +310,7 @@
     }
 
     function defaultRoleFallback(roleKey) {
-        return roleKey === 'monospace' ? 'monospace' : 'system-ui, sans-serif';
+        return roleKey === 'monospace' ? 'ui-monospace, monospace' : 'system-ui, sans-serif';
     }
 
     function resolveRoleFallback(roleKey, input = {}, options = {}) {
@@ -320,6 +320,23 @@
         const familyCatalog = options.roleFamilyCatalog && typeof options.roleFamilyCatalog === 'object'
             ? options.roleFamilyCatalog
             : {};
+
+        if (familyName && familyCatalog[familyName] && typeof familyCatalog[familyName] === 'object') {
+            const familyFallback = String(familyCatalog[familyName].fallback || '').trim();
+
+            if (familyCatalog[familyName].fallbackIsCustom === true && familyFallback !== '') {
+                return sanitizeFallback(familyFallback, defaultFallback);
+            }
+        }
+
+        const globalFallbacks = options.globalFallbacks && typeof options.globalFallbacks === 'object'
+            ? options.globalFallbacks
+            : {};
+        const globalFallback = String(globalFallbacks[roleKey] || '').trim();
+
+        if (globalFallback !== '') {
+            return sanitizeFallback(globalFallback, defaultFallback);
+        }
 
         if (familyName && familyCatalog[familyName] && typeof familyCatalog[familyName] === 'object') {
             const familyFallback = String(familyCatalog[familyName].fallback || '').trim();
@@ -450,33 +467,24 @@
         return ['minimal', 'variables', 'classes', 'custom'].includes(normalized) ? normalized : '';
     }
 
-    function normalizeToggleFlags(flags) {
-        return Array.isArray(flags)
-            ? flags.filter((value) => typeof value === 'boolean')
-            : [];
-    }
-
-    function allToggleFlagsEnabled(flags) {
-        return normalizeToggleFlags(flags).every((value) => value);
-    }
-
     function deriveExactOutputQuickMode(state = {}) {
         const minimalEnabled = !!state.minimalEnabled;
         const classOutputEnabled = !!state.classOutputEnabled;
         const variableOutputEnabled = !!state.variableOutputEnabled;
-        const roleUsageFontWeightEnabled = !!state.roleUsageFontWeightEnabled;
-        const classFlags = normalizeToggleFlags(state.classFlags);
-        const variableFlags = normalizeToggleFlags(state.variableFlags);
 
         if (minimalEnabled) {
             return 'minimal';
         }
 
-        if (!roleUsageFontWeightEnabled && !classOutputEnabled && variableOutputEnabled && allToggleFlagsEnabled(variableFlags)) {
+        if (classOutputEnabled && variableOutputEnabled) {
+            return 'custom';
+        }
+
+        if (variableOutputEnabled) {
             return 'variables';
         }
 
-        if (!roleUsageFontWeightEnabled && classOutputEnabled && !variableOutputEnabled && allToggleFlagsEnabled(classFlags)) {
+        if (classOutputEnabled) {
             return 'classes';
         }
 
@@ -484,18 +492,9 @@
     }
 
     function normalizeOutputQuickModePreference(preference, state = {}) {
-        const normalizedPreference = sanitizeOutputQuickModePreference(preference);
-        const exactMode = deriveExactOutputQuickMode(state);
+        sanitizeOutputQuickModePreference(preference);
 
-        if (normalizedPreference === 'custom') {
-            return 'custom';
-        }
-
-        if (normalizedPreference === '') {
-            return exactMode;
-        }
-
-        return exactMode === normalizedPreference ? normalizedPreference : 'custom';
+        return deriveExactOutputQuickMode(state);
     }
 
     function canDisableOutputLayer(layerKey, state = {}) {

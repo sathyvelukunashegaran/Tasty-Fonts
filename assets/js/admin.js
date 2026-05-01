@@ -168,6 +168,9 @@
     const roleFamilyCatalog = config.roleFamilyCatalog && typeof config.roleFamilyCatalog === 'object'
         ? config.roleFamilyCatalog
         : {};
+    const globalFallbacks = config.globalFallbacks && typeof config.globalFallbacks === 'object'
+        ? config.globalFallbacks
+        : {};
     const hostedSearchPageSize = 12;
     const hostedSearchScrollThreshold = 160;
     const roleWeightEditors = {
@@ -339,6 +342,12 @@
         : '';
     const outputQuickModeNotice = document.querySelector('[data-output-quick-mode-notice]');
     const outputRoleClassStylesOption = document.querySelector('[data-output-role-class-styles-option]');
+    const outputRoleClassStylesInput = document.querySelector('[data-output-role-class-styles-control]');
+    const outputRoleClassStylesHiddenInput = document.querySelector('[data-output-role-class-styles-hidden]');
+    const outputRoleClassStylePrerequisiteInputs = Array.from(document.querySelectorAll(
+        'input[type="checkbox"][name="class_output_role_heading_enabled"], ' +
+        'input[type="checkbox"][name="class_output_role_body_enabled"]'
+    ));
     const outputDetailGroups = {
         sitewide: document.querySelector('[data-output-detail-group="sitewide"]'),
         classes: document.querySelector('[data-output-detail-group="classes"]'),
@@ -364,9 +373,15 @@
         classes: document.querySelector('[data-output-panel="classes"]'),
         variables: document.querySelector('[data-output-panel="variables"]'),
     };
+    const outputTogglePreviewAccordions = Array.from(document.querySelectorAll('[data-output-toggle-preview]'));
+    const outputTogglePreviewCodeBlocks = Array.from(document.querySelectorAll('[data-output-toggle-preview-code]'));
     const outputMonoDependentInputs = Array.from(document.querySelectorAll('[data-output-mono-dependent]'));
+    const outputDependencyControls = Array.from(document.querySelectorAll('[data-output-dependency-control]'));
     const monospaceRoleSettingInputs = Array.from(document.querySelectorAll('input[type="checkbox"][name="monospace_role_enabled"]'));
     const outputRoleWeightInput = document.querySelector('input[type="checkbox"][name="role_usage_font_weight_enabled"]');
+    const outputRoleWeightVariablesInput = document.querySelector('input[type="checkbox"][name="extended_variable_role_weight_vars_enabled"]');
+    const outputRoleWeightVariablesHiddenInput = document.querySelector('input[type="hidden"][name="extended_variable_role_weight_vars_enabled"]');
+    const acssRoleSyncInput = document.querySelector('input[type="checkbox"][name="acss_font_role_sync_enabled"]');
     const unicodeRangeModeInputs = Array.from(document.querySelectorAll('[data-unicode-range-mode]'));
     const unicodeRangeCustomWrap = document.querySelector('[data-unicode-range-custom-wrap]');
     const unicodeRangeCustomInput = document.querySelector('[data-unicode-range-custom]');
@@ -649,6 +664,7 @@
         '.tasty-fonts-settings-flat-row--channel',
         '.tasty-fonts-integrations-panel > .tasty-fonts-settings-board .tasty-fonts-integration-row--readonly',
         '.tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration',
+        '.tasty-fonts-output-settings-submenu-list--integration > .tasty-fonts-output-settings-detail-group--integration-nested',
         '.tasty-fonts-admin-access-mode-toggle',
     ].join(', ');
 
@@ -708,6 +724,7 @@
             monospaceRoleEnabled,
             variableFontsEnabled,
             roleFamilyCatalog,
+            globalFallbacks,
             ...overrides,
         };
     }
@@ -1110,7 +1127,11 @@
             throw requestError;
         }
 
-        return payload && typeof payload === 'object' ? payload : {};
+        const normalizedPayload = payload && typeof payload === 'object' ? payload : {};
+
+        applyLiveOutputPayloadState(normalizedPayload);
+
+        return normalizedPayload;
     }
 
     function getSettingsFormState(form) {
@@ -1365,6 +1386,12 @@
     function syncCheckboxFields(name, checked) {
         document.querySelectorAll(`input[type="checkbox"][name="${name}"]`).forEach((input) => {
             input.checked = !!checked;
+
+            const hidden = outputDependencyHiddenPreference(input);
+
+            if (hidden) {
+                hidden.value = checked ? '1' : '0';
+            }
         });
     }
 
@@ -1383,6 +1410,10 @@
                 input.checked = false;
             }
 
+            if (enabled && options.enableDefaults) {
+                input.checked = true;
+            }
+
             const dependencyDescriptionId = String(input.dataset.settingsDependencyDescription || '').trim();
 
             if (!enabled && dependencyDescriptionId) {
@@ -1392,6 +1423,11 @@
             }
 
             const label = input.closest('.tasty-fonts-toggle-field');
+            const row = input.closest('[data-output-mono-dependent-row]') || label;
+
+            if (row) {
+                row.hidden = !enabled;
+            }
 
             if (label) {
                 const dependencyTooltip = String(label.dataset.settingsDependencyTooltip || '').trim();
@@ -1407,11 +1443,157 @@
                 }
             }
         });
+    }
 
-        if (enabled && options.enableDefaults) {
-            outputMonoDependentInputs.forEach((input) => {
-                input.checked = true;
-            });
+    function outputDependencyHiddenPreference(input) {
+        if (!(input instanceof HTMLInputElement)) {
+            return null;
+        }
+
+        const row = input.closest('[data-output-dependency-row]');
+        const selector = `input[type="hidden"][name="${input.name}"][data-output-preference-hidden]`;
+
+        if (row) {
+            const hidden = row.querySelector(selector);
+
+            if (hidden instanceof HTMLInputElement) {
+                return hidden;
+            }
+        }
+
+        const form = input.form;
+
+        if (form) {
+            const hidden = form.querySelector(selector);
+
+            if (hidden instanceof HTMLInputElement) {
+                return hidden;
+            }
+        }
+
+        return null;
+    }
+
+    function outputDependencyStaticAvailable(input) {
+        const value = String(input.dataset.outputDependencyStaticAvailable || '').trim();
+
+        return value !== '0';
+    }
+
+    function outputDependencyAvailable(input) {
+        const dependencyKey = String(input.dataset.outputDependencyKey || '').trim();
+        const staticAvailable = outputDependencyStaticAvailable(input);
+
+        if (dependencyKey === 'body-family') {
+            return !!(roleBody && String(roleBody.value || '').trim() !== '');
+        }
+
+        if (dependencyKey === 'monospace-enabled') {
+            return !!monospaceRoleEnabled;
+        }
+
+        if (dependencyKey === 'monospace-family') {
+            return !!(monospaceRoleEnabled && roleMonospace && String(roleMonospace.value || '').trim() !== '');
+        }
+
+        if (dependencyKey === 'category-mono') {
+            return !!(monospaceRoleEnabled && staticAvailable);
+        }
+
+        return staticAvailable;
+    }
+
+    function syncOutputDependencyControls() {
+        outputDependencyControls.forEach((input) => {
+            if (!(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const available = outputDependencyAvailable(input);
+            const hidden = outputDependencyHiddenPreference(input);
+            const row = input.closest('[data-output-dependency-row]');
+            const dependencyDescriptionId = String(input.dataset.settingsDependencyDescription || '').trim();
+
+            if (!available) {
+                if (!input.disabled && hidden) {
+                    hidden.value = input.checked ? '1' : '0';
+                }
+
+                input.checked = false;
+                input.disabled = true;
+
+                if (dependencyDescriptionId) {
+                    input.setAttribute('aria-describedby', dependencyDescriptionId);
+                }
+            } else {
+                input.disabled = false;
+
+                if (hidden) {
+                    input.checked = hidden.value === '1';
+                    hidden.value = '0';
+                }
+
+                if (dependencyDescriptionId) {
+                    input.removeAttribute('aria-describedby');
+                }
+            }
+
+            if (row) {
+                row.classList.toggle('is-disabled', !available);
+                row.classList.toggle('is-disabled-by-dependency', !available);
+
+                const dependencyTooltip = String(row.dataset.settingsDependencyTooltip || '').trim();
+
+                if (!available && dependencyTooltip) {
+                    row.dataset.settingsHelpTooltip = dependencyTooltip;
+                } else if (dependencyTooltip && row.dataset.settingsHelpTooltip === dependencyTooltip) {
+                    delete row.dataset.settingsHelpTooltip;
+                }
+            }
+        });
+    }
+
+    function outputRoleClassStylesAvailable() {
+        return outputRoleClassStylePrerequisiteInputs.length > 0
+            && outputRoleClassStylePrerequisiteInputs.every((input) => input.checked && !input.disabled);
+    }
+
+    function syncRoleClassStylesDependency() {
+        if (!outputRoleClassStylesInput) {
+            return;
+        }
+
+        const available = outputRoleClassStylesAvailable();
+        const row = outputRoleClassStylesInput.closest('[data-output-role-class-styles-row]');
+        const dependencyDescriptionId = String(outputRoleClassStylesInput.dataset.settingsDependencyDescription || '').trim();
+
+        outputRoleClassStylesInput.disabled = !available;
+
+        if (!available) {
+            outputRoleClassStylesInput.checked = false;
+
+            if (outputRoleClassStylesHiddenInput) {
+                outputRoleClassStylesHiddenInput.value = '0';
+            }
+
+            if (dependencyDescriptionId) {
+                outputRoleClassStylesInput.setAttribute('aria-describedby', dependencyDescriptionId);
+            }
+        } else if (dependencyDescriptionId) {
+            outputRoleClassStylesInput.removeAttribute('aria-describedby');
+        }
+
+        if (row) {
+            row.classList.toggle('is-disabled', !available);
+            row.classList.toggle('is-disabled-by-dependency', !available);
+
+            const dependencyTooltip = String(row.dataset.settingsDependencyTooltip || '').trim();
+
+            if (!available && dependencyTooltip) {
+                row.dataset.settingsHelpTooltip = dependencyTooltip;
+            } else if (dependencyTooltip && row.dataset.settingsHelpTooltip === dependencyTooltip) {
+                delete row.dataset.settingsHelpTooltip;
+            }
         }
     }
 
@@ -1866,6 +2048,9 @@
             'extended_variable_role_weight_vars_enabled',
             'extended_variable_weight_tokens_enabled',
             'extended_variable_role_aliases_enabled',
+            'extended_variable_role_alias_interface_enabled',
+            'extended_variable_role_alias_ui_enabled',
+            'extended_variable_role_alias_code_enabled',
             'extended_variable_category_sans_enabled',
             'extended_variable_category_serif_enabled',
             'extended_variable_category_mono_enabled',
@@ -2042,6 +2227,80 @@
                 typeof panel.display_value === 'string' ? panel.display_value : ''
             );
         });
+    }
+
+    function applyOutputTogglePreviewsState(previews) {
+        if (!previews || typeof previews !== 'object' || Array.isArray(previews)) {
+            return;
+        }
+
+		const accordions = outputTogglePreviewAccordions.length > 0
+			? outputTogglePreviewAccordions
+			: outputTogglePreviewCodeBlocks
+				.map((block) => block.closest('[data-output-toggle-preview]'))
+				.filter((accordion) => accordion instanceof HTMLElement);
+
+		accordions.forEach((accordion) => {
+            if (!(accordion instanceof HTMLElement)) {
+                return;
+            }
+
+            const key = String(accordion.getAttribute('data-output-toggle-preview') || '').trim();
+
+            if (!key || !Object.prototype.hasOwnProperty.call(previews, key)) {
+                return;
+            }
+
+            const preview = previews[key];
+
+            if (!preview || typeof preview !== 'object') {
+                return;
+            }
+
+            const css = String(preview.css || '');
+            const isEmpty = preview.is_empty === true || css.trim() === '';
+            const codeBlock = accordion.querySelector('[data-output-toggle-preview-code]');
+            const codeSurface = codeBlock instanceof HTMLElement ? codeBlock.closest('pre') : null;
+            const emptyMessage = accordion.querySelector('[data-output-toggle-preview-empty]');
+            const description = accordion.querySelector('[data-output-toggle-preview-description]');
+
+            if (description instanceof HTMLElement && typeof preview.description === 'string') {
+                description.textContent = preview.description;
+            }
+
+            if (emptyMessage instanceof HTMLElement) {
+                emptyMessage.textContent = typeof preview.empty_message === 'string'
+                    ? preview.empty_message
+                    : getString('outputTogglePreviewEmpty', 'No CSS is available for this option yet.');
+                emptyMessage.hidden = !isEmpty;
+            }
+
+            if (codeBlock instanceof HTMLElement) {
+                codeBlock.innerHTML = renderHighlightedSnippet(css);
+            }
+
+            if (codeSurface instanceof HTMLElement) {
+                codeSurface.hidden = isEmpty;
+            }
+        });
+    }
+
+    function applyLiveOutputPayloadState(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(payload, 'output_panels')) {
+            applyOutputPanelsState(payload.output_panels);
+        }
+
+        if (Object.prototype.hasOwnProperty.call(payload, 'generated_css_panel')) {
+            applyGeneratedCssPanelState(payload.generated_css_panel || null);
+        }
+
+        if (Object.prototype.hasOwnProperty.call(payload, 'output_toggle_previews')) {
+            applyOutputTogglePreviewsState(payload.output_toggle_previews);
+        }
     }
 
     function applyGeneratedCssPanelState(panel) {
@@ -3354,6 +3613,8 @@
         const expandedSlugs = expandedLibraryRowSlugs();
         list.innerHTML = rowsHtml;
 
+        enhanceCustomSelects(list);
+        enhanceCustomSelects(list);
         bindFamilyFallbackControls(list);
         bindFamilyFontDisplayControls(list);
         bindFamilyDeliveryControls(list);
@@ -3536,6 +3797,13 @@
             });
 
             syncRoleFamilyCatalogInPlace(payload.role_family_catalog || {});
+
+            if (payload.global_fallbacks && typeof payload.global_fallbacks === 'object') {
+                Object.keys(globalFallbacks).forEach((key) => delete globalFallbacks[key]);
+                Object.entries(payload.global_fallbacks).forEach(([key, value]) => {
+                    globalFallbacks[key] = value;
+                });
+            }
 
             if (payload.available_family_options && typeof payload.available_family_options === 'object') {
                 syncRoleFamilySelectOptions(payload.available_family_options);
@@ -5422,6 +5690,7 @@
         }
 
         initHelpTooltips();
+        enhanceCustomSelects(target);
 
         bindFamilyFallbackControls(target);
         bindFamilyFontDisplayControls(target);
@@ -6172,27 +6441,27 @@
             [__('Remote Connection Hints', 'tasty-fonts'), __('Adds preconnect hints for active remote font providers. These hints can reduce connection setup time for live Google, Bunny, or Adobe deliveries, but they only matter when the current delivery profile loads from a remote provider.', 'tasty-fonts')],
             [__('Output Preset', 'tasty-fonts'), __('Chooses the generated output shape. Minimal keeps the core role variables lean, Variables only exposes token layers, Classes only exposes helper classes, and Custom lets you decide exactly which groups Tasty Fonts should emit.', 'tasty-fonts')],
             [__('Sitewide Role Weights', 'tasty-fonts'), __('Adds saved role font weights and variation settings to the sitewide body, heading, and code rules. This changes the default rendered role styles, while utility class styling is controlled separately.', 'tasty-fonts')],
-            [__('Utility Classes', 'tasty-fonts'), __('Generates .font-* helper classes that themes, builders, or custom markup can use directly. The groups below decide which role, alias, category, and per-family class selectors are included.', 'tasty-fonts')],
+            [__('Utility Classes', 'tasty-fonts'), __('Generates .font-* helper classes that themes, builders, or custom markup can use directly. Alias, category, and per-family helpers appear only when their source family exists.', 'tasty-fonts')],
             [__('Utility Class Groups', 'tasty-fonts'), __('Controls which utility class groups are generated when class output is active. Keep the groups you plan to use so generated CSS stays smaller and easier to scan.', 'tasty-fonts')],
-            [__('Role Weights in Classes', 'tasty-fonts'), __('Adds each role weight and variable-axis settings to the matching .font-heading, .font-body, and optional monospace class rules. This affects class output only, not the sitewide role rules.', 'tasty-fonts')],
+            [__('Role Weights in Classes', 'tasty-fonts'), __('Adds saved heading and body weights to the matching .font-heading and .font-body rules once those role classes are enabled. This affects class output only, not the sitewide role rules.', 'tasty-fonts')],
             [__('Heading Class', 'tasty-fonts'), __('Generates the .font-heading helper so content can opt into the active heading role font without relying on global selectors.', 'tasty-fonts')],
             [__('Body Class', 'tasty-fonts'), __('Generates the .font-body helper so content can opt into the active body role font in templates, builder fields, or custom markup.', 'tasty-fonts')],
             [__('Monospace Class', 'tasty-fonts'), __('Generates .font-monospace when the monospace role is enabled. Use it for code-like content that should follow the plugin-managed monospace role.', 'tasty-fonts')],
-            [__('Interface Alias', 'tasty-fonts'), __('Generates .font-interface as an alias for the body role so interface text can use a semantic helper without coupling to the underlying role name.', 'tasty-fonts')],
-            [__('UI Alias', 'tasty-fonts'), __('Generates .font-ui as a compact alias for the body role. It is useful for builder components, buttons, and other interface fragments.', 'tasty-fonts')],
-            [__('Code Alias', 'tasty-fonts'), __('Generates .font-code as an alias for the monospace role when that role is enabled. It gives code snippets and developer-oriented UI a semantic helper.', 'tasty-fonts')],
-            [__('Sans Class', 'tasty-fonts'), __('Generates .font-sans as a category helper that points to the active sans-style family resolved from your role and library choices.', 'tasty-fonts')],
-            [__('Serif Class', 'tasty-fonts'), __('Generates .font-serif as a category helper that points to the active serif-style family resolved from your role and library choices.', 'tasty-fonts')],
-            [__('Mono Class', 'tasty-fonts'), __('Generates .font-mono as a category helper when the monospace role is enabled. It follows the plugin-managed mono family rather than a hard-coded stack.', 'tasty-fonts')],
+            [__('Interface Alias', 'tasty-fonts'), __('Generates .font-interface as an alias for the body role when the Body role has an assigned family.', 'tasty-fonts')],
+            [__('UI Alias', 'tasty-fonts'), __('Generates .font-ui as a compact alias for the body role when the Body role has an assigned family.', 'tasty-fonts')],
+            [__('Code Alias', 'tasty-fonts'), __('Generates .font-code as an alias when the monospace role is enabled and has an assigned family.', 'tasty-fonts')],
+            [__('Sans Class', 'tasty-fonts'), __('Generates .font-sans when a sans family is available from your role and library choices.', 'tasty-fonts')],
+            [__('Serif Class', 'tasty-fonts'), __('Generates .font-serif when a serif family is available from your role and library choices.', 'tasty-fonts')],
+            [__('Mono Class', 'tasty-fonts'), __('Generates .font-mono when the monospace role is enabled and a monospace family is available.', 'tasty-fonts')],
             [__('Per-Family Classes', 'tasty-fonts'), __('Generates one helper class per available font family, such as .font-inter. This is convenient for hand-authored templates but can create more selectors on sites with large libraries.', 'tasty-fonts')],
-            [__('CSS Variables', 'tasty-fonts'), __('Generates --font-* custom properties for roles, aliases, categories, and optional weights. These variables are the safest integration surface for themes, builders, and design systems that consume Tasty Fonts output.', 'tasty-fonts')],
+            [__('CSS Variables', 'tasty-fonts'), __('Generates --font-* custom properties for roles, aliases, categories, and optional weights. Alias and category tokens appear only when their source family exists.', 'tasty-fonts')],
             [__('CSS Variable Groups', 'tasty-fonts'), __('Controls which CSS variable groups are emitted when variable output is active. Keep the groups your theme or integrations consume, and leave unused groups off to reduce generated output.', 'tasty-fonts')],
             [__('Role Weight Variables', 'tasty-fonts'), __('Generates role-specific weight variables such as --font-heading-weight and --font-body-weight. Some integrations, including Automatic.css role sync, depend on these tokens when weight mapping is active.', 'tasty-fonts')],
             [__('Global Weight Tokens', 'tasty-fonts'), __('Generates reusable global weight tokens such as --weight-400 and --weight-bold, plus related snippets. Use these when your design system references named weight tokens independently of font roles.', 'tasty-fonts')],
-            [__('Role Alias Variables', 'tasty-fonts'), __('Generates alias variables such as --font-interface, --font-ui, and optionally --font-code. Aliases let other tools use semantic names while still following the active Tasty Fonts role assignments.', 'tasty-fonts')],
-            [__('Sans Alias', 'tasty-fonts'), __('Generates --font-sans as a category alias for the active sans family. This helps external CSS consume category-level typography without hard-coding a family name.', 'tasty-fonts')],
-            [__('Serif Alias', 'tasty-fonts'), __('Generates --font-serif as a category alias for the active serif family. This keeps category-level CSS tied to the managed font library instead of fixed stacks.', 'tasty-fonts')],
-            [__('Mono Alias', 'tasty-fonts'), __('Generates --font-mono when the monospace role is enabled. Use it for category-level mono styling that should follow the managed role configuration.', 'tasty-fonts')],
+            [__('Role Alias Variables', 'tasty-fonts'), __('Generates alias variables such as --font-interface, --font-ui, and optionally --font-code. Body aliases require an assigned Body family; --font-code requires an assigned Monospace family.', 'tasty-fonts')],
+            [__('Sans Alias', 'tasty-fonts'), __('Generates --font-sans when a sans family is available. This helps external CSS consume category-level typography without hard-coding a family name.', 'tasty-fonts')],
+            [__('Serif Alias', 'tasty-fonts'), __('Generates --font-serif when a serif family is available. This keeps category-level CSS tied to the managed font library instead of fixed stacks.', 'tasty-fonts')],
+            [__('Mono Alias', 'tasty-fonts'), __('Generates --font-mono when the monospace role is enabled and a monospace family is available.', 'tasty-fonts')],
             [__('Etch Canvas Bridge', 'tasty-fonts'), __('Enables the Etch Canvas Bridge when Etch is active. When enabled, Tasty Fonts loads its runtime stylesheets and role bridge CSS into Etch canvas previews; turning it off prevents those Etch-specific assets from loading.', 'tasty-fonts')],
             [__('Bricks Builder', 'tasty-fonts'), __('Enables Bricks-specific typography integration. When active, the nested controls can map Tasty role variables into Bricks Theme Styles and prevent Bricks from loading its own Google Fonts.', 'tasty-fonts')],
             [__('Sync Bricks Theme Styles', 'tasty-fonts'), __('Writes Tasty Fonts role variables into the selected Bricks Theme Style target. Use this when Bricks typography controls should follow the same heading and body roles used by the rest of the site.', 'tasty-fonts')],
@@ -6310,15 +6579,18 @@
             '.tasty-fonts-settings-flat-row--channel',
             '.tasty-fonts-integrations-panel > .tasty-fonts-settings-board .tasty-fonts-integration-row--readonly',
             '.tasty-fonts-integrations-form > .tasty-fonts-integrations-list > .tasty-fonts-output-settings-detail-group--integration',
+            '.tasty-fonts-output-settings-submenu-list--integration > .tasty-fonts-output-settings-detail-group--integration-nested',
             '.tasty-fonts-admin-access-mode-toggle'
         ].join(', ')));
 
         rows.forEach((row) => {
-            const existingHelp = row.querySelector('.tasty-fonts-settings-row-help');
+            const existingHelp = Array.from(row.children).find((child) => child.classList && child.classList.contains('tasty-fonts-settings-row-help'));
             if (existingHelp) {
                 if (existingHelp.parentElement !== row) {
                     row.append(existingHelp);
                 }
+                const copy = settingsRowHelpText(row);
+                setPassiveHelpTooltip(existingHelp, copy);
                 return;
             }
 
@@ -9821,6 +10093,7 @@
         }
 
         rows.forEach((row) => initializeUploadRow(row));
+        enhanceCustomSelects(group);
         updateUploadGroupAccessibility(group);
         updateUploadRemoveButtons();
     }
@@ -9867,6 +10140,7 @@
         }
 
         initializeUploadRow(appendedRow);
+        enhanceCustomSelects(appendedRow);
         updateUploadGroupAccessibility(group);
         updateUploadRemoveButtons();
 
@@ -11707,7 +11981,11 @@
 
         syncClearableSelectButton(button);
 
-        if (typeof select.focus === 'function') {
+        const enhancedToggle = select instanceof HTMLSelectElement ? enhancedSelectParts(select).toggle : null;
+
+        if (enhancedToggle instanceof HTMLElement) {
+            enhancedToggle.focus();
+        } else if (typeof select.focus === 'function') {
             try {
                 select.focus({ preventScroll: true });
             } catch (error) {
@@ -12659,8 +12937,682 @@
         });
     }
 
+    let enhancedSelectDocumentBound = false;
+    let enhancedSelectIdCounter = 0;
+	let fallbackComboboxDocumentBound = false;
+    const openDropdownAncestorClass = 'tasty-fonts-has-open-dropdown';
+
+    function clearOpenDropdownAncestors() {
+        document.querySelectorAll(`.${openDropdownAncestorClass}`).forEach((element) => {
+            element.classList.remove(openDropdownAncestorClass);
+        });
+    }
+
+    function clearOpenDropdownAncestorsWhenIdle() {
+        if (
+            document.querySelector('[data-enhanced-select].is-open')
+            || document.querySelector('[data-fallback-combobox].is-open')
+        ) {
+            return;
+        }
+
+        clearOpenDropdownAncestors();
+    }
+
+    function markOpenDropdownAncestors(element) {
+        if (!(element instanceof HTMLElement) || !window.getComputedStyle) {
+            return;
+        }
+
+        clearOpenDropdownAncestors();
+
+        let current = element.parentElement;
+
+        while (current instanceof HTMLElement && !current.classList.contains('tasty-fonts-admin')) {
+            const style = window.getComputedStyle(current);
+            const overflowValue = `${style.overflow} ${style.overflowX} ${style.overflowY}`;
+
+            if (/(hidden|auto|scroll|clip)/.test(overflowValue)) {
+                current.classList.add(openDropdownAncestorClass);
+            }
+
+            current = current.parentElement;
+        }
+    }
+
+    function shouldOpenDropdownAbove(control, menu) {
+        if (!(control instanceof HTMLElement) || !(menu instanceof HTMLElement)) {
+            return false;
+        }
+
+        const controlRect = control.getBoundingClientRect();
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const menuStyle = window.getComputedStyle ? window.getComputedStyle(menu) : null;
+        const maxHeight = menuStyle ? Number.parseFloat(menuStyle.maxHeight || '') : 0;
+        const estimatedMenuHeight = Math.min(
+            menu.scrollHeight || maxHeight || 260,
+            Number.isFinite(maxHeight) && maxHeight > 0 ? maxHeight : 260
+        );
+        const spaceBelow = viewportHeight - controlRect.bottom;
+        const spaceAbove = controlRect.top;
+
+        return spaceBelow < estimatedMenuHeight + 12 && spaceAbove > spaceBelow;
+    }
+
+    function syncDropdownDirection(owner, control, menu) {
+        if (!(owner instanceof HTMLElement)) {
+            return;
+        }
+
+        owner.classList.toggle('is-open-above', shouldOpenDropdownAbove(control, menu));
+    }
+
+    function scrollOptionIntoMenu(menu, option) {
+        if (!(menu instanceof HTMLElement) || !(option instanceof HTMLElement)) {
+            return;
+        }
+
+        const optionTop = option.offsetTop;
+        const optionBottom = optionTop + option.offsetHeight;
+        const visibleTop = menu.scrollTop;
+        const visibleBottom = visibleTop + menu.clientHeight;
+
+        if (optionTop < visibleTop) {
+            menu.scrollTop = optionTop;
+        } else if (optionBottom > visibleBottom) {
+            menu.scrollTop = optionBottom - menu.clientHeight;
+        }
+    }
+
+    function enhancedSelects(root = document) {
+        const scope = root || document;
+
+        return Array.from(scope.querySelectorAll('select:not([multiple])')).filter((select) => {
+            return select.closest('.tasty-fonts-admin');
+        });
+    }
+
+    function enhancedSelectOptionLabel(option) {
+        return String(option && option.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function enhancedSelectSelectedOption(select) {
+        if (!(select instanceof HTMLSelectElement)) {
+            return null;
+        }
+
+        return select.selectedOptions && select.selectedOptions.length > 0
+            ? select.selectedOptions[0]
+            : select.options[select.selectedIndex] || null;
+    }
+
+    function enhancedSelectParts(select) {
+        const field = select ? select.closest('.tasty-fonts-select-field') : null;
+        const wrapper = select ? select.nextElementSibling : null;
+
+        return {
+            field,
+            wrapper: wrapper instanceof HTMLElement && wrapper.matches('[data-enhanced-select]') ? wrapper : null,
+            toggle: wrapper instanceof HTMLElement ? wrapper.querySelector('[data-enhanced-select-toggle]') : null,
+            menu: wrapper instanceof HTMLElement ? wrapper.querySelector('[data-enhanced-select-menu]') : null,
+            value: wrapper instanceof HTMLElement ? wrapper.querySelector('[data-enhanced-select-value]') : null,
+        };
+    }
+
+    function closeEnhancedSelect(select) {
+        const { field, wrapper, toggle, menu } = enhancedSelectParts(select);
+
+        if (!wrapper || !menu) {
+            return;
+        }
+
+        wrapper.classList.remove('is-open');
+        wrapper.classList.remove('is-open-above');
+        if (field) {
+            field.classList.remove('is-open');
+        }
+        menu.hidden = true;
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+        clearOpenDropdownAncestorsWhenIdle();
+    }
+
+    function closeOtherEnhancedSelects(activeSelect = null) {
+        document.querySelectorAll('select[data-enhanced-select-bound="1"]').forEach((select) => {
+            if (select !== activeSelect) {
+                closeEnhancedSelect(select);
+            }
+        });
+    }
+
+    function updateEnhancedSelect(select) {
+        if (!(select instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        const { wrapper, toggle, menu, value } = enhancedSelectParts(select);
+
+        if (!wrapper || !toggle || !menu || !value) {
+            return;
+        }
+
+        const selectedOption = enhancedSelectSelectedOption(select);
+        const selectedLabel = selectedOption ? enhancedSelectOptionLabel(selectedOption) : '';
+        const selectedValue = selectedOption ? String(selectedOption.value || '') : String(select.value || '');
+
+        value.textContent = selectedLabel || selectedValue;
+        toggle.disabled = select.disabled;
+        toggle.setAttribute('aria-disabled', select.disabled ? 'true' : 'false');
+        wrapper.classList.toggle('is-disabled', select.disabled);
+
+        menu.innerHTML = '';
+
+        Array.from(select.options || []).forEach((option, index) => {
+            const optionValue = String(option.value || '');
+            const optionLabel = enhancedSelectOptionLabel(option) || optionValue;
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            const optionId = `${menu.id}-option-${index + 1}`;
+            const isSelected = option === selectedOption;
+
+            item.setAttribute('role', 'none');
+            button.type = 'button';
+            button.id = optionId;
+            button.className = 'tasty-fonts-custom-select-option';
+            button.dataset.enhancedSelectOption = optionValue;
+            button.dataset.enhancedSelectIndex = String(index);
+            button.setAttribute('role', 'option');
+            button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+            button.textContent = optionLabel;
+            button.disabled = option.disabled;
+            button.hidden = option.hidden;
+
+            if (isSelected) {
+                button.classList.add('is-selected', 'is-active');
+                toggle.setAttribute('aria-activedescendant', optionId);
+            }
+
+            item.appendChild(button);
+            menu.appendChild(item);
+        });
+    }
+
+    function openEnhancedSelect(select) {
+        if (!(select instanceof HTMLSelectElement) || select.disabled) {
+            return;
+        }
+
+        const { field, wrapper, toggle, menu } = enhancedSelectParts(select);
+
+        if (!wrapper || !toggle || !menu) {
+            return;
+        }
+
+        closeOtherEnhancedSelects(select);
+        updateEnhancedSelect(select);
+
+        wrapper.classList.add('is-open');
+        if (field) {
+            field.classList.add('is-open');
+        }
+        menu.hidden = false;
+        toggle.setAttribute('aria-expanded', 'true');
+        markOpenDropdownAncestors(wrapper);
+        syncDropdownDirection(wrapper, toggle, menu);
+
+        const active = menu.querySelector('.tasty-fonts-custom-select-option.is-selected:not(:disabled)')
+            || menu.querySelector('.tasty-fonts-custom-select-option:not(:disabled)');
+
+        if (active instanceof HTMLElement) {
+            menu.querySelectorAll('.tasty-fonts-custom-select-option.is-active').forEach((option) => {
+                option.classList.remove('is-active');
+            });
+            active.classList.add('is-active');
+            toggle.setAttribute('aria-activedescendant', active.id || '');
+        }
+    }
+
+    function selectEnhancedSelectOption(select, optionButton) {
+        if (!(select instanceof HTMLSelectElement) || !(optionButton instanceof HTMLElement)) {
+            return;
+        }
+
+        const optionIndex = Number(optionButton.dataset.enhancedSelectIndex || '-1');
+        const option = select.options[optionIndex] || null;
+
+        if (!option || option.disabled) {
+            return;
+        }
+
+        const previousValue = String(select.value || '');
+        select.selectedIndex = optionIndex;
+
+        if (String(select.value || '') !== previousValue) {
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            select.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        updateEnhancedSelect(select);
+        closeEnhancedSelect(select);
+
+        const { toggle } = enhancedSelectParts(select);
+        if (toggle instanceof HTMLElement) {
+            toggle.focus();
+        }
+    }
+
+    function moveEnhancedSelectActive(select, direction) {
+        const { menu, toggle } = enhancedSelectParts(select);
+
+        if (!(menu instanceof HTMLElement)) {
+            return;
+        }
+
+        const options = Array.from(menu.querySelectorAll('.tasty-fonts-custom-select-option:not(:disabled)'))
+            .filter((option) => !option.hidden && !((option.closest('li') || {}).hidden));
+
+        if (options.length === 0) {
+            return;
+        }
+
+        const currentIndex = options.findIndex((option) => option.classList.contains('is-active'));
+        let nextIndex = currentIndex < 0
+            ? 0
+            : (currentIndex + direction + options.length) % options.length;
+
+        if (direction === -Infinity) {
+            nextIndex = 0;
+        } else if (direction === Infinity) {
+            nextIndex = options.length - 1;
+        }
+
+        options.forEach((option) => option.classList.remove('is-active'));
+        options[nextIndex].classList.add('is-active');
+
+        if (toggle instanceof HTMLElement) {
+            toggle.setAttribute('aria-activedescendant', options[nextIndex].id || '');
+        }
+
+        scrollOptionIntoMenu(menu, options[nextIndex]);
+    }
+
+    function enhanceSelect(select) {
+        if (!(select instanceof HTMLSelectElement) || select.dataset.enhancedSelectBound === '1') {
+            return;
+        }
+
+        const selectId = String(select.id || '').trim() || `tasty-fonts-enhanced-select-${enhancedSelectIdCounter += 1}`;
+        const menuId = `${selectId}-menu`;
+        const wrapper = document.createElement('span');
+        const toggle = document.createElement('button');
+        const value = document.createElement('span');
+        const icon = document.createElement('span');
+        const menu = document.createElement('ul');
+        const field = select.closest('.tasty-fonts-select-field');
+        const sourceLabel = String(select.getAttribute('aria-label') || select.getAttribute('title') || '').trim();
+
+        if (!select.id) {
+            select.id = selectId;
+        }
+
+        wrapper.className = 'tasty-fonts-custom-select';
+        wrapper.dataset.enhancedSelect = '1';
+
+        toggle.type = 'button';
+        toggle.className = 'tasty-fonts-custom-select-toggle';
+        toggle.dataset.enhancedSelectToggle = '1';
+        toggle.setAttribute('aria-haspopup', 'listbox');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-controls', menuId);
+        if (sourceLabel !== '') {
+            toggle.setAttribute('aria-label', sourceLabel);
+        }
+
+        value.className = 'tasty-fonts-custom-select-value';
+        value.dataset.enhancedSelectValue = '1';
+
+        icon.className = 'tasty-fonts-custom-select-icon';
+        icon.setAttribute('aria-hidden', 'true');
+
+        menu.className = 'tasty-fonts-custom-select-menu';
+        menu.id = menuId;
+        menu.dataset.enhancedSelectMenu = '1';
+        menu.setAttribute('role', 'listbox');
+        menu.hidden = true;
+
+        toggle.appendChild(value);
+        toggle.appendChild(icon);
+        wrapper.appendChild(toggle);
+        wrapper.appendChild(menu);
+        select.insertAdjacentElement('afterend', wrapper);
+
+        select.dataset.enhancedSelectBound = '1';
+        select.classList.add('tasty-fonts-native-select-hidden');
+        select.setAttribute('aria-hidden', 'true');
+        select.tabIndex = -1;
+
+        if (field) {
+            field.classList.add('is-enhanced');
+        }
+
+        updateEnhancedSelect(select);
+
+        toggle.addEventListener('click', () => {
+            if (wrapper.classList.contains('is-open')) {
+                closeEnhancedSelect(select);
+            } else {
+                openEnhancedSelect(select);
+            }
+        });
+
+        toggle.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                openEnhancedSelect(select);
+                moveEnhancedSelectActive(select, 1);
+                return;
+            }
+
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                openEnhancedSelect(select);
+                moveEnhancedSelectActive(select, -1);
+                return;
+            }
+
+            if (event.key === 'Home') {
+                event.preventDefault();
+                openEnhancedSelect(select);
+                moveEnhancedSelectActive(select, -Infinity);
+                return;
+            }
+
+            if (event.key === 'End') {
+                event.preventDefault();
+                openEnhancedSelect(select);
+                moveEnhancedSelectActive(select, Infinity);
+                return;
+            }
+
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                if (!wrapper.classList.contains('is-open')) {
+                    openEnhancedSelect(select);
+                    return;
+                }
+
+                const active = menu.querySelector('.tasty-fonts-custom-select-option.is-active');
+                if (active instanceof HTMLElement) {
+                    selectEnhancedSelectOption(select, active);
+                }
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                closeEnhancedSelect(select);
+            }
+        });
+
+        menu.addEventListener('click', (event) => {
+            const option = event.target instanceof Element ? event.target.closest('[data-enhanced-select-option]') : null;
+
+            if (option instanceof HTMLElement) {
+                selectEnhancedSelectOption(select, option);
+            }
+        });
+
+        select.addEventListener('change', () => {
+            updateEnhancedSelect(select);
+        });
+
+        if (window.MutationObserver) {
+            const observer = new MutationObserver(() => {
+                updateEnhancedSelect(select);
+            });
+
+            observer.observe(select, {
+                attributes: true,
+                attributeFilter: ['disabled'],
+                childList: true,
+                subtree: true,
+            });
+        }
+    }
+
+    function enhanceCustomSelects(root = document) {
+        enhancedSelects(root).forEach((select) => {
+            enhanceSelect(select);
+        });
+
+        if (!enhancedSelectDocumentBound) {
+            enhancedSelectDocumentBound = true;
+            document.addEventListener('click', (event) => {
+                const target = event.target;
+
+                document.querySelectorAll('select[data-enhanced-select-bound="1"]').forEach((select) => {
+                    const { wrapper } = enhancedSelectParts(select);
+
+                    if (
+                        select instanceof HTMLSelectElement
+                        && wrapper instanceof HTMLElement
+                        && target instanceof Node
+                        && !wrapper.contains(target)
+                    ) {
+                        closeEnhancedSelect(select);
+                    }
+                });
+                clearOpenDropdownAncestorsWhenIdle();
+            });
+        }
+    }
+
+	function fallbackComboboxParts(combobox) {
+		return {
+			input: combobox ? combobox.querySelector('input[type="text"]') : null,
+			toggle: combobox ? combobox.querySelector('[data-fallback-combobox-toggle]') : null,
+			menu: combobox ? combobox.querySelector('[data-fallback-combobox-menu]') : null,
+			options: combobox ? Array.from(combobox.querySelectorAll('[data-fallback-value]')) : [],
+		};
+	}
+
+	function closeFallbackCombobox(combobox) {
+		const { input, toggle, menu, options } = fallbackComboboxParts(combobox);
+
+		if (!combobox || !menu) {
+			return;
+		}
+
+		combobox.classList.remove('is-open');
+        combobox.classList.remove('is-open-above');
+		menu.hidden = true;
+		if (input) {
+			input.setAttribute('aria-expanded', 'false');
+		}
+		if (toggle) {
+			toggle.setAttribute('aria-expanded', 'false');
+		}
+		options.forEach((option) => option.classList.remove('is-active'));
+        clearOpenDropdownAncestorsWhenIdle();
+	}
+
+	function filterFallbackComboboxOptions(combobox, queryOverride = null) {
+		const { input, options } = fallbackComboboxParts(combobox);
+		const rawQuery = queryOverride === null && input ? input.value : queryOverride;
+		const query = String(rawQuery || '').trim().toLowerCase();
+		let visibleCount = 0;
+
+		options.forEach((option) => {
+			const value = String(option.dataset.fallbackValue || option.textContent || '').toLowerCase();
+			const visible = query === '' || value.includes(query);
+			const item = option.closest('li');
+
+			if (item) {
+				item.hidden = !visible;
+			}
+			option.hidden = !visible;
+			option.classList.remove('is-active');
+			if (visible) {
+				visibleCount += 1;
+			}
+		});
+
+		return visibleCount;
+	}
+
+	function openFallbackCombobox(combobox, optionsConfig = {}) {
+		const { input, toggle, menu, options } = fallbackComboboxParts(combobox);
+
+		if (!combobox || !menu) {
+			return;
+		}
+
+		const visibleCount = filterFallbackComboboxOptions(combobox, optionsConfig.showAll ? '' : null);
+		combobox.classList.add('is-open');
+		menu.hidden = visibleCount === 0;
+        if (visibleCount > 0) {
+            markOpenDropdownAncestors(combobox);
+            syncDropdownDirection(combobox, input || toggle, menu);
+        }
+		if (input) {
+			input.setAttribute('aria-expanded', visibleCount === 0 ? 'false' : 'true');
+		}
+		if (toggle) {
+			toggle.setAttribute('aria-expanded', visibleCount === 0 ? 'false' : 'true');
+		}
+
+		if (visibleCount > 0 && !options.some((option) => option.classList.contains('is-active') && !option.hidden)) {
+			const firstVisible = options.find((option) => !option.hidden && !(option.closest('li') || {}).hidden);
+			if (firstVisible) {
+				firstVisible.classList.add('is-active');
+			}
+		}
+	}
+
+	function selectFallbackComboboxValue(combobox, value) {
+		const { input } = fallbackComboboxParts(combobox);
+
+		if (!(input instanceof HTMLInputElement)) {
+			return;
+		}
+
+		input.value = String(value || '').trim();
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		input.dispatchEvent(new Event('change', { bubbles: true }));
+		closeFallbackCombobox(combobox);
+		input.focus();
+	}
+
+	function moveFallbackComboboxActive(combobox, direction) {
+		const { options } = fallbackComboboxParts(combobox);
+		const visibleOptions = options.filter((option) => !option.hidden && !((option.closest('li') || {}).hidden));
+
+		if (visibleOptions.length === 0) {
+			return;
+		}
+
+		const currentIndex = visibleOptions.findIndex((option) => option.classList.contains('is-active'));
+		const nextIndex = currentIndex < 0
+			? 0
+			: (currentIndex + direction + visibleOptions.length) % visibleOptions.length;
+
+		visibleOptions.forEach((option) => option.classList.remove('is-active'));
+		visibleOptions[nextIndex].classList.add('is-active');
+		const { menu } = fallbackComboboxParts(combobox);
+        scrollOptionIntoMenu(menu, visibleOptions[nextIndex]);
+	}
+
+	function bindFallbackComboboxes(root = document) {
+		const scope = root || document;
+
+		scope.querySelectorAll('[data-fallback-combobox]').forEach((combobox) => {
+			if (!(combobox instanceof HTMLElement) || combobox.dataset.fallbackComboboxBound === '1') {
+				return;
+			}
+
+			const { input, toggle, options } = fallbackComboboxParts(combobox);
+
+			if (!(input instanceof HTMLInputElement)) {
+				return;
+			}
+
+			combobox.dataset.fallbackComboboxBound = '1';
+
+			input.addEventListener('focus', () => {
+				if (!combobox.classList.contains('is-open')) {
+					filterFallbackComboboxOptions(combobox);
+				}
+			});
+
+			input.addEventListener('input', () => {
+				openFallbackCombobox(combobox);
+			});
+
+			input.addEventListener('keydown', (event) => {
+				if (event.key === 'ArrowDown') {
+					event.preventDefault();
+					openFallbackCombobox(combobox);
+					moveFallbackComboboxActive(combobox, 1);
+					return;
+				}
+
+				if (event.key === 'ArrowUp') {
+					event.preventDefault();
+					openFallbackCombobox(combobox);
+					moveFallbackComboboxActive(combobox, -1);
+					return;
+				}
+
+				if (event.key === 'Enter' && combobox.classList.contains('is-open')) {
+					const active = options.find((option) => option.classList.contains('is-active') && !option.hidden);
+					if (active) {
+						event.preventDefault();
+						selectFallbackComboboxValue(combobox, active.dataset.fallbackValue || active.textContent || '');
+					}
+					return;
+				}
+
+				if (event.key === 'Escape') {
+					closeFallbackCombobox(combobox);
+				}
+			});
+
+			if (toggle instanceof HTMLElement) {
+				toggle.addEventListener('click', () => {
+					if (combobox.classList.contains('is-open')) {
+						closeFallbackCombobox(combobox);
+					} else {
+						openFallbackCombobox(combobox, { showAll: true });
+						input.focus();
+					}
+				});
+			}
+
+			options.forEach((option) => {
+				option.addEventListener('click', () => {
+					selectFallbackComboboxValue(combobox, option.dataset.fallbackValue || option.textContent || '');
+				});
+			});
+		});
+
+		if (!fallbackComboboxDocumentBound) {
+			fallbackComboboxDocumentBound = true;
+			document.addEventListener('click', (event) => {
+				const target = event.target;
+				document.querySelectorAll('[data-fallback-combobox].is-open').forEach((combobox) => {
+					if (combobox instanceof HTMLElement && target instanceof Node && !combobox.contains(target)) {
+						closeFallbackCombobox(combobox);
+					}
+				});
+                clearOpenDropdownAncestorsWhenIdle();
+			});
+		}
+	}
+
     function bindFamilyFallbackControls(root = document) {
         const scope = root || document;
+
+		bindFallbackComboboxes(scope);
 
         scope.querySelectorAll('.tasty-fonts-fallback-selector').forEach((element) => {
             const form = element.closest('[data-family-fallback-form]');
@@ -12831,12 +13783,13 @@
     function bindRolePreviewControls() {
         [roleHeading, roleBody, roleMonospace, roleHeadingFallback, roleBodyFallback, roleMonospaceFallback].forEach((element) => {
             if (element) {
-                element.addEventListener('change', () => {
-                    syncRoleFallbackControls();
-                    renderAllRoleWeightEditors();
-                    renderAllRoleAxisEditors();
-                    updateRoleOutputs();
-                });
+	                element.addEventListener('change', () => {
+	                    syncRoleFallbackControls();
+	                    renderAllRoleWeightEditors();
+	                    renderAllRoleAxisEditors();
+	                    syncOutputSettingsUi();
+	                    updateRoleOutputs();
+	                });
             }
         });
 
@@ -13356,7 +14309,8 @@
             'input[type="checkbox"][name="class_output_category_sans_enabled"], ' +
             'input[type="checkbox"][name="class_output_category_serif_enabled"], ' +
             'input[type="checkbox"][name="class_output_category_mono_enabled"], ' +
-            'input[type="checkbox"][name="class_output_families_enabled"]'
+            'input[type="checkbox"][name="class_output_families_enabled"], ' +
+            'input[type="checkbox"][name="class_output_role_styles_enabled"]'
         ));
     }
 
@@ -13364,7 +14318,9 @@
         return Array.from(document.querySelectorAll(
             'input[type="checkbox"][name="extended_variable_role_weight_vars_enabled"], ' +
             'input[type="checkbox"][name="extended_variable_weight_tokens_enabled"], ' +
-            'input[type="checkbox"][name="extended_variable_role_aliases_enabled"], ' +
+            'input[type="checkbox"][name="extended_variable_role_alias_interface_enabled"], ' +
+            'input[type="checkbox"][name="extended_variable_role_alias_ui_enabled"], ' +
+            'input[type="checkbox"][name="extended_variable_role_alias_code_enabled"], ' +
             'input[type="checkbox"][name="extended_variable_category_sans_enabled"], ' +
             'input[type="checkbox"][name="extended_variable_category_serif_enabled"], ' +
             'input[type="checkbox"][name="extended_variable_category_mono_enabled"]'
@@ -13420,12 +14376,6 @@
         const preference = !outputQuickModeBootstrapped && initialOutputQuickModePreference
             ? sanitizeOutputQuickModePreference(initialOutputQuickModePreference)
             : currentOutputQuickModePreference();
-
-        if (preference === 'custom') {
-            setOutputQuickModePreference('custom');
-            outputQuickModeBootstrapped = true;
-            return;
-        }
 
         setOutputQuickModePreference(
             normalizeOutputQuickModePreference(preference, state)
@@ -13562,6 +14512,8 @@
     }
 
     function applyOutputQuickMode(mode) {
+        syncOutputDependencyControls();
+
         const classFlags = outputClassFlagInputs();
         const variableFlags = outputVariableFlagInputs();
         const minimalMode = mode === 'minimal';
@@ -13585,10 +14537,20 @@
         }
 
         classFlags.forEach((input) => {
+            if (input === outputRoleClassStylesInput) {
+                return;
+            }
+
             if (!input.disabled) {
                 input.checked = enableClassFlags;
             }
         });
+
+        syncRoleClassStylesDependency();
+
+        if (outputRoleClassStylesInput && !outputRoleClassStylesInput.disabled) {
+            outputRoleClassStylesInput.checked = enableClassFlags;
+        }
 
         variableFlags.forEach((input) => {
             if (!input.disabled) {
@@ -13603,7 +14565,30 @@
         syncOutputSettingsUi();
     }
 
+    function syncAcssRoleWeightVariableControl() {
+        if (!outputRoleWeightVariablesInput || !acssRoleSyncInput) {
+            return;
+        }
+
+        const locked = !!acssRoleSyncInput.checked;
+        outputRoleWeightVariablesInput.disabled = locked;
+        if (locked) {
+            outputRoleWeightVariablesInput.checked = true;
+        }
+        if (outputRoleWeightVariablesHiddenInput) {
+            outputRoleWeightVariablesHiddenInput.value = locked ? '1' : '0';
+        }
+
+        const label = outputRoleWeightVariablesInput.closest('.tasty-fonts-toggle-field');
+        if (label) {
+            label.classList.toggle('is-disabled', locked);
+        }
+    }
+
     function syncOutputSettingsUi() {
+        syncAcssRoleWeightVariableControl();
+        syncOutputDependencyControls();
+        syncRoleClassStylesDependency();
         setOutputPanelState(outputPanels.classes, !!(outputMasterInputs.classes && outputMasterInputs.classes.checked));
         setOutputPanelState(outputPanels.variables, !!(outputMasterInputs.variables && outputMasterInputs.variables.checked));
 
@@ -13678,6 +14663,10 @@
 
         if (outputRoleWeightInput) {
             outputRoleWeightInput.addEventListener('change', syncOutputSettingsUi);
+        }
+
+        if (acssRoleSyncInput) {
+            acssRoleSyncInput.addEventListener('change', syncOutputSettingsUi);
         }
 
         monospaceRoleSettingInputs.forEach((input) => {
@@ -14242,6 +15231,7 @@
         });
         window.addEventListener('popstate', handleTrackedUiPopState);
 
+        enhanceCustomSelects();
         bindAdobeProjectControls();
         bindFamilyFallbackControls();
         bindFamilyFontDisplayControls();

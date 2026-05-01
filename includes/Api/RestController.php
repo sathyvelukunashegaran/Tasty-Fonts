@@ -40,6 +40,7 @@ final class RestController
         'saveFamilyFallback' => 'families/fallback',
         'saveFamilyFontDisplay' => 'families/font-display',
         'saveRoleDraft' => 'roles/draft',
+        'publishRoleDraft' => 'roles/publish',
         'saveFamilyDelivery' => 'families/delivery',
         'saveFamilyPublishState' => 'families/publish-state',
         'deleteDeliveryProfile' => 'families/delivery-profile',
@@ -118,6 +119,7 @@ final class RestController
             'font_display' => $this->buildTextArg(false, ['inherit', 'auto', 'block', 'swap', 'fallback', 'optional']),
         ]);
         $this->registerRoute(self::ROUTES['saveRoleDraft'], 'PATCH', [$this, 'saveRoleDraft'], $this->roleDraftArgs());
+        $this->registerRoute(self::ROUTES['publishRoleDraft'], 'POST', [$this, 'publishRoleDraft'], $this->roleDraftArgs());
         $this->registerRoute(self::ROUTES['saveFamilyDelivery'], 'PATCH', [$this, 'saveFamilyDelivery'], [
             'family_slug' => $this->buildTextArg(true),
             'delivery_id' => $this->buildTextArg(true),
@@ -149,6 +151,8 @@ final class RestController
                 'repair_storage_scaffold',
                 'reset_integration_detection_state',
                 'reset_suppressed_notices',
+                'reset_family_fallbacks_to_global',
+                'reset_fallbacks_to_plugin_defaults',
             ]),
         ]);
         $this->registerRoute(self::ROUTES['toolsSupportBundle'], 'POST', [$this, 'buildSupportBundle']);
@@ -299,6 +303,13 @@ final class RestController
     {
         return $this->restResult(
             $this->admin->saveRoleDraftValues($this->getRoleDraftInput($request))
+        );
+    }
+
+    public function publishRoleDraft(WP_REST_Request $request): mixed
+    {
+        return $this->restResult(
+            $this->admin->publishRoleDraftValues($this->getRoleDraftInput($request))
         );
     }
 

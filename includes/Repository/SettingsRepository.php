@@ -84,10 +84,34 @@ final class SettingsRepository
         'class_output_families_enabled',
         'class_output_role_styles_enabled',
     ];
-    private const MONOSPACE_CLASS_OUTPUT_FIELDS = [
+    private const CLASS_OUTPUT_SUBGROUP_FIELDS = [
+        'class_output_role_heading_enabled',
+        'class_output_role_body_enabled',
         'class_output_role_monospace_enabled',
+        'class_output_role_alias_interface_enabled',
+        'class_output_role_alias_ui_enabled',
         'class_output_role_alias_code_enabled',
+        'class_output_category_sans_enabled',
+        'class_output_category_serif_enabled',
         'class_output_category_mono_enabled',
+        'class_output_families_enabled',
+        'class_output_role_styles_enabled',
+    ];
+    private const VARIABLE_OUTPUT_SUBGROUP_FIELDS = [
+        'extended_variable_role_weight_vars_enabled',
+        'extended_variable_weight_tokens_enabled',
+        'extended_variable_role_aliases_enabled',
+        'extended_variable_role_alias_interface_enabled',
+        'extended_variable_role_alias_ui_enabled',
+        'extended_variable_role_alias_code_enabled',
+        'extended_variable_category_sans_enabled',
+        'extended_variable_category_serif_enabled',
+        'extended_variable_category_mono_enabled',
+    ];
+    private const EXTENDED_VARIABLE_ROLE_ALIAS_FIELDS = [
+        'extended_variable_role_alias_interface_enabled',
+        'extended_variable_role_alias_ui_enabled',
+        'extended_variable_role_alias_code_enabled',
     ];
     private const DEFAULT_SETTINGS = [
         'auto_apply_roles' => false,
@@ -97,6 +121,9 @@ final class SettingsRepository
         'font_display' => 'swap',
         'unicode_range_mode' => FontUtils::UNICODE_RANGE_MODE_OFF,
         'unicode_range_custom_value' => '',
+        'fallback_heading' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+        'fallback_body' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+        'fallback_monospace' => FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK,
         'output_quick_mode_preference' => self::OUTPUT_QUICK_MODE_MINIMAL,
         'class_output_enabled' => false,
         'class_output_role_heading_enabled' => true,
@@ -117,6 +144,9 @@ final class SettingsRepository
         'extended_variable_role_weight_vars_enabled' => true,
         'extended_variable_weight_tokens_enabled' => true,
         'extended_variable_role_aliases_enabled' => true,
+        'extended_variable_role_alias_interface_enabled' => true,
+        'extended_variable_role_alias_ui_enabled' => true,
+        'extended_variable_role_alias_code_enabled' => true,
         'extended_variable_category_sans_enabled' => true,
         'extended_variable_category_serif_enabled' => true,
         'extended_variable_category_mono_enabled' => true,
@@ -125,6 +155,7 @@ final class SettingsRepository
         'update_channel' => self::UPDATE_CHANNEL_STABLE,
         'block_editor_font_library_sync_enabled' => null,
         'etch_integration_enabled' => null,
+        'etch_quick_roles_panel_enabled' => false,
         'bricks_integration_enabled' => null,
         'bricks_theme_styles_sync_enabled' => false,
         'bricks_theme_style_target_mode' => 'managed',
@@ -176,7 +207,12 @@ final class SettingsRepository
     private const DEFAULT_ROLE_FALLBACKS = [
         'heading_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
         'body_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
-        'monospace_fallback' => 'monospace',
+        'monospace_fallback' => FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK,
+    ];
+    private const GLOBAL_FALLBACK_DEFAULTS = [
+        'fallback_heading' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+        'fallback_body' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
+        'fallback_monospace' => FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK,
     ];
     private const ROLE_WEIGHT_KEYS = ['heading_weight', 'body_weight', 'monospace_weight'];
     private const ROLE_AXIS_KEYS = ['heading_axes', 'body_axes', 'monospace_axes'];
@@ -197,6 +233,7 @@ final class SettingsRepository
             $storedSettings,
             self::DEFAULT_SETTINGS
         ));
+        $settings = $this->defaultRoleAliasVariableSettingsFromLegacy($settings, $storedSettings);
         $settings = $this->mergeGoogleApiKeyDataIntoSettings($settings, $this->getGoogleApiKeyDataFromOptions());
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($this->normalizeInputMap($storedSettings), $settings));
         $settings['auto_apply_roles'] = !empty($settings['auto_apply_roles']);
@@ -207,6 +244,9 @@ final class SettingsRepository
         $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue(
             $this->stringValue($settings, 'unicode_range_custom_value')
         );
+        $settings['fallback_heading'] = $this->normalizeGlobalFallback($settings['fallback_heading'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_body'] = $this->normalizeGlobalFallback($settings['fallback_body'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_monospace'] = $this->normalizeGlobalFallback($settings['fallback_monospace'] ?? '', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK);
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
         $settings['class_output_role_styles_enabled'] = !empty($settings['class_output_role_styles_enabled']);
@@ -215,6 +255,9 @@ final class SettingsRepository
         $settings['extended_variable_role_weight_vars_enabled'] = !empty($settings['extended_variable_role_weight_vars_enabled']);
         $settings['extended_variable_weight_tokens_enabled'] = !empty($settings['extended_variable_weight_tokens_enabled']);
         $settings['extended_variable_role_aliases_enabled'] = !empty($settings['extended_variable_role_aliases_enabled']);
+        $settings['extended_variable_role_alias_interface_enabled'] = !empty($settings['extended_variable_role_alias_interface_enabled']);
+        $settings['extended_variable_role_alias_ui_enabled'] = !empty($settings['extended_variable_role_alias_ui_enabled']);
+        $settings['extended_variable_role_alias_code_enabled'] = !empty($settings['extended_variable_role_alias_code_enabled']);
         $settings['extended_variable_category_sans_enabled'] = !empty($settings['extended_variable_category_sans_enabled']);
         $settings['extended_variable_category_serif_enabled'] = !empty($settings['extended_variable_category_serif_enabled']);
         $settings['extended_variable_category_mono_enabled'] = !empty($settings['extended_variable_category_mono_enabled']);
@@ -227,6 +270,7 @@ final class SettingsRepository
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
         $settings['etch_integration_enabled'] = $this->normalizeOptionalBoolean($settings['etch_integration_enabled'] ?? null);
+        $settings['etch_quick_roles_panel_enabled'] = !empty($settings['etch_quick_roles_panel_enabled']);
         $settings['bricks_integration_enabled'] = $this->normalizeOptionalBoolean($settings['bricks_integration_enabled'] ?? null);
         $settings['bricks_theme_styles_sync_enabled'] = !empty($settings['bricks_theme_styles_sync_enabled']);
         $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($settings['bricks_theme_style_target_mode'] ?? 'managed');
@@ -272,10 +316,16 @@ final class SettingsRepository
         );
         $settings['google_api_key_status_message'] = $this->sanitizeStatusMessage($settings['google_api_key_status_message'] ?? '');
         $settings['google_api_key_checked_at'] = $this->normalizeTimestamp($settings['google_api_key_checked_at'] ?? 0);
+        $settings['fallback_heading'] = $this->normalizeGlobalFallback($settings['fallback_heading'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_body'] = $this->normalizeGlobalFallback($settings['fallback_body'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_monospace'] = $this->normalizeGlobalFallback($settings['fallback_monospace'] ?? '', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK);
         $settings['family_fallbacks'] = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
         $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
         $settings['delete_uploaded_files_on_uninstall'] = !empty($settings['delete_uploaded_files_on_uninstall']);
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings = $this->normalizeAcssRoleWeightVariableOutput($settings);
+        $settings = $this->normalizeMonospaceOutputSettings($settings);
+        $settings = $this->normalizeRoleUsageFontWeightOutput($settings);
         $settings['output_quick_mode_preference'] = $this->resolveOutputQuickModePreference($storedSettings, $settings);
 
         return $this->cacheSettings($settings);
@@ -287,6 +337,7 @@ final class SettingsRepository
      */
     public function saveSettings(array $input): array
     {
+        $input = $this->defaultRoleAliasVariableSettingsFromLegacy($input, $input);
         $settings = $this->getSettings();
         $monospaceRoleWasEnabled = !empty($settings['monospace_role_enabled']);
         $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
@@ -335,6 +386,15 @@ final class SettingsRepository
             $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue(
                 $this->stringValue($input, 'unicode_range_custom_value')
             );
+            $settingsChanged = true;
+        }
+
+        foreach (self::GLOBAL_FALLBACK_DEFAULTS as $field => $defaultFallback) {
+            if (!array_key_exists($field, $input)) {
+                continue;
+            }
+
+            $settings[$field] = $this->normalizeGlobalFallback($input[$field], $defaultFallback);
             $settingsChanged = true;
         }
 
@@ -415,6 +475,9 @@ final class SettingsRepository
                 'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
+                'extended_variable_role_alias_interface_enabled',
+                'extended_variable_role_alias_ui_enabled',
+                'extended_variable_role_alias_code_enabled',
                 'extended_variable_category_sans_enabled',
                 'extended_variable_category_serif_enabled',
                 'extended_variable_category_mono_enabled',
@@ -450,6 +513,11 @@ final class SettingsRepository
 
         if (array_key_exists('etch_integration_enabled', $input)) {
             $settings['etch_integration_enabled'] = $this->normalizeOptionalBoolean($input['etch_integration_enabled']);
+            $settingsChanged = true;
+        }
+
+        if (array_key_exists('etch_quick_roles_panel_enabled', $input)) {
+            $settings['etch_quick_roles_panel_enabled'] = !empty($input['etch_quick_roles_panel_enabled']);
             $settingsChanged = true;
         }
 
@@ -517,8 +585,6 @@ final class SettingsRepository
             $settingsChanged = true;
         }
 
-        $settings = $this->restoreMonospaceClassOutputsOnFirstEnable($settings, $input, $monospaceRoleWasEnabled);
-
         if (array_key_exists('acss_font_role_sync_enabled', $input)) {
             $settings['acss_font_role_sync_enabled'] = $this->normalizeOptionalBoolean($input['acss_font_role_sync_enabled']);
             $settingsChanged = true;
@@ -549,7 +615,12 @@ final class SettingsRepository
             $settings['output_quick_mode_preference'] = self::OUTPUT_QUICK_MODE_MINIMAL;
         }
 
+        $settings = $this->applyOutputQuickModeSelectionDefaults($settings, $input);
+        $settings = $this->restoreMonospaceOutputDefaultsOnFirstEnable($settings, $input, $monospaceRoleWasEnabled);
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings = $this->normalizeAcssRoleWeightVariableOutput($settings);
+        $settings = $this->normalizeMonospaceOutputSettings($settings);
+        $settings = $this->normalizeRoleUsageFontWeightOutput($settings);
         $settings['output_quick_mode_preference'] = $this->normalizeOutputQuickModePreference(
             $this->stringValue($settings, 'output_quick_mode_preference'),
             $settings
@@ -803,6 +874,33 @@ final class SettingsRepository
     }
 
     /**
+     * @return NormalizedSettings
+     */
+    public function resetFamilyFallbacks(): array
+    {
+        $settings = $this->getSettings();
+        $settings['family_fallbacks'] = [];
+
+        return $this->persistSettings($settings);
+    }
+
+    /**
+     * @return NormalizedSettings
+     */
+    public function resetAllFallbacksToDefaults(): array
+    {
+        $settings = $this->getSettings();
+
+        foreach (self::GLOBAL_FALLBACK_DEFAULTS as $field => $defaultFallback) {
+            $settings[$field] = $defaultFallback;
+        }
+
+        $settings['family_fallbacks'] = [];
+
+        return $this->persistSettings($settings);
+    }
+
+    /**
      * @param SettingsInput $settings
      * @return NormalizedSettings
      */
@@ -875,6 +973,7 @@ final class SettingsRepository
         $settings = $this->getSettings();
         $settings['block_editor_font_library_sync_enabled'] = null;
         $settings['etch_integration_enabled'] = null;
+        $settings['etch_quick_roles_panel_enabled'] = false;
         $settings['bricks_integration_enabled'] = null;
         $settings['bricks_theme_styles_sync_enabled'] = false;
         $settings['bricks_theme_style_target_mode'] = 'managed';
@@ -1189,7 +1288,9 @@ final class SettingsRepository
     {
         $settings = $this->withoutGoogleApiKeyData($settings);
         $hasAdminAccessCustomEnabled = array_key_exists('admin_access_custom_enabled', $settings);
+        $rawSettings = $settings;
         $settings = $this->normalizeInputMap(wp_parse_args($settings, self::DEFAULT_SETTINGS));
+        $settings = $this->defaultRoleAliasVariableSettingsFromLegacy($settings, $rawSettings);
         $settings['acss_font_role_sync_opted_out'] = false;
         $settings['acss_font_role_sync_applied'] = false;
         $settings['acss_font_role_sync_previous_heading_font_family'] = '';
@@ -1227,6 +1328,9 @@ final class SettingsRepository
         $settings['unicode_range_custom_value'] = FontUtils::normalizeUnicodeRangeValue(
             $this->stringValue($settings, 'unicode_range_custom_value')
         );
+        $settings['fallback_heading'] = $this->normalizeGlobalFallback($settings['fallback_heading'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_body'] = $this->normalizeGlobalFallback($settings['fallback_body'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_monospace'] = $this->normalizeGlobalFallback($settings['fallback_monospace'] ?? '', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK);
         $settings['minify_css_output'] = !empty($settings['minify_css_output']);
         $settings['role_usage_font_weight_enabled'] = !empty($settings['role_usage_font_weight_enabled']);
         $settings['class_output_role_styles_enabled'] = !empty($settings['class_output_role_styles_enabled']);
@@ -1235,6 +1339,9 @@ final class SettingsRepository
         $settings['extended_variable_role_weight_vars_enabled'] = !empty($settings['extended_variable_role_weight_vars_enabled']);
         $settings['extended_variable_weight_tokens_enabled'] = !empty($settings['extended_variable_weight_tokens_enabled']);
         $settings['extended_variable_role_aliases_enabled'] = !empty($settings['extended_variable_role_aliases_enabled']);
+        $settings['extended_variable_role_alias_interface_enabled'] = !empty($settings['extended_variable_role_alias_interface_enabled']);
+        $settings['extended_variable_role_alias_ui_enabled'] = !empty($settings['extended_variable_role_alias_ui_enabled']);
+        $settings['extended_variable_role_alias_code_enabled'] = !empty($settings['extended_variable_role_alias_code_enabled']);
         $settings['extended_variable_category_sans_enabled'] = !empty($settings['extended_variable_category_sans_enabled']);
         $settings['extended_variable_category_serif_enabled'] = !empty($settings['extended_variable_category_serif_enabled']);
         $settings['extended_variable_category_mono_enabled'] = !empty($settings['extended_variable_category_mono_enabled']);
@@ -1247,6 +1354,7 @@ final class SettingsRepository
             $settings['block_editor_font_library_sync_enabled'] ?? null
         );
         $settings['etch_integration_enabled'] = $this->normalizeOptionalBoolean($settings['etch_integration_enabled'] ?? null);
+        $settings['etch_quick_roles_panel_enabled'] = !empty($settings['etch_quick_roles_panel_enabled']);
         $settings['bricks_integration_enabled'] = $this->normalizeOptionalBoolean($settings['bricks_integration_enabled'] ?? null);
         $settings['bricks_theme_styles_sync_enabled'] = !empty($settings['bricks_theme_styles_sync_enabled']);
         $settings['bricks_theme_style_target_mode'] = $this->normalizeBricksThemeStyleTargetMode($settings['bricks_theme_style_target_mode'] ?? 'managed');
@@ -1290,6 +1398,9 @@ final class SettingsRepository
         );
         $settings['google_api_key_status_message'] = $this->sanitizeStatusMessage($settings['google_api_key_status_message'] ?? '');
         $settings['google_api_key_checked_at'] = $this->normalizeTimestamp($settings['google_api_key_checked_at'] ?? 0);
+        $settings['fallback_heading'] = $this->normalizeGlobalFallback($settings['fallback_heading'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_body'] = $this->normalizeGlobalFallback($settings['fallback_body'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $settings['fallback_monospace'] = $this->normalizeGlobalFallback($settings['fallback_monospace'] ?? '', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK);
         $settings['family_fallbacks'] = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
         $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
         $settings['delete_uploaded_files_on_uninstall'] = !empty($settings['delete_uploaded_files_on_uninstall']);
@@ -1320,7 +1431,7 @@ final class SettingsRepository
         $normalizedRoles['monospace'] = $this->sanitizeTextValue($normalizedRoles['monospace'] ?? '');
         $normalizedRoles['heading_fallback'] = $this->normalizeRoleFallback($normalizedRoles['heading_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
         $normalizedRoles['body_fallback'] = $this->normalizeRoleFallback($normalizedRoles['body_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
-        $normalizedRoles['monospace_fallback'] = $this->normalizeRoleFallback($normalizedRoles['monospace_fallback'] ?? '', 'monospace');
+        $normalizedRoles['monospace_fallback'] = $this->normalizeRoleFallback($normalizedRoles['monospace_fallback'] ?? '', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK);
         $normalizedRoles['heading_weight'] = $this->normalizeRoleWeight($normalizedRoles['heading_weight'] ?? '');
         $normalizedRoles['body_weight'] = $this->normalizeRoleWeight($normalizedRoles['body_weight'] ?? '');
         $normalizedRoles['monospace_weight'] = $this->normalizeRoleWeight($normalizedRoles['monospace_weight'] ?? '');
@@ -1422,6 +1533,13 @@ final class SettingsRepository
         }
 
         return FontUtils::sanitizeFallback($rawValue);
+    }
+
+    private function normalizeGlobalFallback(mixed $value, string $default): string
+    {
+        $fallback = FontUtils::sanitizeOptionalFallback(wp_unslash($this->mixedStringValue($value)));
+
+        return $fallback !== '' ? $fallback : $default;
     }
 
     private function sanitizeTextValue(mixed $value): string
@@ -1625,6 +1743,9 @@ final class SettingsRepository
 
         $settings = array_replace($settings, $this->normalizeClassOutputSettings($settings));
         $settings = $this->normalizeMinimalOutputPresetSettings($settings);
+        $settings = $this->normalizeAcssRoleWeightVariableOutput($settings);
+        $settings = $this->normalizeMonospaceOutputSettings($settings);
+        $settings = $this->normalizeRoleUsageFontWeightOutput($settings);
         $settings['admin_access_role_slugs'] = $this->normalizeAdminAccessRoleSlugs($settings['admin_access_role_slugs'] ?? []);
         $settings['admin_access_user_ids'] = $this->normalizeAdminAccessUserIds($settings['admin_access_user_ids'] ?? []);
         $settings['admin_access_custom_enabled'] = $this->normalizeAdminAccessCustomEnabled(
@@ -1663,6 +1784,140 @@ final class SettingsRepository
     }
 
     /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
+    private function normalizeAcssRoleWeightVariableOutput(array $settings): array
+    {
+        if (($settings['acss_font_role_sync_enabled'] ?? null) === true) {
+            $settings['extended_variable_role_weight_vars_enabled'] = true;
+        }
+
+        return $settings;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
+    private function normalizeMonospaceOutputSettings(array $settings): array
+    {
+        return $settings;
+    }
+
+    /**
+     * @param SettingsInput|NormalizedSettings $settings
+     * @param SettingsInput|NormalizedSettings $source
+     * @return SettingsInput|NormalizedSettings
+     */
+    private function defaultRoleAliasVariableSettingsFromLegacy(array $settings, array $source): array
+    {
+        if (!array_key_exists('extended_variable_role_aliases_enabled', $source)) {
+            return $settings;
+        }
+
+        $legacyValue = !empty($source['extended_variable_role_aliases_enabled']);
+
+        foreach (self::EXTENDED_VARIABLE_ROLE_ALIAS_FIELDS as $field) {
+            if (!array_key_exists($field, $source)) {
+                $settings[$field] = $legacyValue;
+            }
+        }
+
+        return $settings;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @return NormalizedSettings
+     */
+    private function normalizeRoleUsageFontWeightOutput(array $settings): array
+    {
+        if ($this->deriveExactOutputQuickMode($settings) !== self::OUTPUT_QUICK_MODE_CUSTOM) {
+            $settings['role_usage_font_weight_enabled'] = false;
+        }
+
+        return $settings;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @param SettingsInput $input
+     * @return NormalizedSettings
+     */
+    private function applyOutputQuickModeSelectionDefaults(array $settings, array $input): array
+    {
+        if (!array_key_exists('output_quick_mode_preference', $input)) {
+            return $settings;
+        }
+
+        $requestedMode = $this->sanitizeOutputQuickModePreference($input['output_quick_mode_preference']);
+
+        if ($requestedMode === '') {
+            return $settings;
+        }
+
+        if ($requestedMode === self::OUTPUT_QUICK_MODE_MINIMAL) {
+            $settings['minimal_output_preset_enabled'] = true;
+            $settings['class_output_enabled'] = false;
+            $settings['per_variant_font_variables_enabled'] = true;
+            $settings['role_usage_font_weight_enabled'] = false;
+            $settings['class_output_role_styles_enabled'] = false;
+
+            return $settings;
+        }
+
+        $settings['minimal_output_preset_enabled'] = false;
+        $settings['role_usage_font_weight_enabled'] = $requestedMode === self::OUTPUT_QUICK_MODE_CUSTOM
+            ? !empty($settings['role_usage_font_weight_enabled'])
+            : false;
+
+        if ($requestedMode === self::OUTPUT_QUICK_MODE_VARIABLES) {
+            $settings['class_output_enabled'] = false;
+            $settings['per_variant_font_variables_enabled'] = true;
+            $settings = $this->defaultAbsentBooleanFields($settings, $input, self::VARIABLE_OUTPUT_SUBGROUP_FIELDS, true);
+            $settings = $this->defaultAbsentBooleanFields($settings, $input, self::CLASS_OUTPUT_SUBGROUP_FIELDS, false);
+
+            return $settings;
+        }
+
+        if ($requestedMode === self::OUTPUT_QUICK_MODE_CLASSES) {
+            $settings['class_output_enabled'] = true;
+            $settings['per_variant_font_variables_enabled'] = false;
+            $settings = $this->defaultAbsentBooleanFields($settings, $input, self::CLASS_OUTPUT_SUBGROUP_FIELDS, true);
+            $settings = $this->defaultAbsentBooleanFields($settings, $input, self::VARIABLE_OUTPUT_SUBGROUP_FIELDS, false);
+
+            return $settings;
+        }
+
+        $settings['class_output_enabled'] = true;
+        $settings['per_variant_font_variables_enabled'] = true;
+        $settings = $this->defaultAbsentBooleanFields($settings, $input, self::CLASS_OUTPUT_SUBGROUP_FIELDS, true);
+        $settings = $this->defaultAbsentBooleanFields($settings, $input, self::VARIABLE_OUTPUT_SUBGROUP_FIELDS, true);
+
+        return $settings;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @param SettingsInput $input
+     * @param list<string> $fields
+     * @return NormalizedSettings
+     */
+    private function defaultAbsentBooleanFields(array $settings, array $input, array $fields, bool $default): array
+    {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $input)) {
+                continue;
+            }
+
+            $settings[$field] = $default;
+        }
+
+        return $settings;
+    }
+
+    /**
      * @param SettingsInput $storedSettings
      * @param NormalizedSettings $settings
      */
@@ -1680,20 +1935,9 @@ final class SettingsRepository
      */
     private function normalizeOutputQuickModePreference(string $preference, array $settings): string
     {
-        $preference = $this->sanitizeOutputQuickModePreference($preference);
-        $exactMode = $this->deriveExactOutputQuickMode($settings);
+        $this->sanitizeOutputQuickModePreference($preference);
 
-        if ($preference === self::OUTPUT_QUICK_MODE_CUSTOM) {
-            return self::OUTPUT_QUICK_MODE_CUSTOM;
-        }
-
-        if ($preference === '') {
-            return $exactMode;
-        }
-
-        return $exactMode === $preference
-            ? $preference
-            : self::OUTPUT_QUICK_MODE_CUSTOM;
+        return $this->deriveExactOutputQuickMode($settings);
     }
 
     /**
@@ -1705,81 +1949,22 @@ final class SettingsRepository
             return self::OUTPUT_QUICK_MODE_MINIMAL;
         }
 
-        if (
-            empty($settings['class_output_enabled'])
-            && !empty($settings['per_variant_font_variables_enabled'])
-            && empty($settings['role_usage_font_weight_enabled'])
-            && $this->allVariableSubgroupsEnabled($settings)
-        ) {
+        $classOutputEnabled = !empty($settings['class_output_enabled']);
+        $variableOutputEnabled = !empty($settings['per_variant_font_variables_enabled']);
+
+        if ($classOutputEnabled && $variableOutputEnabled) {
+            return self::OUTPUT_QUICK_MODE_CUSTOM;
+        }
+
+        if ($variableOutputEnabled) {
             return self::OUTPUT_QUICK_MODE_VARIABLES;
         }
 
-        if (
-            !empty($settings['class_output_enabled'])
-            && empty($settings['per_variant_font_variables_enabled'])
-            && empty($settings['role_usage_font_weight_enabled'])
-            && $this->allClassSubgroupsEnabled($settings)
-        ) {
+        if ($classOutputEnabled) {
             return self::OUTPUT_QUICK_MODE_CLASSES;
         }
 
         return self::OUTPUT_QUICK_MODE_CUSTOM;
-    }
-
-    /**
-     * @param NormalizedSettings $settings
-     */
-    private function allVariableSubgroupsEnabled(array $settings): bool
-    {
-        $fields = [
-            'extended_variable_role_weight_vars_enabled',
-            'extended_variable_weight_tokens_enabled',
-            'extended_variable_role_aliases_enabled',
-            'extended_variable_category_sans_enabled',
-            'extended_variable_category_serif_enabled',
-        ];
-
-        if (!empty($settings['monospace_role_enabled'])) {
-            $fields[] = 'extended_variable_category_mono_enabled';
-        }
-
-        foreach ($fields as $field) {
-            if (empty($settings[$field])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * @param NormalizedSettings $settings
-     */
-    private function allClassSubgroupsEnabled(array $settings): bool
-    {
-        $fields = [
-            'class_output_role_heading_enabled',
-            'class_output_role_body_enabled',
-            'class_output_role_alias_interface_enabled',
-            'class_output_role_alias_ui_enabled',
-            'class_output_category_sans_enabled',
-            'class_output_category_serif_enabled',
-            'class_output_families_enabled',
-        ];
-
-        if (!empty($settings['monospace_role_enabled'])) {
-            $fields[] = 'class_output_role_monospace_enabled';
-            $fields[] = 'class_output_role_alias_code_enabled';
-            $fields[] = 'class_output_category_mono_enabled';
-        }
-
-        foreach ($fields as $field) {
-            if (empty($settings[$field])) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private function sanitizeOutputQuickModePreference(mixed $value): string
@@ -1809,6 +1994,9 @@ final class SettingsRepository
                 'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
+                'extended_variable_role_alias_interface_enabled',
+                'extended_variable_role_alias_ui_enabled',
+                'extended_variable_role_alias_code_enabled',
                 'extended_variable_category_sans_enabled',
                 'extended_variable_category_serif_enabled',
                 'extended_variable_category_mono_enabled',
@@ -1850,6 +2038,9 @@ final class SettingsRepository
                 'extended_variable_role_weight_vars_enabled',
                 'extended_variable_weight_tokens_enabled',
                 'extended_variable_role_aliases_enabled',
+                'extended_variable_role_alias_interface_enabled',
+                'extended_variable_role_alias_ui_enabled',
+                'extended_variable_role_alias_code_enabled',
                 'extended_variable_category_sans_enabled',
                 'extended_variable_category_serif_enabled',
                 'extended_variable_category_mono_enabled',
@@ -2173,20 +2364,8 @@ final class SettingsRepository
      * @param SettingsInput $input
      * @return NormalizedSettings
      */
-    private function restoreMonospaceClassOutputsOnFirstEnable(array $settings, array $input, bool $monospaceRoleWasEnabled): array
+    private function restoreMonospaceOutputDefaultsOnFirstEnable(array $settings, array $input, bool $monospaceRoleWasEnabled): array
     {
-        if ($monospaceRoleWasEnabled || empty($settings['monospace_role_enabled'])) {
-            return $settings;
-        }
-
-        foreach (self::MONOSPACE_CLASS_OUTPUT_FIELDS as $field) {
-            if (array_key_exists($field, $input)) {
-                continue;
-            }
-
-            $settings[$field] = true;
-        }
-
         return $settings;
     }
 

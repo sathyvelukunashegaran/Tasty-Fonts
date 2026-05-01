@@ -105,6 +105,14 @@ final class AdminPageViewBuilder
         $fontDisplayOptions = $this->valueLabelOptionListValue($context, 'font_display_options');
         $unicodeRangeMode = $this->stringValue($context, 'unicode_range_mode', FontUtils::UNICODE_RANGE_MODE_OFF);
         $unicodeRangeCustomValue = $this->stringValue($context, 'unicode_range_custom_value');
+        $fallbackHeading = $this->stringValue($context, 'fallback_heading', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $fallbackBody = $this->stringValue($context, 'fallback_body', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
+        $fallbackMonospace = $this->stringValue($context, 'fallback_monospace', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK);
+        $globalFallbackSettings = [
+            'fallback_heading' => $fallbackHeading,
+            'fallback_body' => $fallbackBody,
+            'fallback_monospace' => $fallbackMonospace,
+        ];
         $unicodeRangeModeOptions = $this->valueLabelOptionListValue($context, 'unicode_range_mode_options');
         $unicodeRangeCustomVisible = !empty($context['unicode_range_custom_visible']);
         $outputQuickModePreference = $this->stringValue($context, 'output_quick_mode_preference');
@@ -141,6 +149,15 @@ final class AdminPageViewBuilder
             || !empty($context['extended_variable_weight_tokens_enabled']);
         $extendedVariableRoleAliasesEnabled = !array_key_exists('extended_variable_role_aliases_enabled', $context)
             || !empty($context['extended_variable_role_aliases_enabled']);
+        $extendedVariableRoleAliasInterfaceEnabled = array_key_exists('extended_variable_role_alias_interface_enabled', $context)
+            ? !empty($context['extended_variable_role_alias_interface_enabled'])
+            : $extendedVariableRoleAliasesEnabled;
+        $extendedVariableRoleAliasUiEnabled = array_key_exists('extended_variable_role_alias_ui_enabled', $context)
+            ? !empty($context['extended_variable_role_alias_ui_enabled'])
+            : $extendedVariableRoleAliasesEnabled;
+        $extendedVariableRoleAliasCodeEnabled = array_key_exists('extended_variable_role_alias_code_enabled', $context)
+            ? !empty($context['extended_variable_role_alias_code_enabled'])
+            : $extendedVariableRoleAliasesEnabled;
         $extendedVariableCategorySansEnabled = !array_key_exists('extended_variable_category_sans_enabled', $context)
             || !empty($context['extended_variable_category_sans_enabled']);
         $extendedVariableCategorySerifEnabled = !array_key_exists('extended_variable_category_serif_enabled', $context)
@@ -167,12 +184,17 @@ final class AdminPageViewBuilder
         $bunnyFontImportsEnabled = !empty($context['bunny_font_imports_enabled']);
         $adobeFontImportsEnabled = !empty($context['adobe_font_imports_enabled']);
         $localFontUploadsEnabled = !empty($context['local_font_uploads_enabled']);
+        $customCssUrlImportsAvailable = array_key_exists('custom_css_url_imports_available', $context)
+            ? !empty($context['custom_css_url_imports_available'])
+            : in_array($updateChannel, ['beta', 'nightly'], true);
         $customCssUrlImportsEnabled = !empty($context['custom_css_url_imports_enabled']);
+        $customCssUrlImportsExperimentalHelp = __('This workflow is being tested and can break. Only switch it on if you are testing URL imports and can share feedback.', 'tasty-fonts');
         $deleteUploadedFilesOnUninstall = !empty($context['delete_uploaded_files_on_uninstall']);
         $advancedTools = $this->mapValue($context, 'advanced_tools');
         $diagnosticItems = $this->listOfMapsValue($context, 'diagnostic_items');
         $overviewMetrics = $this->listOfMapsValue($context, 'overview_metrics');
         $outputPanels = $this->listOfMapsValue($context, 'output_panels');
+        $outputTogglePreviews = $this->mapValue($context, 'output_toggle_previews');
         $generatedCssPanel = $this->mapValue($context, 'generated_css_panel');
         $previewPanels = $this->listOfMapsValue($context, 'preview_panels');
         $localEnvironmentNotice = $this->mapValue($context, 'local_environment_notice');
@@ -180,6 +202,10 @@ final class AdminPageViewBuilder
         $gutenbergIntegration = $this->mapValue($context, 'gutenberg_integration');
         $etchIntegration = $this->mapValue($context, 'etch_integration');
         $acssIntegration = $this->mapValue($context, 'acss_integration');
+        $roleWeightVariablesLocked = !empty($acssIntegration['enabled']);
+        if ($roleWeightVariablesLocked) {
+            $extendedVariableRoleWeightVarsEnabled = true;
+        }
         $bricksIntegration = $this->mapValue($context, 'bricks_integration');
         $bricksIntegration = $this->buildBricksIntegrationView($bricksIntegration);
         $oxygenIntegration = $this->mapValue($context, 'oxygen_integration');
@@ -198,9 +224,9 @@ final class AdminPageViewBuilder
         $previewHasDraftRoleChanges = !$this->roleSetsMatch($previewRoles, $roles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled, $familyFallbacks);
         $previewHasPendingLiveRoleChanges = $applyEverywhere && !$this->roleSetsMatch($previewRoles, $appliedRoles, $monospaceRoleEnabled, $catalog, $variableFontsEnabled, $familyFallbacks);
         $libraryRoleUsageRoles = $applyEverywhere ? $appliedRoles : [];
-        $previewHeadingFallback = $this->resolveEffectiveRoleFallback('heading', $previewRoles, $catalog, $familyFallbacks);
-        $previewBodyFallback = $this->resolveEffectiveRoleFallback('body', $previewRoles, $catalog, $familyFallbacks);
-        $previewMonospaceFallback = $this->resolveEffectiveRoleFallback('monospace', $previewRoles, $catalog, $familyFallbacks);
+        $previewHeadingFallback = $this->resolveEffectiveRoleFallback('heading', $previewRoles, $catalog, $familyFallbacks, $globalFallbackSettings);
+        $previewBodyFallback = $this->resolveEffectiveRoleFallback('body', $previewRoles, $catalog, $familyFallbacks, $globalFallbackSettings);
+        $previewMonospaceFallback = $this->resolveEffectiveRoleFallback('monospace', $previewRoles, $catalog, $familyFallbacks, $globalFallbackSettings);
         $previewHeadingStack = FontUtils::buildFontStack(
             $this->stringValue($previewRoles, 'heading'),
             $previewHeadingFallback
@@ -220,9 +246,9 @@ final class AdminPageViewBuilder
         $headingFamily = $this->stringValue($roles, 'heading');
         $bodyFamily = $this->stringValue($roles, 'body');
         $monospaceFamily = $this->stringValue($roles, 'monospace');
-        $headingFallback = $this->resolveEffectiveRoleFallback('heading', $roles, $catalog, $familyFallbacks);
-        $bodyFallback = $this->resolveEffectiveRoleFallback('body', $roles, $catalog, $familyFallbacks);
-        $monospaceFallback = $this->resolveEffectiveRoleFallback('monospace', $roles, $catalog, $familyFallbacks);
+        $headingFallback = $this->resolveEffectiveRoleFallback('heading', $roles, $catalog, $familyFallbacks, $globalFallbackSettings);
+        $bodyFallback = $this->resolveEffectiveRoleFallback('body', $roles, $catalog, $familyFallbacks, $globalFallbackSettings);
+        $monospaceFallback = $this->resolveEffectiveRoleFallback('monospace', $roles, $catalog, $familyFallbacks, $globalFallbackSettings);
         $headingStack = FontUtils::buildFontStack($headingFamily, $headingFallback);
         $bodyStack = FontUtils::buildFontStack($bodyFamily, $bodyFallback);
         $monospaceStack = FontUtils::buildFontStack($monospaceFamily, $monospaceFallback);
@@ -262,33 +288,41 @@ final class AdminPageViewBuilder
         $roleDeploymentAnnouncementId = 'tasty-fonts-role-deployment-announcement';
         $storageErrorMessage = trim($this->storage->getLastFilesystemErrorMessage());
         $categoryAliasOwners = $this->buildCategoryAliasOwners($catalog, $roles, $monospaceRoleEnabled);
+        $bodyFamilyAssigned = trim($this->stringValue($roles, 'body')) !== '';
+        $monospaceFamilyAssigned = $monospaceRoleEnabled && trim($this->stringValue($roles, 'monospace')) !== '';
+        $outputDependencyStates = $this->buildOutputDependencyStates(
+            $bodyFamilyAssigned,
+            $monospaceFamilyAssigned,
+            $monospaceRoleEnabled,
+            $categoryAliasOwners,
+            $availableFamilies
+        );
         $extendedVariableOptions = [
             'enabled' => $perVariantFontVariablesEnabled,
             'minimal' => $minimalOutputPresetEnabled,
             'role_weight_vars' => $extendedVariableRoleWeightVarsEnabled,
             'weight_tokens' => $extendedVariableWeightTokensEnabled,
             'role_aliases' => $extendedVariableRoleAliasesEnabled,
+            'role_alias_interface' => $extendedVariableRoleAliasInterfaceEnabled,
+            'role_alias_ui' => $extendedVariableRoleAliasUiEnabled,
+            'role_alias_code' => $extendedVariableRoleAliasCodeEnabled,
             'category_sans' => $extendedVariableCategorySansEnabled,
             'category_serif' => $extendedVariableCategorySerifEnabled,
+            'category_mono' => $extendedVariableCategoryMonoEnabled,
         ];
-        if ($monospaceRoleEnabled) {
-            $extendedVariableOptions['category_mono'] = $extendedVariableCategoryMonoEnabled;
-        }
         $classOutputOptions = [
             'enabled' => $classOutputEnabled,
             'role_heading' => $classOutputRoleHeadingEnabled,
             'role_body' => $classOutputRoleBodyEnabled,
+            'role_monospace' => $classOutputRoleMonospaceEnabled,
             'role_alias_interface' => $classOutputRoleAliasInterfaceEnabled,
             'role_alias_ui' => $classOutputRoleAliasUiEnabled,
+            'role_alias_code' => $classOutputRoleAliasCodeEnabled,
             'category_sans' => $classOutputCategorySansEnabled,
             'category_serif' => $classOutputCategorySerifEnabled,
+            'category_mono' => $classOutputCategoryMonoEnabled,
             'families' => $classOutputFamiliesEnabled,
         ];
-        if ($monospaceRoleEnabled) {
-            $classOutputOptions['role_monospace'] = $classOutputRoleMonospaceEnabled;
-            $classOutputOptions['role_alias_code'] = $classOutputRoleAliasCodeEnabled;
-            $classOutputOptions['category_mono'] = $classOutputCategoryMonoEnabled;
-        }
         $outputQuickMode = $this->deriveOutputQuickMode(
             $outputQuickModePreference,
             $classOutputOptions,
@@ -298,6 +332,8 @@ final class AdminPageViewBuilder
         if ($outputQuickMode === 'custom') {
             $classOutputEnabled = true;
             $perVariantFontVariablesEnabled = true;
+        } else {
+            $roleUsageFontWeightEnabled = false;
         }
         $advancedOutputControlsExpanded = in_array($outputQuickMode, ['variables', 'classes', 'custom'], true);
 
@@ -583,6 +619,57 @@ final class AdminPageViewBuilder
         ];
     }
 
+    /**
+     * @param array<string, string> $categoryAliasOwners
+     * @param list<string> $availableFamilies
+     * @return array<string, array{available: bool, help: string}>
+     */
+    private function buildOutputDependencyStates(
+        bool $bodyFamilyAssigned,
+        bool $monospaceFamilyAssigned,
+        bool $monospaceRoleEnabled,
+        array $categoryAliasOwners,
+        array $availableFamilies
+    ): array {
+        $savedPreferenceHelp = __('Saved preference will resume when available.', 'tasty-fonts');
+        $monospaceHelp = $monospaceRoleEnabled
+            ? __('Needs an assigned Monospace family.', 'tasty-fonts')
+            : __('Needs Monospace enabled and an assigned Monospace family.', 'tasty-fonts');
+
+        return [
+            'body-family' => [
+                'available' => $bodyFamilyAssigned,
+                'help' => __('Needs an assigned Body family.', 'tasty-fonts') . ' ' . $savedPreferenceHelp,
+            ],
+            'monospace-family' => [
+                'available' => $monospaceFamilyAssigned,
+                'help' => $monospaceHelp . ' ' . $savedPreferenceHelp,
+            ],
+            'monospace-enabled' => [
+                'available' => $monospaceRoleEnabled,
+                'help' => __('Needs Monospace enabled.', 'tasty-fonts') . ' ' . $savedPreferenceHelp,
+            ],
+            'category-sans' => [
+                'available' => trim((string) ($categoryAliasOwners['--font-sans'] ?? '')) !== '',
+                'help' => __('Needs an available sans family.', 'tasty-fonts') . ' ' . $savedPreferenceHelp,
+            ],
+            'category-serif' => [
+                'available' => trim((string) ($categoryAliasOwners['--font-serif'] ?? '')) !== '',
+                'help' => __('Needs an available serif family.', 'tasty-fonts') . ' ' . $savedPreferenceHelp,
+            ],
+            'category-mono' => [
+                'available' => $monospaceRoleEnabled && trim((string) ($categoryAliasOwners['--font-mono'] ?? '')) !== '',
+                'help' => ($monospaceRoleEnabled
+                    ? __('Needs an available monospace family.', 'tasty-fonts')
+                    : __('Needs Monospace enabled and an available monospace family.', 'tasty-fonts')) . ' ' . $savedPreferenceHelp,
+            ],
+            'family-library' => [
+                'available' => $availableFamilies !== [],
+                'help' => __('Needs at least one available library family.', 'tasty-fonts') . ' ' . $savedPreferenceHelp,
+            ],
+        ];
+    }
+
     private function buildBricksFeatureStatusLabel(string $featureKey, string $status): string
     {
         if ($featureKey === 'bricks_theme_styles_sync_enabled') {
@@ -788,20 +875,9 @@ final class AdminPageViewBuilder
         bool $roleUsageFontWeightEnabled
     ): string
     {
-        $preference = $this->sanitizeOutputQuickModePreference($preference);
-        $exactMode = $this->deriveExactOutputQuickMode($classOutputOptions, $extendedVariableOptions, $roleUsageFontWeightEnabled);
+        $this->sanitizeOutputQuickModePreference($preference);
 
-        if ($preference === 'custom') {
-            return 'custom';
-        }
-
-        if ($preference === '') {
-            return $exactMode;
-        }
-
-        return $exactMode === $preference
-            ? $preference
-            : 'custom';
+        return $this->deriveExactOutputQuickMode($classOutputOptions, $extendedVariableOptions, $roleUsageFontWeightEnabled);
     }
 
     /**
@@ -817,44 +893,22 @@ final class AdminPageViewBuilder
             return 'minimal';
         }
 
-        if (
-            empty($classOutputOptions['enabled'])
-            && !empty($extendedVariableOptions['enabled'])
-            && !$roleUsageFontWeightEnabled
-            && $this->allOutputFlagsEnabled($extendedVariableOptions, ['enabled', 'minimal'])
-        ) {
+        $classOutputEnabled = !empty($classOutputOptions['enabled']);
+        $variableOutputEnabled = !empty($extendedVariableOptions['enabled']);
+
+        if ($classOutputEnabled && $variableOutputEnabled) {
+            return 'custom';
+        }
+
+        if ($variableOutputEnabled) {
             return 'variables';
         }
 
-        if (
-            !empty($classOutputOptions['enabled'])
-            && empty($extendedVariableOptions['enabled'])
-            && !$roleUsageFontWeightEnabled
-            && $this->allOutputFlagsEnabled($classOutputOptions, ['enabled'])
-        ) {
+        if ($classOutputEnabled) {
             return 'classes';
         }
 
         return 'custom';
-    }
-
-    /**
-     * @param array<string, bool> $options
-     * @param list<string> $ignoredKeys
-     */
-    private function allOutputFlagsEnabled(array $options, array $ignoredKeys = []): bool
-    {
-        foreach ($options as $key => $enabled) {
-            if (in_array((string) $key, $ignoredKeys, true)) {
-                continue;
-            }
-
-            if (!$enabled) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private function sanitizeOutputQuickModePreference(string $preference): string

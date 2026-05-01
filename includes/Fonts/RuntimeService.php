@@ -7,6 +7,9 @@ namespace TastyFonts\Fonts;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Adobe\AdobeProjectClient;
+use TastyFonts\Admin\AdminAccessService;
+use TastyFonts\Admin\AdminController;
+use TastyFonts\Api\RestController;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
@@ -42,7 +45,10 @@ final class RuntimeService
         private readonly SettingsRepository $settings,
         private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
-        private readonly OxygenIntegrationService $oxygenIntegration
+        private readonly OxygenIntegrationService $oxygenIntegration,
+        private readonly ?CatalogService $catalog = null,
+        private readonly ?RoleFamilyCatalogBuilder $roleFamilyCatalogBuilder = null,
+        private readonly ?AdminAccessService $adminAccess = null
     ) {
     }
 
@@ -386,8 +392,9 @@ final class RuntimeService
 
         $stylesheetUrls = $this->getCanvasStylesheetUrls();
         $inlineCss = $this->getCanvasInlineCss();
+        $quickRoles = $this->buildEtchCanvasQuickRolesPayload();
 
-        if ($stylesheetUrls === [] && $inlineCss === []) {
+        if ($stylesheetUrls === [] && $inlineCss === [] && empty($quickRoles['enabled'])) {
             return;
         }
 
@@ -400,9 +407,26 @@ final class RuntimeService
         );
 
         wp_enqueue_script(
+            'tasty-fonts-admin-contracts',
+            TASTY_FONTS_URL . 'assets/js/admin-contracts.js',
+            [],
+            TASTY_FONTS_VERSION,
+            true
+        );
+
+        if (!empty($quickRoles['enabled'])) {
+            wp_enqueue_style(
+                'tasty-fonts-canvas',
+                TASTY_FONTS_URL . 'assets/css/tasty-canvas.css',
+                [],
+                TASTY_FONTS_VERSION
+            );
+        }
+
+        wp_enqueue_script(
             'tasty-fonts-canvas',
             TASTY_FONTS_URL . 'assets/js/tasty-canvas.js',
-            ['tasty-fonts-canvas-contracts'],
+            ['tasty-fonts-canvas-contracts', 'tasty-fonts-admin-contracts'],
             TASTY_FONTS_VERSION,
             true
         );
@@ -414,8 +438,77 @@ final class RuntimeService
                 'stylesheetUrl' => $stylesheetUrls[0] ?? '',
                 'stylesheetUrls' => $stylesheetUrls,
                 'inlineCss' => $inlineCss,
+                'quickRoles' => $quickRoles,
             ]
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildEtchCanvasQuickRolesPayload(): array
+    {
+        if ($this->catalog === null) {
+            return ['enabled' => false];
+        }
+
+        $adminAccess = $this->adminAccess ?? new AdminAccessService($this->settings);
+
+        if (!$adminAccess->canCurrentUserAccess()) {
+            return ['enabled' => false];
+        }
+
+        $settings = $this->settings->getSettings();
+
+        if (empty($settings['etch_quick_roles_panel_enabled'])) {
+            return ['enabled' => false];
+        }
+
+        $catalog = $this->catalog->getCatalog();
+        $builder = $this->roleFamilyCatalogBuilder ?? new RoleFamilyCatalogBuilder();
+        $roleFamilyCatalog = $builder->build($catalog, $settings);
+
+        $familyNames = array_keys($roleFamilyCatalog);
+        $roles = $this->settings->getRoles($familyNames);
+        $appliedRoles = $this->settings->getAppliedRoles($familyNames);
+
+        return [
+            'enabled' => true,
+            'restUrl' => rest_url(RestController::API_NAMESPACE . '/'),
+            'restNonce' => wp_create_nonce('wp_rest'),
+            'routes' => RestController::routeMap(),
+            'adminUrl' => add_query_arg(
+                ['page' => AdminController::MENU_SLUG],
+                admin_url('admin.php')
+            ),
+            'roles' => $roles,
+            'appliedRoles' => $appliedRoles,
+            'applyEverywhere' => !empty($settings['auto_apply_roles']),
+            'monospaceRoleEnabled' => !empty($settings['monospace_role_enabled']),
+            'variableFontsEnabled' => !empty($settings['variable_fonts_enabled']),
+            'roleFamilyCatalog' => $roleFamilyCatalog,
+            'strings' => [
+                'title' => __('Tasty Fonts', 'tasty-fonts'),
+                'subtitle' => __('Quick roles', 'tasty-fonts'),
+                'close' => __('Close panel', 'tasty-fonts'),
+                'heading' => __('Heading', 'tasty-fonts'),
+                'body' => __('Body', 'tasty-fonts'),
+                'monospace' => __('Monospace', 'tasty-fonts'),
+                'fallbackOnly' => __('Fallback only', 'tasty-fonts'),
+                'saving' => __('Saving…', 'tasty-fonts'),
+                'saved' => __('Saved', 'tasty-fonts'),
+                'failed' => __('Could not save roles.', 'tasty-fonts'),
+                'pendingPublish' => __('Saved as draft. Publish roles to update the live site.', 'tasty-fonts'),
+                'publish' => __('Publish Site-Wide', 'tasty-fonts'),
+                'publishing' => __('Publishing…', 'tasty-fonts'),
+                'published' => __('Published site-wide.', 'tasty-fonts'),
+                'publishFailed' => __('Could not publish roles.', 'tasty-fonts'),
+                'openAdmin' => __('Open Tasty Fonts', 'tasty-fonts'),
+                'alreadyLive' => __('These roles are already live site-wide.', 'tasty-fonts'),
+                'refreshingCanvas' => __('Refreshing the Etch canvas…', 'tasty-fonts'),
+                'noFamilies' => __('No Tasty Fonts families are available yet.', 'tasty-fonts'),
+            ],
+        ];
     }
 
     /**

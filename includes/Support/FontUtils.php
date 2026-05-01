@@ -29,8 +29,11 @@ final class FontUtils
     public const UNICODE_RANGE_PRESET_LATIN_BASIC = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
     public const UNICODE_RANGE_PRESET_LATIN_EXTENDED = 'U+0000-00FF,U+0100-024F,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+1E00-1EFF,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
     public const DEFAULT_ROLE_SANS_FALLBACK = 'system-ui, sans-serif';
+    public const DEFAULT_ROLE_MONOSPACE_FALLBACK = 'ui-monospace, monospace';
     public const FALLBACK_SUGGESTIONS = [
         self::DEFAULT_ROLE_SANS_FALLBACK,
+        self::DEFAULT_ROLE_MONOSPACE_FALLBACK,
+        'system-ui, sans-serif',
         'sans-serif',
         'serif',
         'monospace',
@@ -38,7 +41,6 @@ final class FontUtils
         'ui-sans-serif',
         'ui-serif',
         'ui-monospace',
-        '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         'Arial, sans-serif',
         'Georgia, serif',
     ];
@@ -66,6 +68,21 @@ final class FontUtils
         $fallback = trim($fallback, " \t\n\r\0\x0B,");
 
         return $fallback !== '' ? $fallback : 'sans-serif';
+    }
+
+    public static function sanitizeOptionalFallback(mixed $fallback): string
+    {
+        if (!is_scalar($fallback)) {
+            return '';
+        }
+
+        $fallback = html_entity_decode(trim((string) $fallback), ENT_QUOTES, 'UTF-8');
+
+        if ($fallback === '') {
+            return '';
+        }
+
+        return self::sanitizeFallback($fallback);
     }
 
     public static function escapeFontFamily(string $family): string

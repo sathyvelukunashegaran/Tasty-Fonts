@@ -6,12 +6,14 @@ namespace TastyFonts\Admin\Renderer;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Fonts\FallbackResolver;
 use TastyFonts\Support\FontUtils;
 
 /**
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
  * @phpstan-type PreviewView array<string, mixed>
  * @phpstan-type FamilyLabelMap array<string, string>
+ * @phpstan-type GlobalFallbackSettings array<string, string>
  * @phpstan-type FamilyOption array{value: string, label: string, type?: string}
  * @phpstan-type FamilyOptionList list<FamilyOption>
  */
@@ -28,8 +30,16 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
     /**
      * @param RoleSet $roles
      * @param FamilyLabelMap $familyLabels
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
-    public function renderPreviewScene(string $key, string $previewText, array $roles, bool $monospaceRoleEnabled = false, array $familyLabels = []): void
+    public function renderPreviewScene(
+        string $key,
+        string $previewText,
+        array $roles,
+        bool $monospaceRoleEnabled = false,
+        array $familyLabels = [],
+        array $globalFallbackSettings = []
+    ): void
     {
         switch ($key) {
             case 'editorial':
@@ -45,7 +55,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                                 <div class="tasty-fonts-preview-specimen-poster-meta">
                                     <span class="tasty-fonts-preview-specimen-poster-eyebrow" data-role-preview="body"><?php esc_html_e('Type Specimen', 'tasty-fonts'); ?></span>
                                     <h3 class="tasty-fonts-preview-specimen-poster-title" data-role-preview="heading"><?php esc_html_e('Hello, world &mdash; this is how your typography reads.', 'tasty-fonts'); ?></h3>
-                                    <?php $this->renderPreviewRoleList($roles, $familyLabels, $monospaceRoleEnabled, 'tasty-fonts-preview-specimen-poster-keys', 'tasty-fonts-preview-specimen-poster-key', true); ?>
+                                    <?php $this->renderPreviewRoleList($roles, $familyLabels, $monospaceRoleEnabled, 'tasty-fonts-preview-specimen-poster-keys', 'tasty-fonts-preview-specimen-poster-key', true, $globalFallbackSettings); ?>
                                 </div>
                             </header>
 
@@ -334,11 +344,11 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 return;
 
             case 'code':
-                $this->renderCodePreviewScene($previewText, $roles, $monospaceRoleEnabled, $familyLabels);
+                $this->renderCodePreviewScene($previewText, $roles, $monospaceRoleEnabled, $familyLabels, $globalFallbackSettings);
                 return;
 
             case 'snippet':
-                $this->renderSnippetPreviewScene($roles, $monospaceRoleEnabled, $familyLabels);
+                $this->renderSnippetPreviewScene($roles, $monospaceRoleEnabled, $familyLabels, $globalFallbackSettings);
                 return;
 
             case 'interface':
@@ -468,8 +478,9 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
     /**
      * @param RoleSet $roles
      * @param FamilyLabelMap $familyLabels
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
-    public function previewRoleName(string $roleKey, array $roles, array $familyLabels = []): string
+    public function previewRoleName(string $roleKey, array $roles, array $familyLabels = [], array $globalFallbackSettings = []): string
     {
         $familyName = trim($this->roleStringValue($roles, $roleKey));
 
@@ -479,13 +490,14 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
 
         return sprintf(
             __('Fallback only (%s)', 'tasty-fonts'),
-            FontUtils::sanitizeFallback($this->roleFallbackValue($roles, $roleKey))
+            FontUtils::sanitizeFallback($this->roleFallbackValue($roles, $roleKey, $globalFallbackSettings))
         );
     }
 
     /**
      * @param RoleSet $roles
      * @param FamilyLabelMap $familyLabels
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
     private function renderPreviewRoleList(
         array $roles,
@@ -493,7 +505,8 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         bool $includeMonospace,
         string $listClass,
         string $itemClass,
-        bool $longLabels = false
+        bool $longLabels = false,
+        array $globalFallbackSettings = []
     ): void {
         $items = [
             'heading' => $longLabels ? __('Heading Family', 'tasty-fonts') : __('Heading', 'tasty-fonts'),
@@ -508,7 +521,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
             <?php foreach ($items as $roleKey => $label): ?>
                 <div class="<?php echo esc_attr($itemClass); ?>">
                     <dt><?php echo esc_html($label); ?></dt>
-                    <dd data-role-preview="<?php echo esc_attr($roleKey); ?>" data-role-preview-name="<?php echo esc_attr($roleKey); ?>"><?php echo esc_html($this->previewRoleName($roleKey, $roles, $familyLabels)); ?></dd>
+                    <dd data-role-preview="<?php echo esc_attr($roleKey); ?>" data-role-preview-name="<?php echo esc_attr($roleKey); ?>"><?php echo esc_html($this->previewRoleName($roleKey, $roles, $familyLabels, $globalFallbackSettings)); ?></dd>
                 </div>
             <?php endforeach; ?>
         </dl>
@@ -519,6 +532,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
      * @param FamilyOptionList $availableFamilyOptions
      * @param RoleSet $previewRoles
      * @param RoleSet $draftRoles
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
     public function renderPreviewRolePicker(
         string $roleKey,
@@ -526,11 +540,12 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
         array $availableFamilyOptions,
         array $previewRoles,
         array $draftRoles,
-        bool $allowFallbackOnly = false
+        bool $allowFallbackOnly = false,
+        array $globalFallbackSettings = []
     ): void {
         $selectedFamily = trim($this->roleStringValue($previewRoles, $roleKey));
         $draftFamily = trim($this->roleStringValue($draftRoles, $roleKey));
-        $fallbackValue = $this->roleFallbackValue($previewRoles, $roleKey);
+        $fallbackValue = $this->roleFallbackValue($previewRoles, $roleKey, $globalFallbackSettings);
         $selectId = 'tasty-fonts-preview-' . sanitize_html_class($roleKey) . '-family';
         ?>
         <div class="tasty-fonts-preview-role-picker" data-preview-role-picker="<?php echo esc_attr($roleKey); ?>">
@@ -587,10 +602,11 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
     /**
      * @param RoleSet $roles
      * @param FamilyLabelMap $familyLabels
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
-    public function renderSnippetPreviewScene(array $roles, bool $monospaceRoleEnabled, array $familyLabels = []): void
+    public function renderSnippetPreviewScene(array $roles, bool $monospaceRoleEnabled, array $familyLabels = [], array $globalFallbackSettings = []): void
     {
-        $snippet = $this->buildPreviewSnippetCss($roles, $monospaceRoleEnabled);
+        $snippet = $this->buildPreviewSnippetCss($roles, $monospaceRoleEnabled, $globalFallbackSettings);
         $lineCount = substr_count($snippet, "\n") + 1;
         ?>
         <div class="tasty-fonts-preview-snippet-workspace">
@@ -599,7 +615,7 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 <h3 class="tasty-fonts-preview-snippet-title" data-role-preview="heading"><?php esc_html_e('Copy the exact pairing you are previewing.', 'tasty-fonts'); ?></h3>
                 <p class="tasty-fonts-preview-snippet-copy" data-role-preview="body"><?php esc_html_e('This CSS is generated from the current Preview Workspace selection, including draft changes that are not published yet. Use it when you want this same font combo in custom CSS, a child theme, or a builder field.', 'tasty-fonts'); ?></p>
 
-                <?php $this->renderPreviewRoleList($roles, $familyLabels, $monospaceRoleEnabled, 'tasty-fonts-preview-snippet-role-list', 'tasty-fonts-preview-snippet-role'); ?>
+                <?php $this->renderPreviewRoleList($roles, $familyLabels, $monospaceRoleEnabled, 'tasty-fonts-preview-snippet-role-list', 'tasty-fonts-preview-snippet-role', false, $globalFallbackSettings); ?>
 
                 <div class="tasty-fonts-preview-snippet-note" data-role-preview="body">
                     <span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
@@ -643,8 +659,9 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
     /**
      * @param RoleSet $roles
      * @param FamilyLabelMap $familyLabels
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
-    public function renderCodePreviewScene(string $previewText, array $roles, bool $monospaceRoleEnabled, array $familyLabels = []): void
+    public function renderCodePreviewScene(string $previewText, array $roles, bool $monospaceRoleEnabled, array $familyLabels = [], array $globalFallbackSettings = []): void
     {
         $editorPreviewHeadingId = 'tasty-fonts-preview-code-editor-heading';
         $blockPreviewHeadingId = 'tasty-fonts-preview-code-block-heading';
@@ -657,15 +674,15 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
                 <div class="tasty-fonts-preview-code-meta">
                     <div class="tasty-fonts-preview-code-meta-item">
                         <span class="tasty-fonts-preview-code-meta-label"><?php esc_html_e('Code Face', 'tasty-fonts'); ?></span>
-                        <strong class="tasty-fonts-preview-code-meta-value" data-role-preview="monospace" data-role-preview-name="monospace"><?php echo esc_html($this->previewRoleName('monospace', $roles, $familyLabels)); ?></strong>
+                        <strong class="tasty-fonts-preview-code-meta-value" data-role-preview="monospace" data-role-preview-name="monospace"><?php echo esc_html($this->previewRoleName('monospace', $roles, $familyLabels, $globalFallbackSettings)); ?></strong>
                     </div>
                     <div class="tasty-fonts-preview-code-meta-item">
                         <span class="tasty-fonts-preview-code-meta-label"><?php esc_html_e('Headings', 'tasty-fonts'); ?></span>
-                        <strong class="tasty-fonts-preview-code-meta-value" data-role-preview="heading" data-role-preview-name="heading"><?php echo esc_html($this->previewRoleName('heading', $roles, $familyLabels)); ?></strong>
+                        <strong class="tasty-fonts-preview-code-meta-value" data-role-preview="heading" data-role-preview-name="heading"><?php echo esc_html($this->previewRoleName('heading', $roles, $familyLabels, $globalFallbackSettings)); ?></strong>
                     </div>
                     <div class="tasty-fonts-preview-code-meta-item">
                         <span class="tasty-fonts-preview-code-meta-label"><?php esc_html_e('Annotations', 'tasty-fonts'); ?></span>
-                        <strong class="tasty-fonts-preview-code-meta-value" data-role-preview="body" data-role-preview-name="body"><?php echo esc_html($this->previewRoleName('body', $roles, $familyLabels)); ?></strong>
+                        <strong class="tasty-fonts-preview-code-meta-value" data-role-preview="body" data-role-preview-name="body"><?php echo esc_html($this->previewRoleName('body', $roles, $familyLabels, $globalFallbackSettings)); ?></strong>
                     </div>
                 </div>
                 <div class="tasty-fonts-preview-code-inline">
@@ -808,34 +825,26 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
 
     /**
      * @param array<int|string, mixed> $roles
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
-    private function roleFallbackValue(array $roles, string $roleKey): string
+    private function roleFallbackValue(array $roles, string $roleKey, array $globalFallbackSettings = []): string
     {
-        $fallback = match ($roleKey) {
-            'heading' => $this->roleStringValue($roles, 'heading_fallback'),
-            'body' => $this->roleStringValue($roles, 'body_fallback'),
-            default => $this->roleStringValue($roles, 'monospace_fallback'),
-        };
-
-        if ($fallback !== '') {
-            return $fallback;
-        }
-
-        return $roleKey === 'monospace' ? 'monospace' : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
+        return FallbackResolver::roleFallback($roleKey, $roles, $globalFallbackSettings);
     }
 
     /**
      * @param RoleSet $roles
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
-    private function buildPreviewSnippetCss(array $roles, bool $includeMonospace): string
+    private function buildPreviewSnippetCss(array $roles, bool $includeMonospace, array $globalFallbackSettings = []): string
     {
         $lines = [':root {'];
 
-        $this->appendRolePreviewSnippetVariables($lines, $roles, 'heading');
-        $this->appendRolePreviewSnippetVariables($lines, $roles, 'body');
+        $this->appendRolePreviewSnippetVariables($lines, $roles, 'heading', $globalFallbackSettings);
+        $this->appendRolePreviewSnippetVariables($lines, $roles, 'body', $globalFallbackSettings);
 
         if ($includeMonospace) {
-            $this->appendRolePreviewSnippetVariables($lines, $roles, 'monospace');
+            $this->appendRolePreviewSnippetVariables($lines, $roles, 'monospace', $globalFallbackSettings);
         }
 
         $lines[] = '}';
@@ -864,11 +873,12 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
     /**
      * @param list<string> $lines
      * @param RoleSet $roles
+     * @param GlobalFallbackSettings $globalFallbackSettings
      */
-    private function appendRolePreviewSnippetVariables(array &$lines, array $roles, string $roleKey): void
+    private function appendRolePreviewSnippetVariables(array &$lines, array $roles, string $roleKey, array $globalFallbackSettings = []): void
     {
         $family = trim($this->roleStringValue($roles, $roleKey));
-        $fallback = $this->roleFallbackValue($roles, $roleKey);
+        $fallback = $this->roleFallbackValue($roles, $roleKey, $globalFallbackSettings);
         $stack = FontUtils::buildFontStack($family, $fallback);
 
         if ($family !== '') {

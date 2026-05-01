@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use TastyFonts\Admin\AdminPageRenderer;
 use TastyFonts\Admin\AdminPageViewBuilder;
+use TastyFonts\Admin\AdminController;
 use TastyFonts\Admin\Renderer\FamilyCardRenderer;
 use TastyFonts\Admin\Renderer\HealthTriagePresenter;
 use TastyFonts\Admin\Renderer\RuntimeDebugDetailsPresenter;
@@ -952,9 +953,18 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
         $renderer->renderPage([
             'storage' => ['root' => '/tmp/uploads/fonts'],
             'current_page' => 'settings',
-            'catalog' => [],
-            'available_families' => [],
-            'roles' => [],
+            'catalog' => [
+                'JetBrains Mono' => [
+                    'family' => 'JetBrains Mono',
+                    'font_category' => 'monospace',
+                    'faces' => [],
+                ],
+            ],
+            'available_families' => ['JetBrains Mono'],
+            'roles' => [
+                'monospace' => 'JetBrains Mono',
+                'monospace_fallback' => 'monospace',
+            ],
             'logs' => [],
             'activity_actor_options' => [],
             'family_fallbacks' => [],
@@ -1048,7 +1058,7 @@ $tests['admin_page_renderer_renders_single_page_tabs_with_settings_active'] = st
     assertSameValue(0, preg_match('/Font Capabilities[\s\S]*Compact Mode[\s\S]*Enable Monospace Role/', $output), 'Compact Mode should not render inside Font Capabilities.');
     assertContainsValue('is-disabled-by-dependency', $output, 'Settings dependency-disabled rows should expose a semantic dependency-disabled class.');
     assertContainsValue('aria-describedby="tasty-fonts-class-output-role-monospace-dependency"', $output, 'Dependency-disabled Settings controls should keep an accessible explanation.');
-    assertContainsValue('Enable the monospace role in Settings &gt; Behavior to use this control.', $output, 'Dependency-disabled rows should explain what enables the control.');
+    assertContainsValue('Needs Monospace enabled. Saved preference will resume when available.', $output, 'Dependency-disabled rows should explain what enables the control without clearing saved intent.');
     assertContainsValue('is-risky', $output, 'Settings rows with destructive persistence consequences should expose a risky row state.');
     assertContainsValue('Review before turning this off. When disabled, uninstall removes plugin-managed uploaded font files.', $output, 'Risky Settings rows should explain the review-worthy consequence.');
 	assertNotContainsValue('has-unsaved-changes', $output, 'Routine Settings rows should not render persistent changed markers before the user edits the form.');
@@ -1338,11 +1348,127 @@ $tests['admin_page_renderer_renders_extended_variable_submenu_controls'] = stati
     assertContainsValue('CSS Variable Groups', $output, 'Output Settings should render grouped variable controls.');
     assertContainsValue('Role Weight Variables', $output, 'The submenu should include the role weight variable group.');
     assertContainsValue('Global Weight Tokens', $output, 'The submenu should include a granular weight-token toggle.');
-    assertContainsValue('Role Alias Variables', $output, 'The submenu should include a granular role-alias toggle.');
+    assertContainsValue('Role Alias Variables', $output, 'The submenu should include granular role-alias controls.');
     assertContainsValue('Sans Alias', $output, 'The submenu should include a granular sans-category toggle.');
     assertContainsValue('Serif Alias', $output, 'The submenu should include a granular serif-category toggle.');
-    assertNotContainsValue('Mono Alias', $output, 'The submenu should hide the mono-category toggle when the monospace feature is disabled.');
-    assertNotContainsValue('--font-code', $output, 'The role-alias copy should not mention the code alias when the monospace feature is disabled.');
+    assertSameValue(1, preg_match('/<label(?=[^>]*data-output-dependency-row)(?![^>]*hidden)[^>]*>[\s\S]*?name="extended_variable_category_mono_enabled" value="1" data-output-preference-hidden[\s\S]*?name="extended_variable_category_mono_enabled"[\s\S]*?disabled="disabled"[\s\S]*?Mono Alias[\s\S]*?<\/label>/', $output), 'The submenu should keep the mono-category toggle visible, disabled, and preference-preserving when the monospace dependency is missing.');
+    assertSameValue(1, preg_match('/<label(?=[^>]*data-output-dependency-row)(?![^>]*hidden)[^>]*>[\s\S]*?name="class_output_role_monospace_enabled" value="1" data-output-preference-hidden[\s\S]*?name="class_output_role_monospace_enabled"[\s\S]*?disabled="disabled"[\s\S]*?Monospace Class[\s\S]*?<\/label>/', $output), 'The role class mono toggle should stay visible and disabled when the monospace feature is disabled.');
+    assertSameValue(1, preg_match('/<label(?=[^>]*data-output-dependency-row)(?![^>]*hidden)[^>]*>[\s\S]*?name="class_output_role_alias_code_enabled" value="1" data-output-preference-hidden[\s\S]*?name="class_output_role_alias_code_enabled"[\s\S]*?disabled="disabled"[\s\S]*?Code Alias[\s\S]*?<\/label>/', $output), 'The code alias class toggle should stay visible, disabled, and preference-preserving when the monospace family dependency is missing.');
+    assertSameValue(1, preg_match('/<label(?=[^>]*data-output-dependency-row)(?![^>]*hidden)[^>]*>[\s\S]*?name="class_output_category_mono_enabled" value="1" data-output-preference-hidden[\s\S]*?name="class_output_category_mono_enabled"[\s\S]*?disabled="disabled"[\s\S]*?Mono Class[\s\S]*?<\/label>/', $output), 'The mono category class toggle should stay visible, disabled, and preference-preserving when the monospace dependency is missing.');
+    assertContainsValue('Code Alias', $output, 'The role-alias section should keep the code alias control visible even when disabled.');
+    assertContainsValue('Needs an assigned Body family. Saved preference will resume when available.', $output, 'Body-dependent alias controls should explain that they wait for an assigned Body family.');
+    assertContainsValue('Needs an available sans family. Saved preference will resume when available.', $output, 'Sans output controls should explain that they wait for an available family.');
+    assertContainsValue('Needs at least one available library family. Saved preference will resume when available.', $output, 'Per-family class copy should explain that generated selectors depend on available library families.');
+};
+
+$tests['admin_page_renderer_renders_output_toggle_preview_accordions'] = static function (): void {
+	resetTestState();
+
+	$renderer = new AdminPageRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPage([
+			'current_page' => AdminController::PAGE_SETTINGS,
+			'settings_studio' => 'output-settings',
+			'storage' => ['root' => '/tmp/uploads/fonts'],
+			'catalog' => [],
+			'available_families' => ['Inter'],
+			'roles' => [
+				'heading' => 'Inter',
+				'heading_fallback' => 'sans-serif',
+			],
+			'logs' => [],
+			'activity_actor_options' => [],
+			'family_fallbacks' => [],
+			'family_font_displays' => [],
+			'family_font_display_options' => [],
+			'preview_text' => 'The quick brown fox jumps over the lazy dog. 1234567890',
+			'preview_size' => 32,
+			'font_display' => 'optional',
+			'font_display_options' => [],
+			'output_quick_mode_preference' => 'custom',
+			'class_output_enabled' => true,
+			'class_output_role_heading_enabled' => true,
+			'class_output_role_body_enabled' => false,
+			'class_output_role_monospace_enabled' => true,
+			'per_variant_font_variables_enabled' => true,
+			'extended_variable_role_weight_vars_enabled' => true,
+			'extended_variable_weight_tokens_enabled' => true,
+			'minify_css_output' => true,
+			'preload_primary_fonts' => true,
+			'remote_connection_hints' => true,
+			'block_editor_font_library_sync_enabled' => false,
+			'training_wheels_off' => false,
+			'show_activity_log' => true,
+			'delete_uploaded_files_on_uninstall' => false,
+			'diagnostic_items' => [],
+			'overview_metrics' => [],
+			'output_panels' => [],
+			'output_toggle_previews' => [
+				'role_usage_font_weight_enabled' => [
+					'key' => 'role_usage_font_weight_enabled',
+					'label' => 'Sitewide Role Weights CSS',
+					'description' => 'Generated font-weight declarations for active sitewide role rules.',
+					'css' => "body {\n  font-weight: 400;\n}\n\nh1 {\n  font-weight: 700;\n}",
+					'empty_message' => 'No sitewide role weight CSS is available for the current role assignment.',
+					'is_empty' => false,
+				],
+				'class_output_role_heading_enabled' => [
+					'key' => 'class_output_role_heading_enabled',
+					'label' => 'Heading Class CSS',
+					'description' => 'Generated selector for the heading role utility class.',
+					'css' => ".font-heading {\n  font-family: \"Inter\", sans-serif;\n}",
+					'empty_message' => 'No heading class CSS is available for the current role assignment.',
+					'is_empty' => false,
+				],
+				'class_output_role_monospace_enabled' => [
+					'key' => 'class_output_role_monospace_enabled',
+					'label' => 'Monospace Class CSS',
+					'description' => 'Generated selector for the monospace role utility class.',
+					'css' => '',
+					'empty_message' => 'Enable the monospace role to preview monospace class CSS.',
+					'is_empty' => true,
+					'dependency_key' => 'monospace-role',
+				],
+				'extended_variable_role_weight_vars_enabled' => [
+					'key' => 'extended_variable_role_weight_vars_enabled',
+					'label' => 'Role Weight Variables CSS',
+					'description' => 'Custom property declarations for the active role font weights.',
+					'css' => "--font-heading-weight: 700;\n--font-body-weight: 400;",
+					'empty_message' => 'No role weight variables are available for the current role assignment.',
+					'is_empty' => false,
+				],
+			],
+			'generated_css_panel' => [],
+			'preview_panels' => [],
+			'local_environment_notice' => [],
+			'toasts' => [],
+			'apply_everywhere' => false,
+			'role_deployment' => [],
+		]);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('class="tasty-fonts-output-toggle-preview"', $output, 'Class and variable toggles should render native preview accordions.');
+	assertContainsValue('data-output-toggle-preview="role_usage_font_weight_enabled"', $output, 'Sitewide role weights should expose a refreshable preview hook.');
+	assertContainsValue('aria-label="View CSS for Sitewide Role Weights"', $output, 'Sitewide role weights should keep the CSS preview action specific without repeating the row title visibly.');
+	assertContainsValue('data-output-toggle-preview="class_output_role_heading_enabled"', $output, 'Heading class output should expose a refreshable preview hook.');
+	assertContainsValue('aria-label="View CSS for Heading Class"', $output, 'Heading class output should keep the disclosure accessible without repeating Heading Class CSS in the visible row.');
+	assertNotContainsValue('tasty-fonts-output-toggle-preview-meta', $output, 'Preview accordions should not render a second visible label row.');
+	assertNotContainsValue('Generated selector for the heading role utility class.', $output, 'Preview accordions should not render explanatory copy beside the generated CSS.');
+	assertContainsValue('data-output-toggle-preview-code="class_output_role_heading_enabled"', $output, 'Heading class preview code should expose a targeted refresh hook.');
+	assertContainsValue('id="tasty-fonts-output-toggle-preview-class-output-role-heading-enabled"', $output, 'Preview code blocks should use stable ids derived from field names.');
+	assertContainsValue('<span class="tasty-fonts-syntax-selector">.font-heading</span>', $output, 'Preview CSS should reuse shared selector highlighting.');
+	assertContainsValue('<span class="tasty-fonts-syntax-property">--font-heading-weight</span>', $output, 'Variable preview CSS should reuse shared property highlighting.');
+	assertSameValue(1, preg_match('/data-output-toggle-preview="class_output_role_monospace_enabled"[\s\S]*?Enable the monospace role to preview monospace class CSS\.[\s\S]*?<pre[^>]*hidden/', $output), 'Empty dependency previews should show their empty copy and hide the code surface.');
+	$headingInputPosition = strpos($output, 'name="class_output_role_heading_enabled"');
+	$headingLabelClosePosition = $headingInputPosition === false ? false : strpos($output, '</label>', $headingInputPosition);
+	$headingPreviewPosition = strpos($output, 'data-output-toggle-preview="class_output_role_heading_enabled"');
+	assertSameValue(true, $headingLabelClosePosition !== false && $headingPreviewPosition !== false && $headingLabelClosePosition < $headingPreviewPosition, 'Preview accordions should not be nested inside toggle labels.');
 };
 
 $tests['admin_page_renderer_renders_unified_output_controls'] = static function (): void {
@@ -1354,9 +1480,18 @@ $tests['admin_page_renderer_renders_unified_output_controls'] = static function 
     try {
         $renderer->renderPage([
             'storage' => ['root' => '/tmp/uploads/fonts'],
-            'catalog' => [],
-            'available_families' => [],
-            'roles' => [],
+            'catalog' => [
+                'JetBrains Mono' => [
+                    'family' => 'JetBrains Mono',
+                    'font_category' => 'monospace',
+                    'faces' => [],
+                ],
+            ],
+            'available_families' => ['JetBrains Mono'],
+            'roles' => [
+                'monospace' => 'JetBrains Mono',
+                'monospace_fallback' => 'monospace',
+            ],
             'logs' => [],
             'activity_actor_options' => [],
             'family_fallbacks' => [],
@@ -1459,7 +1594,18 @@ $tests['admin_page_renderer_renders_unified_output_controls'] = static function 
     assertContainsValue('name="class_output_role_styles_enabled"', $output, 'The role class style toggle should submit through the shared settings form.');
     assertContainsValue('Role Styling', $output, 'Output Settings should surface the shared role class styling section.');
     assertContainsValue('Role Weights in Classes', $output, 'Output Settings should explain the opt-in role class styling toggle.');
-    assertContainsValue('Adds role weights and variation settings to class output.', $output, 'Output Settings should explain how role class styling differs from sitewide role weight output.');
+    assertNotContainsValue('Adds saved heading and body weights to .font-heading and .font-body.', $output, 'Output Settings should keep preview-row explanations in help tooltips instead of inline descriptions.');
+    assertContainsValue('Turn on Heading Class and Body Class before adding role weights to class output.', $output, 'Output Settings should explain the role class styling dependency.');
+    assertSameValue(
+        1,
+        preg_match('/Heading Class[\s\S]*Body Class[\s\S]*Role Weights in Classes/', $output),
+        'Output Settings should present role class toggles before the dependent role weight styling toggle.'
+    );
+    assertSameValue(
+        1,
+        preg_match('/name="class_output_role_styles_enabled"[\s\S]*disabled="disabled"/', $output),
+        'Role class styling should be disabled when the heading and body classes are not enabled.'
+    );
     assertContainsValue('Sitewide Role Weights', $output, 'Output Settings should render the sitewide role weight setting.');
     assertContainsValue('Utility Classes', $output, 'Output Settings should render the class output master toggle.');
     assertContainsValue('CSS Variables', $output, 'Output Settings should render the variable output master toggle.');
@@ -1519,7 +1665,7 @@ $tests['admin_page_renderer_scopes_output_groups_to_quick_mode'] = static functi
         'extended_variable_weight_tokens_enabled' => true,
         'extended_variable_role_aliases_enabled' => true,
         'extended_variable_category_sans_enabled' => true,
-        'extended_variable_category_serif_enabled' => true,
+		'extended_variable_category_serif_enabled' => false,
         'role_usage_font_weight_enabled' => false,
     ]);
 
@@ -1528,6 +1674,34 @@ $tests['admin_page_renderer_scopes_output_groups_to_quick_mode'] = static functi
     assertSameValue(1, preg_match('/data-output-detail-group="classes"[^>]*hidden/', $variablesOutput), 'Variables-only should hide the classes group.');
     assertSameValue(1, preg_match('/data-output-detail-group="sitewide"[^>]*hidden/', $variablesOutput), 'Variables-only should hide the sitewide group.');
     assertSameValue(1, preg_match('/<label[^>]*data-output-layer-master-row="variables"[^>]*hidden[^>]*>.*?CSS Variables/s', $variablesOutput), 'Variables-only should hide the redundant variable layer master toggle.');
+
+	$lockedVariablesOutput = $render([
+		'output_quick_mode_preference' => 'variables',
+		'class_output_enabled' => false,
+		'per_variant_font_variables_enabled' => true,
+		'minimal_output_preset_enabled' => false,
+		'extended_variable_role_weight_vars_enabled' => false,
+		'acss_integration' => [
+			'enabled' => true,
+		],
+	]);
+
+	assertSameValue(1, preg_match('/<input[^>]*type="hidden"[^>]*name="extended_variable_role_weight_vars_enabled"[^>]*value="1"/', $lockedVariablesOutput), 'Automatic.css sync should submit role weight variables as enabled while the visible toggle is locked.');
+	assertSameValue(1, preg_match('/<input(?=[^>]*type="checkbox")(?=[^>]*name="extended_variable_role_weight_vars_enabled")(?=[^>]*checked="checked")(?=[^>]*disabled="disabled")[^>]*>/', $lockedVariablesOutput), 'Automatic.css sync should render the role weight variables toggle checked and disabled.');
+	assertContainsValue('Required while Automatic.css sync is on.', $lockedVariablesOutput, 'Locked role weight variables should explain the Automatic.css dependency.');
+
+	$minimalOutput = $render([
+		'output_quick_mode_preference' => 'minimal',
+		'class_output_enabled' => false,
+		'per_variant_font_variables_enabled' => true,
+		'minimal_output_preset_enabled' => true,
+		'role_usage_font_weight_enabled' => false,
+	]);
+
+	assertSameValue(1, preg_match('/id="tasty-fonts-advanced-output-controls"[^>]*hidden/', $minimalOutput), 'Minimal should hide the advanced output panel before JS runs.');
+	assertSameValue(1, preg_match('/data-output-detail-group="variables"[^>]*hidden/', $minimalOutput), 'Minimal should hide the variables group.');
+	assertSameValue(1, preg_match('/data-output-detail-group="classes"[^>]*hidden/', $minimalOutput), 'Minimal should hide the classes group.');
+	assertSameValue(1, preg_match('/data-output-detail-group="sitewide"[^>]*hidden/', $minimalOutput), 'Minimal should hide the sitewide group.');
 
     $classesOutput = $render([
         'output_quick_mode_preference' => 'classes',
@@ -1654,7 +1828,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             false,
         ]
     );
-    assertSameValue('variables', $variablesMode, 'Quick mode should resolve to variables only when the full preset baseline remains intact.');
+	assertSameValue('variables', $variablesMode, 'Quick mode should resolve to variables only from the variable layer shape.');
 
     $customVariablesMode = invokePrivateMethod(
         $builder,
@@ -1683,7 +1857,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             false,
         ]
     );
-    assertSameValue('custom', $customVariablesMode, 'Quick mode should resolve to custom when a variables-only subgroup is disabled.');
+	assertSameValue('variables', $customVariablesMode, 'Quick mode should stay variables when a variables-only subgroup is disabled.');
 
     $classesMode = invokePrivateMethod(
         $builder,
@@ -1711,7 +1885,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             false,
         ]
     );
-    assertSameValue('classes', $classesMode, 'Quick mode should resolve to classes only when the full preset baseline remains intact.');
+	assertSameValue('classes', $classesMode, 'Quick mode should resolve to classes only from the class layer shape.');
 
     $styledClassesMode = invokePrivateMethod(
         $builder,
@@ -1768,7 +1942,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             false,
         ]
     );
-    assertSameValue('custom', $customMode, 'Quick mode should resolve to custom when both outputs are enabled but one granular subgroup is disabled.');
+	assertSameValue('custom', $customMode, 'Quick mode should resolve to custom when both output layers are enabled.');
 
     $stickyCustomMode = invokePrivateMethod(
         $builder,
@@ -1796,7 +1970,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             false,
         ]
     );
-    assertSameValue('custom', $stickyCustomMode, 'Quick mode should stay custom when an explicit custom preference is saved, even if the output booleans match variables-only.');
+	assertSameValue('variables', $stickyCustomMode, 'Quick mode should normalize to variables when an explicit custom preference has only the variable layer enabled.');
 
     $staleVariablesMode = invokePrivateMethod(
         $builder,
@@ -1824,7 +1998,7 @@ $tests['admin_page_view_builder_derives_output_quick_modes_from_explicit_flag_se
             false,
         ]
     );
-    assertSameValue('custom', $staleVariablesMode, 'Saved non-custom preferences should coerce to custom when the detailed output settings no longer match the preset baseline.');
+	assertSameValue('variables', $staleVariablesMode, 'Saved variables preferences should stay variables when detailed output subgroups are changed.');
 };
 
 $tests['admin_page_view_builder_builds_typed_family_selector_options'] = static function (): void {
@@ -1883,7 +2057,7 @@ $tests['admin_page_view_builder_casts_admin_access_user_ids_to_strings'] = stati
     assertSameValue('Author User (author)', $view['adminAccessUserOptions'][0]['label'] ?? '', 'The view builder should pass through admin-access user options for the template.');
 };
 
-$tests['admin_page_view_builder_prefers_saved_custom_output_quick_mode_on_reload'] = static function (): void {
+$tests['admin_page_view_builder_derives_saved_output_quick_mode_on_reload'] = static function (): void {
     resetTestState();
 
     $builder = new AdminPageViewBuilder(new Storage());
@@ -1906,13 +2080,14 @@ $tests['admin_page_view_builder_prefers_saved_custom_output_quick_mode_on_reload
         'extended_variable_role_aliases_enabled' => true,
         'extended_variable_category_sans_enabled' => true,
         'extended_variable_category_serif_enabled' => true,
-        'role_usage_font_weight_enabled' => false,
+        'role_usage_font_weight_enabled' => true,
     ]);
 
-    assertSameValue('custom', (string) ($view['outputQuickMode'] ?? ''), 'A saved custom quick-mode preference should remain selected on reload even when the current booleans match variables-only.');
-    assertSameValue(true, !empty($view['advancedOutputControlsExpanded']), 'A saved custom quick-mode preference should keep the advanced output controls expanded on reload.');
-    assertSameValue(true, !empty($view['classOutputEnabled']), 'Custom should treat the class layer as enabled because the visible grouped controls now own the choice.');
-    assertSameValue(true, !empty($view['perVariantFontVariablesEnabled']), 'Custom should treat the variable layer as enabled because the visible grouped controls now own the choice.');
+	assertSameValue('variables', (string) ($view['outputQuickMode'] ?? ''), 'A saved custom quick-mode preference should normalize to variables when only the variable layer is enabled.');
+	assertSameValue(true, !empty($view['advancedOutputControlsExpanded']), 'Variables-only should keep the advanced output controls expanded on reload.');
+	assertSameValue(false, !empty($view['classOutputEnabled']), 'Variables-only should keep the class layer disabled on reload.');
+	assertSameValue(true, !empty($view['perVariantFontVariablesEnabled']), 'Variables-only should keep the variable layer enabled on reload.');
+	assertSameValue(false, !empty($view['roleUsageFontWeightEnabled']), 'Variables-only view state should force hidden sitewide role weights off before form submission.');
 
     $variablesView = $builder->build([
         'storage' => ['root' => '/tmp/uploads/fonts'],
@@ -2009,9 +2184,18 @@ $tests['admin_page_renderer_shows_mono_extended_variable_controls_when_monospace
     try {
         $renderer->renderPage([
             'storage' => ['root' => '/tmp/uploads/fonts'],
-            'catalog' => [],
-            'available_families' => [],
-            'roles' => [],
+            'catalog' => [
+                'JetBrains Mono' => [
+                    'family' => 'JetBrains Mono',
+                    'font_category' => 'monospace',
+                    'faces' => [],
+                ],
+            ],
+            'available_families' => ['JetBrains Mono'],
+            'roles' => [
+                'monospace' => 'JetBrains Mono',
+                'monospace_fallback' => 'monospace',
+            ],
             'logs' => [],
             'activity_actor_options' => [],
             'family_fallbacks' => [],
@@ -2050,8 +2234,14 @@ $tests['admin_page_renderer_shows_mono_extended_variable_controls_when_monospace
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('Mono Alias', $output, 'The submenu should show the mono-category toggle when the monospace feature is enabled.');
+    assertSameValue(1, preg_match('/name="extended_variable_category_mono_enabled"[\s\S]{0,2500}checked="checked"[\s\S]{0,2500}Mono Alias/', $output), 'The submenu should show the checked mono-category toggle when the monospace feature is enabled.');
+    assertSameValue(1, preg_match('/<label(?=[^>]*data-output-dependency-row)(?![^>]*hidden)[^>]*>[\s\S]*?name="class_output_role_monospace_enabled"[\s\S]*?Monospace Class[\s\S]*?<\/label>/', $output), 'The role class mono toggle should be visible when the monospace feature is enabled.');
     assertContainsValue('--font-code', $output, 'The role-alias copy should mention the code alias when the monospace feature is enabled.');
+    assertContainsValue('--font-mono', $output, 'The category alias copy should mention the mono alias when the monospace feature is enabled.');
+    assertContainsValue('Controls .font-code when the Monospace role has an assigned family.', $output, 'Code alias class copy should explain that it waits for an assigned Monospace family.');
+    assertContainsValue('Controls --font-code when the Monospace role has an assigned family.', $output, 'Code alias variable copy should explain that it waits for an assigned Monospace family.');
+    assertContainsValue('Controls .font-mono when a monospace family is available.', $output, 'Mono class copy should explain that it waits for an available monospace family.');
+    assertContainsValue('Controls --font-mono when a monospace family is available.', $output, 'Mono variable copy should explain that it waits for an available monospace family.');
 };
 
 $tests['admin_page_renderer_renders_font_classes_output_tab_content'] = static function (): void {
@@ -2301,7 +2491,7 @@ $tests['admin_page_renderer_renders_copy_ready_face_variant_variables'] = static
             [
                 'Inter',
                 'inter',
-                '"Inter", sans-serif',
+                '"Inter", system-ui, sans-serif',
                 'The quick brown fox jumps over the lazy dog.',
                 2,
                 ['body'],
@@ -2404,8 +2594,8 @@ $tests['admin_page_renderer_renders_copy_ready_family_css_variables'] = static f
     assertContainsValue('tasty-fonts-family-details-grid', $output, 'Expanded family details should render a dedicated layout grid wrapper.');
     assertContainsValue('tasty-fonts-family-details-utilities', $output, 'Expanded family details should render a dedicated utility-card column when utility snippets are available.');
     assertNotContainsValue('>Font Classes<', $output, 'Family details should keep class selectors hidden when class output is not enabled for the card.');
-    assertContainsValue('data-copy-text="--font-jetbrains-mono: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should expose the base family variable.');
-    assertContainsValue('data-copy-text="--font-monospace: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should expose the role variable at the family level.');
+    assertContainsValue('data-copy-text="--font-jetbrains-mono: &quot;JetBrains Mono&quot;, ui-monospace, monospace;"', $output, 'Family details should expose the base family variable.');
+    assertContainsValue('data-copy-text="--font-monospace: &quot;JetBrains Mono&quot;, ui-monospace, monospace;"', $output, 'Family details should expose the role variable at the family level.');
     assertContainsValue('data-copy-text="--font-code: var(--font-monospace);"', $output, 'Family details should expose the code alias when the family is assigned to monospace.');
     assertContainsValue('data-copy-text="--font-mono: var(--font-jetbrains-mono);"', $output, 'Family details should expose the category monospace alias when the family resolves the mono token.');
 };
@@ -2551,8 +2741,8 @@ $tests['admin_page_renderer_hides_extended_family_css_variables_when_disabled'] 
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('data-copy-text="--font-jetbrains-mono: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should still expose the base family variable when extended output is disabled.');
-    assertContainsValue('data-copy-text="--font-monospace: &quot;JetBrains Mono&quot;, monospace;"', $output, 'Family details should still expose the active role variable when extended output is disabled.');
+    assertContainsValue('data-copy-text="--font-jetbrains-mono: &quot;JetBrains Mono&quot;, ui-monospace, monospace;"', $output, 'Family details should still expose the base family variable when extended output is disabled.');
+    assertContainsValue('data-copy-text="--font-monospace: &quot;JetBrains Mono&quot;, ui-monospace, monospace;"', $output, 'Family details should still expose the active role variable when extended output is disabled.');
     assertNotContainsValue('data-copy-text="--font-code: var(--font-monospace);"', $output, 'Family details should hide extended code aliases when extended output is disabled.');
     assertNotContainsValue('data-copy-text="--font-mono: var(--font-jetbrains-mono);"', $output, 'Family details should hide category aliases when extended output is disabled.');
 };
@@ -2638,7 +2828,7 @@ $tests['admin_page_renderer_uses_raw_face_weights_when_extended_variables_are_di
             [
                 'Inter',
                 'inter',
-                '"Inter", sans-serif',
+                '"Inter", system-ui, sans-serif',
                 'The quick brown fox jumps over the lazy dog.',
                 2,
                 ['body'],
@@ -2680,7 +2870,7 @@ $tests['admin_page_renderer_hides_category_alias_when_the_family_does_not_win_it
             [
                 'Inter',
                 'inter',
-                '"Inter", sans-serif',
+                '"Inter", system-ui, sans-serif',
                 'The quick brown fox jumps over the lazy dog.',
                 2,
                 [],
@@ -2771,7 +2961,7 @@ $tests['admin_page_renderer_uses_category_aware_family_preview_fallbacks'] = sta
     }
     $output = (string) ob_get_clean();
 
-    assertContainsValue('style="font-family:&quot;JetBrains Mono&quot;, monospace;"', $output, 'Family previews should default monospace catalog families to the monospace generic fallback.');
+    assertContainsValue('style="font-family:&quot;JetBrains Mono&quot;, ui-monospace, monospace;"', $output, 'Family previews should default monospace catalog families to the monospace generic fallback.');
 };
 
 $tests['admin_page_renderer_translates_stored_delivery_profile_labels_at_output'] = static function (): void {
@@ -2904,7 +3094,7 @@ $tests['admin_page_renderer_renders_type_badges_for_adobe_delivery_and_face_card
         $renderer->renderFaceDetailCard(
             'Lora',
             'lora',
-            '"Lora", serif',
+            '"Lora", system-ui, sans-serif',
             'The quick brown fox jumps over the lazy dog.',
             1,
             [],
@@ -3086,7 +3276,7 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
 
     ob_start();
     try {
-        $renderer->renderPage([
+        $baseContext = [
             'storage' => ['root' => '/tmp/uploads/fonts'],
             'catalog' => [],
             'available_families' => [],
@@ -3191,7 +3381,8 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
                 'title' => 'Live',
                 'copy' => 'Current selections are being served sitewide.',
             ],
-        ]);
+        ];
+        $renderer->renderPage($baseContext);
     } catch (\Throwable $e) {
         ob_end_clean();
         throw $e;
@@ -3221,9 +3412,10 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
 	assertSameValue(1, preg_match('/name="google_font_imports_enabled" value="1"(?! checked="checked")/', $output), 'Google Fonts imports should render off by default.');
 	assertSameValue(1, preg_match('/name="bunny_font_imports_enabled" value="1"(?! checked="checked")/', $output), 'Bunny Fonts imports should render off by default.');
 	assertSameValue(1, preg_match('/name="local_font_uploads_enabled" value="1"(?! checked="checked")/', $output), 'Custom uploads should render off by default.');
-	assertSameValue(1, preg_match('/name="adobe_font_imports_enabled" value="1"(?! checked="checked")/', $output), 'Adobe Fonts imports should render off by default.');
+    assertSameValue(1, preg_match('/name="adobe_font_imports_enabled" value="1"(?! checked="checked")/', $output), 'Adobe Fonts imports should render off by default.');
     assertContainsValue('name="custom_css_url_imports_enabled" value="0"', $output, 'The URL import workflow toggle should submit an explicit off value.');
 	assertSameValue(1, preg_match('/name="custom_css_url_imports_enabled" value="1"(?! checked="checked")/', $output), 'URL imports should render off by default.');
+    assertContainsValue('Experimental', $output, 'The URL import workflow should be flagged as experimental on testing channels.');
     assertNotContainsValue('Save Gate', $output, 'The Developer tab should no longer show a save action for URL imports.');
     assertContainsValue('Release Rail', $output, 'The Advanced Tools Developer tab should group release-channel controls for testing workflows.');
     assertContainsValue('Testing Channel', $output, 'The Advanced Tools Developer tab should frame release-channel controls as a testing setting.');
@@ -3405,6 +3597,41 @@ $tests['admin_page_renderer_exposes_behavior_tab_and_can_hide_help_ui'] = static
     assertNotContainsValue('Create a local restore point before manual work.', $output, 'Show Onboarding Hints should omit snapshot helper copy when turned off.');
     assertNotContainsValue('Downloads one sanitized ZIP for troubleshooting', $output, 'Show Onboarding Hints should omit support bundle helper copy when turned off.');
     assertNotContainsValue('Exports, imports, snapshots, support bundles, and transfer recovery messages will appear here.', $output, 'Show Onboarding Hints should omit transfer activity helper copy when turned off.');
+
+    ob_start();
+    try {
+        $renderer->renderPage(array_replace($baseContext, [
+            'current_page' => AdminController::PAGE_SETTINGS,
+            'settings_studio' => 'plugin-behavior',
+            'training_wheels_off' => false,
+            'update_channel' => 'beta',
+            'custom_css_url_imports_available' => true,
+        ]));
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $betaOutput = (string) ob_get_clean();
+
+    assertContainsValue('This workflow is being tested and can break.', $betaOutput, 'The experimental badge should expose a testing warning tooltip when help is visible.');
+
+    ob_start();
+    try {
+        $renderer->renderPage(array_replace($baseContext, [
+            'current_page' => AdminController::PAGE_SETTINGS,
+            'settings_studio' => 'plugin-behavior',
+            'update_channel' => 'stable',
+            'custom_css_url_imports_available' => false,
+            'custom_css_url_imports_enabled' => true,
+        ]));
+    } catch (\Throwable $e) {
+        ob_end_clean();
+        throw $e;
+    }
+    $stableOutput = (string) ob_get_clean();
+
+    assertNotContainsValue('Enable URL Imports', $stableOutput, 'Stable-channel users should not see the experimental URL import toggle.');
+    assertNotContainsValue('name="custom_css_url_imports_enabled"', $stableOutput, 'Stable-channel renders should not submit the hidden experimental URL import field.');
 };
 
 $tests['admin_page_renderer_attaches_update_channel_rollback_action_to_the_field'] = static function (): void {
@@ -3525,6 +3752,9 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
                 'status_label' => 'Configured',
                 'available' => true,
                 'enabled' => true,
+                'quick_panel_enabled' => true,
+                'quick_panel_title' => 'Quick role panel',
+                'quick_panel_description' => 'Shows the Tasty Fonts Aa panel in Etch’s left toolbar.',
             ],
             'gutenberg_integration' => [
                 'title' => 'Gutenberg Font Library',
@@ -3535,8 +3765,9 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
             ],
             'acss_integration' => [
                 'title' => 'Automatic.css',
-                'description' => 'Automatic.css role variables are live through Sitewide delivery.',
-                'status_label' => 'Live',
+                'description' => 'Re-save to refresh the Automatic.css mapping.',
+                'status' => 'out_of_sync',
+                'status_label' => 'Needs reapply',
                 'available' => true,
                 'enabled' => true,
                 'current' => [
@@ -3569,8 +3800,11 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     assertContainsValue('Canvas + Theme Controls', $output, 'The builder group should describe both Etch canvas loading and builder theme controls.');
     assertContainsValue('Etch Canvas Bridge', $output, 'The Etch bridge should render inside the builder integrations group.');
 	assertContainsValue('name="etch_integration_enabled"', $output, 'The Etch integration should render as a persisted toggle field.');
+	assertContainsValue('name="etch_quick_roles_panel_enabled"', $output, 'The Etch quick role panel should render as its own persisted toggle field.');
+	assertContainsValue('Quick role panel', $output, 'The Etch quick role panel toggle should render below the canvas bridge.');
 	foreach ([
 		'etch_integration_enabled',
+		'etch_quick_roles_panel_enabled',
 		'block_editor_font_library_sync_enabled',
 		'acss_font_role_sync_enabled',
 	] as $fieldName) {
@@ -3592,18 +3826,22 @@ $tests['admin_page_renderer_keeps_integration_toggle_copy_single_line'] = static
     assertContainsValue('Configured', $output, 'The Gutenberg integration row should surface configured setup without claiming live role delivery.');
     assertNotContainsValue('Sync to Gutenberg Font Library', $output, 'The Gutenberg integration should no longer render a second row title.');
     assertSameValue(1, substr_count($output, 'Gutenberg Font Library'), 'The Gutenberg integration should render a single main title.');
-    assertContainsValue('Automatic.css role variables are live through Sitewide delivery.', $output, 'The Automatic.css integration summary should render within the main toggle copy.');
-    assertContainsValue('Live', $output, 'The Automatic.css integration row should surface live role delivery only when Sitewide delivery is on.');
+    assertContainsValue('Re-save to refresh the Automatic.css mapping.', $output, 'The Automatic.css integration summary should render within the main toggle copy.');
+    assertContainsValue('Needs reapply', $output, 'The Automatic.css integration row should surface drift when ACSS no longer matches the Tasty mapping.');
     assertContainsValue('tasty-fonts-integration-mapping tasty-fonts-acss-mapping', $output, 'The Automatic.css managed mapping should render as the shared settings mapping table.');
     assertContainsValue('Font mapping', $output, 'The Automatic.css managed mapping should use a compact table label.');
-    assertContainsValue('Tasty role variable', $output, 'The Automatic.css managed mapping should label the destination variable clearly.');
+    assertContainsValue('Automatic.css value', $output, 'The Automatic.css managed mapping should label the current ACSS value clearly.');
+    assertContainsValue('Tasty target', $output, 'The Automatic.css managed mapping should label the destination variable clearly.');
+    assertContainsValue('Automatic.css has values that differ from the Tasty mapping.', $output, 'The Automatic.css managed mapping should explain drift inline.');
+    assertContainsValue('Reapply Tasty mapping', $output, 'The Automatic.css managed mapping should offer a single action for drift.');
+    assertContainsValue('data-settings-force-submit', $output, 'The reapply action should submit even when no form field has changed.');
     assertNotContainsValue('Current to Target', $output, 'The Automatic.css managed mapping should not describe the row as an abstract current-to-target comparison.');
     assertContainsValue('Heading Weight', $output, 'The Automatic.css managed mapping should list the heading font-weight field.');
     assertContainsValue('Body Weight', $output, 'The Automatic.css managed mapping should list the body font-weight field.');
     assertContainsValue('var(--font-heading-weight)', $output, 'The Automatic.css managed mapping should expose the heading weight variable target.');
     assertContainsValue('var(--font-body-weight)', $output, 'The Automatic.css managed mapping should expose the body weight variable target.');
-    assertNotContainsValue('Inter, sans-serif', $output, 'The Automatic.css managed mapping should avoid showing old current values when the integration is synced.');
-    assertNotContainsValue('System UI, sans-serif', $output, 'The Automatic.css managed mapping should avoid showing old current values when the integration is synced.');
+    assertContainsValue('Inter, sans-serif', $output, 'The Automatic.css managed mapping should show the current ACSS heading value when it has drifted.');
+    assertContainsValue('System UI, sans-serif', $output, 'The Automatic.css managed mapping should show the current ACSS body value when it has drifted.');
     assertNotContainsValue('Sync heading/body roles to Automatic.css', $output, 'The Automatic.css integration should no longer render a second row title.');
     assertNotContainsValue('Managed Mapping', $output, 'The Automatic.css integration should now use the quieter Font mapping disclosure instead of a loud subsection heading.');
     assertNotContainsValue('Sets ACSS `heading-font-family` to `var(--font-heading)` and `text-font-family` to `var(--font-body)` while the integration is enabled.', $output, 'The Automatic.css integration should no longer render a second explanatory line.');
@@ -6449,7 +6687,7 @@ $tests['admin_page_renderer_associates_code_previews_and_snippet_panels_with_vis
                 [
                     'label' => 'CSS Variables',
                     'target' => 'tasty-fonts-output-vars',
-                    'value' => '--font-body: "Inter", sans-serif;',
+                    'value' => '--font-body: "Inter", system-ui, sans-serif;',
                 ],
             ]
         );
@@ -6732,8 +6970,8 @@ $tests['admin_page_renderer_allows_fallback_only_heading_and_body_roles'] = stat
 	assertContainsValue('data-help-tooltip="Choose the delivery method in the Font Library. Role selectors use the family’s active delivery profile."', $output, 'Role family selectors should explain that delivery is controlled in the Font Library.');
 	assertContainsValue('aria-label="Explain role family delivery"', $output, 'Role family delivery tooltips should expose a clear accessible label.');
     assertSameValue(true, substr_count($output, 'Use Fallback Only') >= 3, 'Heading, body, and preview selectors should all expose fallback-only choices.');
-    assertContainsValue('Fallback only (sans-serif)', $output, 'Fallback-only heading selections should render a readable preview label.');
-    assertContainsValue('Fallback only (serif)', $output, 'Fallback-only body selections should render a readable preview label.');
+    assertContainsValue('Fallback only (system-ui, sans-serif)', $output, 'Fallback-only heading selections should render a readable preview label from the global fallback.');
+    assertContainsValue('Fallback only (system-ui, sans-serif)', $output, 'Fallback-only body selections should render a readable preview label from the global fallback.');
 };
 
 $tests['admin_page_renderer_preview_workspace_defaults_to_live_sitewide_baseline'] = static function (): void {

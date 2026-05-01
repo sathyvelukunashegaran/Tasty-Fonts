@@ -2,8 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+    buildQuickRoleRouteUrl,
     getIframeDocument,
+    getQuickRoleKeys,
     normalizeInlineCssBlocks,
+    normalizeQuickRoleConfig,
     normalizeStylesheetUrls,
     requiresCrossOriginStylesheetAccess,
     syncIframeInlineStyles,
@@ -159,6 +162,54 @@ test('canvas contracts normalize inline CSS blocks from array or singular config
     assert.deepEqual(normalizeInlineCssBlocks({}), []);
 });
 
+test('canvas contracts normalize quick-role config only when transport is complete', () => {
+    assert.deepEqual(normalizeQuickRoleConfig({ enabled: true }), { enabled: false });
+
+    const config = normalizeQuickRoleConfig({
+        enabled: true,
+        restUrl: ' https://example.test/wp-json/tasty-fonts/v1/ ',
+        restNonce: ' nonce ',
+        routes: { saveRoleDraft: '/roles/draft', publishRoleDraft: 'roles/publish' },
+        adminUrl: ' https://example.test/wp-admin/admin.php?page=tasty-fonts ',
+        roles: { heading: 'Inter' },
+        appliedRoles: { heading: 'Inter' },
+        monospaceRoleEnabled: true,
+        roleFamilyCatalog: { Inter: { publishState: 'published' } },
+    });
+
+    assert.equal(config.enabled, true);
+    assert.equal(config.restUrl, 'https://example.test/wp-json/tasty-fonts/v1/');
+    assert.equal(config.restNonce, 'nonce');
+    assert.equal(config.routes.saveRoleDraft, '/roles/draft');
+    assert.equal(config.routes.publishRoleDraft, 'roles/publish');
+    assert.equal(config.adminUrl, 'https://example.test/wp-admin/admin.php?page=tasty-fonts');
+    assert.deepEqual(config.roles, { heading: 'Inter' });
+    assert.deepEqual(config.appliedRoles, { heading: 'Inter' });
+    assert.equal(config.monospaceRoleEnabled, true);
+});
+
+test('canvas contracts keep quick-role config enabled when publish route is missing', () => {
+    const config = normalizeQuickRoleConfig({
+        enabled: true,
+        restUrl: 'https://example.test/wp-json/tasty-fonts/v1/',
+        restNonce: 'nonce',
+        routes: { saveRoleDraft: 'roles/draft' },
+    });
+
+    assert.equal(config.enabled, true);
+    assert.equal(config.routes.saveRoleDraft, 'roles/draft');
+    assert.equal(config.routes.publishRoleDraft, '');
+});
+
+test('canvas contracts provide quick-role keys and route URL joining', () => {
+    assert.deepEqual(getQuickRoleKeys(false), ['heading', 'body']);
+    assert.deepEqual(getQuickRoleKeys(true), ['heading', 'body', 'monospace']);
+    assert.equal(
+        buildQuickRoleRouteUrl('https://example.test/wp-json/tasty-fonts/v1/', '/roles/draft'),
+        'https://example.test/wp-json/tasty-fonts/v1/roles/draft'
+    );
+});
+
 test('canvas contracts guard iframe documents without a head element', () => {
     assert.equal(getIframeDocument(null), null);
     assert.equal(getIframeDocument({ contentDocument: {} }), null);
@@ -229,7 +280,7 @@ test('canvas contracts skip injecting duplicate iframe stylesheets when Etch alr
 
     assert.equal(
         syncIframeStylesheets(document, [
-            'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?ver=hash456',
+            'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?ver=hash456&tasty_fonts_canvas_refresh=publish-1',
         ]),
         true
     );
@@ -243,6 +294,42 @@ test('canvas contracts skip injecting duplicate iframe stylesheets when Etch alr
             {
                 href: 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?etch_rand=abc123',
                 runtime: null,
+            },
+        ]
+    );
+});
+
+test('canvas contracts can force-refresh selected runtime stylesheets despite equivalent Etch links', () => {
+    const { document, links } = createFakeDocument();
+    const existing = new FakeLink();
+    existing.rel = 'stylesheet';
+    existing.href = 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?etch_rand=abc123';
+    document.head.appendChild(existing);
+
+    assert.equal(
+        syncIframeStylesheets(
+            document,
+            [
+                'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?ver=hash456&tasty_fonts_canvas_refresh=publish-1',
+            ],
+            { forceRefreshIndexes: [0] }
+        ),
+        true
+    );
+
+    assert.deepEqual(
+        links.map((link) => ({
+            href: link.href,
+            runtime: link.getAttribute('data-tasty-fonts-runtime'),
+        })),
+        [
+            {
+                href: 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?etch_rand=abc123',
+                runtime: null,
+            },
+            {
+                href: 'https://example.test/wp-content/uploads/fonts/.generated/tasty-fonts.css?ver=hash456&tasty_fonts_canvas_refresh=publish-1',
+                runtime: '1',
             },
         ]
     );

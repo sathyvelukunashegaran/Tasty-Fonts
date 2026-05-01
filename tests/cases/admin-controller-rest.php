@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Admin\AdminPageViewBuilder;
 use TastyFonts\Admin\GoogleApiKeyValidationClient;
 use TastyFonts\Admin\GoogleApiKeyValidator;
 use TastyFonts\Admin\SettingsSaveFields;
@@ -35,7 +36,10 @@ if (!function_exists('tastyFontsCustomCssSnapshotTransientKey')) {
 if (!function_exists('tastyFontsEnableCustomCssUrlImports')) {
     function tastyFontsEnableCustomCssUrlImports(array $services): void
     {
-        $services['settings']->saveSettings(['custom_css_url_imports_enabled' => '1']);
+        $services['settings']->saveSettings([
+            'update_channel' => SettingsRepository::UPDATE_CHANNEL_BETA,
+            'custom_css_url_imports_enabled' => '1',
+        ]);
     }
 }
 
@@ -160,6 +164,11 @@ $tests['rest_controller_route_reference_builds_full_api_paths_and_ignores_unknow
         '/tasty-fonts/v1/library/refresh',
         RestController::routeReference('libraryRefresh'),
         'Library refresh requests should expose a dedicated REST route reference.'
+    );
+    assertSameValue(
+        '/tasty-fonts/v1/roles/publish',
+        RestController::routeReference('publishRoleDraft'),
+        'Quick role publishing should expose a dedicated REST route reference.'
     );
 };
 
@@ -1078,7 +1087,7 @@ $tests['admin_controller_builds_monospace_role_output_panels_when_enabled'] = st
         $panelDisplayValues[(string) ($panel['key'] ?? '')] = (string) ($panel['display_value'] ?? '');
     }
 
-    assertContainsValue('--font-monospace: monospace;', $panelValues['variables'] ?? '', 'Enabled monospace support should add the monospace variable to the CSS Variables panel.');
+    assertContainsValue('--font-monospace: ui-monospace, monospace;', $panelValues['variables'] ?? '', 'Enabled monospace support should add the global fallback monospace variable to the CSS Variables panel.');
     assertContainsValue('code, pre {', $panelValues['usage'] ?? '', 'Enabled monospace support should add the code/pre usage rule to the Site Snippet panel.');
     assertContainsValue('Class output is off', $panelValues['classes'] ?? '', 'The Font Classes panel should explain when the workflow is disabled.');
     assertContainsValue("monospace\n", ($panelValues['stacks'] ?? '') . "\n", 'Enabled monospace support should include the fallback-only monospace stack in the Font Stacks panel.');
@@ -1114,8 +1123,8 @@ $tests['admin_controller_keeps_minimal_output_panels_monospace_aware'] = static 
         $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
     }
 
-    assertContainsValue('--font-monospace: monospace;', $panelValues['variables'] ?? '', 'Minimal output should still include the monospace role variable in the CSS Variables panel when the monospace role is enabled.');
-    assertContainsValue('--font-monospace: monospace;', $panelValues['usage'] ?? '', 'Minimal output should still include the monospace role variable in the Site Snippet panel when the monospace role is enabled.');
+    assertContainsValue('--font-monospace: ui-monospace, monospace;', $panelValues['variables'] ?? '', 'Minimal output should still include the global fallback monospace role variable in the CSS Variables panel when the monospace role is enabled.');
+    assertContainsValue('--font-monospace: ui-monospace, monospace;', $panelValues['usage'] ?? '', 'Minimal output should still include the global fallback monospace role variable in the Site Snippet panel when the monospace role is enabled.');
     assertNotContainsValue('code, pre {', $panelValues['usage'] ?? '', 'Minimal output should keep the Site Snippet panel variable-only.');
 };
 
@@ -1190,6 +1199,122 @@ $tests['admin_controller_builds_font_class_output_panel_content'] = static funct
     assertContainsValue('.font-heading', $panelValues['classes'] ?? '', 'The Font Classes panel should include role classes when the mode enables them.');
     assertContainsValue('.font-inter', $panelValues['classes'] ?? '', 'The Font Classes panel should include published family classes when the mode enables them.');
     assertNotContainsValue('.font-draft-only', $panelValues['classes'] ?? '', 'The Font Classes panel should skip library-only families so it matches frontend output.');
+};
+
+$tests['admin_controller_builds_output_toggle_preview_payloads'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular', '500'],
+            'faces' => [
+                ['family' => 'Inter', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'inter/Inter-400.woff2']],
+                ['family' => 'Inter', 'weight' => '500', 'style' => 'normal', 'files' => ['woff2' => 'inter/Inter-500.woff2']],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Draft Only',
+        'draft-only',
+        [
+            'id' => 'draft-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                ['family' => 'Draft Only', 'weight' => '900', 'style' => 'normal', 'files' => ['woff2' => 'draft/Draft-900.woff2']],
+            ],
+        ],
+        'library_only',
+        true
+    );
+
+    $draftRoles = [
+        'heading' => 'Draft Heading',
+        'body' => 'Draft Body',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $appliedRoles = [
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'serif',
+        'body_fallback' => 'sans-serif',
+    ];
+    $settings = $services['settings']->saveSettings([
+        'minimal_output_preset_enabled' => '0',
+        'class_output_enabled' => '1',
+        'class_output_role_styles_enabled' => '1',
+        'per_variant_font_variables_enabled' => '1',
+        'minify_css_output' => '0',
+    ]);
+    $settings['auto_apply_roles'] = true;
+
+    $previews = invokePrivateMethod(
+        $services['controller'],
+        'buildOutputTogglePreviews',
+        [$draftRoles, $settings, $services['catalog']->getCatalog(), $appliedRoles]
+    );
+
+    assertContainsValue('"Inter"', (string) ($previews['class_output_role_heading_enabled']['css'] ?? ''), 'Output toggle previews should use applied roles when sitewide delivery is on.');
+    assertNotContainsValue('Draft Heading', (string) ($previews['class_output_role_heading_enabled']['css'] ?? ''), 'Output toggle previews should not use draft roles while applied roles are active.');
+    assertContainsValue('.font-inter', (string) ($previews['class_output_families_enabled']['css'] ?? ''), 'Family class previews should include published runtime families.');
+    assertNotContainsValue('.font-draft-only', (string) ($previews['class_output_families_enabled']['css'] ?? ''), 'Family class previews should exclude library-only families.');
+    assertContainsValue('  --weight-500: 500;', (string) ($previews['extended_variable_weight_tokens_enabled']['css'] ?? ''), 'Weight token previews should include dynamic published family weights.');
+    assertNotContainsValue('--weight-900', (string) ($previews['extended_variable_weight_tokens_enabled']['css'] ?? ''), 'Weight token previews should exclude library-only family weights.');
+    assertSameValue(false, !empty($previews['class_output_role_heading_enabled']['is_empty']), 'Preview payload items should expose an is_empty flag.');
+    assertSameValue('class_output_role_heading_enabled', (string) ($previews['class_output_role_heading_enabled']['key'] ?? ''), 'Preview payload items should be keyed by the submitted settings field.');
+};
+
+$tests['admin_page_context_and_view_include_output_toggle_previews'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'inter-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                ['family' => 'Inter', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'inter/Inter-400.woff2']],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveRoles([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ], ['Inter']);
+    $services['settings']->saveSettings([
+        'minimal_output_preset_enabled' => '0',
+        'class_output_enabled' => '1',
+        'per_variant_font_variables_enabled' => '1',
+    ]);
+
+    $context = invokePrivateMethod($services['controller'], 'buildPageContext');
+    $view = (new AdminPageViewBuilder($services['storage']))->build($context);
+
+    assertSameValue(true, is_array($context['output_toggle_previews'] ?? null), 'Admin page context should include normalized output toggle previews.');
+    assertContainsValue('.font-heading', (string) ($context['output_toggle_previews']['class_output_role_heading_enabled']['css'] ?? ''), 'Context previews should include exact heading class CSS.');
+    assertSameValue(true, is_array($view['outputTogglePreviews'] ?? null), 'Admin page view data should pass output toggle previews through for the settings template.');
+    assertContainsValue('--font-heading-weight', (string) ($view['outputTogglePreviews']['extended_variable_role_weight_vars_enabled']['css'] ?? ''), 'View previews should include variable toggle CSS.');
 };
 
 $tests['admin_controller_builds_role_class_output_panel_content_when_apply_sitewide_is_off'] = static function (): void {
@@ -1409,7 +1534,7 @@ $tests['admin_controller_builds_variant_variable_output_panel_content'] = static
         $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
     }
 
-    assertContainsValue('--font-inter: "Inter", sans-serif;', $panelValues['variables'] ?? '', 'The CSS Variables panel should include the base family variable.');
+    assertContainsValue('--font-inter: "Inter", system-ui, sans-serif;', $panelValues['variables'] ?? '', 'The CSS Variables panel should include the base family variable.');
     assertContainsValue('--font-interface: var(--font-body);', $panelValues['variables'] ?? '', 'The CSS Variables panel should include interface aliases.');
     assertContainsValue('--weight-400: 400;', $panelValues['variables'] ?? '', 'The CSS Variables panel should include numeric global weight tokens.');
     assertContainsValue('--weight-bold: var(--weight-700);', $panelValues['variables'] ?? '', 'The CSS Variables panel should include semantic global weight aliases.');
@@ -1434,7 +1559,7 @@ $tests['admin_controller_builds_preview_panels_including_marketing_code_and_snip
     );
 };
 
-$tests['admin_controller_keeps_role_font_weights_in_usage_panel_when_variable_output_is_disabled'] = static function (): void {
+$tests['admin_controller_suppresses_role_font_weights_when_output_mode_is_not_custom'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
@@ -1502,9 +1627,10 @@ $tests['admin_controller_keeps_role_font_weights_in_usage_panel_when_variable_ou
         $panelValues[(string) ($panel['key'] ?? '')] = (string) ($panel['value'] ?? '');
     }
 
-    assertContainsValue('font-weight: 400;', $panelValues['usage'] ?? '', 'The Site Snippet should keep raw body font weights when variable output is disabled.');
-    assertContainsValue('font-weight: 700;', $panelValues['usage'] ?? '', 'The Site Snippet should keep raw heading font weights when variable output is disabled.');
-    assertNotContainsValue('var(--weight-700)', $panelValues['usage'] ?? '', 'The Site Snippet should not rely on weight tokens when variable output is disabled.');
+    assertSameValue(false, !empty($settings['role_usage_font_weight_enabled']), 'Classes-only settings should force hidden sitewide role weights off.');
+    assertNotContainsValue('font-weight: 400;', $panelValues['usage'] ?? '', 'Classes-only output should not emit hidden sitewide body font weights.');
+    assertNotContainsValue('font-weight: 700;', $panelValues['usage'] ?? '', 'Classes-only output should not emit hidden sitewide heading font weights.');
+    assertNotContainsValue('var(--weight-700)', $panelValues['usage'] ?? '', 'Classes-only output should not rely on hidden weight tokens.');
 };
 
 $tests['admin_controller_exposes_generated_css_as_a_top_level_panel'] = static function (): void {
@@ -2082,6 +2208,7 @@ $tests['rest_controller_registers_expected_admin_routes'] = static function (): 
         'tasty-fonts/v1/families/fallback' => 'PATCH',
         'tasty-fonts/v1/families/font-display' => 'PATCH',
         'tasty-fonts/v1/roles/draft' => 'PATCH',
+        'tasty-fonts/v1/roles/publish' => 'POST',
         'tasty-fonts/v1/families/delivery' => 'PATCH',
         'tasty-fonts/v1/families/publish-state' => 'PATCH',
         'tasty-fonts/v1/families/delivery-profile' => 'DELETE',
@@ -3135,10 +3262,12 @@ $tests['rest_controller_settings_accepts_patch_payloads'] = static function (): 
     assertSameValue(false, !empty($data['reload_required']), 'Settings that only patch client-synced controls should not ask the autosave client to reload the page.');
     assertSameValue(true, is_array($data['output_panels'] ?? null), 'The settings autosave route should return refreshed output panels for the live admin snippets.');
     assertContainsValue('usage', implode(',', array_map(static fn (array $panel): string => (string) ($panel['key'] ?? ''), (array) ($data['output_panels'] ?? []))), 'The refreshed output panels payload should include the site snippet tab.');
+    assertSameValue(true, is_array($data['output_toggle_previews'] ?? null), 'The settings autosave route should return refreshed output toggle preview payloads.');
+    assertSameValue('extended_variable_role_weight_vars_enabled', (string) ($data['output_toggle_previews']['extended_variable_role_weight_vars_enabled']['key'] ?? ''), 'Preview payloads should be keyed by the submitted output setting field.');
     assertContainsValue('Plugin settings saved', (string) ($data['message'] ?? ''), 'The settings autosave route should return the save summary message.');
 };
 
-$tests['rest_controller_settings_keeps_custom_output_preference_sticky'] = static function (): void {
+$tests['rest_controller_settings_custom_output_preference_enables_combined_layers'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
@@ -3159,8 +3288,10 @@ $tests['rest_controller_settings_keeps_custom_output_preference_sticky'] = stati
     $response = $services['rest']->saveSettings($request);
     $data = $response->get_data();
 
-    assertSameValue(true, $response instanceof WP_REST_Response, 'Sticky custom output saves should return a native REST response.');
-    assertSameValue('custom', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Custom should remain selected when the saved booleans happen to match variables-only.');
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Custom output saves should return a native REST response.');
+    assertSameValue('custom', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Custom should enable the combined variable and class layers.');
+    assertSameValue(true, !empty($data['settings']['class_output_enabled']), 'Custom should force class output on.');
+    assertSameValue(true, !empty($data['settings']['per_variant_font_variables_enabled']), 'Custom should keep variable output on.');
 };
 
 $tests['rest_controller_settings_preserves_variables_and_classes_output_presets'] = static function (): void {
@@ -3178,7 +3309,7 @@ $tests['rest_controller_settings_preserves_variables_and_classes_output_presets'
         'extended_variable_weight_tokens_enabled' => '1',
         'extended_variable_role_aliases_enabled' => '1',
         'extended_variable_category_sans_enabled' => '1',
-        'extended_variable_category_serif_enabled' => '1',
+        'extended_variable_category_serif_enabled' => '0',
         'extended_variable_category_mono_enabled' => '1',
     ]);
 
@@ -3186,7 +3317,7 @@ $tests['rest_controller_settings_preserves_variables_and_classes_output_presets'
     $data = $response->get_data();
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'Variables-only autosave should return a native REST response.');
-    assertSameValue('variables', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Variables-only should remain selected when the saved booleans still match the preset.');
+    assertSameValue('variables', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Variables-only should remain selected from the variable layer shape.');
     assertSameValue(false, !empty($data['settings']['class_output_enabled']), 'Variables-only should keep class output disabled.');
     assertSameValue(true, !empty($data['settings']['per_variant_font_variables_enabled']), 'Variables-only should keep variable output enabled.');
     assertSameValue(false, !empty($data['settings']['role_usage_font_weight_enabled']), 'Variables-only should keep role font-weight output disabled.');
@@ -3215,10 +3346,11 @@ $tests['rest_controller_settings_preserves_variables_and_classes_output_presets'
     $data = $response->get_data();
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'Classes-only autosave should return a native REST response.');
-    assertSameValue('classes', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Classes-only should remain selected when the saved booleans still match the preset.');
+    assertSameValue('classes', (string) ($data['settings']['output_quick_mode_preference'] ?? ''), 'Classes-only should remain selected from the class layer shape.');
     assertSameValue(true, !empty($data['settings']['class_output_enabled']), 'Classes-only should keep class output enabled.');
     assertSameValue(false, !empty($data['settings']['per_variant_font_variables_enabled']), 'Classes-only should keep variable output disabled.');
     assertSameValue(false, !empty($data['settings']['role_usage_font_weight_enabled']), 'Classes-only should keep role font-weight output disabled.');
+    assertSameValue(true, !empty($data['settings']['class_output_role_styles_enabled']), 'Selecting Classes only should default role class styles on when the field is absent.');
 };
 
 $tests['rest_controller_settings_keeps_role_class_styles_in_classes_output'] = static function (): void {
@@ -3324,7 +3456,7 @@ $tests['rest_controller_settings_persists_admin_access_lists_and_requests_reload
     assertContainsValue('admin access updated', (string) ($data['message'] ?? ''), 'Admin access setting saves should mention the access change in the returned settings toast.');
 };
 
-$tests['rest_controller_settings_reenables_monospace_class_outputs_when_the_role_is_first_enabled'] = static function (): void {
+$tests['rest_controller_settings_preserves_monospace_output_preferences_when_the_role_is_enabled'] = static function (): void {
     resetTestState();
 
     $services = makeServiceGraph();
@@ -3333,6 +3465,7 @@ $tests['rest_controller_settings_reenables_monospace_class_outputs_when_the_role
         'class_output_role_monospace_enabled' => '0',
         'class_output_role_alias_code_enabled' => '0',
         'class_output_category_mono_enabled' => '0',
+        'extended_variable_category_mono_enabled' => '0',
     ]);
 
     $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
@@ -3345,9 +3478,10 @@ $tests['rest_controller_settings_reenables_monospace_class_outputs_when_the_role
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'Enabling the monospace role through autosave should return a native REST response.');
     assertSameValue(true, !empty($data['settings']['monospace_role_enabled']), 'Autosave should persist the monospace role setting.');
-    assertSameValue(true, !empty($data['settings']['class_output_role_monospace_enabled']), 'Autosave should restore the monospace class output when the role is first enabled.');
-    assertSameValue(true, !empty($data['settings']['class_output_role_alias_code_enabled']), 'Autosave should restore the code alias output when the role is first enabled.');
-    assertSameValue(true, !empty($data['settings']['class_output_category_mono_enabled']), 'Autosave should restore the mono category output when the role is first enabled.');
+    assertSameValue(false, !empty($data['settings']['class_output_role_monospace_enabled']), 'Autosave should preserve the saved monospace class output preference when the role is enabled.');
+    assertSameValue(false, !empty($data['settings']['class_output_role_alias_code_enabled']), 'Autosave should preserve the saved code alias output preference when the role is enabled.');
+    assertSameValue(false, !empty($data['settings']['class_output_category_mono_enabled']), 'Autosave should preserve the saved mono category output preference when the role is enabled.');
+    assertSameValue(false, !empty($data['settings']['extended_variable_category_mono_enabled']), 'Autosave should preserve the saved mono variable alias output preference when the role is enabled.');
 };
 
 $tests['rest_controller_settings_reload_flag_covers_update_channel_changes'] = static function (): void {
@@ -3403,10 +3537,10 @@ $tests['rest_controller_roles_draft_accepts_and_returns_monospace_fields'] = sta
 
     assertSameValue(true, $response instanceof WP_REST_Response, 'The roles/draft route should return a native REST response.');
     assertSameValue('', (string) ($data['roles']['monospace'] ?? ''), 'The roles/draft route should preserve fallback-only monospace selections.');
-    assertSameValue('monospace', (string) ($data['roles']['monospace_fallback'] ?? ''), 'The roles/draft route should normalize blank monospace fallbacks back to the generic monospace stack.');
+    assertSameValue('ui-monospace, monospace', (string) ($data['roles']['monospace_fallback'] ?? ''), 'The roles/draft route should normalize blank monospace fallbacks back to the modern monospace stack.');
     assertSameValue('off', (string) ($data['role_deployment']['state'] ?? ''), 'Role deployment payloads should expose the Sitewide delivery Off state.');
     assertContainsValue('Role assignments are saved as draft only and are not served sitewide.', (string) ($data['role_deployment']['copy'] ?? ''), 'Role deployment payloads should include the composed Sitewide delivery detail copy.');
-    assertContainsValue('Monospace: fallback only (monospace).', (string) ($data['role_deployment']['summary'] ?? ''), 'Role deployment payloads should preserve monospace role summaries when the feature is enabled.');
+    assertContainsValue('Monospace: fallback only (ui-monospace, monospace).', (string) ($data['role_deployment']['summary'] ?? ''), 'Role deployment payloads should preserve monospace role summaries when the feature is enabled.');
 };
 
 $tests['rest_controller_roles_draft_accepts_variable_axis_maps_when_the_feature_flag_is_enabled'] = static function (): void {
@@ -3649,6 +3783,84 @@ $tests['rest_controller_roles_draft_response_keeps_sitewide_enabled_and_marks_pe
     assertSameValue('Live sitewide', (string) ($data['preview_baseline_label'] ?? ''), 'Draft role saves while Sitewide is enabled should preserve the Live sitewide preview baseline label.');
 };
 
+$tests['rest_controller_roles_publish_enables_sitewide_and_promotes_library_only_family'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('draft-sans/DraftSans-400.woff2'), 'font-data');
+    $generatedCssPath = (string) $services['storage']->getGeneratedCssPath();
+    $services['storage']->writeAbsoluteFile($generatedCssPath, '/* stale generated css */ body{font-family:Inter;}');
+
+    $services['imports']->saveProfile(
+        'Draft Sans',
+        'draft-sans',
+        [
+            'id' => 'draft-sans-self-hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [[
+                'family' => 'Draft Sans',
+                'slug' => 'draft-sans',
+                'source' => 'local',
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => ['woff2' => 'draft-sans/DraftSans-400.woff2'],
+                'paths' => ['woff2' => 'draft-sans/DraftSans-400.woff2'],
+            ]],
+        ],
+        'library_only',
+        true
+    );
+
+    $request = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/roles/publish');
+    $request->set_body_params([
+        'heading' => 'Draft Sans',
+        'body' => 'Draft Sans',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ]);
+
+    $response = $services['rest']->publishRoleDraft($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'The roles/publish route should return a native REST response.');
+    assertSameValue(true, !empty($data['apply_everywhere']), 'Quick publish should enable Sitewide delivery.');
+    assertSameValue('live', (string) ($data['role_deployment']['state'] ?? ''), 'Quick publish should leave role deployment in the Live state.');
+    assertSameValue('Draft Sans', (string) ($data['applied_roles']['heading'] ?? ''), 'Quick publish should apply the submitted heading role sitewide.');
+    assertSameValue('Draft Sans', (string) ($data['applied_roles']['body'] ?? ''), 'Quick publish should apply the submitted body role sitewide.');
+    assertSameValue('role_active', (string) (($data['role_family_catalog']['Draft Sans'] ?? [])['publishState'] ?? ''), 'Quick publish should promote selected library-only families to role-active in the returned catalog.');
+    assertSameValue('runtime_styles', (string) (($data['canvas_refresh'] ?? [])['mode'] ?? ''), 'Quick publish should ask the canvas panel to refresh runtime styles without iframe reload.');
+    assertContainsValue('Draft Sans', (string) (($data['canvas_refresh'] ?? [])['generated_css'] ?? ''), 'Quick publish should include fresh generated CSS for immediate canvas refresh.');
+
+    $status = $services['assets']->getStatus();
+    $generatedFileCss = is_file($generatedCssPath) ? (string) file_get_contents($generatedCssPath) : '';
+
+    assertTrueValue(!empty($status['is_current']), 'Quick publish should synchronously write the current generated CSS file.');
+    assertContainsValue('Draft Sans', $generatedFileCss, 'Quick publish should replace stale generated CSS file contents before deferred regeneration runs.');
+};
+
+$tests['admin_controller_publish_role_drafts_logs_roles_published'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['controller']->publishRoleDraftValues([
+        'heading' => 'Inter',
+        'body' => 'Inter',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'sans-serif',
+    ]);
+
+    $entry = $services['log']->all()[0] ?? [];
+
+    assertSameValue('roles', (string) ($entry['category'] ?? ''), 'Quick role publishes should be categorized as role activity.');
+    assertSameValue('roles_published', (string) ($entry['event'] ?? ''), 'Quick role publishes should record a role-publish event.');
+    assertSameValue('Published', (string) ($entry['status_label'] ?? ''), 'Quick role publishes should expose a concise publish outcome label.');
+    assertContainsValue('Live roles', (string) ($entry['details_json'] ?? ''), 'Quick role publishes should include live role detail rows.');
+};
+
 $tests['settings_repository_defaults_font_import_workflows_off_by_default'] = static function (): void {
     resetTestState();
 
@@ -3668,6 +3880,7 @@ $tests['rest_controller_settings_accepts_font_import_workflow_gates'] = static f
     $services = makeServiceGraph();
     $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
     $request->set_body_params([
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_BETA,
         'google_font_imports_enabled' => '0',
         'bunny_font_imports_enabled' => '0',
         'local_font_uploads_enabled' => '0',
@@ -3685,6 +3898,24 @@ $tests['rest_controller_settings_accepts_font_import_workflow_gates'] = static f
     assertSameValue(true, !empty($data['settings']['adobe_font_imports_enabled']), 'The settings route should allow Adobe Fonts imports to be turned on.');
     assertSameValue(true, !empty($data['settings']['custom_css_url_imports_enabled']), 'The settings route should allow URL imports to be turned on.');
     assertSameValue(true, !empty($data['reload_required']), 'Changing font import workflow gates should request a reload so server-rendered Add Fonts panels update.');
+};
+
+$tests['rest_controller_settings_hides_url_import_gate_on_stable_channel'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $request = new WP_REST_Request('PATCH', '/' . RestController::API_NAMESPACE . '/settings');
+    $request->set_body_params([
+        'update_channel' => SettingsRepository::UPDATE_CHANNEL_STABLE,
+        'custom_css_url_imports_enabled' => '1',
+    ]);
+
+    $response = $services['rest']->saveSettings($request);
+    $data = $response instanceof WP_REST_Response ? $response->get_data() : [];
+
+    assertSameValue(true, $response instanceof WP_REST_Response, 'Stable-channel settings saves should still return a native REST response.');
+    assertSameValue(SettingsRepository::UPDATE_CHANNEL_STABLE, (string) ($data['settings']['update_channel'] ?? ''), 'The stable update channel should persist.');
+    assertSameValue(false, !empty($data['settings']['custom_css_url_imports_enabled']), 'URL imports should stay disabled on the stable channel.');
 };
 
 $tests['rest_controller_settings_accepts_variable_font_feature_flag'] = static function (): void {
@@ -5372,10 +5603,14 @@ $tests['rest_controller_settings_disabling_monospace_creates_snapshot_and_clears
     assertSameValue(1, count($snapshots), 'Disabling the monospace role should create one rollback snapshot before cleanup.');
     assertSameValue('before_capability_disable', (string) ($snapshots[0]['reason'] ?? ''), 'Monospace capability disable snapshots should use the expected reason slug.');
     assertSameValue(false, !empty($settings['monospace_role_enabled']), 'Disabling monospace should persist the disabled setting value.');
-    assertSameValue(false, !empty($settings['class_output_role_monospace_enabled']), 'Disabling monospace should force-disable monospace class output controls.');
-    assertSameValue(false, !empty($settings['class_output_role_alias_code_enabled']), 'Disabling monospace should force-disable code alias output controls.');
-    assertSameValue(false, !empty($settings['class_output_category_mono_enabled']), 'Disabling monospace should force-disable mono category output controls.');
-    assertSameValue(false, !empty($settings['extended_variable_category_mono_enabled']), 'Disabling monospace should force-disable mono extended variable controls.');
+    assertSameValue(true, !empty($settings['class_output_role_monospace_enabled']), 'Disabling monospace should preserve the saved monospace class output preference.');
+    assertSameValue(true, !empty($settings['class_output_role_alias_code_enabled']), 'Disabling monospace should preserve the saved code alias output preference.');
+    assertSameValue(true, !empty($settings['class_output_category_mono_enabled']), 'Disabling monospace should preserve the saved mono category output preference.');
+    assertSameValue(true, !empty($settings['extended_variable_category_mono_enabled']), 'Disabling monospace should preserve the saved mono extended variable preference.');
+    assertSameValue(true, !empty($data['settings']['class_output_role_monospace_enabled']), 'Disabling monospace should return the preserved monospace class output preference in the autosave payload.');
+    assertSameValue(true, !empty($data['settings']['class_output_role_alias_code_enabled']), 'Disabling monospace should return the preserved code alias output preference in the autosave payload.');
+    assertSameValue(true, !empty($data['settings']['class_output_category_mono_enabled']), 'Disabling monospace should return the preserved mono category output preference in the autosave payload.');
+    assertSameValue(true, !empty($data['settings']['extended_variable_category_mono_enabled']), 'Disabling monospace should return the preserved mono variable alias preference in the autosave payload.');
     assertSameValue('', (string) ($roles['monospace'] ?? ''), 'Disabling monospace should clear draft monospace role families.');
     assertSameValue('', (string) ($appliedRoles['monospace'] ?? ''), 'Disabling monospace should clear applied monospace role families.');
     assertSameValue('Inter', (string) ($roles['heading'] ?? ''), 'Disabling monospace should preserve heading role assignments.');

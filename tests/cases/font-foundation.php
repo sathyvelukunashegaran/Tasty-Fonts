@@ -300,11 +300,11 @@ $tests['css_builder_can_add_role_weight_and_variation_settings_to_role_derived_c
 
     $css = $builder->buildClassOutputSnippet($roles, true, $families, $settings);
 
-    assertContainsValue(".font-heading {\n  font-family: \"Lora\", serif;\n  font-weight: 800;\n  font-variation-settings: var(--font-heading-settings);\n}", $css, 'Role classes should be able to include the saved heading weight and variation settings.');
-    assertContainsValue(".font-body {\n  font-family: \"Inter\", sans-serif;\n  font-weight: 450;\n  font-variation-settings: var(--font-body-settings);\n}", $css, 'Role classes should use the resolved body weight when role class styles are enabled.');
-    assertContainsValue(".font-monospace {\n  font-family: \"JetBrains Mono\", monospace;\n  font-weight: 500;\n  font-variation-settings: var(--font-monospace-settings);\n}", $css, 'Role classes should be able to include monospace weight and variation settings.');
-    assertContainsValue(".font-interface {\n  font-family: \"Inter\", sans-serif;\n  font-weight: 450;\n  font-variation-settings: var(--font-body-settings);\n}", $css, 'Role alias classes should inherit the source role styles when the feature is enabled.');
-    assertContainsValue(".font-code {\n  font-family: \"JetBrains Mono\", monospace;\n  font-weight: 500;\n  font-variation-settings: var(--font-monospace-settings);\n}", $css, 'Code aliases should inherit the monospace role styles when the feature is enabled.');
+    assertContainsValue(".font-heading {\n  font-family: \"Lora\", system-ui, sans-serif;\n  font-weight: 800;\n  font-variation-settings: var(--font-heading-settings);\n}", $css, 'Role classes should be able to include the saved heading weight and variation settings.');
+    assertContainsValue(".font-body {\n  font-family: \"Inter\", system-ui, sans-serif;\n  font-weight: 450;\n  font-variation-settings: var(--font-body-settings);\n}", $css, 'Role classes should use the resolved body weight when role class styles are enabled.');
+    assertContainsValue(".font-monospace {\n  font-family: \"JetBrains Mono\", ui-monospace, monospace;\n  font-weight: 500;\n  font-variation-settings: var(--font-monospace-settings);\n}", $css, 'Role classes should be able to include monospace weight and variation settings.');
+    assertContainsValue(".font-interface {\n  font-family: \"Inter\", system-ui, sans-serif;\n  font-weight: 450;\n  font-variation-settings: var(--font-body-settings);\n}", $css, 'Role alias classes should inherit the source role styles when the feature is enabled.');
+    assertContainsValue(".font-code {\n  font-family: \"JetBrains Mono\", ui-monospace, monospace;\n  font-weight: 500;\n  font-variation-settings: var(--font-monospace-settings);\n}", $css, 'Code aliases should inherit the monospace role styles when the feature is enabled.');
     assertNotContainsValue(".font-lora {\n  font-family: Lora, serif;\n  font-weight:", $css, 'Per-family classes should remain family-only even when role class styles are enabled.');
     assertNotContainsValue(".font-sans {\n  font-family: Inter, sans-serif;\n  font-weight:", $css, 'Category classes should remain family-only even when role class styles are enabled.');
 };

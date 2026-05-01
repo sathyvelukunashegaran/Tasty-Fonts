@@ -6,6 +6,7 @@ namespace TastyFonts\Admin\Renderer;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Fonts\FallbackResolver;
 use TastyFonts\Support\FontUtils;
 
 /**
@@ -13,6 +14,7 @@ use TastyFonts\Support\FontUtils;
  * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
  */
 trait LibraryRenderValueHelpers
 {
@@ -72,39 +74,19 @@ trait LibraryRenderValueHelpers
      * @param array<int|string, mixed> $roles
      * @param CatalogMap $catalog
      * @param FamilyFallbackMap $familyFallbacks
+     * @param NormalizedSettings|array{} $settings
      */
     protected function resolveEffectiveRoleFallback(
         string $roleKey,
         array $roles,
         array $catalog = [],
-        array $familyFallbacks = []
+        array $familyFallbacks = [],
+        array $settings = []
     ): string
     {
-        $default = $roleKey === 'monospace' ? 'monospace' : 'sans-serif';
-        $familyName = trim($this->roleStringValue($roles, $roleKey));
-        $fallback = trim($this->roleStringValue($roles, $roleKey . '_fallback'));
+        $settings['family_fallbacks'] = $familyFallbacks;
 
-        if ($familyName !== '') {
-            if (array_key_exists($familyName, $familyFallbacks)) {
-                $configuredFallback = trim((string) $familyFallbacks[$familyName]);
-
-                if ($configuredFallback !== '') {
-                    return FontUtils::sanitizeFallback($configuredFallback);
-                }
-            }
-
-            $family = $this->findCatalogFamilyByName($familyName, $catalog);
-
-            if (is_array($family)) {
-                return FontUtils::defaultFallbackForCategory($this->resolveFamilyCategory($family));
-            }
-        }
-
-        if ($fallback !== '') {
-            return FontUtils::sanitizeFallback($fallback);
-        }
-
-        return $default;
+        return FallbackResolver::roleFallback($roleKey, $roles, $settings, $catalog);
     }
 
     /**
