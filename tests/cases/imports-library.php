@@ -3583,3 +3583,56 @@ $tests['capability_cleanup_service_keeps_manifest_unchanged_when_file_deletion_f
     assertSameValue('tasty_fonts_variable_cleanup_failed', $result->get_error_code(), 'Capability cleanup should use the variable cleanup error code when file deletion fails.');
     assertSameValue($before, $after, 'Capability cleanup should leave the import manifest unchanged when file deletion fails.');
 };
+
+$tests['local_upload_service_preserves_multiple_variable_axes_for_uploaded_faces'] = static function (): void {
+    resetTestState();
+
+    global $uploadedFilePaths;
+
+    $services = makeServiceGraph();
+    $tmpName = uniqueTestDirectory('tmp-upload-variable') . '/jost-variable.woff2';
+    mkdir(dirname($tmpName), FS_CHMOD_DIR, true);
+    file_put_contents($tmpName, "wOF2test-font");
+    $uploadedFilePaths[] = $tmpName;
+
+    $result = $services['local_upload']->uploadRows([
+        [
+            'family' => 'Jost Variable',
+            'weight' => '400',
+            'style' => 'normal',
+            'fallback' => 'sans-serif',
+            'is_variable' => true,
+            'axes' => [
+                'WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'],
+                'ITAL' => ['min' => '0', 'default' => '0', 'max' => '1'],
+            ],
+            'variation_defaults' => [
+                'WGHT' => '400',
+                'ITAL' => '0',
+            ],
+            'file' => [
+                'name' => 'jost-variable.woff2',
+                'tmp_name' => $tmpName,
+                'error' => UPLOAD_ERR_OK,
+                'size' => filesize($tmpName),
+            ],
+        ],
+    ]);
+
+    $family = $services['imports']->getFamily('jost-variable');
+    $profile = (array) (($family['delivery_profiles']['local-self_hosted'] ?? null) ?: []);
+    $face = (array) (($profile['faces'][0] ?? null) ?: []);
+
+    assertSameValue(1, (int) ($result['summary']['imported'] ?? 0), 'Variable uploads with multiple axes should still import successfully.');
+    assertSameValue('100..900', (string) ($face['weight'] ?? ''), 'Variable uploads with multiple axes should derive their stored weight range from the normalized WGHT axis.');
+    assertTrueValue(isset($face['axes']['WGHT']), 'Variable uploads should preserve the normalized WGHT axis.');
+    assertTrueValue(isset($face['axes']['ITAL']), 'Variable uploads should preserve the normalized ITAL axis.');
+    assertSameValue('100', (string) ($face['axes']['WGHT']['min'] ?? ''), 'The WGHT min should be preserved.');
+    assertSameValue('400', (string) ($face['axes']['WGHT']['default'] ?? ''), 'The WGHT default should be preserved.');
+    assertSameValue('900', (string) ($face['axes']['WGHT']['max'] ?? ''), 'The WGHT max should be preserved.');
+    assertSameValue('0', (string) ($face['axes']['ITAL']['min'] ?? ''), 'The ITAL min should be preserved.');
+    assertSameValue('0', (string) ($face['axes']['ITAL']['default'] ?? ''), 'The ITAL default should be preserved.');
+    assertSameValue('1', (string) ($face['axes']['ITAL']['max'] ?? ''), 'The ITAL max should be preserved.');
+    assertSameValue('400', (string) ($face['variation_defaults']['WGHT'] ?? ''), 'The WGHT variation default should be preserved.');
+    assertSameValue('0', (string) ($face['variation_defaults']['ITAL'] ?? ''), 'The ITAL variation default should be preserved.');
+};

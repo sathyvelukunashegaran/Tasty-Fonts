@@ -241,7 +241,19 @@ final class CatalogService
             return;
         }
 
-        if (!isset($families[$familyName])) {
+        $existingFamilyName = null;
+        foreach ($families as $existingName => $existingFamily) {
+            if ($this->stringValue($existingFamily, 'slug', FontUtils::slugify($existingName)) === $familySlug) {
+                $existingFamilyName = $existingName;
+                break;
+            }
+        }
+
+        if ($existingFamilyName !== null && !$this->familiesShareFiles($families[$existingFamilyName], $synthetic)) {
+            $existingFamilyName = null;
+        }
+
+        if ($existingFamilyName === null && !isset($families[$familyName])) {
             $families[$familyName] = $this->buildCatalogFamilyRecord(
                 $familyName,
                 $familySlug,
@@ -253,7 +265,8 @@ final class CatalogService
             return;
         }
 
-        $existingProfiles = $this->deliveryProfiles($families[$familyName]['delivery_profiles'] ?? []);
+        $targetFamilyName = $existingFamilyName ?? $familyName;
+        $existingProfiles = $this->deliveryProfiles($families[$targetFamilyName]['delivery_profiles'] ?? []);
 
         foreach ($this->deliveryProfiles($synthetic['delivery_profiles'] ?? []) as $profileId => $profile) {
             if (!isset($existingProfiles[$profileId])) {
@@ -264,7 +277,64 @@ final class CatalogService
             $existingFaces = $this->deliveryFaceList($existingProfiles[$profileId]);
             $syntheticFaces = $this->deliveryFaceList($profile);
             $existingProfiles[$profileId] = array_replace($profile, $existingProfiles[$profileId]);
-            $existingProfiles[$profileId]['faces'] = HostedImportSupport::mergeManifestFaces($existingFaces, $syntheticFaces);
+
+            $existingFilePaths = [];
+            foreach ($existingFaces as $existingFace) {
+                foreach (array_values($this->stringMap($existingFace['files'] ?? [])) as $path) {
+                    if (trim($path) !== '') {
+                        $existingFilePaths[] = trim($path);
+                    }
+                }
+                foreach (array_values($this->stringMap($existingFace['paths'] ?? [])) as $path) {
+                    if (trim($path) !== '') {
+                        $existingFilePaths[] = trim($path);
+                    }
+                }
+            }
+            $existingFilePaths = array_unique($existingFilePaths);
+
+            $newSyntheticFaces = [];
+            foreach ($syntheticFaces as $syntheticFace) {
+                $syntheticPaths = [];
+                foreach (array_values($this->stringMap($syntheticFace['files'] ?? [])) as $path) {
+                    if (trim($path) !== '') {
+                        $syntheticPaths[] = trim($path);
+                    }
+                }
+                foreach (array_values($this->stringMap($syntheticFace['paths'] ?? [])) as $path) {
+                    if (trim($path) !== '') {
+                        $syntheticPaths[] = trim($path);
+                    }
+                }
+                $syntheticPaths = array_unique($syntheticPaths);
+                $allFilesExist = $syntheticPaths !== [] && array_diff($syntheticPaths, $existingFilePaths) === [];
+                if ($allFilesExist) {
+                    continue;
+                }
+                $newSyntheticFaces[] = $syntheticFace;
+            }
+
+            $mergedFaces = HostedImportSupport::mergeManifestFaces($existingFaces, $newSyntheticFaces);
+
+            $existingFaceMap = [];
+            foreach ($existingFaces as $existingFace) {
+                $existingFaceMap[HostedImportSupport::faceKeyFromFace($existingFace)] = $existingFace;
+            }
+            foreach ($mergedFaces as &$mergedFace) {
+                $key = HostedImportSupport::faceKeyFromFace($mergedFace);
+                if (!isset($existingFaceMap[$key])) {
+                    continue;
+                }
+                $existingAxes = is_array($existingFaceMap[$key]['axes'] ?? null) ? $existingFaceMap[$key]['axes'] : [];
+                if ($existingAxes === []) {
+                    continue;
+                }
+                $mergedAxes = is_array($mergedFace['axes'] ?? null) ? $mergedFace['axes'] : [];
+                $mergedFace['axes'] = array_replace($mergedAxes, $existingAxes);
+            }
+            unset($mergedFace);
+
+            $existingProfiles[$profileId]['faces'] = $mergedFaces;
             $existingProfiles[$profileId]['variants'] = array_values(
                 array_unique(
                     array_merge(
@@ -279,10 +349,10 @@ final class CatalogService
             );
         }
 
-        $families[$familyName]['delivery_profiles'] = $existingProfiles;
+        $families[$targetFamilyName]['delivery_profiles'] = $existingProfiles;
 
-        if (trim($this->stringValue($families[$familyName], 'active_delivery_id')) === '') {
-            $families[$familyName]['active_delivery_id'] = $this->stringValue($synthetic, 'active_delivery_id');
+        if (trim($this->stringValue($families[$targetFamilyName], 'active_delivery_id')) === '') {
+            $families[$targetFamilyName]['active_delivery_id'] = $this->stringValue($synthetic, 'active_delivery_id');
         }
     }
 
@@ -1202,6 +1272,50 @@ final class CatalogService
         $value = $values[$key] ?? null;
 
         return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param CatalogFamily $left
+     * @param CatalogFamily $right
+     */
+    private function familiesShareFiles(array $left, array $right): bool
+    {
+        $leftPaths = [];
+        foreach ($this->deliveryProfiles($left['delivery_profiles'] ?? []) as $profile) {
+            foreach ($this->deliveryFaceList($profile) as $face) {
+                foreach (array_values($this->stringMap($face['files'] ?? [])) as $path) {
+                    if (trim($path) !== '') {
+                        $leftPaths[] = trim($path);
+                    }
+                }
+                foreach (array_values($this->stringMap($face['paths'] ?? [])) as $path) {
+                    if (trim($path) !== '') {
+                        $leftPaths[] = trim($path);
+                    }
+                }
+            }
+        }
+        $leftPaths = array_unique($leftPaths);
+        if ($leftPaths === []) {
+            return false;
+        }
+
+        foreach ($this->deliveryProfiles($right['delivery_profiles'] ?? []) as $profile) {
+            foreach ($this->deliveryFaceList($profile) as $face) {
+                foreach (array_values($this->stringMap($face['files'] ?? [])) as $path) {
+                    if (trim($path) !== '' && in_array(trim($path), $leftPaths, true)) {
+                        return true;
+                    }
+                }
+                foreach (array_values($this->stringMap($face['paths'] ?? [])) as $path) {
+                    if (trim($path) !== '' && in_array(trim($path), $leftPaths, true)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

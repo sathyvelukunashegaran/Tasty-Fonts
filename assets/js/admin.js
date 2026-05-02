@@ -165,6 +165,7 @@
     const roleDeploymentAnnouncement = document.querySelector('[data-role-deployment-announcement]');
     let monospaceRoleEnabled = !!config.monospaceRoleEnabled && !!roleMonospace;
     const variableFontsEnabled = !!config.variableFontsEnabled;
+	const fontBinaryParser = window.TastyFontsFontBinaryParser || null;
     const roleFamilyCatalog = config.roleFamilyCatalog && typeof config.roleFamilyCatalog === 'object'
         ? config.roleFamilyCatalog
         : {};
@@ -423,6 +424,8 @@
     let pendingHelpTooltipButton = null;
     let nextUploadGroupIndex = uploadGroupsWrap ? uploadGroupsWrap.querySelectorAll('[data-upload-group]').length : 0;
     let nextUploadRowIndex = uploadGroupsWrap ? uploadGroupsWrap.querySelectorAll('[data-upload-row]').length : 0;
+	let nextUploadDetectionRequestId = 1;
+	const uploadDetectionState = new WeakMap();
     let nextGeneratedFieldIndex = 0;
     let disclosureAnnouncementRegion = null;
     let disclosureAnnouncementToken = 0;
@@ -556,6 +559,7 @@
         uploadUseDetected: __('Use Detected Values', 'tasty-fonts'),
         uploadDetectedSummary: __('Detected: %1$s / %2$s / %3$s', 'tasty-fonts'),
         uploadDetectedWeightStyle: __('Detected: %1$s / %2$s', 'tasty-fonts'),
+		uploadVariableWeightTooltip: __('Weight range is managed by the variable font axis below.', 'tasty-fonts'),
         uploadRequiresRows: __('Add at least one upload row before submitting.', 'tasty-fonts'),
         rolesDraftSaved: __('Roles saved.', 'tasty-fonts'),
         rolesDraftSaveError: __('The roles could not be saved.', 'tasty-fonts'),
@@ -4107,15 +4111,9 @@
         editor.hidden = false;
         fields.innerHTML = '';
         const axisEntries = Object.entries(definitions);
-        const singleAxis = axisEntries.length === 1;
 
         if (heading) {
-            heading.textContent = singleAxis
-                ? formatMessage(
-                    getString('singleAxisHeading', 'Variable Axes (%1$s - %2$s)'),
-                    [axisEntries[0][1].min, axisEntries[0][1].max]
-                )
-                : getString('variableAxesHeading', 'Variable Axes');
+            heading.textContent = getString('variableAxesHeading', 'Variable Axes');
         }
 
         axisEntries.forEach(([tag, definition]) => {
@@ -4129,7 +4127,7 @@
             field.className = 'tasty-fonts-stack-field tasty-fonts-role-axis-field';
 
             const title = document.createElement('span');
-            title.className = singleAxis ? 'screen-reader-text' : 'tasty-fonts-field-label-text';
+            title.className = 'tasty-fonts-field-label-text';
             title.textContent = `${cssAxisTag(normalizedTag)} (${definition.min} - ${definition.max})`;
 
             const input = document.createElement('input');
@@ -4152,16 +4150,11 @@
         });
 
         if (summary) {
-            summary.hidden = singleAxis;
-
-            if (!singleAxis) {
-                summary.textContent = formatMessage(
-                    getString('roleAxisSummary', 'Available axes for %1$s. Leave a field empty to use the family default.'),
-                    [familyName]
-                );
-            } else {
-                summary.textContent = '';
-            }
+            summary.hidden = false;
+            summary.textContent = formatMessage(
+                getString('roleAxisSummary', 'Available axes for %1$s. Leave a field empty to use the family default.'),
+                [familyName]
+            );
         }
     }
 
@@ -4293,15 +4286,9 @@
         editor.hidden = false;
         fields.innerHTML = '';
         const axisEntries = Object.entries(definitions);
-        const singleAxis = axisEntries.length === 1;
 
         if (heading) {
-            heading.textContent = singleAxis
-                ? formatMessage(
-                    getString('singleAxisHeading', 'Variable Axes (%1$s - %2$s)'),
-                    [axisEntries[0][1].min, axisEntries[0][1].max]
-                )
-                : getString('variableAxesHeading', 'Variable Axes');
+            heading.textContent = getString('variableAxesHeading', 'Variable Axes');
         }
 
         axisEntries.forEach(([tag, definition]) => {
@@ -4315,7 +4302,7 @@
             field.className = 'tasty-fonts-stack-field tasty-fonts-role-axis-field';
 
             const title = document.createElement('span');
-            title.className = singleAxis ? 'screen-reader-text' : 'tasty-fonts-field-label-text';
+            title.className = 'tasty-fonts-field-label-text';
             title.textContent = `${cssAxisTag(normalizedTag)} (${definition.min} - ${definition.max})`;
 
             const input = document.createElement('input');
@@ -7766,7 +7753,7 @@
     }
 
     function updateGroupDetectedSuggestions(group) {
-        uploadRows(group).forEach((row) => updateUploadDetectedSuggestion(row));
+		uploadRows(group).forEach((row) => void updateUploadDetectedSuggestion(row));
     }
 
     function setFamilyFallbackFeedback(form, message, tone) {
@@ -9503,7 +9490,7 @@
         return value.replace(/\b[a-z]/g, (match) => match.toUpperCase());
     }
 
-    function detectUploadMetadata(fileName) {
+	function detectUploadMetadataFromFilename(fileName) {
         if (!fileName) {
             return null;
         }
@@ -9525,7 +9512,7 @@
         }
 
         const axisTags = [];
-        let isVariable = /variablefont/i.test(baseName);
+		let isVariable = /\bvariable\b/i.test(baseName);
         const axisMatch = baseName.match(/\[([a-z0-9,]+)\]/i);
 
         if (axisMatch && axisMatch[1]) {
@@ -9584,7 +9571,7 @@
         }
 
         if (!isVariable) {
-            return { family, weight, style, isVariable: false, axes: [] };
+			return { family, weight, style, isVariable: false, axes: [], defaultWeight: weight };
         }
 
         if (!axisTags.length) {
@@ -9599,8 +9586,59 @@
             return { tag, min: '0', default: '0', max: '100' };
         });
 
-        return { family, weight: '100..900', style, isVariable: true, axes };
+		const wghtAxis = axes.find((ax) => ax.tag === 'WGHT');
+		const defaultWeight = wghtAxis ? wghtAxis.default : weight;
+
+		return { family, weight: '100..900', style, isVariable: true, axes, defaultWeight };
     }
+
+	async function detectUploadMetadata(file) {
+		if (!file) {
+			return null;
+		}
+
+		const fallback = detectUploadMetadataFromFilename(file.name);
+
+		if (!fontBinaryParser || typeof fontBinaryParser.parse !== 'function') {
+			return fallback;
+		}
+
+		let binaryResult;
+		try {
+			binaryResult = await fontBinaryParser.parse(file);
+		} catch (e) {
+			return fallback;
+		}
+
+		if (!binaryResult) {
+			return fallback;
+		}
+
+		const result = {
+			family: binaryResult.family || fallback?.family || null,
+			style: binaryResult.style || fallback?.style || 'normal',
+			isVariable: binaryResult.variableKnown ? !!binaryResult.isVariable : !!fallback?.isVariable,
+			axes: binaryResult.axes && binaryResult.axes.length ? binaryResult.axes : (fallback ? fallback.axes : []),
+			weight: binaryResult.weight || fallback?.weight || '400',
+			defaultWeight: binaryResult.weight || fallback?.weight || '400',
+		};
+
+		if (result.isVariable && result.axes.length > 0) {
+			const wghtAxis = result.axes.find((ax) => ax.tag === 'WGHT');
+			if (wghtAxis) {
+				result.weight = `${wghtAxis.min}..${wghtAxis.max}`;
+				result.defaultWeight = wghtAxis.default;
+			}
+		}
+
+		if (result.isVariable && result.axes.length === 0) {
+			result.axes = [{ tag: 'WGHT', min: '100', default: '400', max: '900' }];
+			result.weight = '100..900';
+			result.defaultWeight = '400';
+		}
+
+		return result;
+	}
 
     function familyInputForGroup(group) {
         return group ? group.querySelector('[data-upload-group-field="family"]') : null;
@@ -9877,56 +9915,138 @@
         }
     }
 
-    function updateUploadDetectedSuggestion(row) {
-        if (!row) {
-            return null;
-        }
-
+	function renderUploadDetectedSuggestion(row, detected) {
         const group = row.closest('[data-upload-group]');
         const familyField = familyInputForGroup(group);
         const weightField = row.querySelector('[data-upload-field="weight"]');
         const styleField = row.querySelector('[data-upload-field="style"]');
-        const fileField = row.querySelector('[data-upload-field="file"]');
         const variableField = row.querySelector('[data-upload-field="is-variable"]');
         const button = row.querySelector('[data-upload-detected-apply]');
-        const file = fileField && fileField.files ? fileField.files[0] : null;
-        const detected = file ? detectUploadMetadata(file.name) : null;
 
         if (!button) {
-            return null;
+			return;
         }
 
         if (!detected) {
             button.hidden = true;
             delete button.dataset.detectedFamily;
             delete button.dataset.detectedWeight;
+			delete button.dataset.detectedDefaultWeight;
             delete button.dataset.detectedStyle;
             delete button.dataset.detectedVariable;
             delete button.dataset.detectedAxes;
-            return null;
+			return;
         }
 
         const familyValue = familyField ? familyField.value.trim() : '';
+        const detectedFamily = String(detected.family || '').trim();
+        if (!detectedFamily && !familyValue) {
+            button.hidden = true;
+            return;
+        }
         const weightValue = weightField ? weightField.value : '400';
         const styleValue = styleField ? styleField.value : 'normal';
-        const shouldShowFamily = familyValue === '' || familyValue.toLowerCase() === detected.family.toLowerCase();
+		const variableValue = !!(variableField && variableField.checked);
+		const currentAxes = variableValue ? readUploadAxes(row) : [];
+        const shouldShowFamily = familyValue === '' || familyValue.toLowerCase() === detectedFamily.toLowerCase();
         const label = shouldShowFamily
-            ? formatMessage(getString('uploadDetectedSummary', 'Detected: %1$s / %2$s / %3$s'), [detected.family, detected.weight, detected.style])
+            ? formatMessage(getString('uploadDetectedSummary', 'Detected: %1$s / %2$s / %3$s'), [detectedFamily, detected.weight, detected.style])
             : formatMessage(getString('uploadDetectedWeightStyle', 'Detected: %1$s / %2$s'), [detected.weight, detected.style]);
-        const alreadyApplied = weightValue === detected.weight
+
+        const effectiveDetectedVariable = variableFontsEnabled && detected.isVariable;
+
+		let axesMatch = true;
+		if (effectiveDetectedVariable && variableValue) {
+			if (currentAxes.length !== detected.axes.length) {
+				axesMatch = false;
+			} else {
+				for (let i = 0; i < currentAxes.length; i++) {
+					const ca = currentAxes[i];
+					const da = detected.axes[i];
+					if (!ca || !da || ca.tag !== da.tag || ca.min !== da.min || ca.default !== da.default || ca.max !== da.max) {
+						axesMatch = false;
+						break;
+					}
+				}
+			}
+		} else if (effectiveDetectedVariable !== variableValue) {
+			axesMatch = false;
+		}
+
+		const alreadyApplied = weightValue === (detected.defaultWeight || detected.weight)
             && styleValue === detected.style
-            && (!shouldShowFamily || familyValue.toLowerCase() === detected.family.toLowerCase());
+			&& (!shouldShowFamily || familyValue.toLowerCase() === detectedFamily.toLowerCase())
+			&& variableValue === effectiveDetectedVariable
+			&& axesMatch;
 
         button.hidden = alreadyApplied;
-        button.dataset.detectedFamily = detected.family;
+        button.dataset.detectedFamily = detectedFamily;
         button.dataset.detectedWeight = detected.weight;
+		button.dataset.detectedDefaultWeight = detected.defaultWeight || detected.weight;
         button.dataset.detectedStyle = detected.style;
         button.dataset.detectedVariable = detected.isVariable ? '1' : '0';
         button.dataset.detectedAxes = JSON.stringify(detected.axes || []);
         button.textContent = `${getString('uploadUseDetected', 'Use Detected Values')} · ${label}`;
         button.setAttribute('aria-label', button.textContent);
+	}
 
-        return detected;
+	function updateUploadDetectedSuggestion(row) {
+		if (!row) {
+			return Promise.resolve(null);
+		}
+
+		const fileField = row.querySelector('[data-upload-field="file"]');
+		const file = fileField && fileField.files ? fileField.files[0] : null;
+		const button = row.querySelector('[data-upload-detected-apply]');
+
+		if (!button) {
+			return Promise.resolve(null);
+		}
+
+		if (!file) {
+			button.hidden = true;
+			delete button.dataset.detectedFamily;
+			delete button.dataset.detectedWeight;
+			delete button.dataset.detectedDefaultWeight;
+			delete button.dataset.detectedStyle;
+			delete button.dataset.detectedVariable;
+			delete button.dataset.detectedAxes;
+			uploadDetectionState.delete(row);
+			return Promise.resolve(null);
+		}
+
+		const state = uploadDetectionState.get(row);
+		if (state && state.file === file) {
+			if (state.promise) {
+				return state.promise;
+			}
+			renderUploadDetectedSuggestion(row, state.result);
+			return Promise.resolve(state.result);
+		}
+
+		button.hidden = true;
+		delete button.dataset.detectedFamily;
+		delete button.dataset.detectedWeight;
+		delete button.dataset.detectedDefaultWeight;
+		delete button.dataset.detectedStyle;
+		delete button.dataset.detectedVariable;
+		delete button.dataset.detectedAxes;
+
+		const requestId = nextUploadDetectionRequestId++;
+		const detectionPromise = detectUploadMetadata(file).then((detected) => {
+			const currentState = uploadDetectionState.get(row);
+			if (!currentState || currentState.requestId !== requestId || currentState.file !== file) {
+				return detected;
+			}
+			uploadDetectionState.set(row, { file, requestId, promise: null, result: detected });
+			renderUploadDetectedSuggestion(row, detected);
+			return detected;
+		}).catch(() => {
+			return null;
+		});
+
+		uploadDetectionState.set(row, { file, requestId, promise: detectionPromise, result: null });
+		return detectionPromise;
     }
 
     function uploadAxisRows(row) {
@@ -9952,7 +10072,7 @@
             field.setAttribute('data-upload-axis-label', key);
 
             const title = document.createElement('span');
-            title.className = 'screen-reader-text';
+			title.className = 'tasty-fonts-field-label-text';
             title.textContent = label;
 
             const input = document.createElement('input');
@@ -10013,10 +10133,25 @@
         const variableField = row.querySelector('[data-upload-field="is-variable"]');
         const weightField = row.querySelector('[data-upload-field="weight"]');
         const axisShell = row.querySelector('[data-upload-axis-shell]');
+
+		if (variableField) {
+			variableField.disabled = !variableFontsEnabled;
+
+			if (!variableFontsEnabled) {
+				variableField.checked = false;
+			}
+		}
+
         const isVariable = !!variableFontsEnabled && !!(variableField && variableField.checked);
 
         if (weightField) {
             weightField.disabled = isVariable;
+			if (isVariable) {
+				weightField.setAttribute('data-help-tooltip', getString('uploadVariableWeightTooltip', 'Weight range is managed by the variable font axis below.'));
+			} else {
+				weightField.removeAttribute('data-help-tooltip');
+			}
+			updateEnhancedSelect(weightField);
         }
 
         if (axisShell) {
@@ -10074,7 +10209,7 @@
         assignUploadRowIndex(row);
         setUploadRowStatus(row, '', '');
         updateUploadFileName(row);
-        updateUploadDetectedSuggestion(row);
+		void updateUploadDetectedSuggestion(row);
         syncUploadVariableState(row);
     }
 
@@ -10129,7 +10264,7 @@
         }
 
         if (variableField) {
-            variableField.checked = !!options.isVariable;
+			variableField.checked = !!variableFontsEnabled && !!options.isVariable;
         }
 
         faceList.appendChild(fragment);
@@ -10176,7 +10311,7 @@
         }
 
         updateUploadGroupAccessibility(appendedGroup);
-        uploadRows(appendedGroup).forEach((row) => updateUploadDetectedSuggestion(row));
+		uploadRows(appendedGroup).forEach((row) => void updateUploadDetectedSuggestion(row));
 
         return appendedGroup;
     }
@@ -10184,9 +10319,12 @@
     function lastUploadGroupSeed() {
         const groups = uploadGroups();
         const lastGroup = groups[groups.length - 1];
+		const defaultFallback = globalFallbacks.body || 'system-ui, sans-serif';
 
         if (!lastGroup) {
-            return {};
+			return {
+				fallback: defaultFallback
+			};
         }
 
         const family = familyInputForGroup(lastGroup);
@@ -10194,7 +10332,7 @@
 
         return {
             family: '',
-            fallback: fallback ? fallback.value : 'sans-serif'
+			fallback: fallback ? fallback.value : defaultFallback
         };
     }
 
@@ -10211,10 +10349,21 @@
         updateUploadRemoveButtons();
     }
 
+    function resetUploadForm() {
+        if (!uploadGroupsWrap) {
+            return;
+        }
+
+        uploadGroups().forEach((group) => group.remove());
+        createUploadGroup();
+        updateUploadRemoveButtons();
+    }
+
     function buildUploadRequestData(groups) {
         const formData = new FormData();
         let hasAnyFile = false;
         let rowIndex = 0;
+		const defaultFallback = globalFallbacks.body || 'system-ui, sans-serif';
 
         groups.forEach((group) => {
             const family = familyInputForGroup(group);
@@ -10232,7 +10381,7 @@
                 formData.append(`rows[${rowIndex}][family]`, family ? family.value.trim() : '');
                 formData.append(`rows[${rowIndex}][weight]`, weight ? weight.value : '400');
                 formData.append(`rows[${rowIndex}][style]`, style ? style.value : 'normal');
-                formData.append(`rows[${rowIndex}][fallback]`, fallback ? fallback.value : 'sans-serif');
+				formData.append(`rows[${rowIndex}][fallback]`, fallback ? fallback.value : defaultFallback);
                 formData.append(`rows[${rowIndex}][is_variable]`, isVariable ? '1' : '0');
 
                 axes.forEach((axis, axisIndex) => {
@@ -10338,6 +10487,8 @@
             setStatus(uploadStatus, payload.message || getString('uploadSuccess', 'Upload complete.'), 'success');
 
             if ((payload.summary && payload.summary.imported > 0) || (Array.isArray(payload.families) && payload.families.length > 0)) {
+                resetUploadForm();
+
                 const refreshed = await refreshLibraryViewAfterMutation(payload, {
                     families: Array.isArray(payload.families) ? payload.families : [],
                     highlightSlug: normalizeImportFamilySlug(payload, ''),
@@ -12510,6 +12661,7 @@
         const variableField = row ? row.querySelector('[data-upload-field="is-variable"]') : null;
         const detectedFamily = detectedButton.dataset.detectedFamily || '';
         const detectedWeight = detectedButton.dataset.detectedWeight || '';
+		const detectedDefaultWeight = detectedButton.dataset.detectedDefaultWeight || detectedWeight || '400';
         const detectedStyle = detectedButton.dataset.detectedStyle || '';
         const detectedVariable = detectedButton.dataset.detectedVariable === '1';
         const detectedAxes = (() => {
@@ -12520,12 +12672,46 @@
             }
         })();
 
+		const familyValue = familyField ? familyField.value.trim() : '';
+		const weightValue = weightField ? weightField.value : '400';
+		const styleValue = styleField ? styleField.value : 'normal';
+		const variableValue = !!(variableField && variableField.checked);
+		const currentAxes = variableValue ? readUploadAxes(row) : [];
+
+		let axesMatch = true;
+		if (detectedVariable && variableValue) {
+			if (currentAxes.length !== detectedAxes.length) {
+				axesMatch = false;
+			} else {
+				for (let i = 0; i < currentAxes.length; i++) {
+					const ca = currentAxes[i];
+					const da = detectedAxes[i];
+					if (!ca || !da || ca.tag !== da.tag || ca.min !== da.min || ca.default !== da.default || ca.max !== da.max) {
+						axesMatch = false;
+						break;
+					}
+				}
+			}
+		} else if (detectedVariable !== variableValue) {
+			axesMatch = false;
+		}
+
+		const alreadyApplied = weightValue === detectedDefaultWeight
+			&& styleValue === detectedStyle
+			&& (detectedFamily ? familyValue.toLowerCase() === detectedFamily.toLowerCase() : !familyValue)
+			&& variableValue === detectedVariable
+			&& axesMatch;
+
+		if (alreadyApplied) {
+			return true;
+		}
+
         if (familyField && !familyField.value.trim() && detectedFamily) {
             familyField.value = detectedFamily;
         }
 
-        if (weightField && detectedWeight) {
-            weightField.value = detectedWeight;
+		if (weightField && detectedDefaultWeight) {
+			weightField.value = detectedDefaultWeight;
         }
 
         if (styleField && detectedStyle) {
@@ -12542,7 +12728,7 @@
 
         syncUploadVariableState(row);
 
-        updateUploadDetectedSuggestion(row);
+		void updateUploadDetectedSuggestion(row);
         return true;
     }
 
@@ -13106,6 +13292,14 @@
         toggle.setAttribute('aria-disabled', select.disabled ? 'true' : 'false');
         wrapper.classList.toggle('is-disabled', select.disabled);
 
+        const sourceTooltip = String(select.getAttribute('data-help-tooltip') || '').trim();
+
+        if (sourceTooltip !== '') {
+            toggle.setAttribute('data-help-tooltip', sourceTooltip);
+        } else {
+            toggle.removeAttribute('data-help-tooltip');
+        }
+
         menu.innerHTML = '';
 
         Array.from(select.options || []).forEach((option, index) => {
@@ -13267,6 +13461,12 @@
         toggle.setAttribute('aria-controls', menuId);
         if (sourceLabel !== '') {
             toggle.setAttribute('aria-label', sourceLabel);
+        }
+
+        const sourceTooltip = String(select.getAttribute('data-help-tooltip') || '').trim();
+
+        if (sourceTooltip !== '') {
+            toggle.setAttribute('data-help-tooltip', sourceTooltip);
         }
 
         value.className = 'tasty-fonts-custom-select-value';
@@ -14249,7 +14449,7 @@
             if (fileInput) {
                 const row = fileInput.closest('[data-upload-row]');
                 updateUploadFileName(row);
-                updateUploadDetectedSuggestion(row);
+				void updateUploadDetectedSuggestion(row);
                 return;
             }
 
@@ -14272,7 +14472,7 @@
             const rowField = event.target.closest('[data-upload-field="weight"], [data-upload-field="style"], [data-upload-axis-field]');
 
             if (rowField) {
-                updateUploadDetectedSuggestion(rowField.closest('[data-upload-row]'));
+				void updateUploadDetectedSuggestion(rowField.closest('[data-upload-row]'));
             }
         });
     }

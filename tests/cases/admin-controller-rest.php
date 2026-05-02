@@ -2128,7 +2128,7 @@ $tests['admin_controller_enqueues_wp_i18n_and_script_translations'] = static fun
     $services['controller']->enqueueAssets('toplevel_page_' . AdminController::MENU_SLUG);
 
     assertSameValue(
-        ['wp-i18n', 'tasty-fonts-admin-contracts'],
+        ['wp-i18n', 'tasty-fonts-admin-contracts', 'tasty-fonts-font-binary-parser'],
         $enqueuedScripts['tasty-fonts-admin']['deps'] ?? null,
         'Admin scripts should depend on wp-i18n and the shared admin contracts so translations and tested helper contracts load together.'
     );

@@ -397,12 +397,12 @@ trait SharedRenderHelpers
         return FontTypeHelper::buildSelectorOptionLabel($familyName, $entry, $context);
     }
 
-    public function renderPassiveHelpAttributes(string $copy, string $describedBy = 'tasty-fonts-help-tooltip-layer'): void
+    public function renderPassiveHelpAttributes(string $copy, string $describedBy = 'tasty-fonts-help-tooltip-layer', bool $force = false): void
     {
         $copy = trim($copy);
         $describedBy = trim($describedBy);
 
-        if ($this->trainingWheelsOff || $copy === '') {
+        if (($this->trainingWheelsOff && !$force) || $copy === '') {
             return;
         }
 
@@ -836,8 +836,9 @@ trait SharedRenderHelpers
         <?php
     }
 
-    public function renderUploadBuilderGroup(bool $showUploadVariableControls): void
+    public function renderUploadBuilderGroup(bool $variableUploadControlsEnabled, string $defaultFallback = ''): void
     {
+        $fallbackValue = $defaultFallback !== '' ? $defaultFallback : FontUtils::DEFAULT_ROLE_SANS_FALLBACK;
         ?>
         <section class="tasty-fonts-upload-group" data-upload-group>
             <div class="tasty-fonts-upload-group-head">
@@ -857,7 +858,7 @@ trait SharedRenderHelpers
                         <?php
                         $this->renderFallbackInput(
                             '',
-                            'sans-serif',
+                            $fallbackValue,
                             [
                                 'data-upload-group-field' => 'fallback',
                                 'placeholder' => __('Example: system-ui, sans-serif', 'tasty-fonts'),
@@ -876,19 +877,17 @@ trait SharedRenderHelpers
                 </button>
             </div>
 
-            <div class="tasty-fonts-upload-face-shell<?php echo $showUploadVariableControls ? '' : ' tasty-fonts-upload-face-shell--static-only'; ?>">
+            <div class="tasty-fonts-upload-face-shell">
                 <div class="tasty-fonts-upload-face-headings">
                     <span data-upload-heading="file"><?php esc_html_e('Font File', 'tasty-fonts'); ?></span>
                     <span data-upload-heading="weight"><?php esc_html_e('Weight', 'tasty-fonts'); ?></span>
                     <span data-upload-heading="style"><?php esc_html_e('Style', 'tasty-fonts'); ?></span>
-                    <?php if ($showUploadVariableControls): ?>
-                        <span data-upload-heading="variable"><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
-                    <?php endif; ?>
+                    <span data-upload-heading="variable"><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
                     <span data-upload-heading="action"><?php esc_html_e('Action', 'tasty-fonts'); ?></span>
                 </div>
 
                 <div class="tasty-fonts-upload-face-list" data-upload-face-list>
-                    <?php $this->renderUploadBuilderRow($showUploadVariableControls); ?>
+                    <?php $this->renderUploadBuilderRow($variableUploadControlsEnabled); ?>
                 </div>
             </div>
 
@@ -899,7 +898,7 @@ trait SharedRenderHelpers
         <?php
     }
 
-    public function renderUploadBuilderRow(bool $showUploadVariableControls): void
+    public function renderUploadBuilderRow(bool $variableUploadControlsEnabled): void
     {
         ?>
         <div class="tasty-fonts-upload-face-row" data-upload-row role="group">
@@ -941,15 +940,13 @@ trait SharedRenderHelpers
                     </span>
                 </label>
 
-                <?php if ($showUploadVariableControls): ?>
-                    <label class="tasty-fonts-stack-field tasty-fonts-upload-variable-field" data-upload-field-label="variable">
-                        <span class="screen-reader-text"><?php esc_html_e('Variable Font', 'tasty-fonts'); ?></span>
-                        <span class="tasty-fonts-upload-variable-toggle">
-                            <input type="checkbox" data-upload-field="is-variable">
-                            <span><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
-                        </span>
-                    </label>
-                <?php endif; ?>
+                <label class="tasty-fonts-upload-variable-field" data-upload-field-label="variable">
+                    <span class="screen-reader-text"><?php esc_html_e('Variable Font', 'tasty-fonts'); ?></span>
+                    <span class="tasty-fonts-inline-checkbox tasty-fonts-upload-variable-toggle<?php echo $variableUploadControlsEnabled ? '' : ' is-disabled'; ?>"<?php if (!$variableUploadControlsEnabled): ?><?php $this->renderPassiveHelpAttributes(__('Enable variable fonts in Settings > Behavior to configure axes for local uploads.', 'tasty-fonts'), 'tasty-fonts-help-tooltip-layer', true); ?><?php endif; ?>>
+                        <input type="checkbox" data-upload-field="is-variable"<?php echo $variableUploadControlsEnabled ? '' : ' disabled'; ?>>
+                        <span><?php esc_html_e('Variable', 'tasty-fonts'); ?></span>
+                    </span>
+                </label>
 
                 <button
                     type="button"

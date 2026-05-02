@@ -1,5 +1,5 @@
                     <?php
-                    $showUploadVariableControls = !empty($variableFontsEnabled);
+                    $variableUploadControlsEnabled = !empty($variableFontsEnabled);
                     $googleFontImportsEnabled = !isset($googleFontImportsEnabled) || !empty($googleFontImportsEnabled);
                     $bunnyFontImportsEnabled = !isset($bunnyFontImportsEnabled) || !empty($bunnyFontImportsEnabled);
                     $adobeFontImportsEnabled = isset($adobeFontImportsEnabled) && !empty($adobeFontImportsEnabled);
@@ -463,7 +463,7 @@
                                                 'title' => __('Upload Files', 'tasty-fonts'),
                                                 'summary' => $localFontUploadsEnabled
                                                     ? (
-                                                        $showUploadVariableControls
+                                                        $variableUploadControlsEnabled
                                                             ? __('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Variable uploads can include axis ranges and defaults.', 'tasty-fonts')
                                                             : __('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Enable variable fonts in Settings to configure axes.', 'tasty-fonts')
                                                     )
@@ -483,15 +483,15 @@
                                             <?php if ($localFontUploadsEnabled): ?>
                                                 <form id="tasty-fonts-upload-form" class="tasty-fonts-upload-form tasty-fonts-upload-form--builder" novalidate>
                                                     <div id="tasty-fonts-upload-groups" class="tasty-fonts-upload-groups">
-                                                    <?php $this->renderUploadBuilderGroup($showUploadVariableControls); ?>
+                                                    <?php $this->renderUploadBuilderGroup($variableUploadControlsEnabled, $fallbackBody); ?>
                                                 </div>
 
                                                 <template id="tasty-fonts-upload-group-template">
-                                                    <?php $this->renderUploadBuilderGroup($showUploadVariableControls); ?>
+                                                    <?php $this->renderUploadBuilderGroup($variableUploadControlsEnabled, $fallbackBody); ?>
                                                 </template>
 
                                                 <template id="tasty-fonts-upload-row-template">
-                                                    <?php $this->renderUploadBuilderRow($showUploadVariableControls); ?>
+                                                    <?php $this->renderUploadBuilderRow($variableUploadControlsEnabled); ?>
                                                 </template>
 
                                                 <div class="tasty-fonts-upload-actions">

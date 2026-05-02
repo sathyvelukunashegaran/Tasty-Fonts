@@ -329,6 +329,10 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $facePreviewText = $this->buildFacePreviewText($previewText, $familyName, $usesMonospacePreview, true);
         $familyFaces = $this->normalizeFaceList($family['faces'] ?? []);
         $faceSummaryLabels = $this->buildFamilyFaceSummaryLabels($familyFaces);
+        $axisSummaryLabels = $this->buildVariationAxisSummaryLabels($familyFaces);
+        if ($axisSummaryLabels === []) {
+            $axisSummaryLabels = $this->buildVariationAxisSummaryLabels([['axes' => $family['variation_axes'] ?? []]]);
+        }
         $visibleFaceSummaryLabels = array_slice($faceSummaryLabels, 0, 4);
         $hiddenFaceSummaryCount = max(0, count($faceSummaryLabels) - count($visibleFaceSummaryLabels));
         $faceCount = count($familyFaces);
@@ -584,6 +588,7 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
         $faceUnicodeRange = $this->stringValue($face, 'unicode_range');
         $faceStorageSummary = $this->buildFaceStorageSummary($face);
         $fontTypeDescriptor = $this->buildFontTypeDescriptor($face);
+        $faceAxisLabels = $this->buildVariationAxisSummaryLabels([$face]);
         $canDeleteVariant = $this->canDeleteFaceVariant($activeDelivery);
         $deleteVariantBlockedMessage = ($faceCount <= 1 && $assignedRoleKeys !== [])
             ? $this->buildDeleteLastVariantBlockedMessage($familyName, $assignedRoleKeys)
@@ -644,6 +649,16 @@ final class FamilyCardRenderer extends AbstractSectionRenderer
                     <dt><?php esc_html_e('Style', 'tasty-fonts'); ?></dt>
                     <dd><?php echo esc_html(ucfirst(FontUtils::normalizeStyle($faceStyle))); ?></dd>
                 </div>
+                <?php if ($faceAxisLabels !== []): ?>
+                <div class="tasty-fonts-detail-meta-item">
+                    <dt><?php esc_html_e('Axes', 'tasty-fonts'); ?></dt>
+                    <dd class="tasty-fonts-detail-chip-row">
+                        <?php foreach ($faceAxisLabels as $label): ?>
+                            <span class="tasty-fonts-chip is-muted"><?php echo esc_html($label); ?></span>
+                        <?php endforeach; ?>
+                    </dd>
+                </div>
+                <?php endif; ?>
                 <div class="tasty-fonts-detail-meta-item">
                     <dt><?php esc_html_e('Storage', 'tasty-fonts'); ?></dt>
                     <dd><?php echo esc_html($faceStorageSummary); ?></dd>

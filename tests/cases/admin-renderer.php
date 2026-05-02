@@ -1220,7 +1220,7 @@ $tests['admin_page_renderer_renders_single_page_library_tab_for_empty_and_popula
     assertNotContainsValue('No Fonts Yet', $populatedOutput, 'The populated Library tab should not render the empty state.');
 };
 
-$tests['admin_page_renderer_only_shows_upload_variable_controls_when_variable_fonts_are_enabled'] = static function (): void {
+$tests['admin_page_renderer_keeps_upload_variable_controls_visible_and_disables_when_variable_fonts_are_disabled'] = static function (): void {
     resetTestState();
 
     $renderer = new AdminPageRenderer(new Storage());
@@ -1267,8 +1267,12 @@ $tests['admin_page_renderer_only_shows_upload_variable_controls_when_variable_fo
     }
     $disabledOutput = (string) ob_get_clean();
 
-    assertContainsValue('tasty-fonts-upload-face-shell--static-only', $disabledOutput, 'The upload builder should switch to the static-only layout when variable font support is off.');
-    assertNotContainsValue('data-upload-field="is-variable"', $disabledOutput, 'The upload builder should not render variable upload toggles when variable font support is off.');
+	assertNotContainsValue('tasty-fonts-upload-face-shell--static-only', $disabledOutput, 'The upload builder should not use the static-only layout when variable font support is off.');
+	assertContainsValue('data-upload-field="is-variable"', $disabledOutput, 'The upload builder should still render variable upload toggles when variable font support is off.');
+	assertContainsValue('tasty-fonts-inline-checkbox', $disabledOutput, 'The upload builder should use the inline-checkbox design system class for the variable toggle.');
+	assertContainsValue('is-disabled', $disabledOutput, 'The upload builder should mark the variable toggle wrapper as disabled when variable font support is off.');
+	assertContainsValue('disabled=', $disabledOutput, 'The upload builder should disable the variable checkbox input when variable font support is off.');
+	assertContainsValue('Enable variable fonts in Settings &gt; Behavior to configure axes for local uploads.', $disabledOutput, 'The upload builder should show a tooltip explaining how to enable variable fonts when they are disabled.');
     assertContainsValue('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Enable variable fonts in Settings to configure axes.', $disabledOutput, 'The Upload source guidance should share the source summary paragraph when variable fonts are disabled.');
     assertNotContainsValue('tasty-fonts-access-note--upload', $disabledOutput, 'The Upload source guidance should not render as a separate helper note when variable fonts are disabled.');
     assertNotContainsValue('If you require variable fonts, use Google Fonts because Bunny&#039;s variable-font files are not optimized for variable font workflows.', $disabledOutput, 'The Bunny source variable-font note should be hidden when variable font support is off.');
@@ -1284,6 +1288,8 @@ $tests['admin_page_renderer_only_shows_upload_variable_controls_when_variable_fo
 
     assertNotContainsValue('tasty-fonts-upload-face-shell--static-only', $enabledOutput, 'The upload builder should keep the full upload grid when variable font support is on.');
     assertContainsValue('data-upload-field="is-variable"', $enabledOutput, 'The upload builder should render variable upload toggles when variable font support is on.');
+	assertNotContainsValue('is-disabled', $enabledOutput, 'The upload builder should not mark the variable toggle wrapper as disabled when variable font support is on.');
+	assertNotContainsValue('Enable variable fonts in Settings &gt; Behavior to configure axes for local uploads.', $enabledOutput, 'The upload builder should not show the disabled tooltip when variable fonts are enabled.');
     assertContainsValue('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Variable uploads can include axis ranges and defaults.', $enabledOutput, 'The Upload source guidance should share the source summary paragraph.');
     assertNotContainsValue('tasty-fonts-access-note--upload', $enabledOutput, 'The Upload source guidance should not render as a separate helper note.');
     assertContainsValue('Import from Bunny, then host the selected files locally or serve them from Bunny CDN. If you require variable fonts, use Google Fonts because Bunny&#039;s variable-font files are not optimized for variable font workflows.', $enabledOutput, 'The Bunny source variable-font note should share the source summary paragraph.');
@@ -7555,4 +7561,122 @@ $tests['admin_page_renderer_labels_before_capability_disable_snapshot_reason'] =
 
     $output = (string) ob_get_clean();
     assertContainsValue('Before turning off font capabilities', $output, 'Diagnostics snapshot lists should map capability-disable reasons to a human-readable label.');
+};
+
+$tests['family_card_renderer_summary_rows_render_variable_axis_pills'] = static function (): void {
+	resetTestState();
+
+	$renderer = new FamilyCardRenderer(new Storage());
+	$family = [
+		'family' => 'Jost',
+		'slug' => 'jost',
+		'delivery_filter_tokens' => ['published', 'same-origin'],
+		'font_category_tokens' => ['sans-serif'],
+		'publish_state' => 'published',
+		'active_delivery_id' => 'local-self-hosted',
+		'active_delivery' => [
+			'id' => 'local-self-hosted',
+			'label' => 'Self-hosted',
+			'provider' => 'local',
+			'type' => 'self_hosted',
+			'variants' => ['regular'],
+		],
+		'available_deliveries' => [
+			[
+				'id' => 'local-self-hosted',
+				'label' => 'Self-hosted',
+				'provider' => 'local',
+				'type' => 'self_hosted',
+				'variants' => ['regular'],
+			],
+		],
+		'faces' => [
+			[
+				'weight' => '100..900',
+				'style' => 'normal',
+				'source' => 'local',
+				'is_variable' => true,
+				'axes' => [
+					'WGHT' => ['min' => '100', 'default' => '400', 'max' => '900'],
+					'ITAL' => ['min' => '0', 'default' => '0', 'max' => '1'],
+				],
+				'files' => ['woff2' => 'jost/Jost-Variable.woff2'],
+				'paths' => ['woff2' => 'jost/Jost-Variable.woff2'],
+			],
+		],
+	];
+
+	ob_start();
+	try {
+		$renderer->renderFamilySummaryRow(
+			$family,
+			['heading' => '', 'body' => ''],
+			[],
+			[],
+			[
+				['value' => 'inherit', 'label' => 'Use plugin default'],
+			],
+			'The quick brown fox jumps over the lazy dog.',
+			[],
+			['enabled' => true],
+			false,
+			[]
+		);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('data-family-details-loaded="false"', $output, 'Collapsed variable family cards should remain lazy until hydrated.');
+	assertContainsValue('tasty-fonts-face-pills', $output, 'Collapsed variable family cards should render axis pills container.');
+	assertContainsValue('tasty-fonts-face-pill is-muted', $output, 'Collapsed variable family cards should render muted axis pills.');
+	assertContainsValue('ital 0..1', $output, 'Collapsed variable family cards should render the ital axis range.');
+	assertContainsValue('wght 100..900', $output, 'Collapsed variable family cards should render the wght axis range.');
+	assertNotContainsValue('Font Faces', $output, 'Collapsed variable family cards should not render heavy face detail markup.');
+};
+
+$tests['family_card_renderer_face_detail_cards_render_variable_axes'] = static function (): void {
+	resetTestState();
+
+	$renderer = new FamilyCardRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderFaceDetailCard(
+			'Jost',
+			'jost',
+			'"Jost", system-ui, sans-serif',
+			'The quick brown fox jumps over the lazy dog.',
+			1,
+			[],
+			'sans-serif',
+			[],
+			['enabled' => true, 'weight_tokens' => true, 'role_aliases' => true, 'category_sans' => true, 'category_serif' => true],
+			['provider' => 'local', 'type' => 'self_hosted'],
+			[
+				'weight' => '100..900',
+				'style' => 'normal',
+				'source' => 'local',
+				'is_variable' => true,
+				'axes' => [
+					'wght' => ['min' => '100', 'default' => '400', 'max' => '900'],
+					'ital' => ['min' => '0', 'default' => '0', 'max' => '1'],
+				],
+				'files' => ['woff2' => 'jost/Jost-Variable.woff2'],
+				'paths' => ['woff2' => 'jost/Jost-Variable.woff2'],
+			],
+			false
+		);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('>Axes<', $output, 'Face detail cards should render an Axes metadata label for variable faces.');
+	assertContainsValue('ital 0..1', $output, 'Face detail cards should render the ital axis range.');
+	assertContainsValue('wght 100..900', $output, 'Face detail cards should render the wght axis range.');
+	assertContainsValue('tasty-fonts-detail-chip-row', $output, 'Face detail cards should render axis labels inside a chip row.');
+	assertContainsValue('tasty-fonts-chip', $output, 'Face detail cards should render axis labels as chips.');
 };

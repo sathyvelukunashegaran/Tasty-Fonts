@@ -42,6 +42,13 @@
                                     </div>
                                 </div>
                             </div>
+                            <?php if (($axisSummaryLabels ?? []) !== []): ?>
+                                <div class="tasty-fonts-face-pills" aria-label="<?php echo esc_attr__('Variable axes', 'tasty-fonts'); ?>">
+                                    <?php foreach ($axisSummaryLabels as $label): ?>
+                                        <span class="tasty-fonts-face-pill is-muted"><?php echo esc_html($label); ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
                             <div class="tasty-fonts-font-inline-preview <?php echo $usesMonospacePreview ? 'is-monospace' : ''; ?>" role="group" aria-label="<?php echo esc_attr(sprintf(__('Preview for %s', 'tasty-fonts'), $familyName)); ?>">
                                 <span class="tasty-fonts-font-inline-preview-label"><?php echo esc_html($previewLabel); ?></span>
                                 <div

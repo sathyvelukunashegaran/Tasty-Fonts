@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added a client-side font binary parser that reads TTF, OTF, and WOFF files to extract family name, weight, style, and variable font axes from the `name`, `OS/2`, `head`, and `fvar` tables, using `DecompressionStream` for WOFF deflate support and falling back to filename-based detection when binary parsing is unavailable.
+- Added automatic upload metadata detection in the admin upload builder so selecting a font file pre-fills family, weight, style, and variable axis ranges from the parsed binary when possible, with a "Use Detected Values" action to apply discovered metadata to the current row.
+- Added variable axis summary pills to Font Library family cards and face detail cards so variable font axes and their ranges are visible at a glance in both collapsed and expanded views.
+- Added JS contract tests for the font binary parser covering TTF/SFNT family extraction, OS/2 weight and style detection, `fvar` axis parsing, WOFF decompression, malformed input handling, and fallback merging.
+
+### Changed
+
+- Refined the upload builder so the Variable column stays visible even when variable font support is disabled, using disabled-state styling and tooltip guidance instead of hiding the control, so users can see what is available and how to enable it.
+- Updated the upload builder default fallback stack to inherit the current Body role fallback instead of hardcoding `sans-serif`, keeping uploaded family fallbacks consistent with the active sitewide configuration.
+- Improved font import deduplication in the catalog so families matched by slug share delivery profiles only when they also share underlying file paths, preventing unrelated families with the same slug from incorrectly merging.
+- Refined catalog face merging during imports so existing faces are skipped when all their files are already present, and existing axis metadata is preserved when merging face records, avoiding duplicate faces and stale axis overwrites.
+- Simplified variable axis editor headings so single-axis variable fonts no longer receive a special condensed heading treatment, keeping the label pattern consistent regardless of how many axes are present.
+
+### Fixed
+
+- Fixed upload builder behavior so the variable toggle is disabled with explanatory tooltip copy when variable fonts are off, rather than being hidden entirely, preserving layout stability and showing actionable guidance.
+- Fixed shared render helper passive-help attributes so forced help copy can render even when training wheels are off, used for disabled-state upload guidance.
+- Added regression coverage for variable axis summary rendering in family cards and face detail cards, multi-axis variable font upload persistence, and admin script dependency ordering.
+
 ## [1.16.0-beta.1] - 2026-05-02
 
 ### Added

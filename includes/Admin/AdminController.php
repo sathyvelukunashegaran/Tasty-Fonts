@@ -264,9 +264,17 @@ final class AdminController
         );
 
         wp_enqueue_script(
+            'tasty-fonts-font-binary-parser',
+            TASTY_FONTS_URL . 'assets/js/font-binary-parser.js',
+            [],
+            $this->assetVersionFor('assets/js/font-binary-parser.js'),
+            true
+        );
+
+        wp_enqueue_script(
             'tasty-fonts-admin',
             TASTY_FONTS_URL . 'assets/js/admin.js',
-            ['wp-i18n', 'tasty-fonts-admin-contracts'],
+            ['wp-i18n', 'tasty-fonts-admin-contracts', 'tasty-fonts-font-binary-parser'],
             $this->assetVersionFor('assets/js/admin.js'),
             true
         );

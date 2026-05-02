@@ -6139,13 +6139,7 @@ h3.tasty-fonts-section-title {
     grid-template-columns: var(--tasty-upload-face-columns);
 }
 
-.tasty-fonts-upload-face-shell--static-only {
-    --tasty-upload-face-columns:
-        minmax(280px, 1.6fr)
-        minmax(110px, 0.65fr)
-        minmax(120px, 0.7fr)
-        minmax(124px, 0.72fr);
-}
+
 
 .tasty-fonts-upload-face-headings {
     padding: var(--tasty-layout-0) calc(var(--tasty-upload-face-inline-padding) + var(--tasty-layout-2px));
@@ -6292,6 +6286,15 @@ h3.tasty-fonts-section-title {
     min-height: var(--tasty-control-height);
 }
 
+.tasty-fonts-upload-variable-toggle.is-disabled {
+    color: var(--tasty-text-muted);
+    cursor: help;
+}
+
+.tasty-fonts-upload-variable-toggle.is-disabled input[type="checkbox"] {
+    cursor: not-allowed;
+}
+
 .tasty-fonts-upload-axis-shell {
     display: grid;
     gap: var(--tasty-space-2);
@@ -6317,6 +6320,14 @@ h3.tasty-fonts-section-title {
 
 .tasty-fonts-upload-axis-remove {
     min-height: var(--tasty-control-height);
+}
+
+.tasty-fonts-upload-axis-field .tasty-fonts-field-label-text {
+    color: var(--tasty-text-muted);
+    font-size: var(--tasty-type-meta-size);
+    font-weight: var(--tasty-type-meta-weight);
+    letter-spacing: var(--tasty-type-meta-spacing);
+    text-transform: uppercase;
 }
 
 .tasty-fonts-upload-group-actions {
