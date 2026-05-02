@@ -223,7 +223,6 @@ final class Plugin
             $this->catalog,
             $this->assets,
             $this->log,
-            $familyMetadataRepo,
             $customCssValidator
         );
         $this->developerTools = new DeveloperToolsService(

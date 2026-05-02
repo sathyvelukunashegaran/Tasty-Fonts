@@ -9,7 +9,6 @@ defined('ABSPATH') || exit;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
-use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -35,14 +34,12 @@ final class CustomCssFinalImportService
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
-        SettingsRepository $settings,
+        private readonly SettingsRepository $settings,
         private readonly CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly LogRepository $log,
-        private readonly FamilyMetadataRepository $familyMetadataRepo,
         private readonly ?CustomCssFontValidator $validator = null
     ) {
-        unset($settings);
     }
 
     private function getValidator(): CustomCssFontValidator
@@ -223,7 +220,7 @@ final class CustomCssFinalImportService
 
             array_push($importedFaces, ...$familyImportedFaces);
             $writtenFileCount += $familyWrittenFileCount;
-            $this->familyMetadataRepo->saveFallback($familyName, $fallback);
+            $this->settings->saveFamilyFallback($familyName, $fallback);
             $importedFamilies[] = [
                 'family' => $familyName,
                 'slug' => $familySlug,
@@ -427,7 +424,7 @@ final class CustomCssFinalImportService
             }
 
             array_push($importedFaces, ...$familyImportedFaces);
-            $this->familyMetadataRepo->saveFallback($familyName, $fallback);
+            $this->settings->saveFamilyFallback($familyName, $fallback);
             $importedFamilies[] = [
                 'family' => $familyName,
                 'slug' => $familySlug,

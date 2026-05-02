@@ -770,8 +770,7 @@ final class AdminController
             $this->settings,
             $this->catalog,
             $this->assets,
-            $this->log,
-            new \TastyFonts\Repository\FamilyMetadataRepository()
+            $this->log
         );
 
         return $finalImport->importSelfHosted($validated);

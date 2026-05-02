@@ -2018,7 +2018,7 @@ function makeServiceGraph(): array
     $customCssValidator = new CustomCssFontValidator();
     $customCssImport = new CustomCssUrlImportService($imports, $customCssValidator);
     $customCssSnapshots = new CustomCssImportSnapshotService();
-    $customCssFinalImport = new CustomCssFinalImportService($storage, $imports, $settings, $catalog, $assets, $log, $familyMetadataRepo, $customCssValidator);
+    $customCssFinalImport = new CustomCssFinalImportService($storage, $imports, $settings, $catalog, $assets, $log, $customCssValidator);
     $developerTools = new DeveloperToolsService(
         $storage,
         $settings,
