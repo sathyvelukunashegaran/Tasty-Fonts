@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.16.0-beta.2] - 2026-05-02
+
 ### Added
 
 - Added a client-side font binary parser that reads TTF, OTF, and WOFF files to extract family name, weight, style, and variable font axes from the `name`, `OS/2`, `head`, and `fvar` tables, using `DecompressionStream` for WOFF deflate support and falling back to filename-based detection when binary parsing is unavailable.
