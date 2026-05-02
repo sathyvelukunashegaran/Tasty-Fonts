@@ -1270,7 +1270,7 @@ $tests['admin_page_renderer_keeps_upload_variable_controls_visible_and_disables_
 	assertNotContainsValue('tasty-fonts-upload-face-shell--static-only', $disabledOutput, 'The upload builder should not use the static-only layout when variable font support is off.');
 	assertContainsValue('data-upload-field="is-variable"', $disabledOutput, 'The upload builder should still render variable upload toggles when variable font support is off.');
 	assertContainsValue('tasty-fonts-inline-checkbox', $disabledOutput, 'The upload builder should use the inline-checkbox design system class for the variable toggle.');
-	assertContainsValue('is-disabled', $disabledOutput, 'The upload builder should mark the variable toggle wrapper as disabled when variable font support is off.');
+	assertContainsValue('tasty-fonts-upload-variable-toggle is-disabled', $disabledOutput, 'The upload builder should mark the variable toggle wrapper as disabled when variable font support is off.');
 	assertContainsValue('disabled=', $disabledOutput, 'The upload builder should disable the variable checkbox input when variable font support is off.');
 	assertContainsValue('Enable variable fonts in Settings &gt; Behavior to configure axes for local uploads.', $disabledOutput, 'The upload builder should show a tooltip explaining how to enable variable fonts when they are disabled.');
     assertContainsValue('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Enable variable fonts in Settings to configure axes.', $disabledOutput, 'The Upload source guidance should share the source summary paragraph when variable fonts are disabled.');
@@ -1288,7 +1288,7 @@ $tests['admin_page_renderer_keeps_upload_variable_controls_visible_and_disables_
 
     assertNotContainsValue('tasty-fonts-upload-face-shell--static-only', $enabledOutput, 'The upload builder should keep the full upload grid when variable font support is on.');
     assertContainsValue('data-upload-field="is-variable"', $enabledOutput, 'The upload builder should render variable upload toggles when variable font support is on.');
-	assertNotContainsValue('is-disabled', $enabledOutput, 'The upload builder should not mark the variable toggle wrapper as disabled when variable font support is on.');
+	assertNotContainsValue('tasty-fonts-upload-variable-toggle is-disabled', $enabledOutput, 'The upload builder should not mark the variable toggle wrapper as disabled when variable font support is on.');
 	assertNotContainsValue('Enable variable fonts in Settings &gt; Behavior to configure axes for local uploads.', $enabledOutput, 'The upload builder should not show the disabled tooltip when variable fonts are enabled.');
     assertContainsValue('Upload one typeface per family and keep its faces together. Clear filenames can prefill family, weight, and style. Variable uploads can include axis ranges and defaults.', $enabledOutput, 'The Upload source guidance should share the source summary paragraph.');
     assertNotContainsValue('tasty-fonts-access-note--upload', $enabledOutput, 'The Upload source guidance should not render as a separate helper note.');
