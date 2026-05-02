@@ -26,6 +26,7 @@ use TastyFonts\Support\FontUtils;
  */
 final class GoogleApiKeyRepository
 {
+    use RepositoryHelpers;
     public const OPTION_GOOGLE_API_KEY_DATA = 'tasty_fonts_google_api_key_data';
     private const GOOGLE_API_KEY_ENCRYPTED_FIELD = 'google_api_key_encrypted';
     private const GOOGLE_API_KEY_CIPHER_PREFIX = 'secretbox:';
@@ -331,26 +332,5 @@ final class GoogleApiKeyRepository
         }
 
         return $this->normalizeTimestamp($values[$key]);
-    }
-
-    private function mixedStringValue(mixed $value, string $default = ''): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
-            return (string) $value;
-        }
-
-        return $default;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeInputMap(mixed $value): array
-    {
-        return FontUtils::normalizeStringKeyedMap($value);
     }
 }

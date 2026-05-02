@@ -27,6 +27,7 @@ use TastyFonts\Support\FontUtils;
  */
 final class RoleRepository
 {
+    use RepositoryHelpers;
     public const OPTION_ROLES = 'tasty_fonts_roles';
     private const OPTION_SETTINGS = 'tasty_fonts_settings';
     private const ROLE_FAMILY_KEYS = ['heading', 'body', 'monospace'];
@@ -358,27 +359,6 @@ final class RoleRepository
     private function sanitizeTextValue(mixed $value): string
     {
         return sanitize_text_field(wp_unslash($this->mixedStringValue($value)));
-    }
-
-    private function mixedStringValue(mixed $value, string $default = ''): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
-            return (string) $value;
-        }
-
-        return $default;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeInputMap(mixed $value): array
-    {
-        return FontUtils::normalizeStringKeyedMap($value);
     }
 
     /**

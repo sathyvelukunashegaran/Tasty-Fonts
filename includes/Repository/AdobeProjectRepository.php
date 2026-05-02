@@ -13,6 +13,7 @@ use TastyFonts\Support\FontUtils;
  */
 final class AdobeProjectRepository
 {
+    use RepositoryHelpers;
     private const OPTION_SETTINGS = 'tasty_fonts_settings';
 
     private const ADOBE_DEFAULTS = [
@@ -146,27 +147,6 @@ final class AdobeProjectRepository
         }
 
         return $this->mixedStringValue($values[$key], $default);
-    }
-
-    private function mixedStringValue(mixed $value, string $default = ''): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
-            return (string) $value;
-        }
-
-        return $default;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeInputMap(mixed $value): array
-    {
-        return FontUtils::normalizeStringKeyedMap($value);
     }
 
     /**

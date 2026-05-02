@@ -14,6 +14,7 @@ use TastyFonts\Support\FontUtils;
  */
 final class FamilyMetadataRepository
 {
+    use RepositoryHelpers;
     private const OPTION_SETTINGS = 'tasty_fonts_settings';
 
     public function getFallback(string $familySlug, string $default = 'sans-serif'): string
@@ -187,26 +188,5 @@ final class FamilyMetadataRepository
     private function isSupportedFontDisplay(string $display): bool
     {
         return in_array($display, ['auto', 'block', 'swap', 'fallback', 'optional'], true);
-    }
-
-    private function mixedStringValue(mixed $value, string $default = ''): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
-            return (string) $value;
-        }
-
-        return $default;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeInputMap(mixed $value): array
-    {
-        return FontUtils::normalizeStringKeyedMap($value);
     }
 }
