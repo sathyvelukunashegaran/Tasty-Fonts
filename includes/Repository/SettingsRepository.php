@@ -50,6 +50,23 @@ use TastyFonts\Support\FontUtils;
  */
 final class SettingsRepository
 {
+    private readonly GoogleApiKeyRepository $googleApiKeyRepo;
+    private readonly AdobeProjectRepository $adobeProjectRepo;
+    private readonly RoleRepository $roleRepo;
+    private readonly FamilyMetadataRepository $familyMetadataRepo;
+
+    public function __construct(
+        ?GoogleApiKeyRepository $googleApiKeyRepo = null,
+        ?AdobeProjectRepository $adobeProjectRepo = null,
+        ?RoleRepository $roleRepo = null,
+        ?FamilyMetadataRepository $familyMetadataRepo = null,
+    ) {
+        $this->googleApiKeyRepo = $googleApiKeyRepo ?? new GoogleApiKeyRepository();
+        $this->adobeProjectRepo = $adobeProjectRepo ?? new AdobeProjectRepository();
+        $this->roleRepo = $roleRepo ?? new RoleRepository();
+        $this->familyMetadataRepo = $familyMetadataRepo ?? new FamilyMetadataRepository();
+    }
+
     public const UPDATE_CHANNEL_STABLE = 'stable';
     public const UPDATE_CHANNEL_BETA = 'beta';
     public const UPDATE_CHANNEL_NIGHTLY = 'nightly';
@@ -645,10 +662,7 @@ final class SettingsRepository
      */
     public function getRoles(array $catalog): array
     {
-        return $this->normalizeRoleSet(
-            $this->getOptionArray(self::OPTION_ROLES),
-            $catalog
-        );
+        return $this->roleRepo->getRoles($catalog);
     }
 
     public function getUpdateChannel(): string
@@ -663,52 +677,7 @@ final class SettingsRepository
      */
     public function saveRoles(array $input, array $catalog): array
     {
-        $storedRoles = $this->normalizeRoleSet(
-            $this->getOptionArray(self::OPTION_ROLES),
-            $catalog
-        );
-        $roles = $storedRoles;
-
-        foreach (self::ROLE_FAMILY_KEYS as $roleKey) {
-            if (!array_key_exists($roleKey, $input)) {
-                continue;
-            }
-
-            $roles[$roleKey] = $this->sanitizeTextValue($input[$roleKey]);
-        }
-
-        foreach (self::DEFAULT_ROLE_FALLBACKS as $roleKey => $defaultFallback) {
-            if (!array_key_exists($roleKey, $input)) {
-                continue;
-            }
-
-            $roles[$roleKey] = $this->normalizeRoleFallback($input[$roleKey], $defaultFallback);
-        }
-
-        foreach (self::ROLE_WEIGHT_KEYS as $roleKey) {
-            if (!array_key_exists($roleKey, $input)) {
-                continue;
-            }
-
-            $roles[$roleKey] = $this->normalizeRoleWeight($input[$roleKey]);
-        }
-
-        foreach (self::ROLE_AXIS_KEYS as $roleKey) {
-            if (!array_key_exists($roleKey, $input)) {
-                continue;
-            }
-
-            $roles[$roleKey] = $this->normalizeRoleAxes($input[$roleKey]);
-        }
-
-        $roles = $this->normalizeRoleSet(
-            $roles,
-            $catalog
-        );
-
-        update_option(self::OPTION_ROLES, $roles, false);
-
-        return $roles;
+        return $this->roleRepo->saveRoles($input, $catalog);
     }
 
     /**
@@ -717,16 +686,7 @@ final class SettingsRepository
      */
     public function getAppliedRoles(array $catalog): array
     {
-        $settings = $this->getSettings();
-        $storedAppliedRoles = is_array($settings['applied_roles'] ?? null)
-            ? $settings['applied_roles']
-            : [];
-
-        if ($storedAppliedRoles === [] && !empty($settings['auto_apply_roles'])) {
-            $storedAppliedRoles = $this->getOptionArray(self::OPTION_ROLES);
-        }
-
-        return $this->normalizeRoleSet($this->normalizeInputMap($storedAppliedRoles), $catalog);
+        return $this->roleRepo->getAppliedRoles($catalog);
     }
 
     /**
@@ -735,20 +695,10 @@ final class SettingsRepository
      */
     public function ensureAppliedRolesInitialized(array $catalog): array
     {
-        $settings = $this->getSettings();
-        $storedAppliedRoles = is_array($settings['applied_roles'] ?? null)
-            ? $settings['applied_roles']
-            : [];
+        $roles = $this->roleRepo->ensureAppliedRolesInitialized($catalog);
+        $this->settingsCache = null;
 
-        if ($storedAppliedRoles !== [] || empty($settings['auto_apply_roles'])) {
-            return $this->normalizeRoleSet($this->normalizeInputMap($storedAppliedRoles), $catalog);
-        }
-
-        $currentRoles = $this->getRoles($catalog);
-        $settings['applied_roles'] = $currentRoles;
-        $this->persistSettings($settings);
-
-        return $currentRoles;
+        return $roles;
     }
 
     /**
@@ -758,15 +708,10 @@ final class SettingsRepository
      */
     public function saveAppliedRoles(array $roles, array $catalog): array
     {
-        $settings = $this->getSettings();
-        $existingRoles = is_array($settings['applied_roles'] ?? null)
-            ? $this->normalizeRoleSet($this->normalizeInputMap($settings['applied_roles']), $catalog)
-            : $this->getRoles($catalog);
-        $normalizedRoles = $this->normalizeRoleSet(array_replace($existingRoles, $roles), $catalog);
-        $settings['applied_roles'] = $normalizedRoles;
-        $this->persistSettings($settings);
+        $saved = $this->roleRepo->saveAppliedRoles($roles, $catalog);
+        $this->settingsCache = null;
 
-        return $normalizedRoles;
+        return $saved;
     }
 
     /**
@@ -778,29 +723,10 @@ final class SettingsRepository
         bool $clearMonospaceRole,
         array $catalog
     ): array {
-        $availableFamilies = $this->normalizeAvailableRoleFamilies($catalog);
-        $roles = $this->normalizeRoleSet(
-            $this->getOptionArray(self::OPTION_ROLES),
-            $availableFamilies
-        );
-        $settings = $this->getSettings();
-        $appliedRolesInput = is_array($settings['applied_roles'] ?? null)
-            ? $this->normalizeInputMap($settings['applied_roles'])
-            : [];
-        $appliedRoles = $this->normalizeRoleSet($appliedRolesInput, $availableFamilies);
+        $result = $this->roleRepo->clearDisabledCapabilityRoleData($clearVariableAxes, $clearMonospaceRole, $catalog);
+        $this->settingsCache = null;
 
-        $roles = $this->clearCapabilityRoleSet($roles, $clearVariableAxes, $clearMonospaceRole, $availableFamilies);
-        $appliedRoles = $this->clearCapabilityRoleSet($appliedRoles, $clearVariableAxes, $clearMonospaceRole, $availableFamilies);
-
-        update_option(self::OPTION_ROLES, $roles, false);
-
-        $settings['applied_roles'] = $appliedRoles;
-        $this->persistSettings($settings);
-
-        return [
-            'roles' => $roles,
-            'applied_roles' => $appliedRoles,
-        ];
+        return $result;
     }
 
     /**
@@ -808,22 +734,20 @@ final class SettingsRepository
      */
     public function setAutoApplyRoles(bool $enabled): array
     {
-        $settings = $this->getSettings();
-        $settings['auto_apply_roles'] = $enabled;
+        $saved = $this->roleRepo->setAutoApplyRoles($enabled);
+        $this->settingsCache = null;
 
-        return $this->persistSettings($settings);
+        return $this->getSettings();
     }
 
     public function hasGoogleApiKey(): bool
     {
-        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
-
-        return trim($googleApiKeyData['google_api_key']) !== '';
+        return $this->googleApiKeyRepo->has();
     }
 
     public function isAdobeEnabled(): bool
     {
-        return !empty($this->getSettings()['adobe_enabled']);
+        return $this->adobeProjectRepo->isEnabled();
     }
 
     public function isBlockEditorFontLibrarySyncEnabled(): bool
@@ -861,7 +785,7 @@ final class SettingsRepository
     {
         delete_option(self::OPTION_SETTINGS);
         delete_option(self::OPTION_ROLES);
-        delete_option(self::OPTION_GOOGLE_API_KEY_DATA);
+        $this->googleApiKeyRepo->clear();
         $this->settingsCache = null;
 
         return $this->getSettings();
@@ -869,7 +793,7 @@ final class SettingsRepository
 
     public function clearGoogleApiKeyData(): void
     {
-        delete_option(self::OPTION_GOOGLE_API_KEY_DATA);
+        $this->googleApiKeyRepo->clear();
         $this->settingsCache = null;
     }
 
@@ -917,7 +841,7 @@ final class SettingsRepository
     {
         $normalized = $this->normalizeImportedSettings($settings);
         update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($normalized), false);
-        delete_option(self::OPTION_GOOGLE_API_KEY_DATA);
+        $this->googleApiKeyRepo->clear();
         $this->settingsCache = null;
 
         return $this->cacheSettings($normalized);
@@ -929,7 +853,7 @@ final class SettingsRepository
      */
     public function previewImportedRoles(array $roles): array
     {
-        return $this->normalizeImportedRoles($roles);
+        return $this->roleRepo->previewImportedRoles($roles);
     }
 
     /**
@@ -938,10 +862,7 @@ final class SettingsRepository
      */
     public function replaceImportedRoles(array $roles): array
     {
-        $normalized = $this->normalizeImportedRoles($roles);
-        update_option(self::OPTION_ROLES, $normalized, false);
-
-        return $normalized;
+        return $this->roleRepo->replaceImportedRoles($roles);
     }
 
     /**
@@ -993,7 +914,7 @@ final class SettingsRepository
 
     public function getAdobeProjectId(): string
     {
-        return trim($this->stringValue($this->getSettings(), 'adobe_project_id'));
+        return $this->adobeProjectRepo->getProjectId();
     }
 
     /**
@@ -1001,13 +922,7 @@ final class SettingsRepository
      */
     public function getAdobeProjectStatus(): array
     {
-        $settings = $this->getSettings();
-
-        return [
-            'state' => $this->stringValue($settings, 'adobe_project_status', 'empty'),
-            'message' => $this->stringValue($settings, 'adobe_project_status_message'),
-            'checked_at' => $this->intValue($settings, 'adobe_project_checked_at'),
-        ];
+        return $this->adobeProjectRepo->getStatus();
     }
 
     /**
@@ -1015,14 +930,10 @@ final class SettingsRepository
      */
     public function saveAdobeProject(string $projectId, bool $enabled): array
     {
-        $settings = $this->getSettings();
-        $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId($projectId);
-        $settings['adobe_enabled'] = $settings['adobe_project_id'] !== '' ? $enabled : false;
-        $settings['adobe_project_status'] = $settings['adobe_project_id'] === '' ? 'empty' : 'unknown';
-        $settings['adobe_project_status_message'] = '';
-        $settings['adobe_project_checked_at'] = 0;
+        $saved = $this->adobeProjectRepo->saveProject($projectId, $enabled);
+        $this->settingsCache = null;
 
-        return $this->persistSettings($settings);
+        return $this->getSettings();
     }
 
     /**
@@ -1030,18 +941,10 @@ final class SettingsRepository
      */
     public function saveAdobeProjectStatus(string $state, string $message = ''): array
     {
-        $settings = $this->getSettings();
-        $normalizedState = $this->normalizeAdobeProjectStatus($state, $this->stringValue($settings, 'adobe_project_id'));
+        $status = $this->adobeProjectRepo->saveStatus($state, $message);
+        $this->settingsCache = null;
 
-        $settings['adobe_project_status'] = $normalizedState;
-        $settings['adobe_project_status_message'] = $normalizedState === 'empty'
-            ? ''
-            : sanitize_text_field($message);
-        $settings['adobe_project_checked_at'] = $normalizedState === 'empty' ? 0 : time();
-
-        $this->persistSettings($settings);
-
-        return $this->getAdobeProjectStatus();
+        return $status;
     }
 
     /**
@@ -1049,14 +952,10 @@ final class SettingsRepository
      */
     public function clearAdobeProject(): array
     {
-        $settings = $this->getSettings();
-        $settings['adobe_enabled'] = false;
-        $settings['adobe_project_id'] = '';
-        $settings['adobe_project_status'] = 'empty';
-        $settings['adobe_project_status_message'] = '';
-        $settings['adobe_project_checked_at'] = 0;
+        $cleared = $this->adobeProjectRepo->clear();
+        $this->settingsCache = null;
 
-        return $this->persistSettings($settings);
+        return $this->getSettings();
     }
 
     /**
@@ -1064,13 +963,7 @@ final class SettingsRepository
      */
     public function getGoogleApiKeyStatus(): array
     {
-        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
-
-        return [
-            'state' => $this->stringValue($googleApiKeyData, 'google_api_key_status', 'empty'),
-            'message' => $this->stringValue($googleApiKeyData, 'google_api_key_status_message'),
-            'checked_at' => $this->intValue($googleApiKeyData, 'google_api_key_checked_at'),
-        ];
+        return $this->googleApiKeyRepo->getStatus();
     }
 
     /**
@@ -1078,32 +971,15 @@ final class SettingsRepository
      */
     public function saveGoogleApiKeyStatus(string $state, string $message = ''): array
     {
-        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
-        $normalizedState = $this->normalizeGoogleApiKeyStatus($state, $googleApiKeyData['google_api_key']);
+        $status = $this->googleApiKeyRepo->saveStatus($state, $message);
+        $this->settingsCache = null;
 
-        $googleApiKeyData['google_api_key_status'] = $normalizedState;
-        $googleApiKeyData['google_api_key_status_message'] = $normalizedState === 'empty'
-            ? ''
-            : sanitize_text_field($message);
-        $googleApiKeyData['google_api_key_checked_at'] = $normalizedState === 'empty' ? 0 : time();
-        $googleApiKeyData = $this->persistGoogleApiKeyData($googleApiKeyData);
-
-        return [
-            'state' => $googleApiKeyData['google_api_key_status'],
-            'message' => $googleApiKeyData['google_api_key_status_message'],
-            'checked_at' => $googleApiKeyData['google_api_key_checked_at'],
-        ];
+        return $status;
     }
 
     public function getFamilyFallback(string $family, string $default = 'sans-serif'): string
     {
-        $fallbacks = $this->getSettings()['family_fallbacks'] ?? [];
-
-        if (!is_array($fallbacks) || trim($family) === '') {
-            return FontUtils::sanitizeFallback($default);
-        }
-
-        return FontUtils::sanitizeFallback($this->mixedStringValue($fallbacks[$family] ?? $default, $default));
+        return $this->familyMetadataRepo->getFallback($family, $default);
     }
 
     /**
@@ -1111,36 +987,15 @@ final class SettingsRepository
      */
     public function saveFamilyFallback(string $family, string $fallback): array
     {
-        $family = sanitize_text_field($family);
+        $saved = $this->familyMetadataRepo->saveFallback($family, $fallback);
+        $this->settingsCache = null;
 
-        if ($family === '') {
-            return $this->normalizeFamilyFallbacks($this->getSettings()['family_fallbacks'] ?? []);
-        }
-
-        $settings = $this->getSettings();
-        $fallbacks = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
-        $fallbacks[$family] = FontUtils::sanitizeFallback($fallback);
-        ksort($fallbacks, SORT_NATURAL | SORT_FLAG_CASE);
-
-        $settings['family_fallbacks'] = $fallbacks;
-        $this->persistSettings($settings);
-
-        return $fallbacks;
+        return $saved;
     }
 
     public function getFamilyFontDisplay(string $family, string $default = ''): string
     {
-        $displays = $this->getSettings()['family_font_displays'] ?? [];
-
-        if (!is_array($displays) || trim($family) === '') {
-            return $default === '' ? '' : $this->normalizeFontDisplay($default);
-        }
-
-        if (!array_key_exists($family, $displays)) {
-            return $default === '' ? '' : $this->normalizeFontDisplay($default);
-        }
-
-        return $this->normalizeFontDisplay($this->mixedStringValue($displays[$family] ?? '', ''));
+        return $this->familyMetadataRepo->getFontDisplay($family, $default);
     }
 
     /**
@@ -1148,30 +1003,10 @@ final class SettingsRepository
      */
     public function saveFamilyFontDisplay(string $family, string $display): array
     {
-        $family = sanitize_text_field($family);
+        $saved = $this->familyMetadataRepo->saveFontDisplay($family, $display);
+        $this->settingsCache = null;
 
-        if ($family === '') {
-            return $this->normalizeFamilyFontDisplays($this->getSettings()['family_font_displays'] ?? []);
-        }
-
-        $settings = $this->getSettings();
-        $displays = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
-        $display = sanitize_text_field($display);
-
-        if ($display === 'inherit') {
-            unset($displays[$family]);
-        } elseif ($this->isSupportedFontDisplay($display)) {
-            $displays[$family] = $display;
-        } else {
-            unset($displays[$family]);
-        }
-
-        ksort($displays, SORT_NATURAL | SORT_FLAG_CASE);
-
-        $settings['family_font_displays'] = $displays;
-        $this->persistSettings($settings);
-
-        return $displays;
+        return $saved;
     }
 
     /**

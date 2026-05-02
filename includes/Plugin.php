@@ -42,8 +42,12 @@ use TastyFonts\Maintenance\DeveloperToolsService;
 use TastyFonts\Maintenance\SnapshotService;
 use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Maintenance\SupportBundleService;
+use TastyFonts\Repository\AdobeProjectRepository;
+use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 use TastyFonts\Updates\GitHubUpdater;
@@ -100,7 +104,16 @@ final class Plugin
         $googleCssParser = new GoogleCssParser();
 
         $this->storage = new Storage();
-        $this->settings = new SettingsRepository();
+        $googleApiKeyRepo = new GoogleApiKeyRepository();
+        $adobeProjectRepo = new AdobeProjectRepository();
+        $roleRepo = new RoleRepository();
+        $familyMetadataRepo = new FamilyMetadataRepository();
+        $this->settings = new SettingsRepository(
+            $googleApiKeyRepo,
+            $adobeProjectRepo,
+            $roleRepo,
+            $familyMetadataRepo
+        );
         $this->adminAccess = new AdminAccessService($this->settings);
         $this->imports = new ImportRepository();
         $this->log = new LogRepository();
