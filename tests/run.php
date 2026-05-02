@@ -14,6 +14,7 @@ require_once __DIR__ . '/cases/storage-context-regression.php';
 require_once __DIR__ . '/cases/settings-assets-runtime.php';
 require_once __DIR__ . '/cases/admin-renderer.php';
 require_once __DIR__ . '/cases/admin-controller-rest.php';
+require_once __DIR__ . '/cases/custom-css-font-validator.php';
 require_once __DIR__ . '/cases/plugin-updater.php';
 require_once __DIR__ . '/cases/hook-regressions.php';
 require_once __DIR__ . '/cases/expanded-utilities.php';

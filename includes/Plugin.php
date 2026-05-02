@@ -16,6 +16,7 @@ use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\Cli\Command as CliCommand;
 use TastyFonts\CustomCss\CustomCssFinalImportService;
+use TastyFonts\CustomCss\CustomCssFontValidator;
 use TastyFonts\CustomCss\CustomCssImportSnapshotService;
 use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
@@ -117,9 +118,9 @@ final class Plugin
         $this->adminAccess = new AdminAccessService($this->settings);
         $this->imports = new ImportRepository();
         $this->log = new LogRepository();
-        $this->adobe = new AdobeProjectClient($this->settings, $adobeCssParser);
+        $this->adobe = new AdobeProjectClient($this->settings, $adobeProjectRepo, $adobeCssParser);
         $this->bunnyClient = new BunnyFontsClient();
-        $this->googleClient = new GoogleFontsClient($this->settings);
+        $this->googleClient = new GoogleFontsClient($this->settings, $googleApiKeyRepo);
         $this->catalog = new CatalogService(
             $this->storage,
             $this->imports,
@@ -133,7 +134,9 @@ final class Plugin
             $this->settings,
             $this->googleClient,
             $this->bunnyClient,
-            $this->adobe
+            $this->adobe,
+            $roleRepo,
+            $familyMetadataRepo
         );
         $this->assets = new AssetService(
             $this->storage,
@@ -141,7 +144,8 @@ final class Plugin
             $this->settings,
             $this->cssBuilder,
             $this->planner,
-            $this->log
+            $this->log,
+            $roleRepo
         );
         $this->hostedImportWorkflow = new HostedImportWorkflow(
             $this->storage,
@@ -156,7 +160,8 @@ final class Plugin
             $this->imports,
             $this->assets,
             $this->log,
-            $this->settings
+            $this->settings,
+            $roleRepo
         );
         $this->capabilityCleanup = new CapabilityDisableCleanupService(
             $this->storage,
@@ -171,7 +176,8 @@ final class Plugin
             $this->assets,
             $this->settings,
             $this->log,
-            new NativeUploadedFileValidator()
+            new NativeUploadedFileValidator(),
+            $familyMetadataRepo
         );
         $this->bunnyImport = new BunnyImportService(
             $this->bunnyClient,
@@ -193,6 +199,7 @@ final class Plugin
             $this->cssBuilder,
             $this->adobe,
             $this->settings,
+            $roleRepo,
             $this->acssIntegration,
             $this->bricksIntegration,
             $this->oxygenIntegration,
@@ -206,7 +213,8 @@ final class Plugin
             $this->settings,
             $this->log
         );
-        $this->customCssImport = new CustomCssUrlImportService($this->imports);
+        $customCssValidator = new CustomCssFontValidator();
+        $this->customCssImport = new CustomCssUrlImportService($this->imports, $customCssValidator);
         $this->customCssSnapshots = new CustomCssImportSnapshotService();
         $this->customCssFinalImport = new CustomCssFinalImportService(
             $this->storage,
@@ -214,7 +222,9 @@ final class Plugin
             $this->settings,
             $this->catalog,
             $this->assets,
-            $this->log
+            $this->log,
+            $familyMetadataRepo,
+            $customCssValidator
         );
         $this->developerTools = new DeveloperToolsService(
             $this->storage,
@@ -223,7 +233,8 @@ final class Plugin
             $this->catalog,
             $this->assets,
             $this->blockEditorFontLibrary,
-            $this->googleClient
+            $this->googleClient,
+            $familyMetadataRepo
         );
         $this->siteTransfer = new SiteTransferService(
             $this->storage,
@@ -233,7 +244,8 @@ final class Plugin
             $this->developerTools,
             $this->library,
             $this->blockEditorFontLibrary,
-            new NativeUploadedFileValidator()
+            new NativeUploadedFileValidator(),
+            $roleRepo
         );
         $this->snapshots = new SnapshotService(
             $this->storage,
@@ -241,7 +253,8 @@ final class Plugin
             $this->imports,
             $this->developerTools,
             $this->library,
-            $this->blockEditorFontLibrary
+            $this->blockEditorFontLibrary,
+            $roleRepo
         );
         $this->supportBundles = new SupportBundleService(
             $this->storage,
@@ -284,7 +297,9 @@ final class Plugin
             null,
             null,
             null,
-            $roleFamilyCatalogBuilder
+            $roleFamilyCatalogBuilder,
+            $googleApiKeyRepo,
+            $roleRepo
         );
         $this->rest = new RestController($this->admin, $this->adminAccess);
     }

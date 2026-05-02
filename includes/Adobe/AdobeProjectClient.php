@@ -6,6 +6,7 @@ namespace TastyFonts\Adobe;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\AdobeProjectRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
@@ -44,14 +45,16 @@ final class AdobeProjectClient
     private const REQUEST_TIMEOUT = 20;
 
     public function __construct(
-        private readonly SettingsRepository $settings,
+        SettingsRepository $settings,
+        private readonly AdobeProjectRepository $adobeRepo,
         private readonly AdobeCssParser $parser
     ) {
+        unset($settings);
     }
 
     public function isEnabled(): bool
     {
-        return $this->settings->isAdobeEnabled();
+        return $this->adobeRepo->isEnabled();
     }
 
     public function hasProjectId(): bool
@@ -68,7 +71,7 @@ final class AdobeProjectClient
 
     public function getProjectId(): string
     {
-        return $this->settings->getAdobeProjectId();
+        return $this->adobeRepo->getProjectId();
     }
 
     /**
@@ -76,7 +79,7 @@ final class AdobeProjectClient
      */
     public function getProjectStatus(): array
     {
-        return $this->settings->getAdobeProjectStatus();
+        return $this->adobeRepo->getStatus();
     }
 
     /**

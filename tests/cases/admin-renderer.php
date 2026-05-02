@@ -10,6 +10,7 @@ use TastyFonts\Admin\Renderer\HealthTriagePresenter;
 use TastyFonts\Admin\Renderer\RuntimeDebugDetailsPresenter;
 use TastyFonts\Admin\Renderer\PreviewSectionRenderer;
 use TastyFonts\Plugin;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Support\Storage;
 
 $tests['admin_page_renderer_uses_inline_delivery_badge_for_single_delivery_families'] = static function (): void {
@@ -3873,6 +3874,7 @@ $tests['admin_page_renderer_disables_integrations_until_sitewide_delivery_is_on'
 	$builder = new \TastyFonts\Admin\AdminPageContextBuilder(
 		$services['storage'],
 		$services['settings'],
+		new RoleRepository(),
 		$services['log'],
 		$services['catalog'],
 		$services['assets'],
@@ -3951,6 +3953,7 @@ $tests['admin_page_renderer_integration_scan_summary_uses_effective_sitewide_sta
 	$builder = new \TastyFonts\Admin\AdminPageContextBuilder(
 		$services['storage'],
 		$services['settings'],
+		new RoleRepository(),
 		$services['log'],
 		$services['catalog'],
 		$services['assets'],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Plugin;
+use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 
@@ -189,8 +190,9 @@ $tests['plugin_google_api_key_revalidation_runs_only_during_cron'] = static func
     global $remoteGetResponses;
 
     $settings = new TastyFonts\Repository\SettingsRepository();
+    $apiKeyRepo = new GoogleApiKeyRepository();
     $settings->saveSettings(['google_api_key' => 'api-key']);
-    $settings->saveGoogleApiKeyStatus('unknown', 'Needs refresh');
+    $apiKeyRepo->saveStatus('unknown', 'Needs refresh');
     $optionStore[TastyFonts\Repository\SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_checked_at'] = time() - (2 * DAY_IN_SECONDS);
     $remoteGetResponses['https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key'] = [
         'response' => ['code' => 200],
@@ -203,7 +205,7 @@ $tests['plugin_google_api_key_revalidation_runs_only_during_cron'] = static func
 
     assertSameValue(
         'unknown',
-        (string) ($settings->getGoogleApiKeyStatus()['state'] ?? ''),
+        (string) ($apiKeyRepo->getStatus()['state'] ?? ''),
         'Google API key revalidation should ignore non-cron executions.'
     );
 
@@ -213,7 +215,7 @@ $tests['plugin_google_api_key_revalidation_runs_only_during_cron'] = static func
 
     assertSameValue(
         'valid',
-        (string) ($settings->getGoogleApiKeyStatus()['state'] ?? ''),
+        (string) ($apiKeyRepo->getStatus()['state'] ?? ''),
         'Google API key revalidation should refresh the saved status during cron execution.'
     );
 

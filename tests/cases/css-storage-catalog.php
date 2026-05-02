@@ -8,6 +8,7 @@ use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedCssParser;
+use TastyFonts\Repository\AdobeProjectRepository;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -1683,7 +1684,7 @@ $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static f
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
     $families = $catalog->getCatalog();
     $family = $families['Inter'] ?? [];
@@ -1703,7 +1704,7 @@ $tests['catalog_service_local_scan_excludes_imported_roots_and_keeps_relative_pa
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
     $families = $catalog->getCatalog();
     $face = $families['Loose']['faces'][0] ?? [];
@@ -1723,7 +1724,7 @@ $tests['catalog_service_only_includes_local_variable_fonts_when_the_feature_flag
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
 
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
     assertSameValue([], array_values(array_keys($catalog->getCatalog())), 'Variable font files should stay out of the local catalog while the feature flag is disabled.');

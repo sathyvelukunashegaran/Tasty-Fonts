@@ -9,6 +9,8 @@ defined('ABSPATH') || exit;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Google\GoogleFontsClient;
+use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 
@@ -31,7 +33,9 @@ final class RuntimeAssetPlanner
         private readonly SettingsRepository $settings,
         private readonly GoogleFontsClient $google,
         private readonly BunnyFontsClient $bunny,
-        private readonly AdobeProjectClient $adobe
+        private readonly AdobeProjectClient $adobe,
+        private readonly RoleRepository $roleRepo,
+        private readonly FamilyMetadataRepository $familyMetadataRepo,
     ) {
     }
 
@@ -146,7 +150,7 @@ final class RuntimeAssetPlanner
         }
 
         $catalog = $this->getLocalRuntimeCatalog();
-        $roles = $this->settings->getAppliedRoles($catalog);
+        $roles = $this->roleRepo->getAppliedRoles($catalog);
         $urls = [];
 
         foreach (
@@ -435,7 +439,7 @@ final class RuntimeAssetPlanner
         }
 
         $settings = $this->settings->getSettings();
-        $saved = $this->settings->getFamilyFontDisplay($familyName);
+        $saved = $this->familyMetadataRepo->getFontDisplay($familyName);
 
         return $saved !== '' ? $saved : $this->settingsStringValue($settings, 'font_display', 'swap');
     }

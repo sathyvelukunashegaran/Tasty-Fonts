@@ -106,6 +106,7 @@ use TastyFonts\Bunny\BunnyCssParser;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Bunny\BunnyImportService;
 use TastyFonts\CustomCss\CustomCssFinalImportService;
+use TastyFonts\CustomCss\CustomCssFontValidator;
 use TastyFonts\CustomCss\CustomCssImportSnapshotService;
 use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
@@ -136,6 +137,10 @@ use TastyFonts\Maintenance\SupportBundleService;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\AdobeProjectRepository;
+use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\GoogleApiKeyRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
@@ -1972,18 +1977,27 @@ function makeAdminControllerTestInstance(): AdminController
 function makeServiceGraph(): array
 {
     $storage = new Storage();
-    $settings = new SettingsRepository();
+    $googleApiKeyRepo = new GoogleApiKeyRepository();
+    $adobeProjectRepo = new AdobeProjectRepository();
+    $roleRepo = new RoleRepository();
+    $familyMetadataRepo = new FamilyMetadataRepository();
+    $settings = new SettingsRepository(
+        $googleApiKeyRepo,
+        $adobeProjectRepo,
+        $roleRepo,
+        $familyMetadataRepo
+    );
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $adobe = new AdobeProjectClient($settings, $adobeProjectRepo, new AdobeCssParser());
     $bunny = new BunnyFontsClient();
-    $google = new GoogleFontsClient($settings);
+    $google = new GoogleFontsClient($settings, $googleApiKeyRepo);
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
-    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe);
+    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe, $roleRepo, $familyMetadataRepo);
     $cssBuilder = new CssBuilder();
-    $assets = new AssetService($storage, $catalog, $settings, $cssBuilder, $planner, $log);
+    $assets = new AssetService($storage, $catalog, $settings, $cssBuilder, $planner, $log, $roleRepo);
     $hostedImportWorkflow = new HostedImportWorkflow($storage, $imports, $assets, $log, new HostedImportVariantPlanner());
-    $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings);
+    $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings, $roleRepo);
     $capabilityCleanup = new CapabilityDisableCleanupService($storage, $imports, $catalog, $log);
     $localUpload = new LocalUploadService(
         $storage,
@@ -1992,7 +2006,8 @@ function makeServiceGraph(): array
         $assets,
         $settings,
         $log,
-        new StubUploadedFileValidator()
+        new StubUploadedFileValidator(),
+        $familyMetadataRepo
     );
     $bunnyImport = new BunnyImportService($bunny, new BunnyCssParser(), $hostedImportWorkflow);
     $googleImport = new GoogleImportService($google, new GoogleCssParser(), $hostedImportWorkflow);
@@ -2000,9 +2015,10 @@ function makeServiceGraph(): array
     $bricksIntegration = new BricksIntegrationService();
     $oxygenIntegration = new OxygenIntegrationService();
     $blockEditorFontLibrary = new BlockEditorFontLibraryService($storage, $imports, $settings, $log);
-    $customCssImport = new CustomCssUrlImportService($imports);
+    $customCssValidator = new CustomCssFontValidator();
+    $customCssImport = new CustomCssUrlImportService($imports, $customCssValidator);
     $customCssSnapshots = new CustomCssImportSnapshotService();
-    $customCssFinalImport = new CustomCssFinalImportService($storage, $imports, $settings, $catalog, $assets, $log);
+    $customCssFinalImport = new CustomCssFinalImportService($storage, $imports, $settings, $catalog, $assets, $log, $familyMetadataRepo, $customCssValidator);
     $developerTools = new DeveloperToolsService(
         $storage,
         $settings,
@@ -2010,7 +2026,8 @@ function makeServiceGraph(): array
         $catalog,
         $assets,
         $blockEditorFontLibrary,
-        $google
+        $google,
+        $familyMetadataRepo
     );
     $siteTransfer = new SiteTransferService(
         $storage,
@@ -2020,7 +2037,8 @@ function makeServiceGraph(): array
         $developerTools,
         $library,
         $blockEditorFontLibrary,
-        new StubUploadedFileValidator()
+        new StubUploadedFileValidator(),
+        $roleRepo
     );
     $snapshots = new SnapshotService(
         $storage,
@@ -2028,7 +2046,8 @@ function makeServiceGraph(): array
         $imports,
         $developerTools,
         $library,
-        $blockEditorFontLibrary
+        $blockEditorFontLibrary,
+        $roleRepo
     );
     $supportBundles = new SupportBundleService($storage, $settings, $imports, $log);
     $adminAccess = new AdminAccessService($settings);
@@ -2068,7 +2087,9 @@ function makeServiceGraph(): array
         null,
         null,
         null,
-        $roleFamilyCatalogBuilder
+        $roleFamilyCatalogBuilder,
+        $googleApiKeyRepo,
+        $roleRepo
     );
     $rest = new RestController($controller, $adminAccess);
     $runtime = new RuntimeService(
@@ -2077,6 +2098,7 @@ function makeServiceGraph(): array
         $cssBuilder,
         $adobe,
         $settings,
+        $roleRepo,
         $acssIntegration,
         $bricksIntegration,
         $oxygenIntegration,
@@ -2113,6 +2135,8 @@ function makeServiceGraph(): array
         'site_transfer' => $siteTransfer,
         'snapshots' => $snapshots,
         'support_bundles' => $supportBundles,
+        'role_repo' => $roleRepo,
+        'family_metadata_repo' => $familyMetadataRepo,
         'admin_access' => $adminAccess,
         'role_family_catalog_builder' => $roleFamilyCatalogBuilder,
         'updater' => $updater,

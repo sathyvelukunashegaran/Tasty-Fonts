@@ -6,6 +6,7 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
@@ -25,6 +26,7 @@ final class GeneratedCssCache
         private readonly SettingsRepository $settings,
         private readonly CssBuilder $cssBuilder,
         private readonly RuntimeAssetPlanner $planner,
+        private readonly RoleRepository $roleRepo,
         private readonly string $cssTransientKey,
         private readonly string $hashTransientKey
     ) {
@@ -65,8 +67,8 @@ final class GeneratedCssCache
         $variableFamilies = $this->planner->getRuntimeVariableFamilies();
         $settings = $this->settings->getSettings();
         $roles = !empty($settings['auto_apply_roles'])
-            ? $this->settings->getAppliedRoles($catalog)
-            : $this->settings->getRoles($catalog);
+            ? $this->roleRepo->getAppliedRoles($catalog)
+            : $this->roleRepo->getRoles($catalog);
 
         $this->css = $this->cssBuilder->build($localCatalog, $roles, $settings, $variableFamilies);
         $this->css = FontUtils::scalarStringValue(apply_filters('tasty_fonts_generated_css', $this->css, $localCatalog, $roles, $settings));

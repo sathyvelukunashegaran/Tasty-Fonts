@@ -21,8 +21,15 @@ use WP_Error;
  */
 final class CustomCssUrlImportService
 {
-    public function __construct(private readonly ?ImportRepository $imports = null)
+    public function __construct(
+        private readonly ?ImportRepository $imports = null,
+        private readonly ?CustomCssFontValidator $validator = null
+    ) {
+    }
+
+    private function getValidator(): CustomCssFontValidator
     {
+        return $this->validator ?? new CustomCssFontValidator();
     }
 
     private const REQUEST_TIMEOUT = 10;
@@ -30,18 +37,7 @@ final class CustomCssUrlImportService
     private const FONT_SIZE_LIMIT_BYTES = 10485760;
     private const MAX_DETECTED_FACES = 50;
     private const MAX_UNIQUE_FONT_URLS = 50;
-    private const FONT_SIGNATURE_RANGE = 'bytes=0-15';
-    private const FONT_SIGNATURE_LIMIT_BYTES = 17;
     private const SUPPORTED_FONT_FORMATS = ['woff2', 'woff'];
-    private const INTERNAL_HOST_SUFFIXES = [
-        '.home',
-        '.internal',
-        '.invalid',
-        '.lan',
-        '.local',
-        '.localhost',
-        '.test',
-    ];
 
     /**
      * @return DryRunPlan|WP_Error
@@ -57,7 +53,7 @@ final class CustomCssUrlImportService
             );
         }
 
-        $urlSafetyError = $this->validatePublicHttpsUrl($stylesheetUrl, 'stylesheet');
+        $urlSafetyError = $this->getValidator()->validatePublicHttpsUrl($stylesheetUrl, 'stylesheet', 'dry-run');
 
         if ($urlSafetyError instanceof WP_Error) {
             return $urlSafetyError;
@@ -107,7 +103,7 @@ final class CustomCssUrlImportService
         if (is_wp_error($response)) {
             $message = $response->get_error_message();
 
-            if ($this->isTimeoutMessage($message)) {
+            if ($this->getValidator()->isTimeoutMessage($message)) {
                 return new WP_Error(
                     'tasty_fonts_custom_css_fetch_timeout',
                     __('The stylesheet request timed out. Try a faster source or a smaller stylesheet.', 'tasty-fonts')
@@ -297,7 +293,7 @@ final class CustomCssUrlImportService
                 return $fontUrl;
             }
 
-            $safetyError = $this->validatePublicHttpsUrl($fontUrl, 'font');
+            $safetyError = $this->getValidator()->validatePublicHttpsUrl($fontUrl, 'font', 'dry-run');
 
             if ($safetyError instanceof WP_Error) {
                 return $safetyError;
@@ -768,390 +764,62 @@ final class CustomCssUrlImportService
      */
     private function validateFontUrl(string $fontUrl, string $format): array
     {
-        $notes = [];
-        $warnings = [];
-        $method = 'HEAD + range GET';
-        $headers = [];
-        $contentType = '';
-        $contentLength = 0;
-        $headResponse = $this->requestFontHead($fontUrl);
+        $result = $this->getValidator()->validateFontUrl($fontUrl, $format);
 
-        if (is_wp_error($headResponse)) {
-            $notes[] = __('HEAD check was unavailable; used a capped GET fallback.', 'tasty-fonts');
-            $method = 'capped GET fallback';
-        } else {
-            $headStatus = (int) wp_remote_retrieve_response_code($headResponse);
-
-            if (!$this->isSuccessfulHttpStatus($headStatus)) {
-                if (!$this->canFallbackAfterHeadStatus($headStatus)) {
-                    return $this->invalidFontValidation(
-                        sprintf(
-                            /* translators: %d is the HTTP status code returned by the font URL. */
-                            __('The font URL returned HTTP %d.', 'tasty-fonts'),
-                            $headStatus
-                        ),
-                        'HEAD',
-                        $this->headersFromResponse($headResponse)
-                    );
-                }
-
-                $notes[] = sprintf(
-                    /* translators: %d is the HTTP status code returned to a HEAD request. */
-                    __('HEAD returned HTTP %d; used a capped GET fallback.', 'tasty-fonts'),
-                    $headStatus
-                );
-                $method = 'capped GET fallback';
-            } else {
-                $headers = $this->headersFromResponse($headResponse);
-                $contentType = $this->headerValue($headers, 'content-type');
-                $contentLength = $this->contentLengthFromHeaders($headers);
-
-                if ($contentLength > self::FONT_SIZE_LIMIT_BYTES) {
-                    return $this->invalidFontValidation(
-                        sprintf(
-                            /* translators: %s is the maximum font response size. */
-                            __('The font file is larger than the %s dry-run limit.', 'tasty-fonts'),
-                            size_format(self::FONT_SIZE_LIMIT_BYTES)
-                        ),
-                        'HEAD',
-                        $headers,
-                        $contentType,
-                        $contentLength
-                    );
-                }
-
-                $contentTypeError = $this->contentTypeValidationError($contentType, $format);
-
-                if ($contentTypeError !== '') {
-                    return $this->invalidFontValidation($contentTypeError, 'HEAD', $headers, $contentType, $contentLength);
-                }
-            }
-        }
-
-        $signatureResponse = $this->requestFontSignature($fontUrl);
-
-        if (is_wp_error($signatureResponse)) {
-            return $this->invalidFontValidation(
-                $signatureResponse->get_error_message() !== ''
-                    ? $signatureResponse->get_error_message()
-                    : __('The font URL could not be reached for signature validation.', 'tasty-fonts'),
-                $method,
-                $headers,
-                $contentType,
-                $contentLength
-            );
-        }
-
-        $signatureStatus = (int) wp_remote_retrieve_response_code($signatureResponse);
-
-        if (!$this->isSuccessfulHttpStatus($signatureStatus)) {
-            return $this->invalidFontValidation(
-                sprintf(
+        if ($result->status === ValidationResult::STATUS_INVALID) {
+            $message = match ($result->code) {
+                ValidationResult::HEAD_FAILED,
+                ValidationResult::HTTP_ERROR => sprintf(
                     /* translators: %d is the HTTP status code returned by the font URL. */
                     __('The font URL returned HTTP %d.', 'tasty-fonts'),
-                    $signatureStatus
+                    $result->httpStatus
                 ),
-                $method,
-                $this->headersFromResponse($signatureResponse),
-                $contentType,
-                $contentLength
-            );
-        }
-
-        $signatureHeaders = $this->headersFromResponse($signatureResponse);
-        $headers = array_replace($headers, $signatureHeaders);
-        $contentType = $contentType !== '' ? $contentType : $this->headerValue($headers, 'content-type');
-        $signatureLength = $this->contentLengthFromHeaders($signatureHeaders);
-        $rangeTotal = $this->contentRangeTotalFromHeaders($signatureHeaders);
-        $contentLength = $contentLength > 0 ? $contentLength : ($rangeTotal > 0 ? $rangeTotal : $signatureLength);
-
-        if ($contentLength > self::FONT_SIZE_LIMIT_BYTES || strlen(wp_remote_retrieve_body($signatureResponse)) > self::FONT_SIZE_LIMIT_BYTES) {
-            return $this->invalidFontValidation(
-                sprintf(
+                ValidationResult::TOO_LARGE => sprintf(
                     /* translators: %s is the maximum font response size. */
                     __('The font file is larger than the %s dry-run limit.', 'tasty-fonts'),
                     size_format(self::FONT_SIZE_LIMIT_BYTES)
                 ),
-                $method,
-                $headers,
-                $contentType,
-                $contentLength
-            );
-        }
-
-        $contentTypeError = $this->contentTypeValidationError($contentType, $format);
-
-        if ($contentTypeError !== '') {
-            return $this->invalidFontValidation($contentTypeError, $method, $headers, $contentType, $contentLength);
-        }
-
-        $body = wp_remote_retrieve_body($signatureResponse);
-
-        if (!$this->fontSignatureMatches($body, $format)) {
-            return $this->invalidFontValidation(
-                sprintf(
+                ValidationResult::CONTENT_TYPE_ERROR => sprintf(
+                    /* translators: 1: returned content type, 2: expected font format label. */
+                    __('The font URL returned %1$s instead of %2$s font content.', 'tasty-fonts'),
+                    $result->contentType,
+                    strtoupper($format)
+                ),
+                ValidationResult::SIGNATURE_MISMATCH => sprintf(
                     /* translators: %s is the expected font format label. */
                     __('The downloaded bytes do not match a %s font signature.', 'tasty-fonts'),
                     strtoupper($format)
                 ),
-                $method,
-                $headers,
-                $contentType,
-                $contentLength
-            );
+                ValidationResult::TIMEOUT => __('The font URL request timed out.', 'tasty-fonts'),
+                ValidationResult::REQUEST_FAILED => $result->notes[0] ?? __('The font URL could not be reached for signature validation.', 'tasty-fonts'),
+                default => $result->notes[0] ?? __('The font URL could not be reached for signature validation.', 'tasty-fonts'),
+            };
+
+            return [
+                'status' => 'invalid',
+                'method' => $result->method,
+                'content_type' => $result->contentType,
+                'content_length' => $result->contentLength,
+                'notes' => [$message],
+                'warnings' => [],
+            ];
         }
 
+        $notes = $result->notes;
         $notes[] = sprintf(
             /* translators: %s is the font format label. */
             __('%s signature matched.', 'tasty-fonts'),
             strtoupper($format)
         );
 
-        if ($contentLength <= 0) {
-            $warnings[] = __('The font response did not expose a reliable size. Final import will recheck before saving.', 'tasty-fonts');
-        }
-
-        $corsWarning = $this->corsWarningForFontUrl($fontUrl, $headers);
-
-        if ($corsWarning !== '') {
-            $warnings[] = $corsWarning;
-        }
-
-        if ((string) wp_parse_url($fontUrl, PHP_URL_QUERY) !== '') {
-            $warnings[] = __('This font URL includes query parameters. If it is signed or temporary, remote serving may stop working when it expires.', 'tasty-fonts');
-        }
-
         return [
-            'status' => $warnings === [] ? 'valid' : 'warning',
-            'method' => $method,
-            'content_type' => $contentType,
-            'content_length' => $contentLength,
+            'status' => $result->status,
+            'method' => $result->method,
+            'content_type' => $result->contentType,
+            'content_length' => $result->contentLength,
             'notes' => array_values(array_filter($notes)),
-            'warnings' => $warnings,
+            'warnings' => $result->warnings,
         ];
-    }
-
-    /**
-     * @param array<string, string> $headers
-     * @return FontValidation
-     */
-    private function invalidFontValidation(string $reason, string $method, array $headers = [], string $contentType = '', int $contentLength = 0): array
-    {
-        return [
-            'status' => 'invalid',
-            'method' => $method,
-            'content_type' => $contentType !== '' ? $contentType : $this->headerValue($headers, 'content-type'),
-            'content_length' => $contentLength > 0 ? $contentLength : $this->contentLengthFromHeaders($headers),
-            'notes' => [$reason],
-            'warnings' => [],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>|WP_Error
-     */
-    private function requestFontHead(string $fontUrl): array|WP_Error
-    {
-        $args = [
-            'method' => 'HEAD',
-            'timeout' => self::REQUEST_TIMEOUT,
-            'redirection' => 3,
-            'reject_unsafe_urls' => true,
-            'headers' => [
-                'Accept' => 'font/woff2,font/woff,application/font-woff2,application/font-woff,*/*;q=0.5',
-            ],
-        ];
-        $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $fontUrl);
-
-        return wp_remote_request($fontUrl, FontUtils::normalizeHttpArgs(is_array($filteredArgs) ? $filteredArgs : $args));
-    }
-
-    /**
-     * @return array<string, mixed>|WP_Error
-     */
-    private function requestFontSignature(string $fontUrl): array|WP_Error
-    {
-        $args = [
-            'timeout' => self::REQUEST_TIMEOUT,
-            'redirection' => 3,
-            'reject_unsafe_urls' => true,
-            'limit_response_size' => self::FONT_SIGNATURE_LIMIT_BYTES,
-            'headers' => [
-                'Accept' => 'font/woff2,font/woff,application/font-woff2,application/font-woff,*/*;q=0.5',
-                'Range' => self::FONT_SIGNATURE_RANGE,
-            ],
-        ];
-        $filteredArgs = apply_filters('tasty_fonts_http_request_args', $args, $fontUrl);
-
-        return wp_remote_get($fontUrl, FontUtils::normalizeHttpArgs(is_array($filteredArgs) ? $filteredArgs : $args));
-    }
-
-    private function isSuccessfulHttpStatus(int $status): bool
-    {
-        return $status >= 200 && $status < 300;
-    }
-
-    private function canFallbackAfterHeadStatus(int $status): bool
-    {
-        return in_array($status, [0, 403, 405, 501], true);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function headersFromResponse(mixed $response): array
-    {
-        if (!is_array($response) || !is_array($response['headers'] ?? null)) {
-            return [];
-        }
-
-        $headers = [];
-
-        foreach ($response['headers'] as $key => $value) {
-            if (is_scalar($value)) {
-                $headers[strtolower((string) $key)] = trim((string) $value);
-            }
-        }
-
-        return $headers;
-    }
-
-    /**
-     * @param array<string, string> $headers
-     */
-    private function headerValue(array $headers, string $header): string
-    {
-        return trim((string) ($headers[strtolower($header)] ?? $headers[strtoupper($header)] ?? ''));
-    }
-
-    /**
-     * @param array<string, string> $headers
-     */
-    private function contentLengthFromHeaders(array $headers): int
-    {
-        $length = trim($this->headerValue($headers, 'content-length'));
-
-        if ($length === '' || preg_match('/^\d+$/', $length) !== 1) {
-            return 0;
-        }
-
-        return (int) $length;
-    }
-
-    /**
-     * @param array<string, string> $headers
-     */
-    private function contentRangeTotalFromHeaders(array $headers): int
-    {
-        $range = $this->headerValue($headers, 'content-range');
-
-        if ($range === '' || preg_match('/\/(\d+)$/', $range, $matches) !== 1) {
-            return 0;
-        }
-
-        return (int) $matches[1];
-    }
-
-    private function contentTypeValidationError(string $contentType, string $format): string
-    {
-        $contentType = strtolower(trim(strtok($contentType, ';') ?: $contentType));
-
-        if ($contentType === '') {
-            return '';
-        }
-
-        $accepted = [
-            'application/font-woff',
-            'application/font-woff2',
-            'application/octet-stream',
-            'application/x-font-woff',
-            'application/x-font-woff2',
-        ];
-
-        if (str_starts_with($contentType, 'font/') || in_array($contentType, $accepted, true) || str_contains($contentType, 'woff')) {
-            return '';
-        }
-
-        return sprintf(
-            /* translators: 1: returned content type, 2: expected font format label. */
-            __('The font URL returned %1$s instead of %2$s font content.', 'tasty-fonts'),
-            $contentType,
-            strtoupper($format)
-        );
-    }
-
-    private function fontSignatureMatches(string $body, string $format): bool
-    {
-        if (strlen($body) < 4) {
-            return false;
-        }
-
-        $signature = substr($body, 0, 4);
-
-        return match ($format) {
-            'woff2' => $signature === 'wOF2',
-            'woff' => $signature === 'wOFF',
-            default => false,
-        };
-    }
-
-    /**
-     * @param array<string, string> $headers
-     */
-    private function corsWarningForFontUrl(string $fontUrl, array $headers): string
-    {
-        $fontHost = $this->hostForUrl($fontUrl);
-
-        if ($fontHost === '') {
-            return '';
-        }
-
-        $allowOrigin = trim($this->headerValue($headers, 'access-control-allow-origin'));
-
-        if ($allowOrigin === '') {
-            return __('Remote serving warning: this cross-origin font response did not expose Access-Control-Allow-Origin. Self-hosted imports are not blocked by browser CORS.', 'tasty-fonts');
-        }
-
-        if ($allowOrigin !== '*') {
-            return __('Remote serving warning: this font response allows a specific origin. Verify your site origin before choosing remote serving; self-hosted imports are not blocked by browser CORS.', 'tasty-fonts');
-        }
-
-        return '';
-    }
-
-    private function validatePublicHttpsUrl(string $url, string $kind): ?WP_Error
-    {
-        if (!$this->hasHttpsSchemeAndHost($url)) {
-            return new WP_Error(
-                'tasty_fonts_custom_css_url_invalid',
-                $kind === 'font'
-                    ? __('Font URLs in the stylesheet must be valid public HTTPS URLs.', 'tasty-fonts')
-                    : __('Enter a valid public HTTPS CSS stylesheet URL.', 'tasty-fonts')
-            );
-        }
-
-        $parts = wp_parse_url($url);
-        $host = $this->normalizeHost((string) ($parts['host'] ?? ''));
-
-        if ($host === '' || !empty($parts['user'] ?? '') || !empty($parts['pass'] ?? '')) {
-            return new WP_Error(
-                'tasty_fonts_custom_css_url_invalid',
-                $kind === 'font'
-                    ? __('Font URLs in the stylesheet must be valid public HTTPS URLs.', 'tasty-fonts')
-                    : __('Enter a valid public HTTPS CSS stylesheet URL.', 'tasty-fonts')
-            );
-        }
-
-        if ($this->isBlockedHost($host) && !$this->isInternalDryRunUrlAllowed($url, $host, $kind)) {
-            return new WP_Error(
-                $kind === 'font' ? 'tasty_fonts_custom_css_font_url_blocked' : 'tasty_fonts_custom_css_url_blocked',
-                $kind === 'font'
-                    ? __('A font URL points to localhost, a private address, or an internal network target. Use public HTTPS font URLs only.', 'tasty-fonts')
-                    : __('That stylesheet URL points to localhost, a private address, or an internal network target. Use a public HTTPS URL.', 'tasty-fonts')
-            );
-        }
-
-        return null;
     }
 
     private function hasHttpsSchemeAndHost(string $url): bool
@@ -1166,33 +834,6 @@ final class CustomCssUrlImportService
             && trim((string) ($parts['host'] ?? '')) !== '';
     }
 
-    private function isBlockedHost(string $host): bool
-    {
-        if ($host === '' || $host === 'localhost') {
-            return true;
-        }
-
-        if ($this->isIpAddress($host)) {
-            return !$this->isPublicIpAddress($host);
-        }
-
-        if (preg_match('/^[0-9.]+$/', $host) === 1) {
-            return true;
-        }
-
-        if (!str_contains($host, '.') || preg_match('/[^a-z0-9.-]/', $host) === 1) {
-            return true;
-        }
-
-        foreach (self::INTERNAL_HOST_SUFFIXES as $suffix) {
-            if (str_ends_with($host, $suffix)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private function normalizeHost(string $host): string
     {
         $host = strtolower(trim($host));
@@ -1200,36 +841,6 @@ final class CustomCssUrlImportService
         $host = trim($host, '[]');
 
         return $host;
-    }
-
-    private function isIpAddress(string $host): bool
-    {
-        return filter_var($host, FILTER_VALIDATE_IP) !== false;
-    }
-
-    private function isPublicIpAddress(string $host): bool
-    {
-        return filter_var(
-            $host,
-            FILTER_VALIDATE_IP,
-            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
-        ) !== false;
-    }
-
-    private function isInternalDryRunUrlAllowed(string $url, string $host, string $kind): bool
-    {
-        /**
-         * Allows local development tooling to opt in to otherwise blocked internal dry-run URLs.
-         *
-         * Defaults to false. Production code must not enable this broadly. A local-only MU plugin may
-         * return true for a narrow current-site `.test` fixture host when manually smoke-testing dry runs.
-         *
-         * @param bool   $allowed Whether to allow the otherwise blocked URL.
-         * @param string $url     The normalized URL being validated.
-         * @param string $host    The normalized URL host.
-         * @param string $kind    Either 'stylesheet' or 'font'.
-         */
-        return apply_filters('tasty_fonts_custom_css_allow_internal_dry_run_url', false, $url, $host, $kind) === true;
     }
 
     private function cssTooLargeError(): WP_Error
@@ -1242,15 +853,6 @@ final class CustomCssUrlImportService
                 size_format(self::CSS_SIZE_LIMIT_BYTES)
             )
         );
-    }
-
-    private function isTimeoutMessage(string $message): bool
-    {
-        $message = strtolower($message);
-
-        return str_contains($message, 'timed out')
-            || str_contains($message, 'timeout')
-            || str_contains($message, 'curl error 28');
     }
 
     private function hostForUrl(string $url): string

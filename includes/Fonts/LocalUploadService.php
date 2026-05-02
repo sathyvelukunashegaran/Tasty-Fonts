@@ -6,6 +6,7 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -48,10 +49,12 @@ final class LocalUploadService
         private readonly CatalogService $catalog,
         private readonly ImportRepository $imports,
         private readonly AssetService $assets,
-        private readonly SettingsRepository $settings,
+        SettingsRepository $settings,
         private readonly LogRepository $log,
-        private readonly UploadedFileValidatorInterface $uploadedFileValidator
+        private readonly UploadedFileValidatorInterface $uploadedFileValidator,
+        private readonly FamilyMetadataRepository $familyMetadataRepo,
     ) {
+        unset($settings);
     }
 
     /**
@@ -188,7 +191,7 @@ final class LocalUploadService
 
         if ($importedFamilies !== []) {
             foreach ($importedFamilies as $familyName => $fallback) {
-                $this->settings->saveFamilyFallback((string) $familyName, (string) $fallback);
+                $this->familyMetadataRepo->saveFallback((string) $familyName, (string) $fallback);
                 $this->saveLocalProfile(
                     (string) $familyName,
                     FontUtils::slugify((string) $familyName),

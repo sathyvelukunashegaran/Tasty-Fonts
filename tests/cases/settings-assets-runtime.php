@@ -20,6 +20,10 @@ use TastyFonts\Maintenance\HealthCheckService;
 use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\AdobeProjectRepository;
+use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\GoogleApiKeyRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
@@ -58,6 +62,7 @@ $tests['settings_repository_persists_adobe_project_state'] = static function ():
     resetTestState();
 
     $settings = new SettingsRepository();
+    $adobeProjectRepo = new AdobeProjectRepository();
     $settings->saveAdobeProject(' AbC-123 ', true);
     $saved = $settings->getSettings();
 
@@ -66,7 +71,7 @@ $tests['settings_repository_persists_adobe_project_state'] = static function ():
     assertSameValue('unknown', $saved['adobe_project_status'], 'Saving a non-empty Adobe project should reset status to unknown before validation.');
 
     $settings->saveAdobeProjectStatus('valid', 'Adobe project ready.');
-    $status = $settings->getAdobeProjectStatus();
+    $status = $adobeProjectRepo->getStatus();
 
     assertSameValue('valid', $status['state'], 'Adobe project status updates should persist the normalized state.');
     assertSameValue('Adobe project ready.', $status['message'], 'Adobe project status updates should persist the status message.');
@@ -239,7 +244,7 @@ $tests['settings_repository_tracks_acss_font_sync_state'] = static function (): 
     assertSameValue('400', $saved['acss_font_role_sync_previous_text_font_weight'], 'Automatic.css sync state should preserve the previous text font-weight value for later restore.');
 };
 
-$tests['settings_repository_reuses_request_scoped_settings_until_a_write_invalidates_the_cache'] = static function (): void {
+$tests['settings_repository_reads_fresh_settings_from_options_each_time'] = static function (): void {
     resetTestState();
 
     global $optionStore;
@@ -252,16 +257,16 @@ $tests['settings_repository_reuses_request_scoped_settings_until_a_write_invalid
     $settings = new SettingsRepository();
     $first = $settings->getSettings();
 
-    $optionStore[SettingsRepository::OPTION_SETTINGS]['preview_sentence'] = 'Changed underneath cache';
+    $optionStore[SettingsRepository::OPTION_SETTINGS]['preview_sentence'] = 'Changed underneath';
     $second = $settings->getSettings();
 
     assertSameValue('Original preview', $first['preview_sentence'], 'Initial settings reads should normalize the stored option value.');
-    assertSameValue('Original preview', $second['preview_sentence'], 'Subsequent settings reads in the same request should reuse the normalized cache.');
+    assertSameValue('Changed underneath', $second['preview_sentence'], 'Subsequent settings reads should reflect underlying option changes directly.');
 
     $settings->saveSettings(['preview_sentence' => 'Saved preview']);
     $afterSave = $settings->getSettings();
 
-    assertSameValue('Saved preview', $afterSave['preview_sentence'], 'Settings writes should refresh the request-scoped cache.');
+    assertSameValue('Saved preview', $afterSave['preview_sentence'], 'Settings writes should be immediately visible on next read.');
 };
 
 $tests['settings_repository_normalizes_preview_sentence_before_saving'] = static function (): void {
@@ -2385,12 +2390,12 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
-    $google = new GoogleFontsClient($settings);
+    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $google = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
     $bunny = new BunnyFontsClient();
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
-    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe);
-    $assets = new AssetService($storage, $catalog, $settings, new CssBuilder(), $planner, $log);
+    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe, new RoleRepository(), new FamilyMetadataRepository());
+    $assets = new AssetService($storage, $catalog, $settings, new CssBuilder(), $planner, $log, new RoleRepository());
 
     $assets->refreshGeneratedAssets();
 
@@ -2669,6 +2674,7 @@ $tests['admin_page_context_builder_uses_asset_status_metadata_for_generated_css_
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -2840,6 +2846,7 @@ $tests['admin_page_context_builder_does_not_report_hydrated_self_hosted_urls_as_
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -2900,6 +2907,7 @@ $tests['admin_page_context_builder_includes_variable_axis_debug_metadata'] = sta
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -2958,6 +2966,7 @@ $tests['admin_page_context_builder_resolves_self_hosted_upload_urls_without_path
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3017,6 +3026,7 @@ $tests['admin_page_context_builder_keeps_reporting_truly_missing_self_hosted_fil
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3051,6 +3061,7 @@ $tests['admin_page_context_builder_exposes_advanced_tools_context'] = static fun
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3119,6 +3130,7 @@ $tests['admin_page_context_builder_surfaces_available_disabled_integrations_as_w
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3165,6 +3177,7 @@ $tests['admin_page_context_builder_reports_acss_sync_waiting_for_sitewide_roles'
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3199,6 +3212,7 @@ $tests['admin_page_context_builder_reports_integration_dependencies_separately_f
         $builder = new AdminPageContextBuilder(
             $services['storage'],
             $services['settings'],
+            new RoleRepository(),
             $services['log'],
             $services['catalog'],
             $services['assets'],
@@ -3305,6 +3319,7 @@ $tests['admin_page_context_builder_treats_unavailable_integrations_as_inactive_e
     $builder = new \TastyFonts\Admin\AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3364,6 +3379,7 @@ $tests['admin_page_context_builder_uses_catalog_family_count_for_delete_library_
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3466,6 +3482,7 @@ $tests['admin_controller_recovers_legacy_acss_drift_disabled_state_without_reapp
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -3650,6 +3667,7 @@ $tests['admin_controller_keeps_acss_sync_enabled_when_acss_drifts_outside_tasty_
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        new RoleRepository(),
         $services['log'],
         $services['catalog'],
         $services['assets'],

@@ -813,7 +813,7 @@ $tests['custom_css_final_import_downloads_selected_woff2_and_woff_to_custom_stor
     assertFalseValue(str_starts_with($firstPath, 'http'), 'Saved face paths should be relative, not remote URLs.');
     assertSameValue($woff2Bytes, (string) file_get_contents((string) $services['storage']->pathForRelativePath($firstPath)), 'The selected WOFF2 file should be downloaded during final import.');
     assertSameValue($woffBytes, (string) file_get_contents((string) $services['storage']->pathForRelativePath($secondPath)), 'The selected WOFF file should be downloaded during final import.');
-    assertSameValue('serif', $services['settings']->getFamilyFallback('Final Sans'), 'Per-family fallback choices should be persisted by family name.');
+    assertSameValue('serif', $services['family_metadata_repo']->getFallback('Final Sans'), 'Per-family fallback choices should be persisted by family name.');
     assertSameValue(true, in_array('tasty_fonts_regenerate_css', array_column($scheduledEvents, 'hook'), true), 'Generated assets should be refreshed after a successful final import.');
     assertSameValue('', (string) ($remoteGetCalls[count($remoteGetCalls) - 1]['args']['headers']['Range'] ?? ''), 'Final imports should download the full font file, not only the dry-run range.');
 };
@@ -1148,7 +1148,7 @@ $tests['custom_css_remote_final_import_saves_remote_profiles_and_generates_contr
     assertSameValue($fontUrl, (string) ($savedFace['files']['woff2'] ?? ''), 'Remote custom CSS faces should save the absolute remote font URL.');
     assertSameValue([], (array) ($savedFace['paths'] ?? []), 'Remote custom CSS faces should not save local relative paths.');
     assertSameValue($fontUrl, (string) ($savedFace['provider']['remote_url'] ?? ''), 'Remote custom face metadata should retain the reviewed remote URL.');
-    assertSameValue('serif', $services['settings']->getFamilyFallback('Remote Sans'), 'Remote imports should persist per-family fallback choices.');
+    assertSameValue('serif', $services['family_metadata_repo']->getFallback('Remote Sans'), 'Remote imports should persist per-family fallback choices.');
     assertSameValue(true, in_array('tasty_fonts_regenerate_css', array_column($scheduledEvents, 'hook'), true), 'Generated assets should refresh after a successful remote import.');
 
     $services['settings']->saveSettings([

@@ -15,9 +15,13 @@ $importRepository = new \TastyFonts\Repository\ImportRepository();
 $logRepository = new \TastyFonts\Repository\LogRepository();
 $adobeClient = new \TastyFonts\Adobe\AdobeProjectClient(
     $settingsRepository,
+    new \TastyFonts\Repository\AdobeProjectRepository(),
     new \TastyFonts\Adobe\AdobeCssParser()
 );
-$googleClient = new \TastyFonts\Google\GoogleFontsClient($settingsRepository);
+$googleClient = new \TastyFonts\Google\GoogleFontsClient(
+    $settingsRepository,
+    new \TastyFonts\Repository\GoogleApiKeyRepository()
+);
 $catalog = new \TastyFonts\Fonts\CatalogService(
     $storage,
     $importRepository,
@@ -30,7 +34,9 @@ $planner = new \TastyFonts\Fonts\RuntimeAssetPlanner(
     $settingsRepository,
     $googleClient,
     new \TastyFonts\Bunny\BunnyFontsClient(),
-    $adobeClient
+    $adobeClient,
+    new \TastyFonts\Repository\RoleRepository(),
+    new \TastyFonts\Repository\FamilyMetadataRepository()
 );
 $assetService = new \TastyFonts\Fonts\AssetService(
     $storage,
@@ -38,7 +44,8 @@ $assetService = new \TastyFonts\Fonts\AssetService(
     $settingsRepository,
     new \TastyFonts\Fonts\CssBuilder(),
     $planner,
-    $logRepository
+    $logRepository,
+    new \TastyFonts\Repository\RoleRepository()
 );
 $blockEditorFontLibrary = new \TastyFonts\Fonts\BlockEditorFontLibraryService(
     $storage,
@@ -53,7 +60,8 @@ $developerTools = new \TastyFonts\Maintenance\DeveloperToolsService(
     $catalog,
     $assetService,
     $blockEditorFontLibrary,
-    $googleClient
+    $googleClient,
+    new \TastyFonts\Repository\FamilyMetadataRepository()
 );
 
 $handler = new \TastyFonts\Uninstall\UninstallHandler(

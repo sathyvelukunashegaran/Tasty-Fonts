@@ -20,6 +20,7 @@ use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Maintenance\HealthCheckService;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\SiteEnvironment;
@@ -62,6 +63,7 @@ final class AdminPageContextBuilder
     public function __construct(
         private readonly Storage $storage,
         private readonly SettingsRepository $settings,
+        private readonly RoleRepository $roleRepo,
         private readonly LogRepository $log,
         private readonly CatalogService $catalog,
         private readonly AssetService $assets,
@@ -97,8 +99,8 @@ final class AdminPageContextBuilder
         $adobeAccessContext = $this->buildAdobeAccessContext();
         $availableFamilies = $this->buildSelectableFamilyNames($catalog);
         $availableFamilyOptions = $this->buildSelectableFamilyOptions($catalog, $availableFamilies);
-        $roles = $this->settings->getRoles($availableFamilies);
-        $appliedRoles = $this->settings->getAppliedRoles($availableFamilies);
+        $roles = $this->roleRepo->getRoles($availableFamilies);
+        $appliedRoles = $this->roleRepo->getAppliedRoles($availableFamilies);
         $googleAccessContext = $this->buildGoogleAccessContext();
         $roleDeploymentContext = $this->buildRoleDeploymentContext($roles, $appliedRoles, $applyEverywhere, $settings);
         $localEnvironmentNotice = $this->buildLocalEnvironmentNotice($settings);
@@ -2150,7 +2152,7 @@ final class AdminPageContextBuilder
     public function buildSelectableFamilyNames(array $catalog): array
     {
         $families = array_keys($catalog);
-        $storedRoles = $this->settings->getRoles([]);
+        $storedRoles = $this->roleRepo->getRoles([]);
 
         foreach ($this->effectiveRoleKeys() as $roleKey) {
             $familyName = trim($this->roleStringValue($storedRoles, $roleKey));

@@ -6,12 +6,14 @@ use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Google\GoogleFontsClient;
+use TastyFonts\Repository\AdobeProjectRepository;
+use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\TransientKey;
 
 $tests['google_fonts_client_builds_variable_css2_urls_when_axes_are_available'] = static function (): void {
     $settings = new SettingsRepository();
-    $client = new GoogleFontsClient($settings);
+    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
 
     assertSameValue(
         'https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap',
@@ -34,7 +36,7 @@ $tests['google_fonts_client_builds_variable_css2_urls_when_axes_are_available'] 
 
 $tests['google_fonts_client_preserves_custom_axis_case_in_variable_css2_urls'] = static function (): void {
     $settings = new SettingsRepository();
-    $client = new GoogleFontsClient($settings);
+    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
 
     assertSameValue(
         'https://fonts.googleapis.com/css2?family=AR+One+Sans:ARRR,wght@10..60,400..700&display=swap',
@@ -366,7 +368,7 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
     $settings = new SettingsRepository();
     $settings->saveSettings(['google_api_key' => 'api-key']);
     $settings->saveGoogleApiKeyStatus('valid', 'Ready');
-    $client = new GoogleFontsClient($settings);
+    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
     $catalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
     $metadataUrl = 'https://fonts.google.com/metadata/fonts';
     $remoteGetResponses[$catalogUrl] = [
@@ -419,7 +421,7 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
 
     $results = $client->searchFamilies('int', 5);
     $resultsAgain = $client->searchFamilies('int', 5);
-    $family = (new GoogleFontsClient($settings))->getFamily('Inter');
+    $family = (new GoogleFontsClient($settings, new GoogleApiKeyRepository()))->getFamily('Inter');
 
     assertSameValue(
         [
@@ -498,7 +500,7 @@ $tests['google_fonts_client_schedules_api_key_revalidation_when_status_is_stale'
     $settings->saveGoogleApiKeyStatus('valid', 'Ready');
     $optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_checked_at'] = time() - (2 * DAY_IN_SECONDS);
 
-    $client = new GoogleFontsClient($settings);
+    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
     $status = $client->getApiKeyStatus();
 
     assertSameValue('valid', (string) ($status['state'] ?? ''), 'Loading stale Google API key status should preserve the stored state while revalidation is queued.');
@@ -523,7 +525,7 @@ $tests['google_fonts_client_clears_catalog_cache'] = static function (): void {
     $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG)] = ['family' => 'Inter'];
     $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA)] = ['inter' => ['family' => 'Inter', 'axes' => []]];
 
-    $client = new GoogleFontsClient(new SettingsRepository());
+    $client = new GoogleFontsClient(new SettingsRepository(), new GoogleApiKeyRepository());
     $client->clearCatalogCache();
 
     assertSameValue(false, array_key_exists(TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG), $transientStore), 'Google catalog cache clearing should remove the cached catalog transient.');
@@ -554,9 +556,9 @@ $tests['provider_clients_apply_http_request_args_filters'] = static function ():
     );
 
     $settings = new SettingsRepository();
-    $google = new GoogleFontsClient($settings);
+    $google = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
     $bunny = new BunnyFontsClient();
-    $adobe = new AdobeProjectClient($settings, new AdobeCssParser());
+    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
     $googleCatalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
     $googleCssUrl = $google->buildCssUrl('Inter', ['regular']);
     $bunnyFamilyUrl = 'https://fonts.bunny.net/family/inter';
@@ -657,7 +659,7 @@ $tests['adobe_project_client_validates_project_and_reuses_cached_families'] = st
 CSS,
     ];
 
-    $client = new AdobeProjectClient(new SettingsRepository(), new AdobeCssParser());
+    $client = new AdobeProjectClient(new SettingsRepository(), new AdobeProjectRepository(), new AdobeCssParser());
     $validation = $client->validateProject('ABC-1234');
     $families = $client->getProjectFamilies($projectId);
 
@@ -684,7 +686,7 @@ $tests['adobe_project_client_maps_invalid_and_unknown_responses'] = static funct
     ];
     $remoteGetResponses[$unknownUrl] = new WP_Error('http_request_failed', 'Timed out');
 
-    $client = new AdobeProjectClient(new SettingsRepository(), new AdobeCssParser());
+    $client = new AdobeProjectClient(new SettingsRepository(), new AdobeProjectRepository(), new AdobeCssParser());
     $invalid = $client->validateProject('invalid01');
     $unknown = $client->validateProject('unknown01');
 

@@ -6,6 +6,7 @@ namespace TastyFonts\Google;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
@@ -13,7 +14,6 @@ use WP_Error;
 
 /**
  * @phpstan-import-type AdobeProjectStatus from \TastyFonts\Repository\SettingsRepository
- * @phpstan-import-type GoogleApiKeyData from \TastyFonts\Repository\SettingsRepository
  * @phpstan-type CatalogItem array<string, mixed>
  * @phpstan-type CatalogIndex array<string, CatalogItem>
  * @phpstan-type MetadataIndex array<string, array<string, mixed>>
@@ -43,13 +43,15 @@ final class GoogleFontsClient
     /** @var MetadataIndex|null */
     private ?array $metadataIndex = null;
 
-    public function __construct(private readonly SettingsRepository $settings)
-    {
+    public function __construct(
+        private readonly SettingsRepository $settings,
+        private readonly GoogleApiKeyRepository $apiKeyRepo,
+    ) {
     }
 
     public function hasApiKey(): bool
     {
-        return $this->settings->hasGoogleApiKey();
+        return $this->apiKeyRepo->has();
     }
 
     public function canSearch(): bool
@@ -64,7 +66,7 @@ final class GoogleFontsClient
      */
     public function getApiKeyStatus(): array
     {
-        $status = $this->settings->getGoogleApiKeyStatus();
+        $status = $this->apiKeyRepo->getStatus();
         $this->maybeScheduleApiKeyRevalidation($status);
 
         return $status;
@@ -146,12 +148,12 @@ final class GoogleFontsClient
         $apiKey = $this->getApiKey();
 
         if ($apiKey === '') {
-            return $this->settings->saveGoogleApiKeyStatus('empty');
+            return $this->apiKeyRepo->saveStatus('empty');
         }
 
         $validation = $this->validateApiKey($apiKey);
 
-        return $this->settings->saveGoogleApiKeyStatus(
+        return $this->apiKeyRepo->saveStatus(
             $this->stringValue($validation, 'state', 'unknown'),
             $this->stringValue($validation, 'message')
         );

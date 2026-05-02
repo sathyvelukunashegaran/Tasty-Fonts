@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\SettingsRepository;
 use WP_Error;
 
@@ -22,6 +23,7 @@ final class GoogleApiKeyActions
 
     public function __construct(
         private readonly SettingsRepository $settings,
+        private readonly GoogleApiKeyRepository $apiKeyRepo,
         private readonly GoogleFontsClient $googleClient,
         private readonly LogRepository $log,
         ?GoogleApiKeyValidator $validator = null
@@ -34,8 +36,8 @@ final class GoogleApiKeyActions
      */
     public function status(): array
     {
-        $status = $this->settings->getGoogleApiKeyStatus();
-        $hasGoogleApiKey = $this->settings->hasGoogleApiKey();
+        $status = $this->apiKeyRepo->getStatus();
+        $hasGoogleApiKey = $this->apiKeyRepo->has();
         $message = $hasGoogleApiKey
             ? __('Google Fonts API key is stored.', 'tasty-fonts')
             : __('Google Fonts API key is not stored.', 'tasty-fonts');
@@ -89,7 +91,7 @@ final class GoogleApiKeyActions
         }
 
         $this->settings->saveSettings(['google_api_key' => $googleApiKey]);
-        $this->settings->saveGoogleApiKeyStatus($validation['state'], $validation['message']);
+        $this->apiKeyRepo->saveStatus($validation['state'], $validation['message']);
         $this->googleClient->clearCatalogCache();
 
         $message = __('Google Fonts API key validated.', 'tasty-fonts');

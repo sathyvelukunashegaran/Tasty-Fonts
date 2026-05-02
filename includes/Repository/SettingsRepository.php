@@ -86,7 +86,6 @@ final class SettingsRepository
         self::OUTPUT_QUICK_MODE_CLASSES,
         self::OUTPUT_QUICK_MODE_CUSTOM,
     ];
-    private const ROLE_FAMILY_KEYS = ['heading', 'body', 'monospace'];
     private const CLASS_OUTPUT_BOOLEAN_FIELDS = [
         'class_output_enabled',
         'class_output_role_heading_enabled',
@@ -221,30 +220,16 @@ final class SettingsRepository
         'google_api_key_status_message',
         'google_api_key_checked_at',
     ];
-    private const DEFAULT_ROLE_FALLBACKS = [
-        'heading_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
-        'body_fallback' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
-        'monospace_fallback' => FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK,
-    ];
     private const GLOBAL_FALLBACK_DEFAULTS = [
         'fallback_heading' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
         'fallback_body' => FontUtils::DEFAULT_ROLE_SANS_FALLBACK,
         'fallback_monospace' => FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK,
     ];
-    private const ROLE_WEIGHT_KEYS = ['heading_weight', 'body_weight', 'monospace_weight'];
-    private const ROLE_AXIS_KEYS = ['heading_axes', 'body_axes', 'monospace_axes'];
-    /** @var NormalizedSettings|null */
-    private ?array $settingsCache = null;
-
     /**
      * @return NormalizedSettings
      */
     public function getSettings(): array
     {
-        if ($this->settingsCache !== null) {
-            return $this->settingsCache;
-        }
-
         $storedSettings = $this->getOptionArray(self::OPTION_SETTINGS);
         $settings = $this->normalizeInputMap(wp_parse_args(
             $storedSettings,
@@ -345,7 +330,7 @@ final class SettingsRepository
         $settings = $this->normalizeRoleUsageFontWeightOutput($settings);
         $settings['output_quick_mode_preference'] = $this->resolveOutputQuickModePreference($storedSettings, $settings);
 
-        return $this->cacheSettings($settings);
+        return $settings;
     }
 
     /**
@@ -651,9 +636,7 @@ final class SettingsRepository
             $googleApiKeyData = $this->persistGoogleApiKeyData($googleApiKeyData);
         }
 
-        return $this->cacheSettings(
-            $this->mergeGoogleApiKeyDataIntoSettings($this->withoutGoogleApiKeyData($settings), $googleApiKeyData)
-        );
+        return $this->mergeGoogleApiKeyDataIntoSettings($this->withoutGoogleApiKeyData($settings), $googleApiKeyData);
     }
 
     /**
@@ -696,7 +679,6 @@ final class SettingsRepository
     public function ensureAppliedRolesInitialized(array $catalog): array
     {
         $roles = $this->roleRepo->ensureAppliedRolesInitialized($catalog);
-        $this->settingsCache = null;
 
         return $roles;
     }
@@ -709,7 +691,6 @@ final class SettingsRepository
     public function saveAppliedRoles(array $roles, array $catalog): array
     {
         $saved = $this->roleRepo->saveAppliedRoles($roles, $catalog);
-        $this->settingsCache = null;
 
         return $saved;
     }
@@ -724,7 +705,6 @@ final class SettingsRepository
         array $catalog
     ): array {
         $result = $this->roleRepo->clearDisabledCapabilityRoleData($clearVariableAxes, $clearMonospaceRole, $catalog);
-        $this->settingsCache = null;
 
         return $result;
     }
@@ -735,14 +715,8 @@ final class SettingsRepository
     public function setAutoApplyRoles(bool $enabled): array
     {
         $saved = $this->roleRepo->setAutoApplyRoles($enabled);
-        $this->settingsCache = null;
 
         return $this->getSettings();
-    }
-
-    public function hasGoogleApiKey(): bool
-    {
-        return $this->googleApiKeyRepo->has();
     }
 
     public function isAdobeEnabled(): bool
@@ -786,15 +760,8 @@ final class SettingsRepository
         delete_option(self::OPTION_SETTINGS);
         delete_option(self::OPTION_ROLES);
         $this->googleApiKeyRepo->clear();
-        $this->settingsCache = null;
 
         return $this->getSettings();
-    }
-
-    public function clearGoogleApiKeyData(): void
-    {
-        $this->googleApiKeyRepo->clear();
-        $this->settingsCache = null;
     }
 
     /**
@@ -842,27 +809,8 @@ final class SettingsRepository
         $normalized = $this->normalizeImportedSettings($settings);
         update_option(self::OPTION_SETTINGS, $this->withoutGoogleApiKeyData($normalized), false);
         $this->googleApiKeyRepo->clear();
-        $this->settingsCache = null;
 
-        return $this->cacheSettings($normalized);
-    }
-
-    /**
-     * @param SettingsInput $roles
-     * @return RoleSet
-     */
-    public function previewImportedRoles(array $roles): array
-    {
-        return $this->roleRepo->previewImportedRoles($roles);
-    }
-
-    /**
-     * @param SettingsInput $roles
-     * @return RoleSet
-     */
-    public function replaceImportedRoles(array $roles): array
-    {
-        return $this->roleRepo->replaceImportedRoles($roles);
+        return $normalized;
     }
 
     /**
@@ -918,20 +866,11 @@ final class SettingsRepository
     }
 
     /**
-     * @return AdobeProjectStatus
-     */
-    public function getAdobeProjectStatus(): array
-    {
-        return $this->adobeProjectRepo->getStatus();
-    }
-
-    /**
      * @return NormalizedSettings
      */
     public function saveAdobeProject(string $projectId, bool $enabled): array
     {
         $saved = $this->adobeProjectRepo->saveProject($projectId, $enabled);
-        $this->settingsCache = null;
 
         return $this->getSettings();
     }
@@ -942,7 +881,6 @@ final class SettingsRepository
     public function saveAdobeProjectStatus(string $state, string $message = ''): array
     {
         $status = $this->adobeProjectRepo->saveStatus($state, $message);
-        $this->settingsCache = null;
 
         return $status;
     }
@@ -953,17 +891,8 @@ final class SettingsRepository
     public function clearAdobeProject(): array
     {
         $cleared = $this->adobeProjectRepo->clear();
-        $this->settingsCache = null;
 
         return $this->getSettings();
-    }
-
-    /**
-     * @return AdobeProjectStatus
-     */
-    public function getGoogleApiKeyStatus(): array
-    {
-        return $this->googleApiKeyRepo->getStatus();
     }
 
     /**
@@ -972,14 +901,8 @@ final class SettingsRepository
     public function saveGoogleApiKeyStatus(string $state, string $message = ''): array
     {
         $status = $this->googleApiKeyRepo->saveStatus($state, $message);
-        $this->settingsCache = null;
 
         return $status;
-    }
-
-    public function getFamilyFallback(string $family, string $default = 'sans-serif'): string
-    {
-        return $this->familyMetadataRepo->getFallback($family, $default);
     }
 
     /**
@@ -988,7 +911,6 @@ final class SettingsRepository
     public function saveFamilyFallback(string $family, string $fallback): array
     {
         $saved = $this->familyMetadataRepo->saveFallback($family, $fallback);
-        $this->settingsCache = null;
 
         return $saved;
     }
@@ -1004,101 +926,8 @@ final class SettingsRepository
     public function saveFamilyFontDisplay(string $family, string $display): array
     {
         $saved = $this->familyMetadataRepo->saveFontDisplay($family, $display);
-        $this->settingsCache = null;
 
         return $saved;
-    }
-
-    /**
-     * @param array<int|string, mixed> $catalog
-     * @return RoleSet
-     */
-    private function getDefaultRoles(array $catalog): array
-    {
-        return self::DEFAULT_ROLE_FALLBACKS + [
-            'heading' => '',
-            'body' => '',
-            'monospace' => '',
-            'heading_weight' => '',
-            'body_weight' => '',
-            'monospace_weight' => '',
-            'heading_axes' => [],
-            'body_axes' => [],
-            'monospace_axes' => [],
-        ];
-    }
-
-    /**
-     * @param array<int|string, mixed> $catalog
-     * @return list<string>
-     */
-    private function normalizeAvailableRoleFamilies(array $catalog): array
-    {
-        $families = [];
-
-        foreach ($catalog as $key => $entry) {
-            if (is_array($entry)) {
-                $family = $this->sanitizeTextValue($entry['family'] ?? ($entry['name'] ?? ''));
-
-                if ($family === '' && is_string($key)) {
-                    $family = $this->sanitizeTextValue($key);
-                }
-            } elseif (is_string($entry)) {
-                $family = $this->sanitizeTextValue($entry);
-            } else {
-                $family = is_string($key) ? $this->sanitizeTextValue($key) : '';
-            }
-
-            if ($family === '') {
-                continue;
-            }
-
-            $families[$family] = $family;
-        }
-
-        return array_values($families);
-    }
-
-    /**
-     * @param RoleSet $roles
-     * @param list<string> $availableFamilies
-     * @return RoleSet
-     */
-    private function clearCapabilityRoleSet(
-        array $roles,
-        bool $clearVariableAxes,
-        bool $clearMonospaceRole,
-        array $availableFamilies
-    ): array {
-        if ($clearVariableAxes) {
-            $roles['heading_axes'] = [];
-            $roles['body_axes'] = [];
-            $roles['monospace_axes'] = [];
-        }
-
-        if ($clearMonospaceRole) {
-            $roles['monospace'] = '';
-            $roles['monospace_fallback'] = 'monospace';
-            $roles['monospace_weight'] = '';
-            $roles['monospace_axes'] = [];
-        }
-
-        $availableMap = array_fill_keys($availableFamilies, true);
-
-        foreach (self::ROLE_FAMILY_KEYS as $roleKey) {
-            $selectedFamily = $this->sanitizeTextValue($roles[$roleKey]);
-
-            if ($selectedFamily !== '' && !isset($availableMap[$selectedFamily])) {
-                $roles[$roleKey] = '';
-
-                if ($roleKey === 'monospace') {
-                    $roles['monospace_weight'] = '';
-                    $roles['monospace_axes'] = [];
-                }
-            }
-        }
-
-        return $roles;
     }
 
     /**
@@ -1243,92 +1072,6 @@ final class SettingsRepository
         return $this->withoutGoogleApiKeyData($settings);
     }
 
-    /**
-     * @param SettingsInput $roles
-     * @return RoleSet
-     */
-    private function normalizeImportedRoles(array $roles): array
-    {
-        return $this->normalizeRoleSet($roles, []);
-    }
-
-    /**
-     * @param SettingsInput|RoleSet $roles
-     * @param array<int|string, mixed> $catalog
-     * @return RoleSet
-     */
-    private function normalizeRoleSet(array $roles, array $catalog): array
-    {
-        $defaults = $this->getDefaultRoles($catalog);
-        $normalizedRoles = wp_parse_args($roles, $defaults);
-        $normalizedRoles['heading'] = $this->sanitizeTextValue($normalizedRoles['heading'] ?? '');
-        $normalizedRoles['body'] = $this->sanitizeTextValue($normalizedRoles['body'] ?? '');
-        $normalizedRoles['monospace'] = $this->sanitizeTextValue($normalizedRoles['monospace'] ?? '');
-        $normalizedRoles['heading_fallback'] = $this->normalizeRoleFallback($normalizedRoles['heading_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
-        $normalizedRoles['body_fallback'] = $this->normalizeRoleFallback($normalizedRoles['body_fallback'] ?? '', FontUtils::DEFAULT_ROLE_SANS_FALLBACK);
-        $normalizedRoles['monospace_fallback'] = $this->normalizeRoleFallback($normalizedRoles['monospace_fallback'] ?? '', FontUtils::DEFAULT_ROLE_MONOSPACE_FALLBACK);
-        $normalizedRoles['heading_weight'] = $this->normalizeRoleWeight($normalizedRoles['heading_weight'] ?? '');
-        $normalizedRoles['body_weight'] = $this->normalizeRoleWeight($normalizedRoles['body_weight'] ?? '');
-        $normalizedRoles['monospace_weight'] = $this->normalizeRoleWeight($normalizedRoles['monospace_weight'] ?? '');
-        $normalizedRoles['heading_axes'] = $this->normalizeRoleAxes($normalizedRoles['heading_axes'] ?? []);
-        $normalizedRoles['body_axes'] = $this->normalizeRoleAxes($normalizedRoles['body_axes'] ?? []);
-        $normalizedRoles['monospace_axes'] = $this->normalizeRoleAxes($normalizedRoles['monospace_axes'] ?? []);
-
-        return [
-            'heading' => $normalizedRoles['heading'],
-            'body' => $normalizedRoles['body'],
-            'monospace' => $normalizedRoles['monospace'],
-            'heading_fallback' => $normalizedRoles['heading_fallback'],
-            'body_fallback' => $normalizedRoles['body_fallback'],
-            'monospace_fallback' => $normalizedRoles['monospace_fallback'],
-            'heading_weight' => $normalizedRoles['heading_weight'],
-            'body_weight' => $normalizedRoles['body_weight'],
-            'monospace_weight' => $normalizedRoles['monospace_weight'],
-            'heading_axes' => $normalizedRoles['heading_axes'],
-            'body_axes' => $normalizedRoles['body_axes'],
-            'monospace_axes' => $normalizedRoles['monospace_axes'],
-        ];
-    }
-
-    /**
-     * @return RoleAxes
-     */
-    private function normalizeRoleAxes(mixed $axes): array
-    {
-        if (is_string($axes) && trim($axes) !== '') {
-            $decoded = json_decode($axes, true);
-
-            if (is_array($decoded)) {
-                $axes = $decoded;
-            }
-        }
-
-        $normalizedAxes = [];
-
-        foreach (FontUtils::normalizeVariationDefaults(is_array($axes) ? $axes : []) as $tag => $value) {
-            $normalizedAxes[$tag] = is_string($value) ? $value : (string) $value;
-        }
-
-        return $normalizedAxes;
-    }
-
-    private function normalizeRoleWeight(mixed $weight): string
-    {
-        $rawWeight = trim(wp_unslash($this->mixedStringValue($weight)));
-
-        if ($rawWeight === '') {
-            return '';
-        }
-
-        $property = FontUtils::weightVariableName($rawWeight);
-
-        if ($property === '') {
-            return '';
-        }
-
-        return substr($property, strlen('--weight-'));
-    }
-
     private function normalizeBlockEditorFontLibrarySyncSetting(mixed $value): bool
     {
         if ($value === null || $value === '') {
@@ -1357,17 +1100,6 @@ final class SettingsRepository
         $mode = trim($mode);
 
         return in_array($mode, ['managed', 'selected', 'all'], true) ? $mode : 'managed';
-    }
-
-    private function normalizeRoleFallback(mixed $value, string $default): string
-    {
-        $rawValue = trim(wp_unslash($this->mixedStringValue($value)));
-
-        if ($rawValue === '') {
-            return $default;
-        }
-
-        return FontUtils::sanitizeFallback($rawValue);
     }
 
     private function normalizeGlobalFallback(mixed $value, string $default): string
@@ -1596,7 +1328,7 @@ final class SettingsRepository
         update_option(self::OPTION_SETTINGS, $settings, false);
         $googleApiKeyData = $this->persistGoogleApiKeyData($googleApiKeyData);
 
-        return $this->cacheSettings($this->mergeGoogleApiKeyDataIntoSettings($settings, $googleApiKeyData));
+        return $this->mergeGoogleApiKeyDataIntoSettings($settings, $googleApiKeyData);
     }
 
     /**
@@ -1918,7 +1650,6 @@ final class SettingsRepository
         $googleApiKeyData = $this->normalizeGoogleApiKeyData($googleApiKeyData);
 
         update_option(self::OPTION_GOOGLE_API_KEY_DATA, $this->buildStoredGoogleApiKeyData($googleApiKeyData), false);
-        $this->settingsCache = null;
 
         return $googleApiKeyData;
     }
@@ -1927,13 +1658,6 @@ final class SettingsRepository
      * @param NormalizedSettings $settings
      * @return NormalizedSettings
      */
-    private function cacheSettings(array $settings): array
-    {
-        $this->settingsCache = $settings;
-
-        return $this->settingsCache;
-    }
-
     /**
      * @param SettingsInput|NormalizedSettings $settings
      * @param GoogleApiKeyData $googleApiKeyData

@@ -486,6 +486,7 @@ $tests['admin_context_builder_labels_update_channel_options_with_available_versi
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        $services['role_repo'],
         $services['log'],
         $services['catalog'],
         $services['assets'],
@@ -647,6 +648,7 @@ $tests['admin_context_labels_plain_dev_nightly_as_local_development'] = static f
     $builder = new AdminPageContextBuilder(
         $services['storage'],
         $services['settings'],
+        $services['role_repo'],
         $services['log'],
         $services['catalog'],
         $services['assets'],

@@ -11,6 +11,7 @@ use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Fonts\UploadedFileValidatorInterface;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
@@ -130,7 +131,8 @@ final class SiteTransferService
         private readonly DeveloperToolsService $developerTools,
         private readonly LibraryService $library,
         private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
-        private readonly UploadedFileValidatorInterface $uploadedFileValidator
+        private readonly UploadedFileValidatorInterface $uploadedFileValidator,
+        private readonly RoleRepository $roleRepo,
     ) {
     }
 
@@ -888,7 +890,7 @@ final class SiteTransferService
             }
 
             $savedSettings = $this->settings->replaceImportedSettings($settings);
-            $savedRoles = $this->settings->replaceImportedRoles($roles);
+            $savedRoles = $this->roleRepo->replaceImportedRoles($roles);
             $savedLibrary = $this->imports->replaceLibrary($library);
 
             if (trim($freshGoogleApiKey) !== '') {
@@ -936,8 +938,8 @@ final class SiteTransferService
             'plugin_version' => defined('TASTY_FONTS_VERSION') ? (string) TASTY_FONTS_VERSION : '',
             'exported_at' => current_time('mysql', true),
             'settings' => $this->buildPortableSettingsSnapshot(),
-            'roles' => $this->settings->getRoles([]),
-            'applied_roles' => $this->settings->getAppliedRoles([]),
+            'roles' => $this->roleRepo->getRoles([]),
+            'applied_roles' => $this->roleRepo->getAppliedRoles([]),
             'library' => $this->imports->allFamilies(),
             'secret_requirements' => [
                 [

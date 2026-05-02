@@ -6,6 +6,7 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\RoleUsageMessageFormatter;
 
@@ -16,7 +17,8 @@ final class LibraryRoleProtectionPolicy
 {
     public function __construct(
         private readonly CatalogService $catalog,
-        private readonly SettingsRepository $settings
+        private readonly SettingsRepository $settings,
+        private readonly RoleRepository $roleRepo,
     ) {
     }
 
@@ -27,7 +29,7 @@ final class LibraryRoleProtectionPolicy
         }
 
         $catalog = $this->catalog->getCatalog();
-        $liveRoles = $this->settings->getAppliedRoles($catalog);
+        $liveRoles = $this->roleRepo->getAppliedRoles($catalog);
 
         foreach ($this->liveRoleKeys() as $roleKey) {
             if (($liveRoles[$roleKey] ?? '') === $familyName) {
@@ -44,10 +46,10 @@ final class LibraryRoleProtectionPolicy
     public function getProtectedRoleLabels(string $familyName): array
     {
         $catalog = $this->catalog->getCatalog();
-        $roleSets = [$this->settings->getRoles($catalog)];
+        $roleSets = [$this->roleRepo->getRoles($catalog)];
 
         if (!empty($this->settings->getSettings()['auto_apply_roles'])) {
-            $roleSets[] = $this->settings->getAppliedRoles($catalog);
+            $roleSets[] = $this->roleRepo->getAppliedRoles($catalog);
         }
 
         $roleLabels = [];

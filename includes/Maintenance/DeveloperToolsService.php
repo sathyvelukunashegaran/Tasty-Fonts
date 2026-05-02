@@ -13,6 +13,7 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Google\GoogleFontsClient;
+use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -51,9 +52,10 @@ HTACCESS;
         CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
-        private readonly GoogleFontsClient $googleClient
+        private readonly GoogleFontsClient $googleClient,
+        FamilyMetadataRepository $familyMetadataRepo,
     ) {
-        unset($catalog);
+        unset($catalog, $familyMetadataRepo);
     }
 
     public function ensureStorageScaffolding(): bool

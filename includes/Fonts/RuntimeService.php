@@ -13,6 +13,7 @@ use TastyFonts\Api\RestController;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use WP_Theme_JSON_Data;
@@ -43,6 +44,7 @@ final class RuntimeService
         private readonly CssBuilder $cssBuilder,
         private readonly AdobeProjectClient $adobe,
         private readonly SettingsRepository $settings,
+        private readonly RoleRepository $roleRepo,
         private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration,
@@ -469,8 +471,8 @@ final class RuntimeService
         $roleFamilyCatalog = $builder->build($catalog, $settings);
 
         $familyNames = array_keys($roleFamilyCatalog);
-        $roles = $this->settings->getRoles($familyNames);
-        $appliedRoles = $this->settings->getAppliedRoles($familyNames);
+        $roles = $this->roleRepo->getRoles($familyNames);
+        $appliedRoles = $this->roleRepo->getAppliedRoles($familyNames);
 
         return [
             'enabled' => true,
@@ -989,7 +991,7 @@ JS;
         }
 
         $css = $this->cssBuilder->buildRoleUsageRulesOnlySnippet(
-            $this->settings->getAppliedRoles($this->planner->getRuntimeFamilies()),
+            $this->roleRepo->getAppliedRoles($this->planner->getRuntimeFamilies()),
             !empty($settings['monospace_role_enabled']),
             array_replace($settings, ['minimal_output_preset_enabled' => false])
         );

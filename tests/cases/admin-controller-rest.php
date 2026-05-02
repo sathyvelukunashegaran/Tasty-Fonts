@@ -13,6 +13,7 @@ use TastyFonts\Cli\Command as CliCommand;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
+use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -2620,7 +2621,7 @@ $tests['rest_controller_custom_css_final_import_accepts_valid_snapshot_once'] = 
     assertSameValue('imported', (string) ($result['status'] ?? ''), 'Slice 6 final import should persist selected self-hosted faces.');
     assertSameValue('self_hosted', (string) ($result['delivery_mode'] ?? ''), 'Final import should report self-hosted delivery mode.');
     assertSameValue(1, (int) ($result['counts']['faces_imported'] ?? 0), 'Final import should save the selected snapshot face.');
-    assertSameValue('serif', $services['settings']->getFamilyFallback('Snapshot Sans'), 'Final import should persist explicit family fallback choices.');
+    assertSameValue('serif', $services['family_metadata_repo']->getFallback('Snapshot Sans'), 'Final import should persist explicit family fallback choices.');
     assertSameValue('custom', (string) ($services['imports']->getFamily('snapshot-sans')['delivery_profiles'][$result['families'][0]['delivery_id']]['provider'] ?? ''), 'Final import should save a custom provider profile from server snapshot metadata.');
 
     $reusedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
@@ -2667,7 +2668,7 @@ $tests['rest_controller_custom_css_remote_final_import_accepts_valid_snapshot_on
     assertSameValue('assets.example.com', (string) ($profile['meta']['source_host'] ?? ''), 'Remote final import should retain the reviewed source CSS host in profile metadata.');
     assertSameValue('https://cdn.example.com/snapshot-sans.woff2', (string) ($face['files']['woff2'] ?? ''), 'Remote final import should save the absolute remote font URL as the generated CSS source.');
     assertSameValue([], (array) ($face['paths'] ?? []), 'Remote final import should not store local path metadata for remote faces.');
-    assertSameValue('serif', $services['settings']->getFamilyFallback('Snapshot Sans'), 'Remote final import should persist explicit family fallback choices like self-hosted import.');
+    assertSameValue('serif', $services['family_metadata_repo']->getFallback('Snapshot Sans'), 'Remote final import should persist explicit family fallback choices like self-hosted import.');
 
     $reusedRequest = new WP_REST_Request('POST', '/' . RestController::API_NAMESPACE . '/custom-css/import');
     $reusedRequest->set_body_params([
@@ -3104,7 +3105,7 @@ $tests['google_api_key_validator_preserves_empty_success_messages'] = static fun
             return ['state' => 'valid'];
         }
     };
-    $validator = new GoogleApiKeyValidator(new GoogleFontsClient($settings), $validationClient);
+    $validator = new GoogleApiKeyValidator(new GoogleFontsClient($settings, new GoogleApiKeyRepository()), $validationClient);
     $result = $validator->validate(
         'valid-key',
         'tasty_fonts_google_api_key_invalid',

@@ -9,6 +9,7 @@ defined('ABSPATH') || exit;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\LibraryService;
 use TastyFonts\Repository\ImportRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
@@ -54,7 +55,8 @@ final class SnapshotService
         private readonly ImportRepository $imports,
         private readonly DeveloperToolsService $developerTools,
         private readonly LibraryService $library,
-        private readonly BlockEditorFontLibraryService $blockEditorFontLibrary
+        private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
+        private readonly RoleRepository $roleRepo,
     ) {
     }
 
@@ -422,7 +424,7 @@ final class SnapshotService
             $settings = $manifest['settings'];
             $settings['applied_roles'] = $manifest['applied_roles'];
             $savedSettings = $this->settings->replaceImportedSettings($settings);
-            $savedRoles = $this->settings->replaceImportedRoles($manifest['roles']);
+            $savedRoles = $this->roleRepo->replaceImportedRoles($manifest['roles']);
             $savedLibrary = $this->imports->replaceLibrary($manifest['library']);
 
             $this->library->syncLiveRolePublishStates(
@@ -467,8 +469,8 @@ final class SnapshotService
             'created_at' => current_time('mysql', true),
             'reason' => sanitize_key($reason) !== '' ? sanitize_key($reason) : 'manual',
             'settings' => $this->sanitizedSettings(),
-            'roles' => $this->settings->getRoles([]),
-            'applied_roles' => $this->settings->getAppliedRoles([]),
+            'roles' => $this->roleRepo->getRoles([]),
+            'applied_roles' => $this->roleRepo->getAppliedRoles([]),
             'library' => $this->imports->allFamilies(),
             'files' => $this->managedFileManifest(),
         ];
@@ -695,8 +697,8 @@ final class SnapshotService
             'created_at' => FontUtils::scalarStringValue($manifest['created_at'] ?? ''),
             'reason' => sanitize_key(FontUtils::scalarStringValue($manifest['reason'] ?? 'manual')),
             'settings' => FontUtils::normalizeStringKeyedMap($manifest['settings'] ?? []),
-            'roles' => $this->settings->previewImportedRoles(FontUtils::normalizeStringKeyedMap($manifest['roles'] ?? [])),
-            'applied_roles' => $this->settings->previewImportedRoles(FontUtils::normalizeStringKeyedMap($manifest['applied_roles'] ?? [])),
+            'roles' => $this->roleRepo->previewImportedRoles(FontUtils::normalizeStringKeyedMap($manifest['roles'] ?? [])),
+            'applied_roles' => $this->roleRepo->previewImportedRoles(FontUtils::normalizeStringKeyedMap($manifest['applied_roles'] ?? [])),
             'library' => $this->imports->replaceLibraryPreview(FontUtils::normalizeStringKeyedMap($manifest['library'] ?? [])),
             'files' => $files,
         ];
@@ -762,7 +764,7 @@ final class SnapshotService
      */
     private function normalizeAppliedRoles(mixed $value): array
     {
-        $roles = $this->settings->previewImportedRoles(is_array($value) ? FontUtils::normalizeStringKeyedMap($value) : []);
+        $roles = $this->roleRepo->previewImportedRoles(is_array($value) ? FontUtils::normalizeStringKeyedMap($value) : []);
         $applied = [];
 
         foreach (['heading', 'body', 'monospace'] as $roleKey) {

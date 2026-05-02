@@ -32,7 +32,9 @@ use TastyFonts\Maintenance\DeveloperToolsService;
 use TastyFonts\Maintenance\SnapshotService;
 use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Maintenance\SupportBundleService;
+use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\SiteEnvironment;
@@ -146,7 +148,9 @@ final class AdminController
         ?SupportActions $supportActions = null,
         ?GoogleApiKeyActions $googleApiKeyActions = null,
         ?GoogleApiKeyValidator $googleApiKeyValidator = null,
-        ?RoleFamilyCatalogBuilder $roleFamilyCatalogBuilder = null
+        ?RoleFamilyCatalogBuilder $roleFamilyCatalogBuilder = null,
+        private readonly ?GoogleApiKeyRepository $apiKeyRepo = null,
+        private readonly ?RoleRepository $roleRepo = null,
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
         $this->roleFamilyCatalogBuilder = $roleFamilyCatalogBuilder ?? new RoleFamilyCatalogBuilder();
@@ -174,6 +178,7 @@ final class AdminController
         $this->googleApiKeyValidator = $googleApiKeyValidator ?? new GoogleApiKeyValidator($this->googleClient);
         $this->googleApiKeyActions = $googleApiKeyActions ?? new GoogleApiKeyActions(
             $this->settings,
+            $this->apiKeyRepo ?? new GoogleApiKeyRepository(),
             $this->googleClient,
             $this->log,
             $this->googleApiKeyValidator
@@ -181,6 +186,7 @@ final class AdminController
         $this->pageContextBuilder = new AdminPageContextBuilder(
             $this->storage,
             $this->settings,
+            $this->roleRepo ?? new RoleRepository(),
             $this->log,
             $this->catalog,
             $this->assets,
@@ -764,7 +770,8 @@ final class AdminController
             $this->settings,
             $this->catalog,
             $this->assets,
-            $this->log
+            $this->log,
+            new \TastyFonts\Repository\FamilyMetadataRepository()
         );
 
         return $finalImport->importSelfHosted($validated);

@@ -8,6 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 use WP_Error;
@@ -38,12 +39,13 @@ final class LibraryService
         private readonly ImportRepository $imports,
         private readonly AssetService $assets,
         private readonly LogRepository $log,
-        private readonly SettingsRepository $settings
+        private readonly SettingsRepository $settings,
+        private readonly RoleRepository $roleRepo,
     ) {
         $errorFactory = new LibraryMutationErrorFactory($this->log);
         $catalogResolver = new LibraryCatalogResolver($this->catalog, $errorFactory);
         $pathCollector = new LibraryPathCollector($catalogResolver);
-        $roleProtection = new LibraryRoleProtectionPolicy($this->catalog, $this->settings);
+        $roleProtection = new LibraryRoleProtectionPolicy($this->catalog, $this->settings, $this->roleRepo);
 
         $this->familyDeletion = new LibraryFamilyDeletionAction(
             $this->storage,
