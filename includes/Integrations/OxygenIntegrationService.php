@@ -9,7 +9,7 @@ defined('ABSPATH') || exit;
 use TastyFonts\Support\FontUtils;
 
 /**
- * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogCache
  * @phpstan-type IntegrationState array{
  *     available: bool,
  *     enabled: bool,

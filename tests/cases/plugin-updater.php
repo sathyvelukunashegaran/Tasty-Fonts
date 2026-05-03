@@ -6,7 +6,7 @@ use TastyFonts\Admin\AdminPageContextBuilder;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CssBuilder;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -112,7 +112,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
     global $clearedScheduledHooks;
 
     foreach ([
-        CatalogService::TRANSIENT_CATALOG,
+        CatalogCache::TRANSIENT_CATALOG,
         'tasty_fonts_css_v2',
         'tasty_fonts_css_hash_v2',
         'tasty_fonts_regenerate_css_queued',
@@ -128,7 +128,7 @@ $tests['plugin_deactivation_flushes_known_transients_and_clears_css_regeneration
     Plugin::deactivate();
 
     foreach ([
-        CatalogService::TRANSIENT_CATALOG,
+        CatalogCache::TRANSIENT_CATALOG,
         'tasty_fonts_css_v2',
         'tasty_fonts_css_hash_v2',
         'tasty_fonts_regenerate_css_queued',

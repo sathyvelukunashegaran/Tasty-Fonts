@@ -21,7 +21,7 @@ use TastyFonts\Support\FontUtils;
 use WP_Theme_JSON_Data;
 
 /**
- * @phpstan-import-type CatalogFamily from CatalogService
+ * @phpstan-import-type CatalogFamily from CatalogCache
  * @phpstan-import-type RuntimeFamilyList from RuntimeAssetPlanner
  * @phpstan-import-type StylesheetDescriptor from RuntimeAssetPlanner
  * @phpstan-import-type NormalizedSettings from SettingsRepository
@@ -52,7 +52,7 @@ final class RuntimeService
         private readonly OxygenIntegrationService $oxygenIntegration,
         /** @var list<EditorIntegrationInterface> */
         private readonly array $editorIntegrations,
-        private readonly ?CatalogService $catalog = null,
+        private readonly ?CatalogCache $catalog = null,
         private readonly ?RoleFamilyCatalogBuilder $roleFamilyCatalogBuilder = null,
         private readonly ?AdminAccessService $adminAccess = null
     ) {

@@ -10,8 +10,8 @@ use TastyFonts\Fonts\FallbackResolver;
 use TastyFonts\Support\FontUtils;
 
 /**
- * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogCache
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository

@@ -9,10 +9,15 @@ use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Fonts\AdobeStylesheetResolver;
+use TastyFonts\Fonts\AdobeCatalogAdapter;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BunnyStylesheetResolver;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogBuilder;
+use TastyFonts\Fonts\CatalogCache;
+use TastyFonts\Fonts\CatalogEnricher;
+use TastyFonts\Fonts\CatalogHydrator;
 use TastyFonts\Fonts\CssBuilder;
+use TastyFonts\Fonts\LocalCatalogScanner;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\GoogleStylesheetResolver;
 use TastyFonts\Fonts\ProviderStylesheetResolverInterface;
@@ -548,7 +553,7 @@ $tests['developer_tools_clear_plugin_caches_and_regenerate_assets'] = static fun
     $services['developer_tools']->ensureStorageScaffolding();
     $services['settings']->saveAdobeProject('abc123', true);
     $transientStore = [
-        TransientKey::forSite(CatalogService::TRANSIENT_CATALOG) => ['cached'],
+        TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG) => ['cached'],
         TransientKey::forSite(AssetService::TRANSIENT_CSS) => 'body{}',
         TransientKey::forSite(AssetService::TRANSIENT_HASH) => 'hash',
         TransientKey::forSite(AssetService::TRANSIENT_REGENERATE_CSS_QUEUED) => true,
@@ -566,7 +571,7 @@ $tests['developer_tools_clear_plugin_caches_and_regenerate_assets'] = static fun
     $result = $services['developer_tools']->clearPluginCachesAndRegenerateAssets();
 
     assertTrueValue($result, 'Clearing plugin caches should report success.');
-    assertSameValue(true, in_array(TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true), 'Clearing plugin caches should invalidate the catalog transient.');
+    assertSameValue(true, in_array(TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG), $transientDeleted, true), 'Clearing plugin caches should invalidate the catalog transient.');
     assertSameValue(true, in_array(TransientKey::forSite(AssetService::TRANSIENT_CSS), $transientDeleted, true), 'Clearing plugin caches should invalidate the CSS transient.');
     assertSameValue(true, in_array(TransientKey::forSite(AssetService::TRANSIENT_HASH), $transientDeleted, true), 'Clearing plugin caches should invalidate the CSS hash transient.');
     assertSameValue(true, in_array(TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG), $transientDeleted, true), 'Clearing plugin caches should invalidate the Google catalog transient.');
@@ -2390,7 +2395,7 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
         'family_fallbacks' => [],
     ];
     $optionStore[SettingsRepository::OPTION_ROLES] = [];
-    $transientStore[TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['stale' => true];
+    $transientStore[TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG)] = ['stale' => true];
     $transientStore[TransientKey::forSite('tasty_fonts_css_v2')] = 'stale-css';
     $transientStore[TransientKey::forSite('tasty_fonts_css_hash_v2')] = 'stale-hash';
 
@@ -2401,7 +2406,12 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
     $google = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
     $bunny = new BunnyFontsClient();
-    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
+    $adobeAdapter = new AdobeCatalogAdapter($adobe);
+    $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
+    $hydrator = new CatalogHydrator($storage);
+    $enricher = new CatalogEnricher();
+    $catalog = new CatalogCache($builder, $hydrator, $enricher, $storage, $log);
     $planner = new RuntimeAssetPlanner(
         $catalog,
         $settings,
@@ -2416,7 +2426,7 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     $generatedPath = $storage->getGeneratedCssPath();
 
     assertSameValue(false, is_string($generatedPath) && file_exists($generatedPath), 'Refreshing generated assets should defer writing the generated CSS file.');
-    assertSameValue(true, in_array(TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true), 'Refreshing generated assets should invalidate the catalog cache first.');
+    assertSameValue(true, in_array(TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG), $transientDeleted, true), 'Refreshing generated assets should invalidate the catalog cache first.');
     assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS payload.');
     assertSameValue(true, in_array(TransientKey::forSite('tasty_fonts_css_hash_v2'), $transientDeleted, true), 'Refreshing generated assets should invalidate the cached CSS hash.');
     assertSameValue(false, array_key_exists(TransientKey::forSite('tasty_fonts_css_v2'), $transientStore), 'Refreshing generated assets should leave CSS transient regeneration to the next request.');

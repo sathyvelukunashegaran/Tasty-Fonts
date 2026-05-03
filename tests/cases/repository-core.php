@@ -2,9 +2,193 @@
 
 declare(strict_types=1);
 
+use TastyFonts\Repository\ActivityLogRepositoryInterface;
 use TastyFonts\Repository\ImportRepository;
+use TastyFonts\Repository\ImportRepositoryInterface;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Support\Storage;
+use TastyFonts\Support\StorageInterface;
+
+// ---------------------------------------------------------------------------
+// Repository interface seams + non-final guards
+// ---------------------------------------------------------------------------
+
+$tests['repository_interfaces_core_contracts_cover_import_log_and_storage'] = static function (): void {
+    resetTestState();
+
+    $importRepository = new ImportRepository();
+    $logRepository = new LogRepository();
+    $storage = new Storage();
+
+    assertTrueValue($importRepository instanceof ImportRepositoryInterface, 'ImportRepository should implement ImportRepositoryInterface.');
+    assertTrueValue($logRepository instanceof ActivityLogRepositoryInterface, 'LogRepository should implement ActivityLogRepositoryInterface.');
+    assertTrueValue($storage instanceof StorageInterface, 'Storage should implement StorageInterface.');
+
+    $logDouble = new class() implements ActivityLogRepositoryInterface {
+        /** @var list<array<string, string>> */
+        private array $entries = [];
+
+        public function add(string $message, array $context = []): void
+        {
+            array_unshift($this->entries, ['message' => $message]);
+        }
+
+        public function all(): array
+        {
+            return $this->entries;
+        }
+
+        public function clear(): void
+        {
+            $this->entries = [];
+        }
+    };
+
+    $logDouble->add('one');
+    $logDouble->add('two');
+    assertSameValue('two', (string) ($logDouble->all()[0]['message'] ?? ''), 'In-memory ActivityLogRepositoryInterface double should support newest-first test behavior.');
+    $logDouble->clear();
+    assertSameValue([], $logDouble->all(), 'In-memory ActivityLogRepositoryInterface double should support clear().');
+
+    $importDouble = new class() implements ImportRepositoryInterface {
+        /** @var array<string, array<string, mixed>> */
+        private array $library = [];
+
+        public function all(): array { return $this->library; }
+        public function allFamilies(): array { return $this->library; }
+        public function get(string $slug): ?array { return $this->library[$slug] ?? null; }
+        public function getFamily(string $slug): ?array { return $this->get($slug); }
+        public function upsert(array $family): void { $this->saveFamily($family); }
+        public function saveFamily(array $family): void { $slug = (string) ($family['slug'] ?? ''); if ($slug !== '') { $this->library[$slug] = $family; } }
+        public function delete(string $slug): void { unset($this->library[$slug]); }
+        public function deleteFamily(string $slug): void { $this->delete($slug); }
+        public function ensureFamily(string $familyName, ?string $familySlug = null, string $defaultPublishState = 'published', ?string $activeDeliveryId = null, ?string $defaultManualPublishState = null): array
+        {
+            $slug = $familySlug ?: strtolower(str_replace(' ', '-', trim($familyName)));
+            if ($familyName === '' || $slug === '') {
+                return [];
+            }
+
+            $this->library[$slug] ??= [
+                'family' => $familyName,
+                'slug' => $slug,
+                'publish_state' => $defaultPublishState,
+                'manual_publish_state' => $defaultManualPublishState ?? $defaultPublishState,
+                'active_delivery_id' => $activeDeliveryId ?? '',
+                'delivery_profiles' => [],
+            ];
+
+            return $this->library[$slug];
+        }
+        public function saveProfile(string $familyName, string $familySlug, array $profile, string $defaultPublishState = 'library_only', bool $activate = false): array
+        {
+            $family = $this->ensureFamily($familyName, $familySlug, $defaultPublishState);
+            $profileId = (string) ($profile['id'] ?? '');
+            if ($profileId === '') {
+                return [];
+            }
+
+            $family['delivery_profiles'][$profileId] = $profile;
+            if ($activate) {
+                $family['active_delivery_id'] = $profileId;
+            }
+
+            $this->library[$familySlug] = $family;
+            return $family;
+        }
+        public function deleteProfile(string $familySlug, string $deliveryId): ?array
+        {
+            if (!isset($this->library[$familySlug])) {
+                return null;
+            }
+
+            unset($this->library[$familySlug]['delivery_profiles'][$deliveryId]);
+            return $this->library[$familySlug];
+        }
+        public function setActiveDelivery(string $familySlug, string $deliveryId, ?string $publishState = null): ?array
+        {
+            if (!isset($this->library[$familySlug])) {
+                return null;
+            }
+
+            $this->library[$familySlug]['active_delivery_id'] = $deliveryId;
+            if ($publishState !== null) {
+                $this->library[$familySlug]['publish_state'] = $publishState;
+            }
+
+            return $this->library[$familySlug];
+        }
+        public function setPublishState(string $familySlug, string $publishState): ?array
+        {
+            if (!isset($this->library[$familySlug])) {
+                return null;
+            }
+
+            $this->library[$familySlug]['publish_state'] = $publishState;
+            return $this->library[$familySlug];
+        }
+        public function clearLibrary(): void { $this->library = []; }
+        public function replaceLibrary(array $library): array { $this->library = $library; return $this->library; }
+        public function replaceLibraryPreview(array $library): array { return $library; }
+    };
+
+    $storageDouble = new class() implements StorageInterface {
+        /** @var array<string, string> */
+        private array $files = [];
+        /** @var array<string, true> */
+        private array $directories = ['/virtual' => true];
+
+        public function ensureRootDirectory(): bool { return true; }
+        public function getLastFilesystemErrorMessage(): string { return ''; }
+        public function get(): ?array { return ['dir' => '/virtual', 'url' => '/fonts']; }
+        public function getRoot(): ?string { return '/virtual'; }
+        public function getRootUrl(): ?string { return '/fonts'; }
+        public function getGoogleRoot(): ?string { return '/virtual/google'; }
+        public function getBunnyRoot(): ?string { return '/virtual/bunny'; }
+        public function getUploadRoot(): ?string { return '/virtual/upload'; }
+        public function getAdobeRoot(): ?string { return '/virtual/adobe'; }
+        public function getCustomRoot(): ?string { return '/virtual/custom'; }
+        public function getProviderRoot(string $provider): ?string { return '/virtual/' . trim($provider, '/'); }
+        public function getGeneratedCssPath(): ?string { return '/virtual/.generated/tasty-fonts.css'; }
+        public function getGeneratedCssUrl(): ?string { return '/fonts/.generated/tasty-fonts.css'; }
+        public function getRootUrlFull(): ?string { return 'https://example.test/fonts'; }
+        public function relativePath(string $absolutePath): string { return ltrim(str_replace('/virtual', '', $absolutePath), '/'); }
+        public function pathForRelativePath(string $relativePath): ?string { return '/virtual/' . ltrim($relativePath, '/'); }
+        public function urlForRelativePath(string $relativePath): ?string { return '/fonts/' . ltrim($relativePath, '/'); }
+        public function listFileMetadata(?callable $include = null, bool $requireChecksum = false): array
+        {
+            $metadata = [];
+            foreach ($this->files as $relativePath => $contents) {
+                $metadata[] = ['relative_path' => $relativePath, 'size' => strlen($contents), 'sha256' => hash('sha256', $contents)];
+            }
+
+            return $metadata;
+        }
+        public function ensureDirectory(string $path): bool { $this->directories[$path] = true; return true; }
+        public function writeAbsoluteFile(string $path, string $contents): bool { $this->files[$this->relativePath($path)] = $contents; return true; }
+        public function copyAbsoluteFile(string $sourcePath, string $targetPath): bool { $this->files[$this->relativePath($targetPath)] = $this->files[$this->relativePath($sourcePath)] ?? ''; return true; }
+        public function deleteRelativeFiles(array $relativePaths): bool { foreach ($relativePaths as $path) { unset($this->files[$path]); } return true; }
+        public function deleteRelativeDirectory(string $relativePath): bool { unset($this->directories['/virtual/' . trim($relativePath, '/')]); return true; }
+        public function deleteAbsolutePath(string $path): bool { unset($this->files[$this->relativePath($path)], $this->directories[$path]); return true; }
+        public function isWithinRoot(string $path): bool { return str_starts_with($path, '/virtual'); }
+    };
+
+    $importDouble->saveFamily(['family' => 'Inter', 'slug' => 'inter', 'delivery_profiles' => []]);
+    assertSameValue('Inter', (string) ($importDouble->getFamily('inter')['family'] ?? ''), 'In-memory ImportRepositoryInterface double should preserve family records.');
+    $storageDouble->writeAbsoluteFile('/virtual/google/inter.woff2', 'font-data');
+    assertSameValue('google/inter.woff2', $storageDouble->listFileMetadata()[0]['relative_path'] ?? '', 'In-memory StorageInterface double should track virtual file writes.');
+};
+
+$tests['repository_classes_that_must_stay_extensible_are_not_final'] = static function (): void {
+    $importRepositoryReflection = new ReflectionClass(ImportRepository::class);
+    $logRepositoryReflection = new ReflectionClass(LogRepository::class);
+    $storageReflection = new ReflectionClass(Storage::class);
+
+    assertFalseValue($importRepositoryReflection->isFinal(), 'ImportRepository must remain non-final for seam-based testing.');
+    assertFalseValue($logRepositoryReflection->isFinal(), 'LogRepository must remain non-final for seam-based testing.');
+    assertFalseValue($storageReflection->isFinal(), 'Storage must remain non-final for seam-based testing.');
+};
 
 // ---------------------------------------------------------------------------
 // SettingsRepository – admin access persistence

@@ -18,9 +18,9 @@ use TastyFonts\Support\Storage;
 
 /**
  * @phpstan-import-type PageContext from AdminPageContextBuilder
- * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type CatalogFace from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type DeliveryProfile from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type CatalogFace from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type DeliveryProfile from \TastyFonts\Fonts\CatalogCache
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type FamilyFontDisplayMap from \TastyFonts\Repository\SettingsRepository

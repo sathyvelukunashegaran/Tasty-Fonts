@@ -11,8 +11,8 @@ use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\RoleUsageMessageFormatter;
 
 /**
- * @phpstan-import-type CatalogFace from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type DeliveryProfile from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFace from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type DeliveryProfile from \TastyFonts\Fonts\CatalogCache
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
  * @phpstan-type CategoryAliasOwners array<string, string>
  * @phpstan-type RendererFlagOptions array<string, mixed>

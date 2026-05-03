@@ -10,7 +10,7 @@ use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Cli\Command as CliCommand;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\GoogleApiKeyRepository;
@@ -4844,7 +4844,7 @@ $tests['admin_controller_clears_plugin_caches_and_logs_the_reset'] = static func
 
     $services = makeServiceGraph();
     $transientStore = [
-        TransientKey::forSite(CatalogService::TRANSIENT_CATALOG) => ['cached'],
+        TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG) => ['cached'],
         TransientKey::forSite('tasty_fonts_css_v2') => 'cached',
         TransientKey::forSite('tasty_fonts_css_hash_v2') => 'hash',
         TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG) => ['google'],

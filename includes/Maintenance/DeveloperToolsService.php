@@ -11,7 +11,7 @@ use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\ImportRepository;
@@ -49,7 +49,7 @@ HTACCESS;
         private readonly Storage $storage,
         private readonly SettingsRepository $settings,
         private readonly ImportRepository $imports,
-        CatalogService $catalog,
+        CatalogCache $catalog,
         private readonly AssetService $assets,
         private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
         private readonly GoogleFontsClient $googleClient,
@@ -299,7 +299,7 @@ HTACCESS;
 
         foreach (
             [
-                CatalogService::TRANSIENT_CATALOG,
+                CatalogCache::TRANSIENT_CATALOG,
                 AssetService::TRANSIENT_CSS,
                 AssetService::TRANSIENT_HASH,
                 AssetService::TRANSIENT_REGENERATE_CSS_QUEUED,

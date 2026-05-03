@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\AdobeCatalogAdapter;
+use TastyFonts\Fonts\CatalogBuilder;
+use TastyFonts\Fonts\CatalogCache;
+use TastyFonts\Fonts\CatalogEnricher;
+use TastyFonts\Fonts\CatalogHydrator;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
+use TastyFonts\Fonts\LocalCatalogScanner;
 use TastyFonts\Fonts\HostedCssParser;
 use TastyFonts\Repository\AdobeProjectRepository;
 use TastyFonts\Repository\ImportRepository;
@@ -1685,7 +1690,12 @@ $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static f
     $imports = new ImportRepository();
     $log = new LogRepository();
     $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
-    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
+    $adobeAdapter = new AdobeCatalogAdapter($adobe);
+    $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
+    $hydrator = new CatalogHydrator($storage);
+    $enricher = new CatalogEnricher();
+    $catalog = new CatalogCache($builder, $hydrator, $enricher, $storage, $log);
     $families = $catalog->getCatalog();
     $family = $families['Inter'] ?? [];
 
@@ -1705,7 +1715,12 @@ $tests['catalog_service_local_scan_excludes_imported_roots_and_keeps_relative_pa
     $imports = new ImportRepository();
     $log = new LogRepository();
     $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
-    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
+    $adobeAdapter = new AdobeCatalogAdapter($adobe);
+    $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
+    $hydrator = new CatalogHydrator($storage);
+    $enricher = new CatalogEnricher();
+    $catalog = new CatalogCache($builder, $hydrator, $enricher, $storage, $log);
     $families = $catalog->getCatalog();
     $face = $families['Loose']['faces'][0] ?? [];
 
@@ -1726,7 +1741,12 @@ $tests['catalog_service_only_includes_local_variable_fonts_when_the_feature_flag
     $log = new LogRepository();
     $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
 
-    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
+    $adobeAdapter = new AdobeCatalogAdapter($adobe);
+    $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
+    $hydrator = new CatalogHydrator($storage);
+    $enricher = new CatalogEnricher();
+    $catalog = new CatalogCache($builder, $hydrator, $enricher, $storage, $log);
     assertSameValue([], array_values(array_keys($catalog->getCatalog())), 'Variable font files should stay out of the local catalog while the feature flag is disabled.');
 
     $settings->saveSettings(['variable_fonts_enabled' => '1']);
@@ -1921,7 +1941,7 @@ $tests['storage_can_copy_absolute_files_without_buffering_contents'] = static fu
 };
 
 // ---------------------------------------------------------------------------
-// CatalogService::maybeInvalidateFromAttachment – edge cases
+// CatalogCache::maybeInvalidateFromAttachment – edge cases
 // ---------------------------------------------------------------------------
 $tests['catalog_service_maybe_invalidate_from_attachment_is_safe_when_catalog_transient_is_absent'] = static function (): void {
     resetTestState();
@@ -1939,7 +1959,7 @@ $tests['catalog_service_maybe_invalidate_from_attachment_is_safe_when_catalog_tr
     $services['catalog']->maybeInvalidateFromAttachment(50);
 
     // Should attempt to delete the transient without throwing.
-    assertSameValue(true, in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true), 'maybeInvalidateFromAttachment() should still call delete_transient even when no cached catalog transient is present.');
+    assertSameValue(true, in_array(TastyFonts\Support\TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG), $transientDeleted, true), 'maybeInvalidateFromAttachment() should still call delete_transient even when no cached catalog transient is present.');
 };
 
 $tests['catalog_service_maybe_invalidate_from_attachment_ignores_paths_outside_font_storage'] = static function (): void {
@@ -1953,12 +1973,12 @@ $tests['catalog_service_maybe_invalidate_from_attachment_ignores_paths_outside_f
 
     $outsideRoot = uniqueTestDirectory('outside-root') . '/image.jpg';
     $attachedFilePaths[60] = $outsideRoot;
-    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG)] = ['cached' => true];
 
     $services['catalog']->maybeInvalidateFromAttachment(60);
 
     assertFalseValue(
-        in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG), $transientDeleted, true),
         'maybeInvalidateFromAttachment() should leave the catalog cache intact when the attachment path is outside the font storage root.'
     );
 };
@@ -1977,13 +1997,13 @@ $tests['catalog_service_maybe_invalidate_from_attachment_normalises_windows_styl
     // Simulate an attachment path that uses backslashes (Windows ABSPATH separators).
     $windowsStylePath = str_replace('/', '\\', $root . '/google/inter/inter-400-normal.woff2');
     $attachedFilePaths[70] = $windowsStylePath;
-    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG)] = ['cached' => true];
+    $transientStore[TastyFonts\Support\TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG)] = ['cached' => true];
 
     $services['catalog']->maybeInvalidateFromAttachment(70);
 
     assertSameValue(
         true,
-        in_array(TastyFonts\Support\TransientKey::forSite(CatalogService::TRANSIENT_CATALOG), $transientDeleted, true),
+        in_array(TastyFonts\Support\TransientKey::forSite(CatalogCache::TRANSIENT_CATALOG), $transientDeleted, true),
         'maybeInvalidateFromAttachment() should treat backslash-separated paths as equivalent to their forward-slash counterparts.'
     );
 };

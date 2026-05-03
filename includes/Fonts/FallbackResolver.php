@@ -9,8 +9,8 @@ defined('ABSPATH') || exit;
 use TastyFonts\Support\FontUtils;
 
 /**
- * @phpstan-import-type CatalogFamily from CatalogService
- * @phpstan-import-type CatalogMap from CatalogService
+ * @phpstan-import-type CatalogFamily from CatalogCache
+ * @phpstan-import-type CatalogMap from CatalogCache
  * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository

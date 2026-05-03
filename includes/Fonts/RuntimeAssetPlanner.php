@@ -13,9 +13,9 @@ use TastyFonts\Support\FontUtils;
 
 /**
  * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
- * @phpstan-import-type CatalogFamily from CatalogService
- * @phpstan-import-type CatalogMap from CatalogService
- * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-import-type CatalogFamily from CatalogCache
+ * @phpstan-import-type CatalogMap from CatalogCache
+ * @phpstan-import-type CatalogFace from CatalogCache
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
@@ -26,7 +26,7 @@ use TastyFonts\Support\FontUtils;
 final class RuntimeAssetPlanner
 {
     public function __construct(
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly SettingsRepository $settings,
         /** @var list<ProviderStylesheetResolverInterface> */
         private readonly array $stylesheetResolvers,

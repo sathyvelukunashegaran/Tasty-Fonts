@@ -10,7 +10,7 @@ use TastyFonts\Admin\FontTypeHelper;
 use TastyFonts\Admin\Renderer\ToolsSectionRenderer;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Fonts\AssetService;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FallbackResolver;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
@@ -29,9 +29,9 @@ use TastyFonts\Support\TransientKey;
 use TastyFonts\Updates\GitHubUpdater;
 
 /**
- * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogCache
  * @phpstan-import-type AdminAccessRoleSlugList from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type AdminAccessUserIdList from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
@@ -65,7 +65,7 @@ final class AdminPageContextBuilder
         private readonly SettingsRepository $settings,
         private readonly RoleRepository $roleRepo,
         private readonly LogRepository $log,
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly AssetService $assets,
         private readonly CssBuilder $cssBuilder,
         private readonly AdobeProjectClient $adobe,

@@ -17,7 +17,7 @@ final class LibraryLiveRolePublishStateSynchronizer
     private const MANUAL_PUBLISH_STATES = ['library_only', 'published'];
 
     public function __construct(
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly ImportRepository $imports,
         private readonly LibraryCatalogResolver $resolver,
         private readonly LibraryRoleProtectionPolicy $roles

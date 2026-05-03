@@ -21,13 +21,13 @@ defined('ABSPATH') || exit;
  */
 final class FontUtils
 {
-    public const UNICODE_RANGE_MODE_PRESERVE = 'preserve';
-    public const UNICODE_RANGE_MODE_LATIN_BASIC = 'latin_basic';
-    public const UNICODE_RANGE_MODE_LATIN_EXTENDED = 'latin_extended';
-    public const UNICODE_RANGE_MODE_OFF = 'off';
-    public const UNICODE_RANGE_MODE_CUSTOM = 'custom';
-    public const UNICODE_RANGE_PRESET_LATIN_BASIC = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
-    public const UNICODE_RANGE_PRESET_LATIN_EXTENDED = 'U+0000-00FF,U+0100-024F,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+1E00-1EFF,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
+    public const UNICODE_RANGE_MODE_PRESERVE = UnicodeRangeService::MODE_PRESERVE;
+    public const UNICODE_RANGE_MODE_LATIN_BASIC = UnicodeRangeService::MODE_LATIN_BASIC;
+    public const UNICODE_RANGE_MODE_LATIN_EXTENDED = UnicodeRangeService::MODE_LATIN_EXTENDED;
+    public const UNICODE_RANGE_MODE_OFF = UnicodeRangeService::MODE_OFF;
+    public const UNICODE_RANGE_MODE_CUSTOM = UnicodeRangeService::MODE_CUSTOM;
+    public const UNICODE_RANGE_PRESET_LATIN_BASIC = UnicodeRangeService::PRESET_LATIN_BASIC;
+    public const UNICODE_RANGE_PRESET_LATIN_EXTENDED = UnicodeRangeService::PRESET_LATIN_EXTENDED;
     public const DEFAULT_ROLE_SANS_FALLBACK = 'system-ui, sans-serif';
     public const DEFAULT_ROLE_MONOSPACE_FALLBACK = 'ui-monospace, monospace';
     public const FALLBACK_SUGGESTIONS = [
@@ -113,46 +113,27 @@ final class FontUtils
 
     public static function fontVariableName(string $family): string
     {
-        $slug = self::slugify($family);
-
-        return $slug !== '' ? '--font-' . $slug : '';
+        return (new CssVariableNamingService())->fontVariableName($family);
     }
 
     public static function fontVariableReference(string $family): string
     {
-        $property = self::fontVariableName($family);
-
-        return $property !== '' ? 'var(' . $property . ')' : '';
+        return (new CssVariableNamingService())->fontVariableReference($family);
     }
 
     public static function weightVariableName(string|int $weight): string
     {
-        $value = self::concreteWeightValue($weight);
-
-        return $value !== '' ? '--weight-' . $value : '';
+        return (new CssVariableNamingService())->weightVariableName($weight);
     }
 
     public static function weightSemanticVariableName(string|int $weight): string
     {
-        $value = self::concreteWeightValue($weight);
-        $slug = $value !== '' ? self::weightNameSlug($value) : '';
-
-        return $slug !== '' ? '--weight-' . $slug : '';
+        return (new CssVariableNamingService())->weightSemanticVariableName($weight);
     }
 
     public static function weightVariableReference(string|int $weight, bool $preferSemantic = true): string
     {
-        $property = $preferSemantic
-            ? self::weightSemanticVariableName($weight)
-            : self::weightVariableName($weight);
-
-        if ($property === '') {
-            $property = $preferSemantic
-                ? self::weightVariableName($weight)
-                : self::weightSemanticVariableName($weight);
-        }
-
-        return $property !== '' ? 'var(' . $property . ')' : '';
+        return (new CssVariableNamingService())->weightVariableReference($weight, $preferSemantic);
     }
 
     /**
@@ -160,30 +141,7 @@ final class FontUtils
      */
     public static function variantVariableNames(string $family, string|int $weight, string $style): array
     {
-        $familyVariable = self::fontVariableName($family);
-
-        if ($familyVariable === '') {
-            return [
-                'family' => '',
-                'numeric' => '',
-                'named' => '',
-            ];
-        }
-
-        $numeric = $familyVariable
-            . '-'
-            . self::weightVariableSegment($weight)
-            . self::styleVariableSuffix($style);
-        $namedWeight = self::weightNameSlug($weight);
-        $named = $namedWeight !== ''
-            ? $familyVariable . '-' . $namedWeight . self::styleVariableSuffix($style)
-            : $numeric;
-
-        return [
-            'family' => $familyVariable,
-            'numeric' => $numeric,
-            'named' => $named,
-        ];
+        return (new CssVariableNamingService())->variantVariableNames($family, $weight, $style);
     }
 
     public static function normalizeStyle(string $style): string
@@ -220,53 +178,17 @@ final class FontUtils
 
     public static function normalizeUnicodeRangeMode(string $mode): string
     {
-        $mode = strtolower(trim($mode));
-
-        return in_array(
-            $mode,
-            [
-                self::UNICODE_RANGE_MODE_PRESERVE,
-                self::UNICODE_RANGE_MODE_LATIN_BASIC,
-                self::UNICODE_RANGE_MODE_LATIN_EXTENDED,
-                self::UNICODE_RANGE_MODE_OFF,
-                self::UNICODE_RANGE_MODE_CUSTOM,
-            ],
-            true
-        ) ? $mode : self::UNICODE_RANGE_MODE_OFF;
+        return (new UnicodeRangeService())->normalizeMode($mode);
     }
 
     public static function normalizeUnicodeRangeValue(string $value): string
     {
-        $value = strtoupper(trim($value));
-
-        if ($value === '') {
-            return '';
-        }
-
-        $parts = array_filter(array_map('trim', explode(',', $value)), static fn (string $part): bool => $part !== '');
-
-        return implode(',', $parts);
+        return (new UnicodeRangeService())->normalizeValue($value);
     }
 
     public static function unicodeRangeValueIsValid(string $value): bool
     {
-        $normalized = self::normalizeUnicodeRangeValue($value);
-
-        if ($normalized === '') {
-            return false;
-        }
-
-        foreach (explode(',', $normalized) as $part) {
-            if (preg_match('/^U\+[0-9A-F?]{1,6}(?:-[0-9A-F]{1,6})?$/', $part) !== 1) {
-                return false;
-            }
-
-            if (str_contains($part, '?') && str_contains($part, '-')) {
-                return false;
-            }
-        }
-
-        return true;
+        return (new UnicodeRangeService())->isValid($value);
     }
 
     /**
@@ -275,44 +197,17 @@ final class FontUtils
      */
     public static function resolveFaceUnicodeRange(array $face, array $settings): string
     {
-        $mode = self::normalizeUnicodeRangeMode(self::stringValue($settings, 'unicode_range_mode', self::UNICODE_RANGE_MODE_OFF));
-        $customRange = self::stringValue($settings, 'unicode_range_custom_value');
-
-        return match ($mode) {
-            self::UNICODE_RANGE_MODE_LATIN_BASIC => self::UNICODE_RANGE_PRESET_LATIN_BASIC,
-            self::UNICODE_RANGE_MODE_LATIN_EXTENDED => self::UNICODE_RANGE_PRESET_LATIN_EXTENDED,
-            self::UNICODE_RANGE_MODE_OFF => '',
-            self::UNICODE_RANGE_MODE_CUSTOM => self::unicodeRangeValueIsValid($customRange)
-                ? self::normalizeUnicodeRangeValue($customRange)
-                : '',
-            default => trim(self::stringValue($face, 'unicode_range')),
-        };
+        return (new UnicodeRangeService())->resolveFaceRange($face, $settings);
     }
 
     public static function normalizeAxisTag(string $tag): string
     {
-        $tag = strtoupper(trim($tag));
-
-        if (preg_match('/^[A-Z0-9]{4}$/', $tag) === 1) {
-            return $tag;
-        }
-
-        return '';
+        return (new FontAxisService())->normalizeAxisTag($tag);
     }
 
     public static function normalizeAxisValue(mixed $value): string
     {
-        if (!is_scalar($value) && $value !== null) {
-            return '';
-        }
-
-        $value = trim((string) $value);
-
-        if ($value === '') {
-            return '';
-        }
-
-        return preg_match('/^-?\d+(?:\.\d+)?$/', $value) === 1 ? $value : '';
+        return (new FontAxisService())->normalizeAxisValue($value);
     }
 
     /**
@@ -320,61 +215,7 @@ final class FontUtils
      */
     public static function normalizeAxesMap(mixed $axes): array
     {
-        if (!is_array($axes)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($axes as $tag => $definition) {
-            $normalizedTag = self::normalizeAxisTag((string) $tag);
-
-            if ($normalizedTag === '' || !is_array($definition)) {
-                continue;
-            }
-
-            $min = self::normalizeAxisValue($definition['min'] ?? '');
-            $default = self::normalizeAxisValue($definition['default'] ?? '');
-            $max = self::normalizeAxisValue($definition['max'] ?? '');
-
-            if ($min === '' && $default === '' && $max === '') {
-                continue;
-            }
-
-            if ($default === '') {
-                $default = $min !== '' ? $min : $max;
-            }
-
-            if ($min === '') {
-                $min = $default;
-            }
-
-            if ($max === '') {
-                $max = $default;
-            }
-
-            if ($min === '' || $default === '' || $max === '') {
-                continue;
-            }
-
-            $minValue = (float) $min;
-            $defaultValue = (float) $default;
-            $maxValue = (float) $max;
-
-            if ($minValue > $maxValue || $defaultValue < $minValue || $defaultValue > $maxValue) {
-                continue;
-            }
-
-            $normalized[$normalizedTag] = [
-                'min' => $min,
-                'default' => $default,
-                'max' => $max,
-            ];
-        }
-
-        ksort($normalized, SORT_STRING);
-
-        return $normalized;
+        return (new FontAxisService())->normalizeAxesMap($axes);
     }
 
     /**
@@ -383,32 +224,7 @@ final class FontUtils
      */
     public static function normalizeVariationDefaults(mixed $defaults, array $axes = []): array
     {
-        if (!is_array($defaults)) {
-            $defaults = [];
-        }
-
-        $normalized = [];
-
-        foreach ($defaults as $tag => $value) {
-            $normalizedTag = self::normalizeAxisTag((string) $tag);
-            $normalizedValue = self::normalizeAxisValue($value);
-
-            if ($normalizedTag === '' || $normalizedValue === '') {
-                continue;
-            }
-
-            $normalized[$normalizedTag] = $normalizedValue;
-        }
-
-        foreach (self::normalizeAxesMap($axes) as $tag => $definition) {
-            if (!isset($normalized[$tag]) && isset($definition['default'])) {
-                $normalized[$tag] = (string) $definition['default'];
-            }
-        }
-
-        ksort($normalized, SORT_STRING);
-
-        return $normalized;
+        return (new FontAxisService())->normalizeVariationDefaults($defaults, $axes);
     }
 
     /**
@@ -416,19 +232,7 @@ final class FontUtils
      */
     public static function buildFontVariationSettings(array $settings): string
     {
-        $normalized = self::normalizeVariationDefaults($settings);
-
-        if ($normalized === []) {
-            return 'normal';
-        }
-
-        $parts = [];
-
-        foreach ($normalized as $tag => $value) {
-            $parts[] = '"' . self::cssAxisTag($tag) . '" ' . $value;
-        }
-
-        return implode(', ', $parts);
+        return (new FontAxisService())->buildFontVariationSettings($settings);
     }
 
     /**
@@ -437,27 +241,12 @@ final class FontUtils
      */
     public static function faceLevelVariationDefaults(mixed $defaults, array $axes = []): array
     {
-        $normalized = self::normalizeVariationDefaults($defaults, $axes);
-
-        foreach (array_keys($normalized) as $tag) {
-            if (self::isRegisteredAxisTag($tag)) {
-                unset($normalized[$tag]);
-            }
-        }
-
-        return $normalized;
+        return (new FontAxisService())->faceLevelVariationDefaults($defaults, $axes);
     }
 
     public static function cssAxisTag(string $tag): string
     {
-        return match (self::normalizeAxisTag($tag)) {
-            'WGHT' => 'wght',
-            'WDTH' => 'wdth',
-            'SLNT' => 'slnt',
-            'ITAL' => 'ital',
-            'OPSZ' => 'opsz',
-            default => self::normalizeAxisTag($tag),
-        };
+        return (new FontAxisService())->cssAxisTag($tag);
     }
 
     /**
@@ -465,11 +254,7 @@ final class FontUtils
      */
     public static function faceIsVariable(array $face): bool
     {
-        if (!empty($face['is_variable'])) {
-            return true;
-        }
-
-        return self::normalizeAxesMap($face['axes'] ?? []) !== [];
+        return (new FontAxisService())->faceIsVariable($face);
     }
 
     /**
@@ -732,7 +517,7 @@ final class FontUtils
      */
     public static function normalizeAxesValue(mixed $axes): array
     {
-        return is_array($axes) ? self::normalizeAxesMap($axes) : [];
+        return (new FontAxisService())->normalizeAxesValue($axes);
     }
 
     /**
@@ -741,7 +526,32 @@ final class FontUtils
      */
     public static function normalizeVariationDefaultsValue(mixed $variationDefaults, array $axes): array
     {
-        return is_array($variationDefaults) ? self::normalizeVariationDefaults($variationDefaults, $axes) : [];
+        return (new FontAxisService())->normalizeVariationDefaultsValue($variationDefaults, $axes);
+    }
+
+    /**
+     * @param mixed $faces
+     * @return AxesMap
+     */
+    public static function collectVariationAxesFromFaces(mixed $faces): array
+    {
+        $axes = [];
+
+        foreach (self::normalizeFaceList($faces) as $face) {
+            foreach (self::normalizeAxesMap($face['axes'] ?? []) as $tag => $definition) {
+                if (!isset($axes[$tag])) {
+                    $axes[$tag] = $definition;
+                    continue;
+                }
+
+                $axes[$tag]['min'] = (string) min((float) $axes[$tag]['min'], (float) $definition['min']);
+                $axes[$tag]['max'] = (string) max((float) $axes[$tag]['max'], (float) $definition['max']);
+            }
+        }
+
+        ksort($axes, SORT_STRING);
+
+        return $axes;
     }
 
     /**
@@ -870,21 +680,23 @@ final class FontUtils
 
     public static function variantKey(string|int $weight, string $style, string $unicodeRange = ''): string
     {
-        $range = trim($unicodeRange);
-
-        return implode(
-            '|',
-            [
-                self::normalizeWeight($weight),
-                self::normalizeStyle($style),
-                $range !== '' ? md5($range) : 'none',
-            ]
-        );
+        return (new VariantTokenService())->variantKey($weight, $style, $unicodeRange);
     }
 
     public static function faceAxisKey(string|int $weight, string $style): string
     {
-        return self::normalizeWeight($weight) . '|' . self::normalizeStyle($style);
+        return (new VariantTokenService())->faceAxisKey($weight, $style);
+    }
+
+    private static function concreteWeightValue(string|int $weight): string
+    {
+        return match (self::normalizeWeight($weight)) {
+            'normal' => '400',
+            'bold' => '700',
+            default => preg_match('/^\d{1,4}$/', self::normalizeWeight($weight)) === 1
+                ? self::normalizeWeight($weight)
+                : '',
+        };
     }
 
     public static function weightSortValue(string|int $weight): int
@@ -1069,111 +881,7 @@ final class FontUtils
      */
     public static function googleVariantToAxis(string $variant): ?array
     {
-        $variant = self::canonicalVariantToken($variant);
-
-        if ($variant === '') {
-            return null;
-        }
-
-        if ($variant === 'regular') {
-            return ['style' => 'normal', 'weight' => '400'];
-        }
-
-        if ($variant === 'italic') {
-            return ['style' => 'italic', 'weight' => '400'];
-        }
-
-        if (preg_match('/^([1-9]00)$/', $variant, $matches) === 1) {
-            return ['style' => 'normal', 'weight' => $matches[1]];
-        }
-
-        if (preg_match('/^([1-9]00)italic$/', $variant, $matches) === 1) {
-            return ['style' => 'italic', 'weight' => $matches[1]];
-        }
-
-        if (preg_match('/^([1-9]00)\.\.([1-9]00)$/', $variant, $matches) === 1) {
-            return ['style' => 'normal', 'weight' => $matches[1] . '..' . $matches[2]];
-        }
-
-        if (preg_match('/^([1-9]00)\.\.([1-9]00)italic$/', $variant, $matches) === 1) {
-            return ['style' => 'italic', 'weight' => $matches[1] . '..' . $matches[2]];
-        }
-
-        return null;
-    }
-
-    private static function canonicalVariantToken(string $variant): string
-    {
-        $variant = strtolower(trim($variant));
-
-        if ($variant === '') {
-            return '';
-        }
-
-        $compact = preg_replace('/[\s_-]+/', '', $variant);
-
-        if (!is_string($compact) || $compact === '') {
-            return '';
-        }
-
-        $weightAliases = [
-            'thin' => '100',
-            'hairline' => '100',
-            'extralight' => '200',
-            'ultralight' => '200',
-            'light' => '300',
-            'regular' => 'regular',
-            'normal' => 'regular',
-            'book' => 'regular',
-            'medium' => '500',
-            'semibold' => '600',
-            'demibold' => '600',
-            'bold' => '700',
-            'extrabold' => '800',
-            'ultrabold' => '800',
-            'black' => '900',
-            'heavy' => '900',
-        ];
-
-        if ($compact === 'italic') {
-            return 'italic';
-        }
-
-        if (
-            preg_match('/^([1-9]00)(italic)?$/', $compact) === 1
-            || preg_match('/^([1-9]00)\.\.([1-9]00)(italic)?$/', $compact) === 1
-        ) {
-            return $compact;
-        }
-
-        if (isset($weightAliases[$compact])) {
-            return $weightAliases[$compact];
-        }
-
-        if (str_ends_with($compact, 'italic')) {
-            $weightAlias = substr($compact, 0, -6);
-
-            if ($weightAlias === '') {
-                return 'italic';
-            }
-
-            if (isset($weightAliases[$weightAlias])) {
-                return $weightAliases[$weightAlias] === 'regular'
-                    ? 'italic'
-                    : $weightAliases[$weightAlias] . 'italic';
-            }
-        }
-
-        return '';
-    }
-
-    private static function isRegisteredAxisTag(string $tag): bool
-    {
-        return in_array(
-            self::normalizeAxisTag($tag),
-            ['WGHT', 'WDTH', 'SLNT', 'ITAL', 'OPSZ'],
-            true
-        );
+        return (new VariantTokenService())->googleVariantToAxis($variant);
     }
 
     /**
@@ -1182,61 +890,10 @@ final class FontUtils
      */
     public static function normalizeHostedAxisList(array $axes): array
     {
-        $normalized = [];
-
-        foreach ($axes as $axis) {
-            if (!is_array($axis)) {
-                continue;
-            }
-
-            $tag = self::normalizeAxisTag(self::stringValue($axis, 'tag'));
-            $min = self::normalizeAxisValue($axis['start'] ?? $axis['min'] ?? '');
-            $max = self::normalizeAxisValue($axis['end'] ?? $axis['max'] ?? '');
-            $default = self::normalizeAxisValue($axis['default'] ?? '');
-
-            if ($tag === '') {
-                continue;
-            }
-
-            if ($default === '') {
-                if ($tag === 'WGHT') {
-                    $default = self::inferDefaultAxisValue($min, $max, '400');
-                } elseif ($tag === 'WDTH') {
-                    $default = self::inferDefaultAxisValue($min, $max, '100');
-                } else {
-                    $default = $min !== '' ? $min : $max;
-                }
-            }
-
-            $normalized[$tag] = [
-                'min' => $min !== '' ? $min : $default,
-                'default' => $default,
-                'max' => $max !== '' ? $max : $default,
-            ];
-        }
-
-        return self::normalizeAxesMap($normalized);
+        return (new FontAxisService())->normalizeHostedAxisList($axes);
     }
 
-    private static function inferDefaultAxisValue(string $min, string $max, string $preferred): string
-    {
-        if ($preferred !== '') {
-            $preferredValue = (float) $preferred;
 
-            if (
-                ($min === '' || $preferredValue >= (float) $min)
-                && ($max === '' || $preferredValue <= (float) $max)
-            ) {
-                return $preferred;
-            }
-        }
-
-        if ($min !== '') {
-            return $min;
-        }
-
-        return $max;
-    }
 
     /**
      * @param list<string> $variants
@@ -1244,74 +901,10 @@ final class FontUtils
      */
     public static function normalizeVariantTokens(array $variants): array
     {
-        $normalized = [];
-
-        foreach ($variants as $variant) {
-            $parts = array_map('trim', explode(',', $variant));
-
-            foreach ($parts as $part) {
-                if ($part === '') {
-                    continue;
-                }
-
-                $canonical = self::canonicalVariantToken($part);
-
-                if ($canonical === '' || self::googleVariantToAxis($canonical) === null) {
-                    continue;
-                }
-
-                $normalized[$canonical] = $canonical;
-            }
-        }
-
-        if ($normalized === []) {
-            $normalized = ['regular' => 'regular'];
-        }
-
-        $tokens = array_values($normalized);
-
-        usort(
-            $tokens,
-            static function (string $left, string $right): int {
-                $leftAxis = self::googleVariantToAxis($left) ?? ['style' => 'normal', 'weight' => '400'];
-                $rightAxis = self::googleVariantToAxis($right) ?? ['style' => 'normal', 'weight' => '400'];
-
-                $leftStyle = $leftAxis['style'] === 'italic' ? 1 : 0;
-                $rightStyle = $rightAxis['style'] === 'italic' ? 1 : 0;
-
-                if ($leftStyle !== $rightStyle) {
-                    return $leftStyle <=> $rightStyle;
-                }
-
-                return self::weightSortValue($leftAxis['weight']) <=> self::weightSortValue($rightAxis['weight']);
-            }
-        );
-
-        return $tokens;
+        return (new VariantTokenService())->normalizeVariantTokens($variants);
     }
 
-    private static function weightVariableSegment(string|int $weight): string
-    {
-        return str_replace('..', '-', self::normalizeWeight($weight));
-    }
 
-    private static function concreteWeightValue(string|int $weight): string
-    {
-        return match (self::normalizeWeight($weight)) {
-            'normal' => '400',
-            'bold' => '700',
-            default => preg_match('/^\d{1,4}$/', self::normalizeWeight($weight)) === 1
-                ? self::normalizeWeight($weight)
-                : '',
-        };
-    }
-
-    private static function styleVariableSuffix(string $style): string
-    {
-        $normalizedStyle = self::normalizeStyle($style);
-
-        return $normalizedStyle === 'normal' ? '' : '-' . $normalizedStyle;
-    }
 
     /**
      * @param array<int|string, mixed> $values

@@ -12,13 +12,13 @@ use WP_Error;
 /**
  * Resolves normalized catalog families and delivery profiles for library mutations.
  *
- * @phpstan-import-type CatalogFamily from CatalogService
- * @phpstan-import-type DeliveryProfile from CatalogService
+ * @phpstan-import-type CatalogFamily from CatalogCache
+ * @phpstan-import-type DeliveryProfile from CatalogCache
  */
 final class LibraryCatalogResolver
 {
     public function __construct(
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly LibraryMutationErrorFactory $errors
     ) {
     }

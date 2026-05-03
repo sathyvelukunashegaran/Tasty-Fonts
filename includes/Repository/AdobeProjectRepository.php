@@ -11,7 +11,7 @@ use TastyFonts\Support\FontUtils;
 /**
  * @phpstan-type AdobeProjectStatus array{state: string, message: string, checked_at: int}
  */
-final class AdobeProjectRepository
+final class AdobeProjectRepository implements AdobeProjectRepositoryInterface
 {
     use RepositoryHelpers;
     private const OPTION_SETTINGS = 'tasty_fonts_settings';

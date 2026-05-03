@@ -16,7 +16,7 @@ use TastyFonts\Support\RoleUsageMessageFormatter;
 final class LibraryRoleProtectionPolicy
 {
     public function __construct(
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly SettingsRepository $settings,
         private readonly RoleRepository $roleRepo,
     ) {

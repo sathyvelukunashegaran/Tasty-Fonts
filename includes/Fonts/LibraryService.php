@@ -27,7 +27,7 @@ final class LibraryService
      * @since 1.4.0
      *
      * @param Storage $storage Storage abstraction for library file operations.
-     * @param CatalogService $catalog Catalog service used to inspect normalized family records.
+     * @param CatalogCache $catalog Catalog service used to inspect normalized family records.
      * @param ImportRepository $imports Repository used to persist delivery and publish-state changes.
      * @param AssetService $assets Asset service used to refresh generated CSS after mutations.
      * @param LogRepository $log Log repository used for audit entries.
@@ -35,7 +35,7 @@ final class LibraryService
      */
     public function __construct(
         private readonly Storage $storage,
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly ImportRepository $imports,
         private readonly AssetService $assets,
         private readonly LogRepository $log,

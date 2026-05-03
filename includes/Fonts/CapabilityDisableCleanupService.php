@@ -21,7 +21,7 @@ final class CapabilityDisableCleanupService
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly LogRepository $log
     ) {
     }

@@ -11,8 +11,8 @@ use TastyFonts\Support\FontUtils;
 
 /**
  * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
- * @phpstan-import-type CatalogFace from CatalogService
- * @phpstan-import-type CatalogFamily from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogCache
+ * @phpstan-import-type CatalogFamily from CatalogCache
  */
 final class AdobeCatalogAdapter
 {

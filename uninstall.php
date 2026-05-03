@@ -23,12 +23,17 @@ $googleClient = new \TastyFonts\Google\GoogleFontsClient(
     new \TastyFonts\Repository\GoogleApiKeyRepository()
 );
 $bunnyClient = new \TastyFonts\Bunny\BunnyFontsClient();
-$catalog = new \TastyFonts\Fonts\CatalogService(
+$localScanner = new \TastyFonts\Fonts\LocalCatalogScanner($storage, new \TastyFonts\Fonts\FontFilenameParser());
+$adobeAdapter = new \TastyFonts\Fonts\AdobeCatalogAdapter($adobeClient);
+$builder = new \TastyFonts\Fonts\CatalogBuilder($importRepository, $localScanner, $adobeAdapter, $logRepository);
+$hydrator = new \TastyFonts\Fonts\CatalogHydrator($storage);
+$enricher = new \TastyFonts\Fonts\CatalogEnricher();
+$catalog = new \TastyFonts\Fonts\CatalogCache(
+    $builder,
+    $hydrator,
+    $enricher,
     $storage,
-    $importRepository,
-    new \TastyFonts\Fonts\FontFilenameParser(),
-    $logRepository,
-    $adobeClient
+    $logRepository
 );
 $planner = new \TastyFonts\Fonts\RuntimeAssetPlanner(
     $catalog,

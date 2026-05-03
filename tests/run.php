@@ -23,5 +23,7 @@ require_once __DIR__ . '/cases/expanded-utilities.php';
 require_once __DIR__ . '/cases/repository-core.php';
 require_once __DIR__ . '/cases/repository-bounded-contexts.php';
 require_once __DIR__ . '/cases/missing-coverage.php';
+require_once __DIR__ . '/cases/extracted-font-services.php';
+require_once __DIR__ . '/cases/catalog-pipeline.php';
 
 runTestSuite($tests);

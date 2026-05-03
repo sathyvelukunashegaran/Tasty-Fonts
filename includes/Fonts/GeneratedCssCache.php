@@ -22,7 +22,7 @@ final class GeneratedCssCache
     private ?string $hash = null;
 
     public function __construct(
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly SettingsRepository $settings,
         private readonly CssBuilder $cssBuilder,
         private readonly RuntimeAssetPlanner $planner,

@@ -15,8 +15,8 @@ use WP_Error;
 /**
  * Coordinates active delivery switching and delivery-profile deletion mutations.
  *
- * @phpstan-import-type CatalogFamily from CatalogService
- * @phpstan-import-type DeliveryProfile from CatalogService
+ * @phpstan-import-type CatalogFamily from CatalogCache
+ * @phpstan-import-type DeliveryProfile from CatalogCache
  */
 final class LibraryDeliveryMutationAction
 {

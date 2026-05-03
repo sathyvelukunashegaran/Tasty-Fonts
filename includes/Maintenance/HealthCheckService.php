@@ -10,7 +10,7 @@ use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 
 /**
- * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogCache
  * @phpstan-import-type NormalizedSettings from SettingsRepository
  * @phpstan-type AssetStatus array<string, mixed>
  * @phpstan-type StorageState array<string, mixed>

@@ -15,7 +15,7 @@ use WP_Error;
 /**
  * Deletes a single face variant from a family's active delivery profile.
  *
- * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogCache
  */
 final class LibraryFaceDeletionAction
 {

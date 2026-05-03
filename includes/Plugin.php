@@ -24,8 +24,13 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\AdobeStylesheetResolver;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\BunnyStylesheetResolver;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\AdobeCatalogAdapter;
+use TastyFonts\Fonts\CatalogBuilder;
+use TastyFonts\Fonts\CatalogCache;
+use TastyFonts\Fonts\CatalogEnricher;
+use TastyFonts\Fonts\CatalogHydrator;
 use TastyFonts\Fonts\CapabilityDisableCleanupService;
+use TastyFonts\Fonts\LocalCatalogScanner;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\GoogleStylesheetResolver;
@@ -74,7 +79,7 @@ final class Plugin
     private readonly AdminAccessService $adminAccess;
     private readonly ImportRepository $imports;
     private readonly LogRepository $log;
-    private readonly CatalogService $catalog;
+    private readonly CatalogCache $catalog;
     private readonly CssBuilder $cssBuilder;
     private readonly RuntimeAssetPlanner $planner;
     private readonly AssetService $assets;
@@ -127,12 +132,21 @@ final class Plugin
         $this->adobe = new AdobeProjectClient($this->settings, $adobeProjectRepo, $adobeCssParser);
         $this->bunnyClient = new BunnyFontsClient();
         $this->googleClient = new GoogleFontsClient($this->settings, $googleApiKeyRepo);
-        $this->catalog = new CatalogService(
-            $this->storage,
+        $localScanner = new LocalCatalogScanner($this->storage, $parser);
+        $adobeAdapter = new AdobeCatalogAdapter($this->adobe);
+        $catalogBuilder = new CatalogBuilder(
             $this->imports,
-            $parser,
-            $this->log,
-            $this->adobe
+            $localScanner,
+            $adobeAdapter
+        );
+        $catalogHydrator = new CatalogHydrator($this->storage);
+        $catalogEnricher = new CatalogEnricher(static fn (string $text, string $domain): string => __($text, $domain));
+        $this->catalog = new CatalogCache(
+            $catalogBuilder,
+            $catalogHydrator,
+            $catalogEnricher,
+            $this->storage,
+            $this->log
         );
         $this->cssBuilder = new CssBuilder();
         $googleStylesheetResolver = new GoogleStylesheetResolver($this->googleClient);

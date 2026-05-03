@@ -12,7 +12,7 @@ defined('ABSPATH') || exit;
  * @phpstan-type DirectoryList list<string>
  * @phpstan-type StorageFileMetadata array{relative_path: string, size: int, sha256: string}
  */
-final class Storage
+class Storage implements StorageInterface
 {
     /** @var StorageState|null */
     private ?array $storage = null;

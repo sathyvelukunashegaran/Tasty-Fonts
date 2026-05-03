@@ -7,18 +7,16 @@ namespace TastyFonts\Fonts;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Adobe\AdobeProjectClient;
-use TastyFonts\Support\FontUtils;
-
 final class AdobeStylesheetResolver implements ProviderStylesheetResolverInterface
 {
+    use ProviderStylesheetDescriptorHelpers;
+
+    private const PROVIDER_KEY = 'adobe';
+    private const DELIVERY_TYPE = 'adobe_hosted';
+    private const PRECONNECT_ORIGIN = 'https://use.typekit.net';
+
     public function __construct(private readonly AdobeProjectClient $client)
     {
-    }
-
-    public function supports(string $provider, string $type): bool
-    {
-        return strtolower(trim($provider)) === $this->getProviderKey()
-            && strtolower(trim($type)) === 'adobe_hosted';
     }
 
     public function buildStylesheetDescriptor(array $delivery, string $familyName, string $familySlug, string $displayOverride): ?array
@@ -31,15 +29,6 @@ final class AdobeStylesheetResolver implements ProviderStylesheetResolverInterfa
         return $url === '' ? null : $this->descriptor($familySlug, 'adobe_hosted', $url);
     }
 
-    public function preconnectOrigin(): string
-    {
-        return 'https://use.typekit.net';
-    }
-
-    public function getProviderKey(): string
-    {
-        return 'adobe';
-    }
 
     /**
      * @param array<string, mixed> $delivery
@@ -57,18 +46,4 @@ final class AdobeStylesheetResolver implements ProviderStylesheetResolverInterfa
         return is_scalar($value) ? (string) $value : $default;
     }
 
-    /**
-     * @return array{handle: string, url: string, provider: string, type: string}
-     */
-    private function descriptor(string $familySlug, string $type, string $url): array
-    {
-        $handleType = str_replace('_', '-', $type);
-
-        return [
-            'handle' => 'tasty-fonts-' . FontUtils::slugify($this->getProviderKey() . '-' . $familySlug . '-' . $handleType),
-            'url' => $url,
-            'provider' => $this->getProviderKey(),
-            'type' => $type,
-        ];
-    }
 }

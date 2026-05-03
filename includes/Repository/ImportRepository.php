@@ -46,7 +46,7 @@ use TastyFonts\Support\FontUtils;
  * }
  * @phpstan-type LibraryMap array<string, LibraryRecord>
  */
-final class ImportRepository
+class ImportRepository implements ImportRepositoryInterface
 {
     public const OPTION_LIBRARY = 'tasty_fonts_library';
     private const SUPPORTED_PUBLISH_STATES = ['library_only', 'published', 'role_active'];

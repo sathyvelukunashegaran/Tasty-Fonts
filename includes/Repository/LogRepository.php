@@ -11,7 +11,7 @@ defined('ABSPATH') || exit;
  * @phpstan-type LogEntry array<string, string>
  * @phpstan-type LogEntryList list<LogEntry>
  */
-final class LogRepository
+class LogRepository implements ActivityLogRepositoryInterface
 {
     public const OPTION_LOG = 'tasty_fonts_log';
     public const CATEGORY_TRANSFER = 'transfer';

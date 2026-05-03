@@ -11,7 +11,7 @@ use WP_Error;
 
 /**
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
- * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogCache
  * @phpstan-type SyncVariablesState array{applied: bool}
  * @phpstan-type SyncThemeStylesState array{
  *     applied: bool,

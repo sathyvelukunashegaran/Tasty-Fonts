@@ -17,9 +17,9 @@ use WP_Error;
 
 /**
  * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
- * @phpstan-import-type CatalogFamily from CatalogService
- * @phpstan-import-type CatalogFace from CatalogService
- * @phpstan-import-type DeliveryProfile from CatalogService
+ * @phpstan-import-type CatalogFamily from CatalogCache
+ * @phpstan-import-type CatalogFace from CatalogCache
+ * @phpstan-import-type DeliveryProfile from CatalogCache
  * @phpstan-type ImportSyncResult array<string, mixed>
  * @phpstan-type RestEntity array<string, mixed>
  * @phpstan-type RestDecoded array<int|string, mixed>

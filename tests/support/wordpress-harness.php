@@ -109,12 +109,17 @@ use TastyFonts\CustomCss\CustomCssFinalImportService;
 use TastyFonts\CustomCss\CustomCssFontValidator;
 use TastyFonts\CustomCss\CustomCssImportSnapshotService;
 use TastyFonts\CustomCss\CustomCssUrlImportService;
+use TastyFonts\Fonts\AdobeCatalogAdapter;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\AdobeStylesheetResolver;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\BunnyStylesheetResolver;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogBuilder;
+use TastyFonts\Fonts\CatalogCache;
+use TastyFonts\Fonts\CatalogEnricher;
+use TastyFonts\Fonts\CatalogHydrator;
 use TastyFonts\Fonts\CapabilityDisableCleanupService;
+use TastyFonts\Fonts\LocalCatalogScanner;
 use TastyFonts\Fonts\CdnImportStrategy;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
@@ -1997,7 +2002,12 @@ function makeServiceGraph(): array
     $adobe = new AdobeProjectClient($settings, $adobeProjectRepo, new AdobeCssParser());
     $bunny = new BunnyFontsClient();
     $google = new GoogleFontsClient($settings, $googleApiKeyRepo);
-    $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
+    $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
+    $adobeAdapter = new AdobeCatalogAdapter($adobe);
+    $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
+    $hydrator = new CatalogHydrator($storage);
+    $enricher = new CatalogEnricher();
+    $catalog = new CatalogCache($builder, $hydrator, $enricher, $storage, $log);
     $planner = new RuntimeAssetPlanner(
         $catalog,
         $settings,

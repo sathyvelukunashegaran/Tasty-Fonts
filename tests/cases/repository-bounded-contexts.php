@@ -3,10 +3,110 @@
 declare(strict_types=1);
 
 use TastyFonts\Repository\AdobeProjectRepository;
+use TastyFonts\Repository\AdobeProjectRepositoryInterface;
 use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\FamilyMetadataRepositoryInterface;
 use TastyFonts\Repository\GoogleApiKeyRepository;
+use TastyFonts\Repository\GoogleApiKeyRepositoryInterface;
 use TastyFonts\Repository\RoleRepository;
+use TastyFonts\Repository\RoleRepositoryInterface;
 use TastyFonts\Repository\SettingsRepository;
+
+// ---------------------------------------------------------------------------
+// Repository interface seams (bounded contexts)
+// ---------------------------------------------------------------------------
+
+$tests['repository_interfaces_bounded_contexts_support_contract_checks_and_in_memory_doubles'] = static function (): void {
+    resetTestState();
+
+    $googleRepo = new GoogleApiKeyRepository();
+    $adobeRepo = new AdobeProjectRepository();
+    $roleRepo = new RoleRepository();
+    $familyMetadataRepo = new FamilyMetadataRepository();
+
+    assertTrueValue($googleRepo instanceof GoogleApiKeyRepositoryInterface, 'GoogleApiKeyRepository should implement GoogleApiKeyRepositoryInterface.');
+    assertTrueValue($adobeRepo instanceof AdobeProjectRepositoryInterface, 'AdobeProjectRepository should implement AdobeProjectRepositoryInterface.');
+    assertTrueValue($roleRepo instanceof RoleRepositoryInterface, 'RoleRepository should implement RoleRepositoryInterface.');
+    assertTrueValue($familyMetadataRepo instanceof FamilyMetadataRepositoryInterface, 'FamilyMetadataRepository should implement FamilyMetadataRepositoryInterface.');
+
+    $googleDouble = new class() implements GoogleApiKeyRepositoryInterface {
+        public function has(): bool { return true; }
+        public function getStatus(): array { return ['state' => 'valid', 'message' => 'ok', 'checked_at' => 1]; }
+        public function saveStatus(string $state, string $message = ''): array { return ['state' => $state, 'message' => $message, 'checked_at' => 1]; }
+        public function clear(): void {}
+    };
+
+    $activityState = ['enabled' => true, 'project' => 'abc123'];
+    $adobeDouble = new class($activityState) implements AdobeProjectRepositoryInterface {
+        /** @var array<string, mixed> */
+        private array $state;
+
+        /** @param array<string, mixed> $state */
+        public function __construct(array &$state) { $this->state = &$state; }
+        public function isEnabled(): bool { return !empty($this->state['enabled']); }
+        public function getProjectId(): string { return (string) ($this->state['project'] ?? ''); }
+        public function getStatus(): array { return ['state' => 'valid', 'message' => '', 'checked_at' => 1]; }
+        public function saveProject(string $projectId, bool $enabled = true): array { $this->state['project'] = $projectId; $this->state['enabled'] = $enabled; return $this->state; }
+        public function saveStatus(string $state, string $message = ''): array { return ['state' => $state, 'message' => $message, 'checked_at' => 1]; }
+        public function clear(): array { $this->state = ['enabled' => false, 'project' => '']; return $this->state; }
+    };
+
+    $adobeDouble->saveProject('project-2', false);
+    assertFalseValue($adobeDouble->isEnabled(), 'In-memory AdobeProjectRepositoryInterface double should be usable as a seam.');
+    assertSameValue('project-2', $adobeDouble->getProjectId(), 'In-memory AdobeProjectRepositoryInterface double should preserve saved values.');
+
+    $defaultRoles = [
+        'heading' => 'Inter',
+        'body' => 'Lora',
+        'monospace' => '',
+        'heading_fallback' => 'sans-serif',
+        'body_fallback' => 'serif',
+        'monospace_fallback' => 'monospace',
+        'heading_weight' => '400',
+        'body_weight' => '400',
+        'monospace_weight' => '400',
+        'heading_axes' => [],
+        'body_axes' => [],
+        'monospace_axes' => [],
+    ];
+    $roleDouble = new class($defaultRoles) implements RoleRepositoryInterface {
+        /** @var array<string, mixed> */
+        private array $roles;
+
+        /** @param array<string, mixed> $roles */
+        public function __construct(array $roles) { $this->roles = $roles; }
+        public function getRoles(array $catalog): array { return $this->roles; }
+        public function saveRoles(array $input, array $catalog): array { $this->roles = array_merge($this->roles, $input); return $this->roles; }
+        public function getAppliedRoles(array $catalog): array { return $this->roles; }
+        public function ensureAppliedRolesInitialized(array $catalog): array { return $this->roles; }
+        public function saveAppliedRoles(array $roles, array $catalog): array { $this->roles = array_merge($this->roles, $roles); return $this->roles; }
+        public function clearDisabledCapabilityRoleData(bool $clearVariableAxes, bool $clearMonospaceRole, array $catalog): array { return ['roles' => $this->roles, 'applied_roles' => $this->roles]; }
+        public function setAutoApplyRoles(bool $enabled): array { return ['auto_apply_roles' => $enabled]; }
+        public function previewImportedRoles(array $roles): array { return array_merge($this->roles, $roles); }
+        public function replaceImportedRoles(array $roles): array { $this->roles = array_merge($this->roles, $roles); return $this->roles; }
+    };
+
+    $familyMetadataDouble = new class() implements FamilyMetadataRepositoryInterface {
+        /** @var array<string, string> */
+        private array $fallbacks = [];
+        /** @var array<string, string> */
+        private array $fontDisplays = [];
+
+        public function getFallback(string $familySlug, string $default = 'sans-serif'): string { return $this->fallbacks[$familySlug] ?? $default; }
+        public function saveFallback(string $familySlug, string $fallback): array { $this->fallbacks[$familySlug] = $fallback; return $this->fallbacks; }
+        public function getFontDisplay(string $familySlug, string $default = ''): string { return $this->fontDisplays[$familySlug] ?? $default; }
+        public function saveFontDisplay(string $familySlug, string $display): array { $this->fontDisplays[$familySlug] = $display; return $this->fontDisplays; }
+        public function resetFallbacks(): array { $this->fallbacks = []; return ['family_fallbacks' => []]; }
+        public function resetAll(): array { $this->fallbacks = []; $this->fontDisplays = []; return ['family_fallbacks' => [], 'family_font_displays' => []]; }
+    };
+
+    assertTrueValue($googleDouble->has(), 'In-memory GoogleApiKeyRepositoryInterface double should be usable as a seam.');
+    assertSameValue('Recursive', $roleDouble->saveRoles(['heading' => 'Recursive'], [])['heading'], 'In-memory RoleRepositoryInterface double should be usable as a seam.');
+    $familyMetadataDouble->saveFallback('inter', 'Arial, sans-serif');
+    $familyMetadataDouble->saveFontDisplay('inter', 'swap');
+    assertSameValue('Arial, sans-serif', $familyMetadataDouble->getFallback('inter'), 'In-memory FamilyMetadataRepositoryInterface double should preserve fallback values.');
+    assertSameValue('swap', $familyMetadataDouble->getFontDisplay('inter'), 'In-memory FamilyMetadataRepositoryInterface double should preserve font-display values.');
+};
 
 // ---------------------------------------------------------------------------
 // GoogleApiKeyRepository

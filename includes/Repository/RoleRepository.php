@@ -25,7 +25,7 @@ use TastyFonts\Support\FontUtils;
  *     monospace_axes: RoleAxes
  * }
  */
-final class RoleRepository
+final class RoleRepository implements RoleRepositoryInterface
 {
     use RepositoryHelpers;
     public const OPTION_ROLES = 'tasty_fonts_roles';

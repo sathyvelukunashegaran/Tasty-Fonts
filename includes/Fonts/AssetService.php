@@ -45,7 +45,7 @@ final class AssetService
      * @since 1.4.0
      *
      * @param Storage $storage Storage abstraction for generated stylesheet reads and writes.
-     * @param CatalogService $catalog Catalog service used to invalidate and rebuild font data.
+     * @param CatalogCache $catalog Catalog service used to invalidate and rebuild font data.
      * @param SettingsRepository $settings Settings repository used to resolve delivery and role options.
      * @param CssBuilder $cssBuilder CSS builder used to generate the runtime stylesheet.
      * @param RuntimeAssetPlanner $planner Planner used to scope runtime and preview catalogs.
@@ -53,7 +53,7 @@ final class AssetService
      */
     public function __construct(
         Storage $storage,
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         SettingsRepository $settings,
         CssBuilder $cssBuilder,
         private readonly RuntimeAssetPlanner $planner,

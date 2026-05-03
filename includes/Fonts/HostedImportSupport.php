@@ -9,7 +9,7 @@ defined('ABSPATH') || exit;
 use TastyFonts\Support\FontUtils;
 
 /**
- * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogCache
  * @phpstan-type FaceList list<CatalogFace>
  * @phpstan-type RequestedAxis array{weight: string, style: string}
  * @phpstan-type RequestedAxisList list<RequestedAxis>

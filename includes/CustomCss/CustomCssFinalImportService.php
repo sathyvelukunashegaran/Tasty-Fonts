@@ -8,7 +8,7 @@ defined('ABSPATH') || exit;
 
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\AssetService;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
@@ -35,7 +35,7 @@ final class CustomCssFinalImportService
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
         private readonly FamilyMetadataRepository $familyMetadata,
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly AssetService $assets,
         private readonly LogRepository $log,
         private readonly ?CustomCssFontValidator $validator = null

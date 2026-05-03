@@ -13,7 +13,7 @@ use TastyFonts\Support\FontUtils;
 /**
  * Builds the shared role-family metadata consumed by admin and builder clients.
  *
- * @phpstan-import-type CatalogMap from CatalogService
+ * @phpstan-import-type CatalogMap from CatalogCache
  * @phpstan-import-type AxesMap from FontUtils
  * @phpstan-import-type NormalizedSettings from SettingsRepository
  */
@@ -100,27 +100,7 @@ final class RoleFamilyCatalogBuilder
      */
     private function profileVariationAxes(array $profile): array
     {
-        $axes = [];
-
-        foreach ((array) ($profile['faces'] ?? []) as $face) {
-            if (!is_array($face)) {
-                continue;
-            }
-
-            foreach (FontUtils::normalizeAxesMap($face['axes'] ?? []) as $tag => $definition) {
-                if (!isset($axes[$tag])) {
-                    $axes[$tag] = $definition;
-                    continue;
-                }
-
-                $axes[$tag]['min'] = (string) min((float) $axes[$tag]['min'], (float) $definition['min']);
-                $axes[$tag]['max'] = (string) max((float) $axes[$tag]['max'], (float) $definition['max']);
-            }
-        }
-
-        ksort($axes, SORT_STRING);
-
-        return $axes;
+        return FontUtils::collectVariationAxesFromFaces($profile['faces'] ?? []);
     }
 
     /**

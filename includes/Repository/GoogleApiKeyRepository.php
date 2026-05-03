@@ -24,7 +24,7 @@ use TastyFonts\Support\FontUtils;
  *     google_api_key_encrypted?: string
  * }
  */
-final class GoogleApiKeyRepository
+final class GoogleApiKeyRepository implements GoogleApiKeyRepositoryInterface
 {
     use RepositoryHelpers;
     public const OPTION_GOOGLE_API_KEY_DATA = 'tasty_fonts_google_api_key_data';

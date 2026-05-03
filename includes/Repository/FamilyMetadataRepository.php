@@ -12,7 +12,7 @@ use TastyFonts\Support\FontUtils;
  * @phpstan-type FamilyFallbackMap array<string, string>
  * @phpstan-type FamilyFontDisplayMap array<string, string>
  */
-final class FamilyMetadataRepository
+final class FamilyMetadataRepository implements FamilyMetadataRepositoryInterface
 {
     use RepositoryHelpers;
     private const OPTION_SETTINGS = 'tasty_fonts_settings';

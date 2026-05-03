@@ -15,7 +15,7 @@ use TastyFonts\Support\Storage;
 
 /**
  * @phpstan-import-type PageContext from AdminPageContextBuilder
- * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogCache
  * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
  */
 final class AdminPageViewBuilder

@@ -16,10 +16,10 @@ use TastyFonts\Support\Storage;
 /**
  * @phpstan-import-type ParsedFilenameResult from \TastyFonts\Fonts\FontFilenameParser
  * @phpstan-import-type VariationDefaults from \TastyFonts\Support\FontUtils
- * @phpstan-import-type CatalogFace from CatalogService
- * @phpstan-import-type DeliveryProfile from CatalogService
- * @phpstan-import-type CatalogFamily from CatalogService
- * @phpstan-import-type CatalogMap from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogCache
+ * @phpstan-import-type DeliveryProfile from CatalogCache
+ * @phpstan-import-type CatalogFamily from CatalogCache
+ * @phpstan-import-type CatalogMap from CatalogCache
  */
 final class LocalCatalogScanner
 {

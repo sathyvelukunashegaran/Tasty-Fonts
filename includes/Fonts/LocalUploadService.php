@@ -16,7 +16,7 @@ use WP_Error;
 
 /**
  * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
- * @phpstan-import-type CatalogFace from CatalogService
+ * @phpstan-import-type CatalogFace from CatalogCache
  * @phpstan-type UploadRowInput array<string, mixed>
  * @phpstan-type NormalizedUploadRow array<string, mixed>
  * @phpstan-type FamilyLookup array<string, string>
@@ -38,7 +38,7 @@ final class LocalUploadService
      * @since 1.4.0
      *
      * @param Storage $storage Storage abstraction for uploads/fonts paths and writes.
-     * @param CatalogService $catalog Catalog service used to inspect existing families and faces.
+     * @param CatalogCache $catalog Catalog service used to inspect existing families and faces.
      * @param AssetService $assets Asset service used to refresh generated CSS after imports.
      * @param SettingsRepository $settings Settings repository used to persist family fallbacks.
      * @param LogRepository $log Log repository used for audit entries.
@@ -46,7 +46,7 @@ final class LocalUploadService
      */
     public function __construct(
         private readonly Storage $storage,
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly ImportRepository $imports,
         private readonly AssetService $assets,
         SettingsRepository $settings,

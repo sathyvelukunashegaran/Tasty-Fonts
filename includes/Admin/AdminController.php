@@ -16,7 +16,7 @@ use TastyFonts\CustomCss\CustomCssFinalImportService;
 use TastyFonts\CustomCss\CustomCssImportSnapshotService;
 use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
-use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Fonts\CapabilityDisableCleanupService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\LibraryService;
@@ -46,9 +46,9 @@ use WP_Error;
 /**
  * @phpstan-import-type PageContext from AdminPageContextBuilder
  * @phpstan-import-type OutputPanel from AdminPageContextBuilder
- * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogService
- * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogService
+ * @phpstan-import-type CatalogFamily from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type CatalogCounts from \TastyFonts\Fonts\CatalogCache
+ * @phpstan-import-type CatalogMap from \TastyFonts\Fonts\CatalogCache
  * @phpstan-import-type AxesMap from \TastyFonts\Support\FontUtils
  * @phpstan-import-type FamilyFallbackMap from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type FamilyFontDisplayMap from \TastyFonts\Repository\SettingsRepository
@@ -118,7 +118,7 @@ final class AdminController
         private readonly Storage $storage,
         private readonly SettingsRepository $settings,
         private readonly LogRepository $log,
-        private readonly CatalogService $catalog,
+        private readonly CatalogCache $catalog,
         private readonly AssetService $assets,
         private readonly LibraryService $library,
         private readonly CapabilityDisableCleanupService $capabilityCleanup,
