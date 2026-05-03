@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use TastyFonts\Fonts\CdnImportStrategy;
 use TastyFonts\Fonts\HostedImportProviderAdapterInterface;
 use TastyFonts\Fonts\HostedImportProviderConfig;
 use TastyFonts\Fonts\HostedImportRequest;
 use TastyFonts\Fonts\HostedImportVariantPlanner;
 use TastyFonts\Fonts\HostedImportWorkflow;
+use TastyFonts\Fonts\SelfHostedImportStrategy;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Repository\LogRepository;
 
@@ -229,11 +231,14 @@ function makeHostedImportWorkflowTestGraph(): array
 {
     $services = makeServiceGraph();
     $services['hosted_import_workflow'] = new HostedImportWorkflow(
-        $services['storage'],
         $services['imports'],
         $services['assets'],
         $services['log'],
-        new HostedImportVariantPlanner()
+        new HostedImportVariantPlanner(),
+        [
+            'cdn' => new CdnImportStrategy(),
+            'self_hosted' => new SelfHostedImportStrategy($services['storage']),
+        ]
     );
 
     return $services;

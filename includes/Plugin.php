@@ -9,6 +9,7 @@ defined('ABSPATH') || exit;
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Admin\AdminAccessService;
+use TastyFonts\Admin\AdminActionRunner;
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Api\RestController;
 use TastyFonts\Bunny\BunnyCssParser;
@@ -25,9 +26,11 @@ use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CapabilityDisableCleanupService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
+use TastyFonts\Fonts\CdnImportStrategy;
 use TastyFonts\Fonts\HostedImportVariantPlanner;
 use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Fonts\LibraryService;
+use TastyFonts\Fonts\SelfHostedImportStrategy;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Fonts\NativeUploadedFileValidator;
 use TastyFonts\Fonts\RoleFamilyCatalogBuilder;
@@ -148,11 +151,14 @@ final class Plugin
             $roleRepo
         );
         $this->hostedImportWorkflow = new HostedImportWorkflow(
-            $this->storage,
             $this->imports,
             $this->assets,
             $this->log,
-            new HostedImportVariantPlanner()
+            new HostedImportVariantPlanner(),
+            [
+                'cdn' => new CdnImportStrategy(),
+                'self_hosted' => new SelfHostedImportStrategy($this->storage),
+            ]
         );
         $this->library = new LibraryService(
             $this->storage,
@@ -262,6 +268,7 @@ final class Plugin
             $this->log
         );
         $this->updater = new GitHubUpdater($this->settings, $this->adminAccess);
+        $actionRunner = new AdminActionRunner($this->log);
         $this->admin = new AdminController(
             $this->storage,
             $this->settings,
@@ -298,7 +305,8 @@ final class Plugin
             null,
             $roleFamilyCatalogBuilder,
             $googleApiKeyRepo,
-            $roleRepo
+            $roleRepo,
+            $actionRunner
         );
         $this->rest = new RestController($this->admin, $this->adminAccess);
     }

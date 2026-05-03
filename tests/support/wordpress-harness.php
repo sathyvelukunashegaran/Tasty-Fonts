@@ -113,12 +113,14 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CapabilityDisableCleanupService;
+use TastyFonts\Fonts\CdnImportStrategy;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\HostedImportVariantPlanner;
 use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Fonts\LibraryService;
+use TastyFonts\Fonts\SelfHostedImportStrategy;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Fonts\RoleFamilyCatalogBuilder;
 use TastyFonts\Fonts\UploadedFileValidatorInterface;
@@ -1996,7 +1998,16 @@ function makeServiceGraph(): array
     $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe, $roleRepo, $familyMetadataRepo);
     $cssBuilder = new CssBuilder();
     $assets = new AssetService($storage, $catalog, $settings, $cssBuilder, $planner, $log, $roleRepo);
-    $hostedImportWorkflow = new HostedImportWorkflow($storage, $imports, $assets, $log, new HostedImportVariantPlanner());
+    $hostedImportWorkflow = new HostedImportWorkflow(
+        $imports,
+        $assets,
+        $log,
+        new HostedImportVariantPlanner(),
+        [
+            'cdn' => new CdnImportStrategy(),
+            'self_hosted' => new SelfHostedImportStrategy($storage),
+        ]
+    );
     $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings, $roleRepo);
     $capabilityCleanup = new CapabilityDisableCleanupService($storage, $imports, $catalog, $log);
     $localUpload = new LocalUploadService(
@@ -2053,6 +2064,7 @@ function makeServiceGraph(): array
     $adminAccess = new AdminAccessService($settings);
     $roleFamilyCatalogBuilder = new RoleFamilyCatalogBuilder();
     $updater = new GitHubUpdater($settings, $adminAccess);
+    $actionRunner = new \TastyFonts\Admin\AdminActionRunner($log);
     $controller = new AdminController(
         $storage,
         $settings,
@@ -2089,7 +2101,8 @@ function makeServiceGraph(): array
         null,
         $roleFamilyCatalogBuilder,
         $googleApiKeyRepo,
-        $roleRepo
+        $roleRepo,
+        $actionRunner
     );
     $rest = new RestController($controller, $adminAccess);
     $runtime = new RuntimeService(
