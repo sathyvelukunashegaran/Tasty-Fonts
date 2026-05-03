@@ -9,9 +9,9 @@ defined('ABSPATH') || exit;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogService;
+use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
-use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use WP_Error;
@@ -34,7 +34,7 @@ final class CustomCssFinalImportService
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
-        private readonly SettingsRepository $settings,
+        private readonly FamilyMetadataRepository $familyMetadata,
         private readonly CatalogService $catalog,
         private readonly AssetService $assets,
         private readonly LogRepository $log,
@@ -220,7 +220,7 @@ final class CustomCssFinalImportService
 
             array_push($importedFaces, ...$familyImportedFaces);
             $writtenFileCount += $familyWrittenFileCount;
-            $this->settings->saveFamilyFallback($familyName, $fallback);
+            $this->familyMetadata->saveFallback($familyName, $fallback);
             $importedFamilies[] = [
                 'family' => $familyName,
                 'slug' => $familySlug,
@@ -424,7 +424,7 @@ final class CustomCssFinalImportService
             }
 
             array_push($importedFaces, ...$familyImportedFaces);
-            $this->settings->saveFamilyFallback($familyName, $fallback);
+            $this->familyMetadata->saveFallback($familyName, $fallback);
             $importedFamilies[] = [
                 'family' => $familyName,
                 'slug' => $familySlug,
@@ -712,7 +712,7 @@ final class CustomCssFinalImportService
             return $safetyError;
         }
 
-        $result = $this->getValidator()->validateFontUrl($url, $format);
+        $result = $this->getValidator()->validateFontUrl($url, $format, 'import');
 
         if ($result->status === ValidationResult::STATUS_INVALID) {
             $message = match ($result->code) {

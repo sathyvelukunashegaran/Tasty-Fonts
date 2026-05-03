@@ -16,7 +16,7 @@ use WP_REST_Request;
 
 /**
  * @phpstan-type RouteArgs array<string, array<string, mixed>>
- * @phpstan-type RestResultPayload array<string, mixed>
+ * @phpstan-type RestResultPayload array<array-key, mixed>
  * @phpstan-type TextArg array<string, mixed>
  * @phpstan-type NestedArg array<string, mixed>
  */

@@ -19,7 +19,7 @@ use TastyFonts\Support\FontUtils;
  * @phpstan-type RuntimeFamilyList list<CatalogFamily>
  * @phpstan-type RuntimeLookup array<string, true>
  */
-final class OxygenIntegrationService
+final class OxygenIntegrationService implements EditorIntegrationInterface
 {
     /** @var list<string> */
     private static array $compatibilityFamilies = [];
@@ -38,17 +38,25 @@ final class OxygenIntegrationService
     /**
      * @return IntegrationState
      */
-    public function readState(?bool $enabled): array
+    public function readState(array $settings): array
     {
         $available = $this->isAvailable();
+        $enabled = array_key_exists('oxygen_integration_enabled', $settings)
+            ? $this->nullableBoolValue($settings['oxygen_integration_enabled'])
+            : null;
+        $configured = $enabled !== null;
         $effectiveEnabled = $available && $enabled !== false;
 
-        return [
-            'available' => $available,
+        return array_merge(IntegrationStatus::fromState(
+            $available,
+            $configured,
+            true,
+            $configured && $effectiveEnabled,
+            !empty($settings['auto_apply_roles'])
+        )->toArray(), [
             'enabled' => $effectiveEnabled,
-            'configured' => $enabled !== null,
             'status' => !$available ? 'unavailable' : ($effectiveEnabled ? 'active' : 'disabled'),
-        ];
+        ]);
     }
 
     /**
@@ -112,6 +120,22 @@ PHP);
     /**
      * @return list<string>
      */
+    public function getManagedEditorStyles(): array
+    {
+        return $this->getEditorStyles([]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getManagedFrontendStyles(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return list<string>
+     */
     public static function compatibilityFamilies(): array
     {
         return self::$compatibilityFamilies;
@@ -163,5 +187,28 @@ PHP);
         $familyName = is_scalar($value) ? trim((string) $value) : '';
 
         return $familyName !== '' && isset($runtimeLookup[$familyName]) ? $familyName : '';
+    }
+
+    private function nullableBoolValue(mixed $value): ?bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value)) {
+            return $value === 1 ? true : ($value === 0 ? false : null);
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+
+        return match ($normalized) {
+            '1', 'true', 'yes', 'on' => true,
+            '0', 'false', 'no', 'off' => false,
+            default => null,
+        };
     }
 }

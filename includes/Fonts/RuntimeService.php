@@ -12,6 +12,8 @@ use TastyFonts\Admin\AdminController;
 use TastyFonts\Api\RestController;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
+use TastyFonts\Integrations\EditorIntegrationInterface;
+use TastyFonts\Integrations\IntegrationStatus;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -48,6 +50,8 @@ final class RuntimeService
         private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration,
+        /** @var list<EditorIntegrationInterface> */
+        private readonly array $editorIntegrations,
         private readonly ?CatalogService $catalog = null,
         private readonly ?RoleFamilyCatalogBuilder $roleFamilyCatalogBuilder = null,
         private readonly ?AdminAccessService $adminAccess = null
@@ -87,12 +91,8 @@ final class RuntimeService
 
         $settings = $this->settings->getSettings();
 
-        if (!$this->bricksIntegration->managedFrontendStylesActive($settings)) {
-            return;
-        }
-
         $css = implode('', array_values(array_unique(array_filter(
-            $this->bricksIntegration->getManagedFrontendStyles(),
+            $this->getManagedFrontendIntegrationStyles($settings),
             static fn (string $style): bool => $style !== ''
         ))));
 
@@ -293,13 +293,9 @@ final class RuntimeService
         $runtimeFamilies = $this->planner->getRuntimeFamilies();
         $settings = $this->settings->getSettings();
 
-        if ($this->hasManagedAcssRuntimeMapping()) {
-            $styles = array_merge($styles, $this->acssIntegration->getManagedEditorStyles());
-        }
+        $styles = array_merge($styles, $this->getManagedEditorIntegrationStyles($settings));
 
-        if ($this->bricksIntegration->managedEditorStylesActive($settings)) {
-            $styles = array_merge($styles, $this->bricksIntegration->getManagedEditorStyles());
-        } elseif ($this->bricksSelectorEnabled() && $this->bricksIntegration->isAvailable()) {
+        if (!$this->bricksIntegration->managedEditorStylesActive($settings) && $this->bricksSelectorEnabled() && $this->bricksIntegration->isAvailable()) {
             $styles = array_merge($styles, $this->bricksIntegration->getEditorStyles($runtimeFamilies));
         }
 
@@ -929,6 +925,68 @@ JS;
         }
 
         return $this->acssIntegration->getRuntimeStylesheet();
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @return CssLineList
+     */
+    private function getManagedEditorIntegrationStyles(array $settings): array
+    {
+        $styles = [];
+
+        foreach ($this->editorIntegrations as $integration) {
+            if (!$integration->isAvailable()) {
+                continue;
+            }
+
+            if ($integration === $this->oxygenIntegration) {
+                continue;
+            }
+
+            if (!$this->integrationManagedStylesLive($integration->readState($settings))) {
+                continue;
+            }
+
+            $styles = array_merge($styles, $integration->getManagedEditorStyles());
+        }
+
+        return $styles;
+    }
+
+    /**
+     * @param NormalizedSettings $settings
+     * @return CssLineList
+     */
+    private function getManagedFrontendIntegrationStyles(array $settings): array
+    {
+        $styles = [];
+
+        foreach ($this->editorIntegrations as $integration) {
+            if (!$integration->isAvailable()) {
+                continue;
+            }
+
+            if (!$this->integrationManagedStylesLive($integration->readState($settings))) {
+                continue;
+            }
+
+            $styles = array_merge($styles, $integration->getManagedFrontendStyles());
+        }
+
+        return $styles;
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function integrationManagedStylesLive(array $state): bool
+    {
+        $managedState = is_array($state['theme_styles'] ?? null) ? $state['theme_styles'] : $state;
+        $humanStatus = $managedState['human_status'] ?? null;
+
+        return (is_string($humanStatus) && $humanStatus === IntegrationStatus::LIVE)
+            || (!empty($managedState['enabled']) && !empty($managedState['applied']) && !empty($managedState['sitewide_delivery']));
     }
 
     private function hasManagedAcssRuntimeMapping(): bool

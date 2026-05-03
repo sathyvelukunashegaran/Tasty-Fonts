@@ -1310,7 +1310,7 @@ $tests['admin_page_context_and_view_include_output_toggle_previews'] = static fu
     ]);
 
     $context = invokePrivateMethod($services['controller'], 'buildPageContext');
-    $view = (new AdminPageViewBuilder($services['storage']))->build($context);
+    $view = (new AdminPageViewBuilder($services['storage']))->build($context)->toArray();
 
     assertSameValue(true, is_array($context['output_toggle_previews'] ?? null), 'Admin page context should include normalized output toggle previews.');
     assertContainsValue('.font-heading', (string) ($context['output_toggle_previews']['class_output_role_heading_enabled']['css'] ?? ''), 'Context previews should include exact heading class CSS.');

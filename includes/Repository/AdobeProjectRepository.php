@@ -104,6 +104,25 @@ final class AdobeProjectRepository
         return $this->persistSettings($settings);
     }
 
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
+     */
+    public function normalizeSettingsData(array $settings): array
+    {
+        $settings = $this->normalizeInputMap(wp_parse_args($settings, self::ADOBE_DEFAULTS));
+        $settings['adobe_enabled'] = !empty($settings['adobe_enabled']);
+        $settings['adobe_project_id'] = $this->sanitizeAdobeProjectId($this->stringValue($settings, 'adobe_project_id'));
+        $settings['adobe_project_status'] = $this->normalizeAdobeProjectStatus(
+            $this->stringValue($settings, 'adobe_project_status', 'empty'),
+            $this->stringValue($settings, 'adobe_project_id')
+        );
+        $settings['adobe_project_status_message'] = $this->sanitizeStatusMessage($settings['adobe_project_status_message'] ?? '');
+        $settings['adobe_project_checked_at'] = $this->normalizeTimestamp($settings['adobe_project_checked_at'] ?? 0);
+
+        return $settings;
+    }
+
     private function sanitizeAdobeProjectId(string $projectId): string
     {
         $projectId = strtolower(trim($projectId));

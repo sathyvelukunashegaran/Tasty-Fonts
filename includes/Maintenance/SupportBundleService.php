@@ -31,7 +31,7 @@ final class SupportBundleService
     }
 
     /**
-     * @param array<string, mixed> $advancedToolsPayload
+     * @param array<array-key, mixed> $advancedToolsPayload
      * @return SupportBundle|WP_Error
      */
     public function buildBundle(array $advancedToolsPayload): array|WP_Error

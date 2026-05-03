@@ -30,7 +30,7 @@ final class CdnImportStrategy implements DeliveryImportStrategy
         $cdnFaces = [];
 
         foreach ($faces as $face) {
-            $cdnFaces[] = $this->buildStoredFace(
+            $cdnFaces[] = StoredFaceBuilder::build(
                 $familyName,
                 $familySlug,
                 $face,
@@ -43,32 +43,4 @@ final class CdnImportStrategy implements DeliveryImportStrategy
         return new ImportFacesResult($cdnFaces, 0);
     }
 
-    /**
-     * @param array<string, mixed> $face
-     * @param array<string, string> $files
-     * @param array<string, mixed> $provider
-     * @return array<string, mixed>
-     */
-    private function buildStoredFace(
-        string $familyName,
-        string $familySlug,
-        array $face,
-        array $files,
-        array $provider,
-        string $source
-    ): array {
-        return [
-            'family' => $familyName,
-            'slug' => $familySlug,
-            'source' => $source,
-            'weight' => FontUtils::stringValue($face, 'weight', '400'),
-            'style' => FontUtils::stringValue($face, 'style', 'normal'),
-            'unicode_range' => FontUtils::stringValue($face, 'unicode_range'),
-            'files' => $files,
-            'provider' => $provider,
-            'is_variable' => !empty($face['is_variable']),
-            'axes' => FontUtils::normalizeStringKeyedMap($face['axes'] ?? []),
-            'variation_defaults' => FontUtils::normalizeStringKeyedMap($face['variation_defaults'] ?? []),
-        ];
-    }
 }

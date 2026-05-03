@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
+use TastyFonts\Fonts\AdobeStylesheetResolver;
+use TastyFonts\Fonts\BunnyStylesheetResolver;
+use TastyFonts\Fonts\GoogleStylesheetResolver;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\AdobeProjectRepository;
@@ -64,6 +67,57 @@ $tests['bunny_fonts_client_builds_css2_urls'] = static function (): void {
         $client->buildCssUrl('Inter', ['regular', '700italic']),
         'Bunny Fonts CSS URLs should use the css2 endpoint and Google-compatible axis syntax.'
     );
+};
+
+$tests['provider_stylesheet_resolvers_adapt_provider_clients_for_runtime_stylesheets'] = static function (): void {
+    resetTestState();
+
+    $settings = new SettingsRepository();
+    $adobeProjectRepo = new AdobeProjectRepository();
+    $google = new GoogleStylesheetResolver(new GoogleFontsClient($settings, new GoogleApiKeyRepository()));
+    $bunny = new BunnyStylesheetResolver(new BunnyFontsClient());
+    $adobe = new AdobeStylesheetResolver(new AdobeProjectClient($settings, $adobeProjectRepo, new AdobeCssParser()));
+
+    $adobeProjectRepo->saveProject('abc123', true);
+
+    $googleDescriptor = $google->buildStylesheetDescriptor(
+        ['provider' => 'google', 'type' => 'cdn', 'variants' => ['regular'], 'faces' => []],
+        'Inter',
+        'inter',
+        'swap'
+    );
+    $bunnyDescriptor = $bunny->buildStylesheetDescriptor(
+        ['provider' => 'bunny', 'type' => 'cdn', 'variants' => ['regular', '700italic']],
+        'Inter',
+        'inter',
+        'swap'
+    );
+    $adobeDescriptor = $adobe->buildStylesheetDescriptor(
+        ['provider' => 'adobe', 'type' => 'adobe_hosted', 'meta' => ['project_id' => 'xyz789']],
+        'Adobe Family',
+        'adobe-family',
+        'swap'
+    );
+
+    assertSameValue(true, $google->supports('google', 'cdn'), 'Google resolver should support Google CDN deliveries.');
+    assertSameValue(false, $google->supports('google', 'self_hosted'), 'Google resolver should reject self-hosted deliveries.');
+    assertSameValue('google', $google->getProviderKey(), 'Google resolver should expose the google provider key.');
+    assertSameValue('https://fonts.googleapis.com', $google->preconnectOrigin(), 'Google resolver should expose the Google preconnect origin.');
+    assertSameValue('tasty-fonts-google-inter-cdn', (string) ($googleDescriptor['handle'] ?? ''), 'Google resolver should preserve the runtime stylesheet handle shape.');
+    assertContainsValue('https://fonts.googleapis.com/css2?family=Inter', (string) ($googleDescriptor['url'] ?? ''), 'Google resolver should delegate CSS URL construction to the Google client.');
+
+    assertSameValue(true, $bunny->supports('bunny', 'cdn'), 'Bunny resolver should support Bunny CDN deliveries.');
+    assertSameValue('bunny', $bunny->getProviderKey(), 'Bunny resolver should expose the bunny provider key.');
+    assertSameValue('https://fonts.bunny.net', $bunny->preconnectOrigin(), 'Bunny resolver should expose the Bunny preconnect origin.');
+    assertSameValue('tasty-fonts-bunny-inter-cdn', (string) ($bunnyDescriptor['handle'] ?? ''), 'Bunny resolver should preserve the runtime stylesheet handle shape.');
+    assertContainsValue('https://fonts.bunny.net/css2?family=Inter', (string) ($bunnyDescriptor['url'] ?? ''), 'Bunny resolver should delegate CSS URL construction to the Bunny client.');
+
+    assertSameValue(true, $adobe->supports('adobe', 'adobe_hosted'), 'Adobe resolver should support Adobe-hosted deliveries.');
+    assertSameValue(false, $adobe->supports('adobe', 'cdn'), 'Adobe resolver should reject generic CDN deliveries.');
+    assertSameValue('adobe', $adobe->getProviderKey(), 'Adobe resolver should expose the adobe provider key.');
+    assertSameValue('https://use.typekit.net', $adobe->preconnectOrigin(), 'Adobe resolver should expose the Typekit preconnect origin.');
+    assertSameValue('tasty-fonts-adobe-adobe-family-adobe-hosted', (string) ($adobeDescriptor['handle'] ?? ''), 'Adobe resolver should preserve the runtime stylesheet handle shape.');
+    assertSameValue('https://use.typekit.net/xyz789.css', (string) ($adobeDescriptor['url'] ?? ''), 'Adobe resolver should use the delivery project ID when present.');
 };
 
 $tests['bunny_fonts_client_searches_sitemap_catalog_and_hydrates_family_details'] = static function (): void {

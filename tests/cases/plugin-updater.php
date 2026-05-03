@@ -662,7 +662,7 @@ $tests['admin_context_labels_plain_dev_nightly_as_local_development'] = static f
         $services['planner']
     );
     $context = $builder->build();
-    $view = (new \TastyFonts\Admin\AdminPageViewBuilder(new Storage()))->build($context);
+    $view = (new \TastyFonts\Admin\AdminPageViewBuilder(new Storage()))->build($context)->toArray();
 
     assertSameValue('development', (string) ($context['update_channel_status']['state'] ?? ''), 'Nightly selected with a plain local -dev version should expose the development state.');
     assertSameValue('Local Dev', (string) ($context['update_channel_status']['state_label'] ?? ''), 'The update-channel context should label local development builds clearly.');

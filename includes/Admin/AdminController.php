@@ -54,7 +54,7 @@ use WP_Error;
  * @phpstan-import-type FamilyFontDisplayMap from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type NormalizedSettings from \TastyFonts\Repository\SettingsRepository
  * @phpstan-import-type RoleSet from \TastyFonts\Repository\SettingsRepository
- * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type Payload array<array-key, mixed>
  * @phpstan-type PayloadList list<array<string, mixed>>
  * @phpstan-type UploadRow array<string, mixed>
  * @phpstan-type UploadRowList list<UploadRow>
@@ -770,7 +770,7 @@ final class AdminController
         $finalImport = $this->customCssFinalImport ?? new CustomCssFinalImportService(
             $this->storage,
             new \TastyFonts\Repository\ImportRepository(),
-            $this->settings,
+            new \TastyFonts\Repository\FamilyMetadataRepository(),
             $this->catalog,
             $this->assets,
             $this->log
@@ -2116,7 +2116,7 @@ final class AdminController
             ['current_page' => self::PAGE_LIBRARY]
         );
 
-        return (new AdminPageViewBuilder($this->storage))->build($context);
+        return (new AdminPageViewBuilder($this->storage))->build($context)->toArray();
     }
 
     /**
@@ -5400,8 +5400,10 @@ final class AdminController
             return;
         }
 
-        $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
-        $state = $this->acssIntegration->readState($sitewideRolesEnabled, true, true);
+        $state = $this->acssIntegration->readState(array_replace($settings, [
+            'acss_font_role_sync_enabled' => true,
+            'acss_font_role_sync_applied' => true,
+        ]));
 
         if (($state['status'] ?? '') !== 'out_of_sync') {
             return;
@@ -5853,7 +5855,7 @@ final class AdminController
                 : __('Automatic.css sync is enabled and will apply after sitewide role delivery is turned on.', 'tasty-fonts');
         }
 
-        $state = $this->acssIntegration->readState($sitewideRolesEnabled, $enabled, $applied);
+        $state = $this->acssIntegration->readState($settings);
 
         if ($applied && !empty($state['synced'])) {
             return '';
@@ -5989,7 +5991,10 @@ final class AdminController
             return false;
         }
 
-        $state = $this->acssIntegration->readState(!empty($settings['auto_apply_roles']), false, false);
+        $state = $this->acssIntegration->readState(array_replace($settings, [
+            'acss_font_role_sync_enabled' => false,
+            'acss_font_role_sync_applied' => false,
+        ]));
 
         return !empty($state['synced']);
     }

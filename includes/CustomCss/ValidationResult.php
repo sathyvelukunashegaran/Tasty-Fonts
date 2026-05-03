@@ -21,6 +21,7 @@ final class ValidationResult
     public const CONTENT_TYPE_ERROR = 'CONTENT_TYPE_ERROR';
     public const TOO_LARGE = 'TOO_LARGE';
     public const HEAD_FAILED = 'HEAD_FAILED';
+    public const CORS_MISSING = 'CORS_MISSING';
     public const HTTP_ERROR = 'HTTP_ERROR';
     public const REQUEST_FAILED = 'REQUEST_FAILED';
 

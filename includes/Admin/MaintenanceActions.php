@@ -13,7 +13,7 @@ use TastyFonts\Support\Storage;
 use WP_Error;
 
 /**
- * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type Payload array<array-key, mixed>
  */
 final class MaintenanceActions
 {

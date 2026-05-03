@@ -214,3 +214,51 @@ $tests['admin_action_runner_message_wins_over_result_message'] = static function
 
     assertSameValue('Runner message.', $result['message'] ?? '', 'Runner message should win over result message.');
 };
+
+$tests['admin_action_runner_error_uses_context_message_when_provided'] = static function (): void {
+    resetTestState();
+
+    $log = new LogRepository();
+    $runner = new AdminActionRunner($log);
+    $error = new WP_Error('test_error', 'Original WP_Error message.');
+
+    $result = $runner->run(
+        fn() => $error,
+        [
+            'category' => LogRepository::CATEGORY_SETTINGS,
+            'event' => 'google_api_key_validation_failed',
+            'status_label' => 'Validation failed',
+            'source' => 'Settings',
+            'message' => 'Google Fonts API key validation failed.',
+        ]
+    );
+
+    assertSameValue($error, $result, 'WP_Error should still be returned unchanged when context message is provided.');
+
+    $entries = $log->all();
+    assertSameValue('Google Fonts API key validation failed.', $entries[0]['message'] ?? '', 'Error log should preserve the explicit context message when provided.');
+};
+
+$tests['admin_action_runner_preserves_numeric_top_level_result_keys'] = static function (): void {
+    resetTestState();
+
+    $log = new LogRepository();
+    $runner = new AdminActionRunner($log);
+
+    $result = $runner->run(
+        fn(): array => [0 => 'zero', 'alpha' => 'a', 5 => 'five'],
+        [
+            'category' => LogRepository::CATEGORY_MAINTENANCE,
+            'event' => 'test_event',
+            'status_label' => 'Test',
+            'source' => 'Test',
+            'message' => 'Runner message.',
+        ]
+    );
+
+    assertSameValue(
+        ['message' => 'Runner message.', 0 => 'zero', 'alpha' => 'a', 5 => 'five'],
+        $result,
+        'Array payloads should preserve numeric and string top-level keys using the legacy union behavior.'
+    );
+};

@@ -71,7 +71,8 @@ final class AdminPageRenderer extends AbstractSectionRenderer
      */
     public function renderPage(array $context): void
     {
-        $view = $this->viewBuilder->build($context);
+        $viewVariables = $this->viewBuilder->build($context);
+        $view = $viewVariables->toArray();
         $this->trainingWheelsOff = !empty($view['trainingWheelsOff']);
         $storage = $view['storage'] ?? null;
         $toasts = $this->normalizeToastList($view['toasts'] ?? []);

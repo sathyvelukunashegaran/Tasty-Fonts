@@ -22,6 +22,7 @@ $googleClient = new \TastyFonts\Google\GoogleFontsClient(
     $settingsRepository,
     new \TastyFonts\Repository\GoogleApiKeyRepository()
 );
+$bunnyClient = new \TastyFonts\Bunny\BunnyFontsClient();
 $catalog = new \TastyFonts\Fonts\CatalogService(
     $storage,
     $importRepository,
@@ -32,9 +33,11 @@ $catalog = new \TastyFonts\Fonts\CatalogService(
 $planner = new \TastyFonts\Fonts\RuntimeAssetPlanner(
     $catalog,
     $settingsRepository,
-    $googleClient,
-    new \TastyFonts\Bunny\BunnyFontsClient(),
-    $adobeClient,
+    [
+        new \TastyFonts\Fonts\GoogleStylesheetResolver($googleClient),
+        new \TastyFonts\Fonts\BunnyStylesheetResolver($bunnyClient),
+        new \TastyFonts\Fonts\AdobeStylesheetResolver($adobeClient),
+    ],
     new \TastyFonts\Repository\RoleRepository(),
     new \TastyFonts\Repository\FamilyMetadataRepository()
 );

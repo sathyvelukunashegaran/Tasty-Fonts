@@ -46,7 +46,7 @@ use WP_Error;
  * @phpstan-type TypographyMap array<string, array<string, mixed>>
  * @phpstan-type TypographyValueMap array<string, string>
  */
-final class BricksIntegrationService
+final class BricksIntegrationService implements EditorIntegrationInterface
 {
     public const OPTION_SYNC_STATE = 'tasty_fonts_bricks_sync_state_v1';
     public const OPTION_GLOBAL_SETTINGS = 'bricks_global_settings';
@@ -109,6 +109,7 @@ final class BricksIntegrationService
     {
         $available = $this->isAvailable();
         $masterEnabled = $this->masterEnabled($settings);
+        $configured = ($settings['bricks_integration_enabled'] ?? null) !== null;
         $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
         $syncState = $this->getSyncState();
         $targetMode = $this->resolveThemeStyleTargetMode($settings, $syncState);
@@ -122,10 +123,16 @@ final class BricksIntegrationService
             && $this->normalizeThemeStyleTargetId($syncState['theme_styles']['target_style_id']) === $targetStyleId
             && $this->managedThemeStylesMatchDesired($targetStyleId, $targetMode);
 
-        return [
-            'available' => $available,
+        $topStatus = IntegrationStatus::fromState(
+            $available,
+            $configured,
+            false,
+            false,
+            $sitewideRolesEnabled
+        )->toArray();
+
+        return array_merge($topStatus, [
             'enabled' => $available && $masterEnabled,
-            'configured' => ($settings['bricks_integration_enabled'] ?? null) !== null,
             'status' => !$available ? 'unavailable' : ($masterEnabled ? 'active' : 'disabled'),
             'selectors' => $this->buildFeatureState(
                 $available,
@@ -162,7 +169,7 @@ final class BricksIntegrationService
                     'google_fonts_disabled' => $googleFontsDisabled,
                 ],
             ],
-        ];
+        ]);
     }
 
     /**
@@ -644,13 +651,18 @@ final class BricksIntegrationService
             $status = 'ready';
         }
 
-        return [
+        return array_merge(IntegrationStatus::fromState(
+            $available,
+            $masterEnabled && $featureEnabled,
+            $synced,
+            $applied,
+            $sitewideRolesEnabled
+        )->toArray(), [
             'enabled' => $available && $masterEnabled && $featureEnabled,
-            'applied' => $applied,
             'status' => $status,
             'current' => $current,
             'desired' => $desired,
-        ];
+        ]);
     }
 
     /**

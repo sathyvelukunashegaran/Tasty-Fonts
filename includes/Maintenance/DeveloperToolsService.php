@@ -53,9 +53,9 @@ HTACCESS;
         private readonly AssetService $assets,
         private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
         private readonly GoogleFontsClient $googleClient,
-        FamilyMetadataRepository $familyMetadataRepo,
+        private readonly FamilyMetadataRepository $familyMetadataRepo,
     ) {
-        unset($catalog, $familyMetadataRepo);
+        unset($catalog);
     }
 
     public function ensureStorageScaffolding(): bool
@@ -166,7 +166,8 @@ HTACCESS;
 
         do_action('tasty_fonts_before_reset_family_fallbacks_to_global', $previousSettings);
 
-        $settings = $this->settings->resetFamilyFallbacks();
+        $this->familyMetadataRepo->resetFallbacks();
+        $settings = $this->settings->getSettings();
 
         if (!$this->clearPluginCachesAndRegenerateAssetsInternal($previousSettings)) {
             return $this->maintenanceError(__('Family fallback overrides were reset, but generated assets could not be rebuilt.', 'tasty-fonts'));

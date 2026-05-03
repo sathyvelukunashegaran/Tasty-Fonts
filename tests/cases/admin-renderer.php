@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use TastyFonts\Admin\AdminPageRenderer;
 use TastyFonts\Admin\AdminPageViewBuilder;
+use TastyFonts\Admin\AdminPageViewVariables;
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Admin\Renderer\FamilyCardRenderer;
 use TastyFonts\Admin\Renderer\HealthTriagePresenter;
@@ -1674,7 +1675,7 @@ $tests['admin_page_renderer_scopes_output_groups_to_quick_mode'] = static functi
         'extended_variable_category_sans_enabled' => true,
 		'extended_variable_category_serif_enabled' => false,
         'role_usage_font_weight_enabled' => false,
-    ]);
+	]);
 
     assertSameValue(1, preg_match('/tasty-fonts-output-settings-advanced-panel[^"]*is-variables-only/', $variablesOutput), 'Variables-only should render the focused variables layout before JS runs.');
     assertSameValue(1, preg_match('/data-output-detail-group="variables"(?![^>]*hidden)/', $variablesOutput), 'Variables-only should show the variables group.');
@@ -1737,7 +1738,7 @@ $tests['admin_page_renderer_scopes_output_groups_to_quick_mode'] = static functi
         'per_variant_font_variables_enabled' => true,
         'minimal_output_preset_enabled' => false,
         'role_usage_font_weight_enabled' => true,
-    ]);
+	]);
 
     assertSameValue(1, preg_match('/data-output-detail-group="sitewide"(?![^>]*hidden)/', $customOutput), 'Custom should show the sitewide group.');
     assertSameValue(1, preg_match('/data-output-detail-group="classes"(?![^>]*hidden)/', $customOutput), 'Custom should show the classes group.');
@@ -2013,39 +2014,39 @@ $tests['admin_page_view_builder_builds_typed_family_selector_options'] = static 
 
     $builder = new AdminPageViewBuilder(new Storage());
     $view = $builder->build([
-        'storage' => ['root' => '/tmp/uploads/fonts'],
-        'catalog' => [
-            'Inter' => [
-                'family' => 'Inter',
-                'has_variable_faces' => true,
-            ],
-            'Lora' => [
-                'family' => 'Lora',
-                'faces' => [
-                    [
-                        'weight' => '400',
-                        'style' => 'normal',
-                    ],
-                ],
-            ],
-        ],
-        'available_families' => ['Inter', 'Lora', 'Legacy Stack'],
-    ]);
+		'storage' => ['root' => '/tmp/uploads/fonts'],
+		'catalog' => [
+			'Inter' => [
+				'family' => 'Inter',
+				'has_variable_faces' => true,
+			],
+			'Lora' => [
+				'family' => 'Lora',
+				'faces' => [
+					[
+						'weight' => '400',
+						'style' => 'normal',
+					],
+				],
+			],
+		],
+		'available_families' => ['Inter', 'Lora', 'Legacy Stack'],
+	])->toArray();
 
-    assertSameValue('Inter · Variable', $view['availableFamilyOptions'][0]['label'] ?? '', 'Known variable families should receive a typed selector label.');
-    assertSameValue('variable', $view['availableFamilyOptions'][0]['type'] ?? '', 'Variable selector options should expose their type token.');
-    assertSameValue('Lora · Static', $view['availableFamilyOptions'][1]['label'] ?? '', 'Known static families should receive a typed selector label.');
-    assertSameValue('static', $view['availableFamilyOptions'][1]['type'] ?? '', 'Static selector options should expose their type token.');
-    assertSameValue('Legacy Stack', $view['availableFamilyOptions'][2]['label'] ?? '', 'Families missing from the current catalog should keep their plain selector label.');
-    assertSameValue('Inter · Variable', $view['availableFamilyLabels']['Inter'] ?? '', 'The preview label lookup should reuse the typed selector label.');
-    assertSameValue('Legacy Stack', $view['availableFamilyLabels']['Legacy Stack'] ?? '', 'Missing catalog families should stay selectable without a type suffix.');
+	assertSameValue('Inter · Variable', $view['availableFamilyOptions'][0]['label'] ?? '', 'Known variable families should receive a typed selector label.');
+	assertSameValue('variable', $view['availableFamilyOptions'][0]['type'] ?? '', 'Variable selector options should expose their type token.');
+	assertSameValue('Lora · Static', $view['availableFamilyOptions'][1]['label'] ?? '', 'Known static families should receive a typed selector label.');
+	assertSameValue('static', $view['availableFamilyOptions'][1]['type'] ?? '', 'Static selector options should expose their type token.');
+	assertSameValue('Legacy Stack', $view['availableFamilyOptions'][2]['label'] ?? '', 'Families missing from the current catalog should keep their plain selector label.');
+	assertSameValue('Inter · Variable', $view['availableFamilyLabels']['Inter'] ?? '', 'The preview label lookup should reuse the typed selector label.');
+	assertSameValue('Legacy Stack', $view['availableFamilyLabels']['Legacy Stack'] ?? '', 'Missing catalog families should stay selectable without a type suffix.');
 };
 
 $tests['admin_page_view_builder_casts_admin_access_user_ids_to_strings'] = static function (): void {
-    resetTestState();
+	resetTestState();
 
-    $builder = new AdminPageViewBuilder(new Storage());
-    $view = $builder->build([
+	$builder = new AdminPageViewBuilder(new Storage());
+	$view = $builder->build([
         'storage' => ['root' => '/tmp/uploads/fonts'],
         'catalog' => [],
         'available_families' => [],
@@ -2057,7 +2058,7 @@ $tests['admin_page_view_builder_casts_admin_access_user_ids_to_strings'] = stati
         'admin_access_user_options' => [
             ['value' => '3', 'label' => 'Author User (author)'],
         ],
-    ]);
+	])->toArray();
 
     assertSameValue(['editor'], $view['adminAccessRoleSlugs'] ?? null, 'The view builder should pass through selected admin-access roles for the template.');
     assertSameValue(['3'], $view['adminAccessUserIds'] ?? null, 'The view builder should cast selected admin-access user IDs to strings for strict template comparisons.');
@@ -2088,7 +2089,7 @@ $tests['admin_page_view_builder_derives_saved_output_quick_mode_on_reload'] = st
         'extended_variable_category_sans_enabled' => true,
         'extended_variable_category_serif_enabled' => true,
         'role_usage_font_weight_enabled' => true,
-    ]);
+	])->toArray();
 
 	assertSameValue('variables', (string) ($view['outputQuickMode'] ?? ''), 'A saved custom quick-mode preference should normalize to variables when only the variable layer is enabled.');
 	assertSameValue(true, !empty($view['advancedOutputControlsExpanded']), 'Variables-only should keep the advanced output controls expanded on reload.');
@@ -2110,9 +2111,9 @@ $tests['admin_page_view_builder_derives_saved_output_quick_mode_on_reload'] = st
         'extended_variable_category_sans_enabled' => true,
         'extended_variable_category_serif_enabled' => true,
         'role_usage_font_weight_enabled' => false,
-    ]);
-    assertSameValue('variables', (string) ($variablesView['outputQuickMode'] ?? ''), 'A saved variables-only quick-mode preference should remain selected when its grouped controls match.');
-    assertSameValue(true, !empty($variablesView['advancedOutputControlsExpanded']), 'Variables-only should expand its grouped output controls on initial render.');
+	])->toArray();
+	assertSameValue('variables', (string) ($variablesView['outputQuickMode'] ?? ''), 'A saved variables-only quick-mode preference should remain selected when its grouped controls match.');
+	assertSameValue(true, !empty($variablesView['advancedOutputControlsExpanded']), 'Variables-only should expand its grouped output controls on initial render.');
 
     $classesView = $builder->build([
         'storage' => ['root' => '/tmp/uploads/fonts'],
@@ -2130,9 +2131,67 @@ $tests['admin_page_view_builder_derives_saved_output_quick_mode_on_reload'] = st
         'per_variant_font_variables_enabled' => false,
         'minimal_output_preset_enabled' => false,
         'role_usage_font_weight_enabled' => false,
-    ]);
+	])->toArray();
     assertSameValue('classes', (string) ($classesView['outputQuickMode'] ?? ''), 'A saved classes-only quick-mode preference should remain selected when its grouped controls match.');
     assertSameValue(true, !empty($classesView['advancedOutputControlsExpanded']), 'Classes-only should expand its grouped output controls on initial render.');
+};
+
+$tests['admin_page_view_variables_exposes_constructor_contract_and_to_array_keys'] = static function (): void {
+    resetTestState();
+
+    $builder = new AdminPageViewBuilder(new Storage());
+    $variables = $builder->build([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+    ]);
+
+    assertSameValue(true, $variables instanceof AdminPageViewVariables, 'AdminPageViewBuilder::build() should return AdminPageViewVariables.');
+
+    $array = $variables->toArray();
+    $constructor = new ReflectionMethod(AdminPageViewVariables::class, '__construct');
+    $parameterNames = array_map(
+        static fn (ReflectionParameter $parameter): string => $parameter->getName(),
+        $constructor->getParameters()
+    );
+
+    assertSameValue($parameterNames, array_keys($array), 'toArray() keys should match constructor parameter names in order.');
+    assertSameValue(false, array_key_exists('context', $array), 'Builder output should not leak local $context.');
+};
+
+$tests['admin_page_view_variables_can_be_constructed_from_full_argument_list'] = static function (): void {
+    resetTestState();
+
+    $builder = new AdminPageViewBuilder(new Storage());
+    $variables = $builder->build([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+    ]);
+
+    $reconstructed = new AdminPageViewVariables(...array_values($variables->toArray()));
+
+    assertSameValue($variables->toArray(), $reconstructed->toArray(), 'AdminPageViewVariables should construct successfully with the full constructor argument list.');
+};
+
+$tests['admin_page_view_variables_requires_all_constructor_arguments'] = static function (): void {
+    resetTestState();
+
+    $builder = new AdminPageViewBuilder(new Storage());
+    $variables = $builder->build([
+        'storage' => ['root' => '/tmp/uploads/fonts'],
+        'catalog' => [],
+        'available_families' => [],
+    ]);
+
+    $args = array_values($variables->toArray());
+    array_pop($args);
+
+    assertThrows(
+        static fn () => new AdminPageViewVariables(...$args),
+        ArgumentCountError::class,
+        'AdminPageViewVariables construction should fail when a required argument is missing.'
+    );
 };
 
 $tests['admin_page_renderer_balances_div_wrappers'] = static function (): void {
@@ -3887,7 +3946,7 @@ $tests['admin_page_renderer_disables_integrations_until_sitewide_delivery_is_on'
 	);
 
 	$renderer = new \TastyFonts\Admin\Renderer\SettingsSectionRenderer(new Storage());
-	$view = (new AdminPageViewBuilder($services['storage']))->build($builder->build());
+	$view = (new AdminPageViewBuilder($services['storage']))->build($builder->build())->toArray();
 
 	ob_start();
 	try {
@@ -7682,4 +7741,269 @@ $tests['family_card_renderer_face_detail_cards_render_variable_axes'] = static f
 	assertContainsValue('wght 100..900', $output, 'Face detail cards should render the wght axis range.');
 	assertContainsValue('tasty-fonts-detail-chip-row', $output, 'Face detail cards should render axis labels inside a chip row.');
 	assertContainsValue('tasty-fonts-chip', $output, 'Face detail cards should render axis labels as chips.');
+};
+
+$tests['preview_section_renderer_scene_templates_map_all_7_keys'] = static function (): void {
+	$expected = [
+		'editorial' => 'preview-editorial.php',
+		'card' => 'preview-card.php',
+		'reading' => 'preview-reading.php',
+		'marketing' => 'preview-marketing.php',
+		'code' => 'preview-code.php',
+		'snippet' => 'preview-snippet.php',
+		'interface' => 'preview-interface.php',
+	];
+
+	$reflection = new ReflectionClass(PreviewSectionRenderer::class);
+	$constant = (array) $reflection->getConstant('SCENE_TEMPLATES');
+
+	assertSameValue($expected, $constant, 'SCENE_TEMPLATES should map each scene key to the expected preview-{scene}.php template filename.');
+};
+
+$tests['preview_section_renderer_editorial_scene_renders_without_errors'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('editorial', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora'], true, ['Inter' => 'Inter Font'], ['heading_fallback' => 'sans-serif', 'body_fallback' => 'serif']);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-showcase', $output, 'Editorial scene should render the showcase container.');
+	assertContainsValue('tasty-fonts-preview-specimen-panel--identity', $output, 'Editorial scene should render the identity panel.');
+	assertContainsValue('tasty-fonts-preview-specimen-panel--usage', $output, 'Editorial scene should render the usage panel.');
+	assertContainsValue('data-role-preview="heading"', $output, 'Editorial scene should contain heading role preview attributes.');
+	assertContainsValue('data-role-preview="body"', $output, 'Editorial scene should contain body role preview attributes.');
+	assertContainsValue('tasty-fonts-preview-specimen-ladder', $output, 'Editorial scene should contain the heading scale ladder.');
+};
+
+$tests['preview_section_renderer_card_scene_renders_without_errors'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('card', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora'], false, [], []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-card-board', $output, 'Card scene should render the card board container.');
+	assertContainsValue('tasty-fonts-preview-article-tile', $output, 'Card scene should render an article tile.');
+	assertContainsValue('tasty-fonts-preview-pricing-tile', $output, 'Card scene should render a pricing tile.');
+	assertContainsValue('tasty-fonts-preview-testimonial-tile', $output, 'Card scene should render a testimonial tile.');
+};
+
+$tests['preview_section_renderer_reading_scene_renders_without_errors'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('reading', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora'], true, ['Inter' => 'Inter Font'], []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-reading-sheet', $output, 'Reading scene should render the reading sheet container.');
+	assertContainsValue('tasty-fonts-preview-reading-masthead', $output, 'Reading scene should render the masthead.');
+	assertContainsValue('tasty-fonts-preview-reading-prose', $output, 'Reading scene should render the prose section.');
+	assertContainsValue('tasty-fonts-preview-reading-aside', $output, 'Reading scene should render the aside section.');
+};
+
+$tests['preview_section_renderer_marketing_scene_renders_without_errors'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('marketing', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora'], false, [], []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-marketing-board', $output, 'Marketing scene should render the marketing board container.');
+	assertContainsValue('tasty-fonts-preview-marketing-cta', $output, 'Marketing scene should render the CTA section.');
+	assertContainsValue('tasty-fonts-preview-marketing-grid', $output, 'Marketing scene should render the marketing grid.');
+};
+
+$tests['preview_section_renderer_code_scene_renders_without_errors'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('code', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora', 'monospace' => 'JetBrains Mono'], true, ['Inter' => 'Inter Font', 'JetBrains Mono' => 'JetBrains Mono Font'], []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-code-workspace', $output, 'Code scene should render the code workspace container.');
+	assertContainsValue('data-role-preview="monospace"', $output, 'Code scene should contain monospace role preview attributes.');
+	assertContainsValue('tasty-fonts-preview-code-panel--editor', $output, 'Code scene should render the editor panel.');
+	assertContainsValue('&lt;code', $output, 'Code scene should keep escaped TSX opening tag text in the editor sample.');
+	assertContainsValue('&lt;/code&gt;', $output, 'Code scene should keep escaped TSX closing tag text in the editor sample.');
+	assertContainsValue('aria-label="Editor preview"', $output, 'Code scene should keep the editor aria-label contract marker.');
+	assertContainsValue('aria-label="Published code block preview"', $output, 'Code scene should keep the published code block aria-label contract marker.');
+};
+
+$tests['preview_section_renderer_snippet_scene_renders_without_errors'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('snippet', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora', 'monospace' => 'JetBrains Mono'], true, ['Inter' => 'Inter Font', 'JetBrains Mono' => 'JetBrains Mono Font'], []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-snippet-workspace', $output, 'Snippet scene should render the snippet workspace container.');
+	assertContainsValue('tasty-fonts-preview-snippet-card', $output, 'Snippet scene should render the snippet card.');
+	assertContainsValue('data-preview-snippet-copy', $output, 'Snippet scene should render a dedicated snippet copy button.');
+	assertContainsValue('aria-label="Copy the CSS for the current preview pairing"', $output, 'Snippet scene copy control should keep its aria-label contract marker.');
+	assertContainsValue('data-preview-snippet-code', $output, 'Snippet scene should contain the snippet code element.');
+	assertContainsValue('tasty-fonts-preview-snippet-role-list', $output, 'Snippet scene should render the preview role list.');
+	assertContainsValue('data-role-preview="monospace"', $output, 'Snippet scene role list should include the monospace role marker when enabled.');
+};
+
+$tests['preview_section_renderer_code_and_snippet_helper_methods_render_contract_markup'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+	$roles = ['heading' => 'Inter', 'body' => 'Lora', 'monospace' => 'JetBrains Mono'];
+	$labels = ['Inter' => 'Inter Font', 'Lora' => 'Lora Font', 'JetBrains Mono' => 'JetBrains Mono Font'];
+
+	ob_start();
+	try {
+		$renderer->renderCodePreviewScene('Test preview text', $roles, true, $labels, []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$codeOutput = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-code-workspace', $codeOutput, 'renderCodePreviewScene() should still render the code workspace markup after scene template extraction.');
+	assertContainsValue('&lt;code', $codeOutput, 'renderCodePreviewScene() should still include escaped TSX opening tag text.');
+	assertContainsValue('&lt;/code&gt;', $codeOutput, 'renderCodePreviewScene() should still include escaped TSX closing tag text.');
+	assertContainsValue('aria-label="Editor preview"', $codeOutput, 'renderCodePreviewScene() should still include the editor aria-label marker.');
+	assertContainsValue('aria-label="Published code block preview"', $codeOutput, 'renderCodePreviewScene() should still include the published block aria-label marker.');
+	assertContainsValue('data-role-preview="monospace"', $codeOutput, 'renderCodePreviewScene() should still include monospace role markers.');
+
+	ob_start();
+	try {
+		$renderer->renderSnippetPreviewScene($roles, true, $labels, []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$snippetOutput = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-snippet-workspace', $snippetOutput, 'renderSnippetPreviewScene() should still render the snippet workspace markup after scene template extraction.');
+	assertContainsValue('data-preview-snippet-copy', $snippetOutput, 'renderSnippetPreviewScene() should still render the snippet copy button marker.');
+	assertContainsValue('aria-label="Copy the CSS for the current preview pairing"', $snippetOutput, 'renderSnippetPreviewScene() should still render snippet copy aria-label marker.');
+	assertContainsValue('data-preview-snippet-code', $snippetOutput, 'renderSnippetPreviewScene() should still render the snippet code marker.');
+	assertContainsValue('tasty-fonts-preview-snippet-role-list', $snippetOutput, 'renderSnippetPreviewScene() should still render the role list wrapper.');
+	assertContainsValue('data-role-preview="monospace"', $snippetOutput, 'renderSnippetPreviewScene() should still include monospace role markers when enabled.');
+};
+
+$tests['preview_section_renderer_scene_templates_have_substantial_markup'] = static function (): void {
+	$codeTemplatePath = __DIR__ . '/../../includes/Admin/Renderer/templates/preview-code.php';
+	$snippetTemplatePath = __DIR__ . '/../../includes/Admin/Renderer/templates/preview-snippet.php';
+
+	$codeTemplate = (string) file_get_contents($codeTemplatePath);
+	$snippetTemplate = (string) file_get_contents($snippetTemplatePath);
+
+	assertContainsValue('tasty-fonts-preview-code-workspace', $codeTemplate, 'preview-code.php should contain direct scene markup.');
+	assertContainsValue('tasty-fonts-preview-code-panel--editor', $codeTemplate, 'preview-code.php should include substantial editor surface markup.');
+	assertNotContainsValue('renderCodePreviewScene(', $codeTemplate, 'preview-code.php should not be a thin wrapper that delegates back to renderCodePreviewScene().');
+
+	assertContainsValue('tasty-fonts-preview-snippet-workspace', $snippetTemplate, 'preview-snippet.php should contain direct scene markup.');
+	assertContainsValue('data-preview-snippet-code', $snippetTemplate, 'preview-snippet.php should include substantial snippet code panel markup.');
+	assertNotContainsValue('renderSnippetPreviewScene(', $snippetTemplate, 'preview-snippet.php should not be a thin wrapper that delegates back to renderSnippetPreviewScene().');
+};
+
+$tests['preview_section_renderer_interface_scene_renders_without_errors'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('interface', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora'], true, ['Inter' => 'Inter Font'], []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-ui-shell', $output, 'Interface scene should render the UI shell container.');
+	assertContainsValue('tasty-fonts-preview-ui-topbar', $output, 'Interface scene should render the topbar.');
+	assertContainsValue('tasty-fonts-preview-ui-hero', $output, 'Interface scene should render the hero section.');
+	assertContainsValue('tasty-fonts-preview-ui-feed', $output, 'Interface scene should render the feed section.');
+};
+
+$tests['preview_section_renderer_unknown_scene_falls_back_to_editorial'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	ob_start();
+	try {
+		$renderer->renderPreviewScene('unknown-scene', 'Test preview text', ['heading' => 'Inter', 'body' => 'Lora'], false, [], []);
+	} catch (\Throwable $e) {
+		ob_end_clean();
+		throw $e;
+	}
+	$output = (string) ob_get_clean();
+
+	assertContainsValue('tasty-fonts-preview-showcase', $output, 'Unknown scene key should fall back to the editorial template.');
+	assertNotContainsValue('tasty-fonts-preview-card-board', $output, 'Unknown scene key should not render the card template.');
+};
+
+$tests['preview_section_renderer_scenes_handle_empty_roles_and_labels'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	foreach (['editorial', 'card', 'reading', 'marketing', 'code', 'snippet', 'interface'] as $scene) {
+		ob_start();
+		try {
+			$renderer->renderPreviewScene($scene, 'Test', [], false, [], []);
+		} catch (\Throwable $e) {
+			ob_end_clean();
+			throw $e;
+		}
+		$output = (string) ob_get_clean();
+
+		assertTrueValue($output !== '', sprintf('Scene "%s" should render non-empty output with empty roles.', $scene));
+	}
+};
+
+$tests['preview_section_renderer_scenes_handle_monospace_disabled'] = static function (): void {
+	resetTestState();
+	$renderer = new PreviewSectionRenderer(new Storage());
+
+	foreach (['editorial', 'card', 'reading', 'marketing', 'code', 'snippet', 'interface'] as $scene) {
+		ob_start();
+		try {
+			$renderer->renderPreviewScene($scene, 'Test', ['heading' => 'Inter', 'body' => 'Lora'], false, [], []);
+		} catch (\Throwable $e) {
+			ob_end_clean();
+			throw $e;
+		}
+		$output = (string) ob_get_clean();
+
+		assertTrueValue($output !== '', sprintf('Scene "%s" should render non-empty output when monospace is disabled.', $scene));
+	}
 };

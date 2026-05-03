@@ -1968,10 +1968,8 @@ final class AdminPageContextBuilder
      */
     public function buildAcssIntegrationContext(array $settings): array
     {
-        $enabled = ($settings['acss_font_role_sync_enabled'] ?? null) === true;
-        $applied = !empty($settings['acss_font_role_sync_applied']);
         $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
-        $state = $this->acssIntegration->readState($sitewideRolesEnabled, $enabled, $applied);
+        $state = $this->acssIntegration->readState($settings);
 
         $status = is_string($state['status'] ?? null) ? $state['status'] : 'disabled';
 
@@ -2044,10 +2042,7 @@ final class AdminPageContextBuilder
      */
     public function buildOxygenIntegrationContext(array $settings): array
     {
-        $enabled = array_key_exists('oxygen_integration_enabled', $settings)
-            ? $this->nullableBoolValue($settings['oxygen_integration_enabled'])
-            : null;
-        $state = $this->oxygenIntegration->readState($enabled);
+        $state = $this->oxygenIntegration->readState($settings);
 
         $status = $state['status'];
 

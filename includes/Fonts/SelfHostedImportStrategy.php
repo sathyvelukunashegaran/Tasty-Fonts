@@ -186,7 +186,7 @@ final class SelfHostedImportStrategy implements DeliveryImportStrategy
             return null;
         }
 
-        return $this->buildStoredFace($familyName, $familySlug, $face, $relativeFiles, $provider, $config->source);
+        return StoredFaceBuilder::build($familyName, $familySlug, $face, $relativeFiles, $provider, $config->source);
     }
 
     private function downloadFontFile(string $url, string $targetPath, HostedImportProviderConfig $config): bool|WP_Error
@@ -309,32 +309,4 @@ final class SelfHostedImportStrategy implements DeliveryImportStrategy
         return FontUtils::normalizeStringKeyedMap($values[$key] ?? []);
     }
 
-    /**
-     * @param array<string, mixed> $face
-     * @param array<string, string> $files
-     * @param array<string, mixed> $provider
-     * @return array<string, mixed>
-     */
-    private function buildStoredFace(
-        string $familyName,
-        string $familySlug,
-        array $face,
-        array $files,
-        array $provider,
-        string $source
-    ): array {
-        return [
-            'family' => $familyName,
-            'slug' => $familySlug,
-            'source' => $source,
-            'weight' => FontUtils::stringValue($face, 'weight', '400'),
-            'style' => FontUtils::stringValue($face, 'style', 'normal'),
-            'unicode_range' => FontUtils::stringValue($face, 'unicode_range'),
-            'files' => $files,
-            'provider' => $provider,
-            'is_variable' => !empty($face['is_variable']),
-            'axes' => $this->arrayValue($face, 'axes'),
-            'variation_defaults' => $this->arrayValue($face, 'variation_defaults'),
-        ];
-    }
 }

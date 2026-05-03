@@ -6,6 +6,7 @@ use TastyFonts\Repository\AdobeProjectRepository;
 use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\RoleRepository;
+use TastyFonts\Repository\SettingsRepository;
 
 // ---------------------------------------------------------------------------
 // GoogleApiKeyRepository
@@ -124,6 +125,46 @@ $tests['google_api_key_repository_plaintext_fallback_when_salts_missing'] = stat
     assertTrueValue($repo->has(), 'has() should return true with plaintext key.');
     $status = $repo->getStatus();
     assertSameValue('valid', $status['state'], 'getStatus() should read plaintext key status.');
+
+    $repo->saveData($repo->getData());
+    $stored = $optionStore[GoogleApiKeyRepository::OPTION_GOOGLE_API_KEY_DATA] ?? [];
+
+    if (array_key_exists('google_api_key_encrypted', $stored)) {
+        return;
+    }
+
+    assertSameValue($keyMaterial, $stored['google_api_key'] ?? '', 'When encryption is unavailable, saveData() should persist plaintext key data.');
+};
+
+$tests['google_api_key_repository_plaintext_to_encrypted_upgrade_on_settings_save'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    if (!function_exists('sodium_crypto_secretbox') || !function_exists('sodium_crypto_secretbox_open')) {
+        return;
+    }
+
+    $repo = new GoogleApiKeyRepository();
+    $canEncrypt = invokePrivateMethod($repo, 'deriveGoogleApiKeyEncryptionKey', []) !== '';
+
+    if (!$canEncrypt) {
+        return;
+    }
+
+    $optionStore[GoogleApiKeyRepository::OPTION_GOOGLE_API_KEY_DATA] = [
+        'google_api_key' => 'upgrade-me',
+        'google_api_key_status' => 'valid',
+        'google_api_key_status_message' => '',
+        'google_api_key_checked_at' => time(),
+    ];
+
+    $settingsRepo = new SettingsRepository($repo);
+    $settingsRepo->saveSettings(['font_display' => 'swap']);
+
+    $stored = $optionStore[GoogleApiKeyRepository::OPTION_GOOGLE_API_KEY_DATA] ?? [];
+    assertSameValue(false, array_key_exists('google_api_key', $stored), 'saveSettings() should upgrade plaintext API key storage to encrypted when encryption is available.');
+    assertSameValue(true, str_starts_with((string) ($stored['google_api_key_encrypted'] ?? ''), 'secretbox:'), 'Encrypted API key should be stored with secretbox prefix.');
 };
 
 $tests['google_api_key_repository_status_state_transitions'] = static function (): void {

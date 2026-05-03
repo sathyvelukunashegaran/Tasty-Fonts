@@ -95,6 +95,23 @@ final class GoogleApiKeyRepository
     /**
      * @return GoogleApiKeyData
      */
+    public function getData(): array
+    {
+        return $this->getGoogleApiKeyDataFromOptions();
+    }
+
+    /**
+     * @param array<string, mixed> $googleApiKeyData
+     * @return GoogleApiKeyData
+     */
+    public function saveData(array $googleApiKeyData): array
+    {
+        return $this->persistGoogleApiKeyData($googleApiKeyData);
+    }
+
+    /**
+     * @return GoogleApiKeyData
+     */
     private function getGoogleApiKeyDataFromOptions(): array
     {
         $googleApiKeyData = get_option(self::OPTION_GOOGLE_API_KEY_DATA, null);
@@ -113,7 +130,7 @@ final class GoogleApiKeyRepository
     }
 
     /**
-     * @param GoogleApiKeyData $googleApiKeyData
+     * @param array<string, mixed> $googleApiKeyData
      * @return GoogleApiKeyData
      */
     private function persistGoogleApiKeyData(array $googleApiKeyData): array

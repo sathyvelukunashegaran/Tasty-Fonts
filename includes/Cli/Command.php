@@ -413,7 +413,7 @@ final class Command
     }
 
     /**
-     * @param array<string, mixed>|WP_Error $result
+     * @param array<array-key, mixed>|WP_Error $result
      * @param array<string, mixed> $assocArgs
      */
     private function finish(array|WP_Error $result, array $assocArgs, string $pathKey = ''): void
@@ -608,7 +608,7 @@ final class Command
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param array<array-key, mixed> $payload
      */
     private function nestedValue(array $payload, string $path): mixed
     {
@@ -667,7 +667,7 @@ final class Command
     }
 
     /**
-     * @param array<string, mixed>|list<mixed> $payload
+     * @param array<array-key, mixed>|list<mixed> $payload
      */
     private function json(array $payload): void
     {

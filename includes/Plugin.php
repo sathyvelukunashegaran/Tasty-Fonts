@@ -21,11 +21,14 @@ use TastyFonts\CustomCss\CustomCssFontValidator;
 use TastyFonts\CustomCss\CustomCssImportSnapshotService;
 use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
+use TastyFonts\Fonts\AdobeStylesheetResolver;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
+use TastyFonts\Fonts\BunnyStylesheetResolver;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CapabilityDisableCleanupService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
+use TastyFonts\Fonts\GoogleStylesheetResolver;
 use TastyFonts\Fonts\CdnImportStrategy;
 use TastyFonts\Fonts\HostedImportVariantPlanner;
 use TastyFonts\Fonts\HostedImportWorkflow;
@@ -132,12 +135,13 @@ final class Plugin
             $this->adobe
         );
         $this->cssBuilder = new CssBuilder();
+        $googleStylesheetResolver = new GoogleStylesheetResolver($this->googleClient);
+        $bunnyStylesheetResolver = new BunnyStylesheetResolver($this->bunnyClient);
+        $adobeStylesheetResolver = new AdobeStylesheetResolver($this->adobe);
         $this->planner = new RuntimeAssetPlanner(
             $this->catalog,
             $this->settings,
-            $this->googleClient,
-            $this->bunnyClient,
-            $this->adobe,
+            [$googleStylesheetResolver, $bunnyStylesheetResolver, $adobeStylesheetResolver],
             $roleRepo,
             $familyMetadataRepo
         );
@@ -209,6 +213,7 @@ final class Plugin
             $this->acssIntegration,
             $this->bricksIntegration,
             $this->oxygenIntegration,
+            [$this->acssIntegration, $this->bricksIntegration, $this->oxygenIntegration],
             $this->catalog,
             $roleFamilyCatalogBuilder,
             $this->adminAccess
@@ -225,7 +230,7 @@ final class Plugin
         $this->customCssFinalImport = new CustomCssFinalImportService(
             $this->storage,
             $this->imports,
-            $this->settings,
+            $familyMetadataRepo,
             $this->catalog,
             $this->assets,
             $this->log,

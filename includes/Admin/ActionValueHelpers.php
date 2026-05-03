@@ -9,21 +9,6 @@ defined('ABSPATH') || exit;
 trait ActionValueHelpers
 {
     /**
-     * @param array<string, mixed> $meta
-     * @return array<string, mixed>
-     */
-    private function logContext(string $category, string $event, array $meta = []): array
-    {
-        return array_merge(
-            [
-                'category' => $category,
-                'event' => $event,
-            ],
-            $meta
-        );
-    }
-
-    /**
      * @param array<string, mixed> $values
      */
     private function stringValue(array $values, int|string $key, string $default = ''): string

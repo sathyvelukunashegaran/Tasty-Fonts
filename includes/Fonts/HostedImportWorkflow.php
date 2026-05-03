@@ -46,10 +46,8 @@ final class HostedImportWorkflow
         private readonly HostedImportVariantPlanner $variantPlanner,
         private readonly array $strategies
     ) {
-        foreach (['cdn', 'self_hosted'] as $required) {
-            if (!isset($this->strategies[$required])) {
-                throw new \InvalidArgumentException("Strategy map must include a DeliveryImportStrategy for '{$required}'.");
-            }
+        if ($this->strategies === []) {
+            throw new \InvalidArgumentException('Strategy map must include at least one DeliveryImportStrategy.');
         }
     }
 
@@ -69,13 +67,21 @@ final class HostedImportWorkflow
 
         $familySlug = FontUtils::slugify($familyName);
         $deliveryMode = $this->normalizeDeliveryMode($request->deliveryMode);
+        $strategySelection = $this->selectStrategy($deliveryMode);
+
+        if (is_wp_error($strategySelection)) {
+            return $strategySelection;
+        }
+
+        $effectiveDeliveryMode = $strategySelection['mode'];
+        $strategy = $strategySelection['strategy'];
         $formatMode = $provider->normalizeFormatMode($request->formatMode);
         $requestedVariants = FontUtils::normalizeVariantTokens($request->variants);
         $existingFamily = $this->imports->getFamily($familySlug);
         $existingProfile = FontUtils::findDeliveryProfile(
             $existingFamily,
             $provider->providerKey(),
-            $deliveryMode,
+            $effectiveDeliveryMode,
             $provider->profileFormatFilter($formatMode)
         );
         $variantPlan = $this->variantPlanner->plan(
@@ -87,7 +93,7 @@ final class HostedImportWorkflow
         if ($variantPlan['import'] === []) {
             return $this->buildSkippedImportResult(
                 $familyName,
-                $deliveryMode,
+                $effectiveDeliveryMode,
                 $requestedVariants,
                 $variantPlan,
                 $config
@@ -110,7 +116,7 @@ final class HostedImportWorkflow
         $draft = $provider->buildProfileDraft([
             'family_name' => $familyName,
             'family_slug' => $familySlug,
-            'delivery_mode' => $deliveryMode,
+            'delivery_mode' => $effectiveDeliveryMode,
             'format_mode' => $formatMode,
             'metadata' => $metadata,
             'existing_family' => $existingFamily,
@@ -120,7 +126,6 @@ final class HostedImportWorkflow
         $profile = FontUtils::normalizeStringKeyedMap($draft['profile']);
         $faceProvider = FontUtils::normalizeStringKeyedMap($draft['face_provider']);
 
-        $strategy = $this->strategies[$deliveryMode] ?? $this->strategies['self_hosted'];
         $faceResult = $strategy->importFaces($familyName, $familySlug, $faces, $faceProvider, $config);
 
         if (is_wp_error($faceResult)) {
@@ -143,7 +148,7 @@ final class HostedImportWorkflow
         $faceCount = count($faceResult->faces);
         $fileCount = $faceResult->files;
 
-        if ($deliveryMode === 'cdn') {
+        if ($effectiveDeliveryMode === 'cdn') {
             $message = $this->buildImportMessageWithoutFiles(
                 $config->cdnSuccessMessage,
                 $familyName,
@@ -168,7 +173,7 @@ final class HostedImportWorkflow
                 $message,
                 $familyName,
                 $this->arrayValue($persisted, 'family_record'),
-                FontUtils::stringValue($profile, 'type', $deliveryMode),
+                FontUtils::stringValue($profile, 'type', $effectiveDeliveryMode),
                 FontUtils::stringValue($profile, 'id'),
                 $faceCount,
                 $fileCount,
@@ -183,7 +188,52 @@ final class HostedImportWorkflow
     {
         $deliveryMode = strtolower(trim($deliveryMode));
 
-        return in_array($deliveryMode, ['self_hosted', 'cdn'], true) ? $deliveryMode : 'self_hosted';
+        return $deliveryMode === '' ? 'self_hosted' : $deliveryMode;
+    }
+
+    /**
+     * @return array{mode: string, strategy: DeliveryImportStrategy}|WP_Error
+     */
+    private function selectStrategy(string $deliveryMode): array|WP_Error
+    {
+        if (isset($this->strategies[$deliveryMode])) {
+            $strategy = $this->strategies[$deliveryMode];
+
+            if ($strategy->supports($deliveryMode)) {
+                return [
+                    'mode' => $deliveryMode,
+                    'strategy' => $strategy,
+                ];
+            }
+        }
+
+        foreach ($this->strategies as $strategy) {
+            if ($strategy->supports($deliveryMode)) {
+                return [
+                    'mode' => $deliveryMode,
+                    'strategy' => $strategy,
+                ];
+            }
+        }
+
+        if (isset($this->strategies['self_hosted'])) {
+            $fallback = $this->strategies['self_hosted'];
+
+            if ($fallback->supports('self_hosted')) {
+                return [
+                    'mode' => 'self_hosted',
+                    'strategy' => $fallback,
+                ];
+            }
+        }
+
+        return $this->error(
+            'tasty_fonts_delivery_strategy_unavailable',
+            sprintf(
+                __('No import strategy is available for delivery mode "%s".', 'tasty-fonts'),
+                $deliveryMode
+            )
+        );
     }
 
     /**
@@ -252,41 +302,6 @@ final class HostedImportWorkflow
         }
 
         return $faces;
-    }
-
-    /**
-     * @param HostedFace $face
-     * @param array<string, string> $files
-     * @param array<string, mixed> $provider
-     * @return HostedFace
-     */
-    /**
-     * @param HostedFace $face
-     * @param array<string, string> $files
-     * @param array<string, mixed> $provider
-     * @return HostedFace
-     */
-    public function buildStoredFace(
-        string $familyName,
-        string $familySlug,
-        array $face,
-        array $files,
-        array $provider,
-        string $source
-    ): array {
-        return [
-            'family' => $familyName,
-            'slug' => $familySlug,
-            'source' => $source,
-            'weight' => FontUtils::stringValue($face, 'weight', '400'),
-            'style' => FontUtils::stringValue($face, 'style', 'normal'),
-            'unicode_range' => FontUtils::stringValue($face, 'unicode_range'),
-            'files' => $files,
-            'provider' => $provider,
-            'is_variable' => !empty($face['is_variable']),
-            'axes' => $this->arrayValue($face, 'axes'),
-            'variation_defaults' => $this->arrayValue($face, 'variation_defaults'),
-        ];
     }
 
     /**

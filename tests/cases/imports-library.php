@@ -1168,6 +1168,85 @@ $tests['custom_css_remote_final_import_saves_remote_profiles_and_generates_contr
     assertSameValue([], $externalStylesheets, 'Custom remote CSS profiles should not enqueue the original third-party stylesheet.');
 };
 
+$tests['custom_css_remote_final_import_revalidation_uses_final_import_internal_url_filter'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetCalls;
+    global $remoteGetResponses;
+    global $remoteRequestCalls;
+
+    $services = makeServiceGraph();
+    $cssUrl = 'https://assets.example.com/remote-final-internal.css';
+    $fontUrl = 'https://cdn.test/fonts/remote-final-internal.woff2';
+    $fontBytes = tastyFontsTestFontBytes('woff2') . '-remote-internal';
+    $remoteGetResponses[$cssUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => '@font-face { font-family: "Remote Internal"; font-weight: 400; font-style: normal; src: url("' . $fontUrl . '") format("woff2"); }',
+    ];
+    tastyFontsMockCustomCssFont($fontUrl, 'woff2', ['access-control-allow-origin' => ''], $fontBytes);
+
+    $allowDryRunInternal = true;
+    add_filter(
+        'tasty_fonts_custom_css_allow_internal_dry_run_url',
+        static function (bool $allowed, string $url, string $host, string $kind) use (&$allowDryRunInternal): bool {
+            unset($allowed, $url);
+
+            return $allowDryRunInternal && $kind === 'font' && $host === 'cdn.test';
+        },
+        10,
+        4
+    );
+
+    $dryRun = $services['custom_css_import']->dryRun($cssUrl);
+    assertFalseValue(is_wp_error($dryRun), 'Dry run should be able to review controlled internal font fixtures when explicitly allowed.');
+
+    $snapshot = is_array($dryRun) ? $services['custom_css_snapshots']->createSnapshot($dryRun) : [];
+    $faceId = (string) ($dryRun['plan']['families'][0]['faces'][0]['id'] ?? '');
+    $validated = is_array($snapshot) ? $services['custom_css_snapshots']->validateFinalImportContract([
+        'snapshot_token' => $snapshot['token'] ?? '',
+        'selected_face_ids' => [$faceId],
+        'delivery_mode' => 'remote',
+    ]) : $snapshot;
+    assertFalseValue(is_wp_error($validated), 'Final import contract should validate against the reviewed snapshot.');
+
+    $allowDryRunInternal = false;
+
+    $dryRunFilterCalls = 0;
+    add_filter(
+        'tasty_fonts_custom_css_allow_internal_dry_run_url',
+        static function (bool $allowed, string $url, string $host, string $kind) use (&$dryRunFilterCalls): bool {
+            unset($allowed, $url, $host, $kind);
+            $dryRunFilterCalls++;
+
+            return false;
+        },
+        20,
+        4
+    );
+    $allowFinalImportInternal = true;
+    add_filter(
+        'tasty_fonts_custom_css_allow_internal_final_import_url',
+        static function (bool $allowed, string $url, string $host, string $kind) use (&$allowFinalImportInternal): bool {
+            unset($allowed, $url);
+
+            return $allowFinalImportInternal && $kind === 'font' && $host === 'cdn.test';
+        },
+        10,
+        4
+    );
+
+    $remoteGetCalls = [];
+    $remoteRequestCalls = [];
+    $result = is_array($validated) ? $services['custom_css_final_import']->importSelfHosted($validated) : $validated;
+
+    assertFalseValue(is_wp_error($result), 'Final remote revalidation should honor final-import internal URL allow filters.');
+    assertSameValue(0, $dryRunFilterCalls, 'Final remote revalidation should not consult dry-run internal URL allow filters.');
+    assertSameValue(true, isset($remoteRequestCalls[0]) && (string) ($remoteRequestCalls[0]['method'] ?? '') === 'HEAD', 'Final remote revalidation should still run a HEAD check before saving.');
+
+    $allowFinalImportInternal = false;
+};
+
 $tests['custom_css_remote_final_import_rejects_material_revalidation_differences'] = static function (): void {
     resetTestState();
 

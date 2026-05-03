@@ -6,9 +6,6 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Adobe\AdobeProjectClient;
-use TastyFonts\Bunny\BunnyFontsClient;
-use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\FamilyMetadataRepository;
 use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -31,9 +28,8 @@ final class RuntimeAssetPlanner
     public function __construct(
         private readonly CatalogService $catalog,
         private readonly SettingsRepository $settings,
-        private readonly GoogleFontsClient $google,
-        private readonly BunnyFontsClient $bunny,
-        private readonly AdobeProjectClient $adobe,
+        /** @var list<ProviderStylesheetResolverInterface> */
+        private readonly array $stylesheetResolvers,
         private readonly RoleRepository $roleRepo,
         private readonly FamilyMetadataRepository $familyMetadataRepo,
     ) {
@@ -217,15 +213,16 @@ final class RuntimeAssetPlanner
                 continue;
             }
 
-            $origin = match ($provider . ':' . $type) {
-                'google:cdn' => 'https://fonts.googleapis.com',
-                'bunny:cdn' => 'https://fonts.bunny.net',
-                'adobe:adobe_hosted' => 'https://use.typekit.net',
-                default => '',
-            };
+            foreach ($this->stylesheetResolvers as $resolver) {
+                if (!$resolver->supports($provider, $type)) {
+                    continue;
+                }
 
-            if ($origin !== '') {
-                $origins[$origin] = $origin;
+                $origin = $resolver->preconnectOrigin();
+
+                if ($origin !== null && trim($origin) !== '') {
+                    $origins[$origin] = $origin;
+                }
             }
         }
 
@@ -347,30 +344,17 @@ final class RuntimeAssetPlanner
         }
 
         $display = $this->runtimeStylesheetDisplay($familyName, $provider, $type, $displayOverride);
-        $variants = $this->normalizeVariantTokenList($delivery['variants'] ?? []);
+        foreach ($this->stylesheetResolvers as $resolver) {
+            if ($resolver->supports($provider, $type)) {
+                $descriptor = $resolver->buildStylesheetDescriptor($delivery, $familyName, $familySlug, $display);
 
-        $url = match ($provider . ':' . $type) {
-            'google:cdn' => $this->google->buildCssUrl(
-                $familyName,
-                $variants,
-                $display,
-                ['faces' => $this->deliveryFaces($delivery)]
-            ),
-            'bunny:cdn' => $this->bunny->buildCssUrl($familyName, $variants, $display),
-            'adobe:adobe_hosted' => $this->adobeStylesheetUrl($delivery),
-            default => '',
-        };
-
-        if ($url === '') {
-            return null;
+                if ($descriptor !== null) {
+                    return $descriptor;
+                }
+            }
         }
 
-        return [
-            'handle' => 'tasty-fonts-' . FontUtils::slugify($provider . '-' . $familySlug . '-' . $type),
-            'url' => $url,
-            'provider' => $provider,
-            'type' => $type,
-        ];
+        return null;
     }
 
     /**
@@ -397,39 +381,6 @@ final class RuntimeAssetPlanner
         }
 
         return array_values($origins);
-    }
-
-    /**
-     * @param array<string, mixed> $delivery
-     */
-    private function adobeStylesheetUrl(array $delivery): string
-    {
-        $projectId = sanitize_text_field($this->deliveryMetaStringValue($delivery, 'project_id', $this->adobe->getProjectId()));
-
-        return $projectId === '' ? '' : $this->adobe->getStylesheetUrl($projectId);
-    }
-
-    /**
-     * @param mixed $variants
-     * @return list<string>
-     */
-    private function normalizeVariantTokenList(mixed $variants): array
-    {
-        if (!is_array($variants)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($variants as $variant) {
-            if (!is_scalar($variant)) {
-                continue;
-            }
-
-            $normalized[] = (string) $variant;
-        }
-
-        return FontUtils::normalizeVariantTokens($normalized);
     }
 
     private function effectiveFontDisplay(string $familyName, string $displayOverride = ''): string
@@ -817,26 +768,6 @@ final class RuntimeAssetPlanner
     private function deliveryStringValue(array $delivery, string $key, string $default = ''): string
     {
         $value = $delivery[$key] ?? null;
-
-        if (is_scalar($value)) {
-            return (string) $value;
-        }
-
-        return $default;
-    }
-
-    /**
-     * @param array<string, mixed> $delivery
-     */
-    private function deliveryMetaStringValue(array $delivery, string $key, string $default = ''): string
-    {
-        $meta = $delivery['meta'] ?? null;
-
-        if (!is_array($meta)) {
-            return $default;
-        }
-
-        $value = $meta[$key] ?? null;
 
         if (is_scalar($value)) {
             return (string) $value;

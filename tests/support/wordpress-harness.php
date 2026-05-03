@@ -110,7 +110,9 @@ use TastyFonts\CustomCss\CustomCssFontValidator;
 use TastyFonts\CustomCss\CustomCssImportSnapshotService;
 use TastyFonts\CustomCss\CustomCssUrlImportService;
 use TastyFonts\Fonts\AssetService;
+use TastyFonts\Fonts\AdobeStylesheetResolver;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
+use TastyFonts\Fonts\BunnyStylesheetResolver;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CapabilityDisableCleanupService;
 use TastyFonts\Fonts\CdnImportStrategy;
@@ -120,6 +122,7 @@ use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\HostedImportVariantPlanner;
 use TastyFonts\Fonts\HostedImportWorkflow;
 use TastyFonts\Fonts\LibraryService;
+use TastyFonts\Fonts\GoogleStylesheetResolver;
 use TastyFonts\Fonts\SelfHostedImportStrategy;
 use TastyFonts\Fonts\LocalUploadService;
 use TastyFonts\Fonts\RoleFamilyCatalogBuilder;
@@ -1995,7 +1998,13 @@ function makeServiceGraph(): array
     $bunny = new BunnyFontsClient();
     $google = new GoogleFontsClient($settings, $googleApiKeyRepo);
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
-    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe, $roleRepo, $familyMetadataRepo);
+    $planner = new RuntimeAssetPlanner(
+        $catalog,
+        $settings,
+        [new GoogleStylesheetResolver($google), new BunnyStylesheetResolver($bunny), new AdobeStylesheetResolver($adobe)],
+        $roleRepo,
+        $familyMetadataRepo
+    );
     $cssBuilder = new CssBuilder();
     $assets = new AssetService($storage, $catalog, $settings, $cssBuilder, $planner, $log, $roleRepo);
     $hostedImportWorkflow = new HostedImportWorkflow(
@@ -2029,7 +2038,7 @@ function makeServiceGraph(): array
     $customCssValidator = new CustomCssFontValidator();
     $customCssImport = new CustomCssUrlImportService($imports, $customCssValidator);
     $customCssSnapshots = new CustomCssImportSnapshotService();
-    $customCssFinalImport = new CustomCssFinalImportService($storage, $imports, $settings, $catalog, $assets, $log, $customCssValidator);
+    $customCssFinalImport = new CustomCssFinalImportService($storage, $imports, $familyMetadataRepo, $catalog, $assets, $log, $customCssValidator);
     $developerTools = new DeveloperToolsService(
         $storage,
         $settings,
@@ -2115,6 +2124,7 @@ function makeServiceGraph(): array
         $acssIntegration,
         $bricksIntegration,
         $oxygenIntegration,
+        [$acssIntegration, $bricksIntegration, $oxygenIntegration],
         $catalog,
         $roleFamilyCatalogBuilder,
         $adminAccess

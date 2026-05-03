@@ -8,14 +8,22 @@ use TastyFonts\Admin\AdminPageViewBuilder;
 use TastyFonts\Adobe\AdobeCssParser;
 use TastyFonts\Adobe\AdobeProjectClient;
 use TastyFonts\Bunny\BunnyFontsClient;
+use TastyFonts\Fonts\AdobeStylesheetResolver;
 use TastyFonts\Fonts\AssetService;
+use TastyFonts\Fonts\BunnyStylesheetResolver;
 use TastyFonts\Fonts\CatalogService;
 use TastyFonts\Fonts\CssBuilder;
 use TastyFonts\Fonts\FontFilenameParser;
+use TastyFonts\Fonts\GoogleStylesheetResolver;
+use TastyFonts\Fonts\ProviderStylesheetResolverInterface;
 use TastyFonts\Fonts\RuntimeAssetPlanner;
+use TastyFonts\Fonts\RuntimeService;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
+use TastyFonts\Integrations\EditorIntegrationInterface;
+use TastyFonts\Integrations\IntegrationStatus;
+use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Maintenance\HealthCheckService;
 use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Repository\ImportRepository;
@@ -2394,7 +2402,13 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     $google = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
     $bunny = new BunnyFontsClient();
     $catalog = new CatalogService($storage, $imports, new FontFilenameParser(), $log, $adobe);
-    $planner = new RuntimeAssetPlanner($catalog, $settings, $google, $bunny, $adobe, new RoleRepository(), new FamilyMetadataRepository());
+    $planner = new RuntimeAssetPlanner(
+        $catalog,
+        $settings,
+        [new GoogleStylesheetResolver($google), new BunnyStylesheetResolver($bunny), new AdobeStylesheetResolver($adobe)],
+        new RoleRepository(),
+        new FamilyMetadataRepository()
+    );
     $assets = new AssetService($storage, $catalog, $settings, new CssBuilder(), $planner, $log, new RoleRepository());
 
     $assets->refreshGeneratedAssets();
@@ -3201,6 +3215,50 @@ $tests['admin_page_context_builder_reports_acss_sync_waiting_for_sitewide_roles'
     assertSameValue('', (string) ($context['acss_integration']['current']['body'] ?? ''), 'Automatic.css integration context should expose the current text font-family value.');
 };
 
+$tests['integration_services_expose_unified_runtime_interface_and_status'] = static function (): void {
+    resetTestState();
+
+    global $automaticCssSettings;
+
+    $automaticCssSettings = [
+        AcssIntegrationService::OPTION_HEADING_FONT_FAMILY => AcssIntegrationService::DESIRED_HEADING_VALUE,
+        AcssIntegrationService::OPTION_TEXT_FONT_FAMILY => AcssIntegrationService::DESIRED_TEXT_VALUE,
+        AcssIntegrationService::OPTION_HEADING_FONT_WEIGHT => AcssIntegrationService::DESIRED_HEADING_WEIGHT_VALUE,
+        AcssIntegrationService::OPTION_TEXT_FONT_WEIGHT => AcssIntegrationService::DESIRED_TEXT_WEIGHT_VALUE,
+    ];
+
+    add_filter('tasty_fonts_acss_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_bricks_integration_available', static fn (): bool => true);
+    add_filter('tasty_fonts_oxygen_integration_available', static fn (): bool => true);
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveAcssFontRoleSyncState(true, true, '', '', '', '');
+    $services['settings']->saveSettings([
+        'bricks_integration_enabled' => true,
+        'bricks_theme_styles_sync_enabled' => true,
+        'oxygen_integration_enabled' => true,
+    ]);
+    $settings = $services['settings']->getSettings();
+
+    assertSameValue(true, $services['acss_integration'] instanceof EditorIntegrationInterface, 'Automatic.css should implement the editor integration seam.');
+    assertSameValue(true, $services['bricks_integration'] instanceof EditorIntegrationInterface, 'Bricks should implement the editor integration seam.');
+    assertSameValue(true, $services['oxygen_integration'] instanceof EditorIntegrationInterface, 'Oxygen should implement the editor integration seam.');
+
+    $acssState = $services['acss_integration']->readState($settings);
+    $bricksState = $services['bricks_integration']->readState($settings);
+    $oxygenState = $services['oxygen_integration']->readState($settings);
+
+    assertSameValue(IntegrationStatus::LIVE, (string) ($acssState['human_status'] ?? ''), 'Automatic.css should report live through the shared IntegrationStatus vocabulary.');
+    assertSameValue(true, (bool) ($acssState['sitewide_delivery'] ?? false), 'Automatic.css should expose the shared sitewide_delivery field.');
+    assertSameValue(IntegrationStatus::WAITING_FOR_SITEWIDE_DELIVERY, IntegrationStatus::fromState(true, true, false, false, false)->humanStatus(), 'IntegrationStatus should standardize the waiting-for-sitewide-delivery state.');
+
+    assertSameValue(IntegrationStatus::CONFIGURED, (string) ($bricksState['human_status'] ?? ''), 'Bricks should report its top-level configured state through IntegrationStatus.');
+    assertSameValue(IntegrationStatus::CONFIGURED, (string) ($bricksState['theme_styles']['human_status'] ?? ''), 'Bricks Theme Styles should expose IntegrationStatus even before sync is applied.');
+    assertSameValue(IntegrationStatus::LIVE, (string) ($oxygenState['human_status'] ?? ''), 'Oxygen should read its enabled flag from the unified settings array.');
+    assertSameValue([], $services['oxygen_integration']->getManagedFrontendStyles(), 'Oxygen should expose no managed frontend styles through the shared seam.');
+};
+
 $tests['admin_page_context_builder_reports_integration_dependencies_separately_from_live_delivery'] = static function (): void {
     $buildContext = static function (callable $setup): array {
         resetTestState();
@@ -3261,7 +3319,7 @@ $tests['admin_page_context_builder_reports_integration_dependencies_separately_f
     assertSameValue('Live', (string) ($liveContext['acss_integration']['status_label'] ?? ''), 'Automatic.css should claim Live only when Sitewide delivery is on and mapping is applied.');
     assertContainsValue('Sitewide delivery is distributing', (string) ($liveContext['acss_integration']['status_copy'] ?? ''), 'Live Automatic.css help should name Sitewide delivery as the delivery path.');
 
-    $view = (new AdminPageViewBuilder(new Storage()))->build($liveContext);
+    $view = (new AdminPageViewBuilder(new Storage()))->build($liveContext)->toArray();
     assertSameValue('Live', (string) ($view['bricksIntegration']['theme_styles']['ui']['status_label'] ?? ''), 'Bricks Theme Style role output should render as Live when the applied mapping matches.');
     assertContainsValue('Sitewide delivery is distributing', (string) ($view['bricksIntegration']['theme_styles']['ui']['status_help'] ?? ''), 'Bricks live help should name Sitewide delivery as the delivery path.');
 
@@ -3293,7 +3351,7 @@ $tests['admin_page_context_builder_reports_integration_dependencies_separately_f
     assertSameValue('Needs reapply', (string) ($staleContext['acss_integration']['status_label'] ?? ''), 'Automatic.css stale mapping should render the Needs reapply badge.');
     assertSameValue('out_of_sync', (string) ($staleContext['bricks_integration']['theme_styles']['status'] ?? ''), 'Bricks Theme Style stale mapping should keep a distinct out-of-sync state for presentation.');
 
-    $staleView = (new AdminPageViewBuilder(new Storage()))->build($staleContext);
+    $staleView = (new AdminPageViewBuilder(new Storage()))->build($staleContext)->toArray();
     assertSameValue('Needs reapply', (string) ($staleView['bricksIntegration']['theme_styles']['ui']['status_label'] ?? ''), 'Bricks Theme Style stale mapping should render the Needs reapply badge.');
 };
 
@@ -6146,6 +6204,122 @@ $tests['runtime_service_appends_builder_editor_styles_for_managed_bricks_and_oxy
     assertNotContainsValue('Draft Sans', $css, 'Builder editor styles should ignore library-only families that are not part of the runtime catalog.');
 };
 
+$tests['runtime_service_honors_injected_editor_integration_list_for_managed_editor_styles'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+
+    $injectedIntegration = new class implements EditorIntegrationInterface {
+        public function isAvailable(): bool
+        {
+            return true;
+        }
+
+        public function readState(array $settings): array
+        {
+            unset($settings);
+
+            return [
+                'human_status' => IntegrationStatus::LIVE,
+                'sitewide_delivery' => true,
+                'enabled' => true,
+                'applied' => true,
+            ];
+        }
+
+        public function getManagedEditorStyles(): array
+        {
+            return ['.injected-editor-style{font-family:"Injected",sans-serif;}'];
+        }
+
+        public function getManagedFrontendStyles(): array
+        {
+            return [];
+        }
+    };
+
+    $runtime = new RuntimeService(
+        $services['planner'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['settings'],
+        $services['role_repo'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration'],
+        [$injectedIntegration],
+        $services['catalog'],
+        $services['role_family_catalog_builder'],
+        $services['admin_access']
+    );
+
+    $settings = $runtime->filterBlockEditorSettings([], null);
+    $css = (string) ($settings['styles'][0]['css'] ?? '');
+
+    assertContainsValue('.injected-editor-style{font-family:"Injected",sans-serif;}', $css, 'RuntimeService should use injected EditorIntegrationInterface entries when collecting managed editor styles.');
+};
+
+$tests['runtime_service_honors_injected_editor_integration_list_for_managed_frontend_styles'] = static function (): void {
+    resetTestState();
+
+    global $enqueuedStyles;
+    global $inlineStyles;
+
+    $services = makeServiceGraph();
+    $services['settings']->setAutoApplyRoles(true);
+
+    $injectedIntegration = new class implements EditorIntegrationInterface {
+        public function isAvailable(): bool
+        {
+            return true;
+        }
+
+        public function readState(array $settings): array
+        {
+            unset($settings);
+
+            return [
+                'human_status' => IntegrationStatus::LIVE,
+                'sitewide_delivery' => true,
+                'enabled' => true,
+                'applied' => true,
+            ];
+        }
+
+        public function getManagedEditorStyles(): array
+        {
+            return [];
+        }
+
+        public function getManagedFrontendStyles(): array
+        {
+            return ['.injected-frontend-style{font-family:"Injected",sans-serif;}'];
+        }
+    };
+
+    $runtime = new RuntimeService(
+        $services['planner'],
+        $services['assets'],
+        new CssBuilder(),
+        $services['adobe'],
+        $services['settings'],
+        $services['role_repo'],
+        $services['acss_integration'],
+        $services['bricks_integration'],
+        $services['oxygen_integration'],
+        [$injectedIntegration],
+        $services['catalog'],
+        $services['role_family_catalog_builder'],
+        $services['admin_access']
+    );
+
+    $runtime->enqueueBricksFrontendOverride();
+
+    assertSameValue(true, isset($enqueuedStyles['tasty-fonts-bricks-runtime-override']), 'RuntimeService should enqueue the frontend override when an injected integration contributes managed frontend styles.');
+    assertContainsValue('.injected-frontend-style{font-family:"Injected",sans-serif;}', (string) ($inlineStyles['tasty-fonts-bricks-runtime-override'] ?? ''), 'RuntimeService should use injected EditorIntegrationInterface entries when collecting managed frontend styles.');
+};
+
 $tests['runtime_service_appends_acss_editor_styles_when_font_role_sync_is_active'] = static function (): void {
     resetTestState();
 
@@ -6346,6 +6520,133 @@ $tests['asset_service_get_primary_font_preload_urls_returns_woff2_urls_for_appli
 // RuntimeAssetPlanner::getPreconnectOrigins
 // ---------------------------------------------------------------------------
 
+$tests['runtime_asset_planner_uses_registered_stylesheet_resolvers'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings([
+        'font_display' => 'optional',
+        'remote_connection_hints' => '1',
+    ]);
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-cdn',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+
+    $nullResolver = new class implements ProviderStylesheetResolverInterface {
+        public function supports(string $provider, string $type): bool
+        {
+            return $provider === 'google' && $type === 'cdn';
+        }
+
+        public function buildStylesheetDescriptor(array $delivery, string $familyName, string $familySlug, string $displayOverride): ?array
+        {
+            unset($delivery, $familyName, $familySlug, $displayOverride);
+
+            return null;
+        }
+
+        public function preconnectOrigin(): ?string
+        {
+            return null;
+        }
+
+        public function getProviderKey(): string
+        {
+            return 'google';
+        }
+    };
+
+    $resolver = new class implements ProviderStylesheetResolverInterface {
+        public function supports(string $provider, string $type): bool
+        {
+            return $provider === 'google' && $type === 'cdn';
+        }
+
+        public function buildStylesheetDescriptor(array $delivery, string $familyName, string $familySlug, string $displayOverride): ?array
+        {
+            unset($delivery, $familyName, $familySlug);
+
+            return [
+                'handle' => 'tasty-fonts-controlled-google',
+                'url' => 'https://fonts.example.test/inter.css?display=' . $displayOverride,
+                'provider' => 'google',
+                'type' => 'cdn',
+            ];
+        }
+
+        public function preconnectOrigin(): ?string
+        {
+            return 'https://fonts.example.test';
+        }
+
+        public function getProviderKey(): string
+        {
+            return 'google';
+        }
+    };
+
+    $planner = new RuntimeAssetPlanner(
+        $services['catalog'],
+        $services['settings'],
+        [$nullResolver, $resolver],
+        $services['role_repo'],
+        $services['family_metadata_repo']
+    );
+
+    assertSameValue(
+        [
+            [
+                'handle' => 'tasty-fonts-controlled-google',
+                'url' => 'https://fonts.example.test/inter.css?display=swap',
+                'provider' => 'google',
+                'type' => 'cdn',
+            ],
+        ],
+        $planner->getExternalStylesheets(),
+        'RuntimeAssetPlanner should keep trying registered resolvers until one returns a descriptor.'
+    );
+    assertSameValue(['https://fonts.example.test'], $planner->getPreconnectOrigins(), 'RuntimeAssetPlanner should collect preconnect origins from registered resolvers.');
+};
+
+$tests['runtime_asset_planner_returns_no_external_stylesheets_when_no_resolver_supports_the_delivery'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'google-cdn',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+
+    $planner = new RuntimeAssetPlanner(
+        $services['catalog'],
+        $services['settings'],
+        [],
+        $services['role_repo'],
+        $services['family_metadata_repo']
+    );
+
+    assertSameValue([], $planner->getExternalStylesheets(), 'RuntimeAssetPlanner should return no external stylesheets when no resolver supports the active delivery.');
+};
+
 $tests['runtime_asset_planner_get_preconnect_origins_returns_empty_when_setting_is_off'] = static function (): void {
     resetTestState();
 
@@ -6405,6 +6706,30 @@ $tests['runtime_asset_planner_get_preconnect_origins_returns_bunny_origin_for_cd
     $origins = $services['planner']->getPreconnectOrigins();
 
     assertContainsValue('https://fonts.bunny.net', implode(' ', $origins), 'getPreconnectOrigins() should return the Bunny origin for CDN-delivered Bunny fonts.');
+};
+
+$tests['runtime_asset_planner_get_preconnect_origins_returns_adobe_origin_for_adobe_hosted_delivery'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['settings']->saveSettings(['remote_connection_hints' => '1']);
+    $services['imports']->saveProfile(
+        'Adobe Family',
+        'adobe-family',
+        [
+            'id' => 'adobe-hosted',
+            'provider' => 'adobe',
+            'type' => 'adobe_hosted',
+            'variants' => ['regular'],
+            'faces' => [],
+        ],
+        'published',
+        true
+    );
+
+    $origins = $services['planner']->getPreconnectOrigins();
+
+    assertContainsValue('https://use.typekit.net', implode(' ', $origins), 'getPreconnectOrigins() should return the Adobe Typekit origin for Adobe-hosted deliveries.');
 };
 
 $tests['runtime_asset_planner_get_preconnect_origins_returns_empty_for_self_hosted_delivery'] = static function (): void {

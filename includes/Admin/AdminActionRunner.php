@@ -18,7 +18,7 @@ use WP_Error;
  *     meta?: array<string, mixed>,
  *     message?: string
  * }
- * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type Payload array<array-key, mixed>
  */
 final class AdminActionRunner
 {
@@ -45,17 +45,11 @@ final class AdminActionRunner
 
         $this->logSuccess($message, $context);
 
-        $resultArray = [];
-
         if (is_array($result)) {
-            foreach ($result as $key => $value) {
-                if (is_string($key)) {
-                    $resultArray[$key] = $value;
-                }
-            }
+            return ['message' => $message] + $result;
         }
 
-        return ['message' => $message] + $resultArray;
+        return ['message' => $message];
     }
 
     /**
@@ -63,8 +57,14 @@ final class AdminActionRunner
      */
     private function logError(WP_Error $error, array $context): void
     {
+        $message = $error->get_error_message();
+
+        if (isset($context['message']) && $context['message'] !== '') {
+            $message = $context['message'];
+        }
+
         $this->log->add(
-            $error->get_error_message(),
+            $message,
             $this->buildLogContext($context, 'error')
         );
     }

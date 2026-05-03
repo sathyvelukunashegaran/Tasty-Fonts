@@ -2,6 +2,21 @@
 
 declare(strict_types=1);
 
+function assertThrows(callable $callback, string $expectedClass, string $message = ''): void
+{
+    try {
+        $callback();
+    } catch (Throwable $throwable) {
+        if ($throwable instanceof $expectedClass) {
+            return;
+        }
+
+        throw new RuntimeException($message !== '' ? $message : sprintf('Expected %s, got %s.', $expectedClass, $throwable::class));
+    }
+
+    throw new RuntimeException($message !== '' ? $message : sprintf('Expected %s to be thrown.', $expectedClass));
+}
+
 /**
  * @param array<string, callable> $tests
  */

@@ -13,7 +13,7 @@ use WP_Error;
  * @phpstan-type IntegrationState array<string, bool|string|FontSettings>
  * @phpstan-type EditorStyleList list<string>
  */
-final class AcssIntegrationService
+final class AcssIntegrationService implements EditorIntegrationInterface
 {
     public const RUNTIME_STYLESHEET_HANDLE = 'automaticcss-core-css';
     public const OPTION_HEADING_FONT_FAMILY = 'heading-font-family';
@@ -40,9 +40,12 @@ final class AcssIntegrationService
     /**
      * @return IntegrationState
      */
-    public function readState(bool $sitewideRolesEnabled, bool $syncEnabled, bool $syncApplied): array
+    public function readState(array $settings): array
     {
         $available = $this->isAvailable();
+        $sitewideRolesEnabled = !empty($settings['auto_apply_roles']);
+        $syncEnabled = ($settings['acss_font_role_sync_enabled'] ?? null) === true;
+        $syncApplied = !empty($settings['acss_font_role_sync_applied']);
         $effectiveEnabled = $available && $syncEnabled;
         $current = $available ? $this->getCurrentSettings() : $this->emptySettings();
         $desired = $this->desiredSettings();
@@ -52,17 +55,19 @@ final class AcssIntegrationService
             && $current['heading_weight'] === (string) ($desired[self::OPTION_HEADING_FONT_WEIGHT] ?? '')
             && $current['body_weight'] === (string) ($desired[self::OPTION_TEXT_FONT_WEIGHT] ?? '');
 
-        return [
-            'available' => $available,
+        return array_merge(IntegrationStatus::fromState(
+            $available,
+            $syncEnabled,
+            $synced,
+            $syncApplied,
+            $sitewideRolesEnabled
+        )->toArray(), [
             'enabled' => $effectiveEnabled,
-            'configured' => $syncEnabled,
-            'applied' => $syncApplied,
             'sitewide_roles_enabled' => $sitewideRolesEnabled,
             'current' => $current,
             'desired' => $desired,
-            'synced' => $synced,
             'status' => $this->resolveStatus($available, $effectiveEnabled, $syncApplied, $sitewideRolesEnabled, $synced),
-        ];
+        ]);
     }
 
     /**
@@ -174,6 +179,14 @@ final class AcssIntegrationService
             'body{font-family:' . self::DESIRED_TEXT_VALUE . ';font-weight:' . self::DESIRED_TEXT_WEIGHT_VALUE . ';}',
             self::EDITOR_HEADING_SELECTOR . '{font-family:' . self::DESIRED_HEADING_VALUE . ';font-weight:' . self::DESIRED_HEADING_WEIGHT_VALUE . ';}',
         ];
+    }
+
+    /**
+     * @return EditorStyleList
+     */
+    public function getManagedFrontendStyles(): array
+    {
+        return [];
     }
 
     /**

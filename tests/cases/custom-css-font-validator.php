@@ -25,6 +25,7 @@ $tests['custom_css_font_validator_rejects_unknown_signatures'] = static function
 
 $tests['custom_css_font_validator_rejects_non_supported_formats_for_signatures'] = static function (): void {
     $validator = new CustomCssFontValidator();
+    // Custom CSS import validation currently treats only WOFF/WOFF2 as supported in this flow.
     assertFalseValue($validator->fontSignatureMatches('wOF2', 'ttf'), 'ttf should not be supported by signature match.');
     assertFalseValue($validator->fontSignatureMatches('wOF2', 'otf'), 'otf should not be supported by signature match.');
     assertFalseValue($validator->fontSignatureMatches('wOF2', 'eot'), 'eot should not be supported by signature match.');
@@ -162,6 +163,17 @@ $tests['custom_css_font_validator_head_request_behavior'] = static function (): 
     assertSameValue(404, $result->httpStatus, '404 HEAD should preserve HTTP status.');
 
     resetTestState();
+    $remoteRequestResponses['HEAD ' . $url] = [
+        'response' => ['code' => 302],
+        'headers' => ['location' => 'https://cdn.example.com/redirected.woff2'],
+        'body' => '',
+    ];
+    $result = $validator->validateFontUrl($url, 'woff2');
+    assertSameValue(ValidationResult::STATUS_INVALID, $result->status, '3xx HEAD should be treated as failed HEAD validation.');
+    assertSameValue(ValidationResult::HEAD_FAILED, $result->code, '3xx HEAD should set HEAD_FAILED code.');
+    assertSameValue(302, $result->httpStatus, '3xx HEAD should preserve HTTP status.');
+
+    resetTestState();
     $remoteRequestResponses['HEAD ' . $url] = new WP_Error('http_request_failed', 'cURL error 28: Operation timed out');
     $remoteGetResponses[$url] = [
         'response' => ['code' => 206],
@@ -194,8 +206,9 @@ $tests['custom_css_font_validator_head_request_behavior'] = static function (): 
     $result = $validator->validateFontUrl($url, 'woff2');
     assertSameValue(ValidationResult::STATUS_WARNING, $result->status, 'HEAD 405 fallback should validate with capped GET but warn about missing CORS.');
     assertSameValue('capped GET fallback', $result->method, 'HEAD 405 should trigger capped GET fallback.');
-    assertTrueValue(
-        count($result->warnings) > 0 && str_contains($result->warnings[0], 'CORS'),
+    assertContainsValue(
+        'Access-Control-Allow-Origin',
+        implode(' ', $result->warnings),
         'Missing Access-Control-Allow-Origin should produce a CORS warning.'
     );
 };
@@ -421,6 +434,39 @@ $tests['custom_css_font_validator_end_to_end_valid_font_url'] = static function 
     assertTrueValue(str_contains($remoteGetCalls[0]['args']['headers']['Range'] ?? '', 'bytes=0-15'), 'GET request should include Range header.');
 };
 
+$tests['custom_css_font_validator_non_woff_format_is_rejected_in_validation_flow'] = static function (): void {
+    resetTestState();
+
+    global $remoteRequestResponses;
+    global $remoteGetResponses;
+    $validator = new CustomCssFontValidator();
+    $url = 'https://cdn.example.com/font.ttf';
+
+    $remoteRequestResponses['HEAD ' . $url] = [
+        'response' => ['code' => 200],
+        'headers' => [
+            'content-type' => 'font/ttf',
+            'content-length' => '1024',
+            'access-control-allow-origin' => '*',
+        ],
+        'body' => '',
+    ];
+    $remoteGetResponses[$url] = [
+        'response' => ['code' => 206],
+        'headers' => [
+            'content-type' => 'font/ttf',
+            'content-length' => '16',
+            'content-range' => 'bytes 0-15/1024',
+            'access-control-allow-origin' => '*',
+        ],
+        'body' => "\x00\x01\x00\x00" . str_repeat('x', 12),
+    ];
+
+    $result = $validator->validateFontUrl($url, 'ttf');
+    assertSameValue(ValidationResult::STATUS_INVALID, $result->status, 'Non-WOFF formats should be rejected by signature checks in this flow.');
+    assertSameValue(ValidationResult::SIGNATURE_MISMATCH, $result->code, 'Non-WOFF format should fail signature validation.');
+};
+
 $tests['custom_css_font_validator_end_to_end_invalid_font_url'] = static function (): void {
     resetTestState();
 
@@ -467,6 +513,8 @@ $tests['custom_css_font_validator_warning_accumulation'] = static function (): v
     ];
 
     $result = $validator->validateFontUrl($url, 'woff2');
+    $warningsText = implode(' ', $result->warnings);
     assertSameValue(ValidationResult::STATUS_WARNING, $result->status, 'Query param and missing CORS should produce warning.');
-    assertSameValue(2, count($result->warnings), 'Should accumulate multiple warnings.');
+    assertContainsValue('Access-Control-Allow-Origin', $warningsText, 'Warnings should include missing CORS guidance.');
+    assertContainsValue('query parameters', $warningsText, 'Warnings should include query-parameter guidance.');
 };

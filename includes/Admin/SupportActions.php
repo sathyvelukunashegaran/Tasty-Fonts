@@ -9,7 +9,7 @@ use TastyFonts\Repository\LogRepository;
 use WP_Error;
 
 /**
- * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type Payload array<array-key, mixed>
  */
 final class SupportActions
 {

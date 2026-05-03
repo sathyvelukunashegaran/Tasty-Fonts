@@ -99,6 +99,17 @@ final class FamilyMetadataRepository
     /**
      * @return array<string, mixed>
      */
+    public function resetFallbacks(): array
+    {
+        $settings = $this->readSettings();
+        $settings['family_fallbacks'] = [];
+
+        return $this->persistSettings($settings);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function resetAll(): array
     {
         $settings = $this->readSettings();
@@ -106,6 +117,18 @@ final class FamilyMetadataRepository
         $settings['family_font_displays'] = [];
 
         return $this->persistSettings($settings);
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
+     */
+    public function normalizeSettingsData(array $settings): array
+    {
+        $settings['family_fallbacks'] = $this->normalizeFamilyFallbacks($settings['family_fallbacks'] ?? []);
+        $settings['family_font_displays'] = $this->normalizeFamilyFontDisplays($settings['family_font_displays'] ?? []);
+
+        return $settings;
     }
 
     /**

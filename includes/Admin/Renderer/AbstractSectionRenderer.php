@@ -6,6 +6,7 @@ namespace TastyFonts\Admin\Renderer;
 
 defined('ABSPATH') || exit;
 
+use TastyFonts\Admin\AdminPageViewVariables;
 use TastyFonts\Support\Storage;
 
 abstract class AbstractSectionRenderer
@@ -29,10 +30,14 @@ abstract class AbstractSectionRenderer
     }
 
     /**
-     * @param array<string, mixed> $view
+     * @param AdminPageViewVariables|array<string, mixed> $view
      */
-    protected function renderTemplate(string $template, array $view): void
+    protected function renderTemplate(string $template, AdminPageViewVariables|array $view): void
     {
+        if ($view instanceof AdminPageViewVariables) {
+            $view = $view->toArray();
+        }
+
         $this->trainingWheelsOff = !empty($view['trainingWheelsOff']);
         extract($view, EXTR_SKIP);
 

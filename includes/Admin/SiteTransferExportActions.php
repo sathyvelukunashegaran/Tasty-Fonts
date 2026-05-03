@@ -9,7 +9,7 @@ use TastyFonts\Repository\LogRepository;
 use WP_Error;
 
 /**
- * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type Payload array<array-key, mixed>
  */
 final class SiteTransferExportActions
 {
@@ -115,20 +115,18 @@ final class SiteTransferExportActions
      */
     public function deleteAllBundles(): array|WP_Error
     {
+        $result = $this->siteTransfer->deleteAllExportBundlesUnlessProtected();
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
         return $this->runner->run(
-            function (): array|WP_Error {
-                $result = $this->siteTransfer->deleteAllExportBundlesUnlessProtected();
-
-                if (is_wp_error($result)) {
-                    return $result;
-                }
-
-                return [
-                    'export_bundles' => $this->siteTransfer->listExportBundles(),
-                    'deleted_export_bundles' => $this->intValue($result, 'deleted_export_bundles'),
-                    'deleted_export_files' => $this->intValue($result, 'deleted_export_files'),
-                ];
-            },
+            fn (): array => [
+                'deleted_export_bundles' => $this->intValue($result, 'deleted_export_bundles'),
+                'deleted_export_files' => $this->intValue($result, 'deleted_export_files'),
+                'export_bundles' => $this->siteTransfer->listExportBundles(),
+            ],
             [
                 'category' => LogRepository::CATEGORY_TRANSFER,
                 'event' => 'site_transfer_exports_deleted_all',

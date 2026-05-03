@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added typed admin page view variables and preview-scene templates for editorial, card, reading, marketing, code, snippet, and interface previews.
+- Added provider stylesheet resolver services for Google, Bunny, and Adobe runtime stylesheets, plus shared editor integration contracts and integration status helpers.
+- Added repository-bounded context coverage for Google API key storage, Adobe project metadata, role storage, and family metadata, including plaintext-to-encrypted Google key upgrade coverage.
+- Added shared custom CSS font URL validation with structured validation results covering URL safety, blocked hosts, HTTP probing, content types, size limits, signatures, and CORS warnings.
+- Added delivery import strategy classes for CDN and self-hosted hosted-font imports, with focused strategy/workflow coverage.
+- Added a shared AdminActionRunner service to standardize admin action execution, success/error logging, and payload responses.
+
+### Changed
+
+- Completed the SettingsRepository bounded-context split so Google API key storage, Adobe project normalization, role storage, and family metadata now live behind focused repositories while the settings facade preserves compatibility.
+- Migrated custom CSS final imports, developer tools, runtime planning, asset generation, admin context building, and provider clients to narrower repository and resolver dependencies.
+- Extracted shared repository helper methods into a reusable trait to remove copy-paste duplication across the bounded-context repositories.
+- Refactored admin rendering around typed view variables, extracted preview templates, and slimmer renderer helpers.
+- Updated admin action helpers, REST, CLI, rollback, maintenance, support, and site-transfer actions to share consistent action payload typing.
+- Centralized hosted import face construction and provider stylesheet resolution to reduce strategy duplication across CDN and self-hosted imports.
+- Simplified HostedImportWorkflow so delivery-specific CDN and self-hosted face building is delegated to strategy implementations while preserving the existing import result shape.
+
+### Fixed
+
+- Fixed guarded bulk site-transfer export deletion so blocked locked-bundle cleanup does not log a deletion success message.
+- Fixed family fallback reset behavior so resetting per-family fallbacks to global values does not also clear family font-display overrides.
+- Fixed custom CSS font validation duplication and tightened final-import URL safety so font downloads are validated consistently before remote requests.
+- Fixed SettingsRepository cache and stale-read gaps by keeping extracted repositories as the source of truth for their bounded contexts.
+- Fixed verification harness gaps for thrown-exception assertions, injected runtime integration tests, and typed admin view reconstruction.
+- Fixed PHPStan return-type issues across admin action flows and kept PHP syntax, PHP tests, PHPStan, and JS tests green for the current change set.
+
 ## [1.16.0-beta.2] - 2026-05-02
 
 ### Added

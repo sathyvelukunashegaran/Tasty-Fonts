@@ -233,6 +233,74 @@ $tests['self_hosted_import_strategy_resolves_directory_and_downloads'] = static 
     assertSameValue(true, is_string($storedPath) && file_exists($storedPath), 'SelfHostedImportStrategy should write the file to disk.');
 };
 
+$tests['self_hosted_import_strategy_returns_error_when_storage_directory_cannot_be_created'] = static function (): void {
+    resetTestState();
+
+    $storage = new Storage();
+    $root = $storage->getRoot();
+    assertTrueValue(is_string($root) && $root !== '', 'Storage root should be available for setup.');
+
+    $providerRootPath = trailingslashit((string) $root) . 'bunny';
+    file_put_contents($providerRootPath, 'not-a-directory');
+
+    $strategy = new SelfHostedImportStrategy($storage);
+    $face = [
+        'family' => 'Inter',
+        'weight' => '400',
+        'style' => 'normal',
+        'files' => ['woff2' => 'https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2'],
+    ];
+    $config = new HostedImportProviderConfig(
+        'bunny',
+        'bunny',
+        'fonts.bunny.net',
+        10 * MB_IN_BYTES,
+        'tasty_fonts_bunny_family_dir_failed',
+        'The Bunny Fonts import directory could not be created.',
+        'tasty_fonts_bunny_invalid_host',
+        'Bunny font downloads must come from fonts.bunny.net.',
+        'tasty_fonts_bunny_invalid_extension',
+        'Only WOFF2 files can be imported from Bunny Fonts.',
+        'tasty_fonts_bunny_download_failed',
+        'Font download failed with status %d.',
+        'tasty_fonts_bunny_empty_file',
+        'Bunny Fonts returned an empty font file.',
+        'tasty_fonts_bunny_file_too_large',
+        'The downloaded font file exceeded the safety size limit.',
+        'tasty_fonts_bunny_invalid_type',
+        'The downloaded file was not returned as a WOFF2 font.',
+        'tasty_fonts_bunny_write_failed',
+        'The imported font file could not be written to uploads/fonts.',
+        'tasty_fonts_bunny_no_faces',
+        'No usable Bunny Fonts faces were returned for that family.',
+        'tasty_fonts_bunny_empty_manifest',
+        'No local font files were saved from that import.',
+        'tasty_fonts_missing_family',
+        'Choose a Bunny Fonts family before importing.',
+        '%s already exists in the library for the selected variants.',
+        'Bunny CDN delivery for %s already includes the selected variants.',
+        'Added %1$s as a self-hosted Bunny delivery (%2$d variant%3$s, %4$d file%5$s).',
+        'Added %1$s as a Bunny CDN delivery (%2$d variant%3$s).'
+    );
+
+    set_error_handler(
+        static fn (int $severity, string $message): bool => str_contains($message, 'mkdir(): File exists')
+    );
+
+    try {
+        $result = $strategy->importFaces('Inter', 'inter', [$face], ['type' => 'bunny'], $config);
+    } finally {
+        restore_error_handler();
+
+        if (is_file($providerRootPath)) {
+            unlink($providerRootPath);
+        }
+    }
+
+    assertTrueValue(is_wp_error($result), 'SelfHostedImportStrategy should return WP_Error when provider directory setup fails.');
+    assertSameValue('tasty_fonts_storage_unavailable', $result->get_error_code(), 'SelfHostedImportStrategy should report storage unavailable error.');
+};
+
 $tests['self_hosted_import_strategy_returns_error_on_download_failure'] = static function (): void {
     resetTestState();
     global $remoteGetResponses;
@@ -333,6 +401,81 @@ $tests['self_hosted_import_strategy_returns_empty_faces_for_non_woff2'] = static
     assertTrueValue($result instanceof ImportFacesResult, 'SelfHostedImportStrategy should return ImportFacesResult even for empty manifest.');
     assertSameValue([], $result->faces, 'SelfHostedImportStrategy should return empty faces when no woff2 files.');
     assertSameValue(0, $result->files, 'SelfHostedImportStrategy should report 0 files for empty manifest.');
+};
+
+$tests['self_hosted_import_strategy_reports_downloaded_count_for_multiple_files'] = static function (): void {
+    resetTestState();
+    global $remoteGetResponses;
+    global $remoteGetCalls;
+
+    $regularUrl = 'https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2';
+    $boldUrl = 'https://fonts.bunny.net/inter/files/inter-latin-700-normal.woff2';
+
+    $remoteGetResponses[$regularUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data-regular',
+    ];
+    $remoteGetResponses[$boldUrl] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'font/woff2'],
+        'body' => 'latin-font-data-bold',
+    ];
+
+    $storage = new Storage();
+    $strategy = new SelfHostedImportStrategy($storage);
+    $faces = [
+        [
+            'family' => 'Inter',
+            'weight' => '400',
+            'style' => 'normal',
+            'files' => ['woff2' => $regularUrl],
+        ],
+        [
+            'family' => 'Inter',
+            'weight' => '700',
+            'style' => 'normal',
+            'files' => ['woff2' => $boldUrl],
+        ],
+    ];
+    $config = new HostedImportProviderConfig(
+        'bunny',
+        'bunny',
+        'fonts.bunny.net',
+        10 * MB_IN_BYTES,
+        'tasty_fonts_bunny_family_dir_failed',
+        'The Bunny Fonts import directory could not be created.',
+        'tasty_fonts_bunny_invalid_host',
+        'Bunny font downloads must come from fonts.bunny.net.',
+        'tasty_fonts_bunny_invalid_extension',
+        'Only WOFF2 files can be imported from Bunny Fonts.',
+        'tasty_fonts_bunny_download_failed',
+        'Font download failed with status %d.',
+        'tasty_fonts_bunny_empty_file',
+        'Bunny Fonts returned an empty font file.',
+        'tasty_fonts_bunny_file_too_large',
+        'The downloaded font file exceeded the safety size limit.',
+        'tasty_fonts_bunny_invalid_type',
+        'The downloaded file was not returned as a WOFF2 font.',
+        'tasty_fonts_bunny_write_failed',
+        'The imported font file could not be written to uploads/fonts.',
+        'tasty_fonts_bunny_no_faces',
+        'No usable Bunny Fonts faces were returned for that family.',
+        'tasty_fonts_bunny_empty_manifest',
+        'No local font files were saved from that import.',
+        'tasty_fonts_missing_family',
+        'Choose a Bunny Fonts family before importing.',
+        '%s already exists in the library for the selected variants.',
+        'Bunny CDN delivery for %s already includes the selected variants.',
+        'Added %1$s as a self-hosted Bunny delivery (%2$d variant%3$s, %4$d file%5$s).',
+        'Added %1$s as a Bunny CDN delivery (%2$d variant%3$s).'
+    );
+
+    $result = $strategy->importFaces('Inter', 'inter', $faces, ['type' => 'bunny'], $config);
+
+    assertFalseValue(is_wp_error($result), 'SelfHostedImportStrategy should return a result for multi-file imports.');
+    assertSameValue(2, $result->files, 'SelfHostedImportStrategy should count all downloaded files across faces.');
+    assertSameValue(2, count($remoteGetCalls), 'SelfHostedImportStrategy should perform one download per requested WOFF2 file.');
 };
 
 $tests['self_hosted_import_strategy_skips_existing_files'] = static function (): void {
@@ -462,6 +605,94 @@ $tests['workflow_handles_empty_faces_after_strategy'] = static function (): void
 
     assertTrueValue(is_wp_error($result), 'Workflow should return WP_Error when no faces are found.');
     assertSameValue('tasty_fonts_bunny_no_faces', $result->get_error_code(), 'Workflow should return no-faces error.');
+};
+
+$tests['workflow_selects_strategy_using_supports_when_map_key_does_not_match_mode'] = static function (): void {
+    resetTestState();
+
+    $cdnStrategy = new class implements DeliveryImportStrategy {
+        public bool $wasCalled = false;
+
+        public function supports(string $deliveryMode): bool
+        {
+            return $deliveryMode === 'cdn';
+        }
+
+        public function importFaces(
+            string $familyName,
+            string $familySlug,
+            array $faces,
+            array $provider,
+            HostedImportProviderConfig $config
+        ): ImportFacesResult|WP_Error {
+            $this->wasCalled = true;
+
+            return new ImportFacesResult([
+                [
+                    'family' => $familyName,
+                    'slug' => $familySlug,
+                    'source' => 'test-cdn',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => ['woff2' => 'https://example.com/font.woff2'],
+                    'provider' => $provider,
+                ]
+            ],
+            0);
+        }
+    };
+
+    $services = makeHostedImportWorkflowTestGraph();
+    $workflow = new HostedImportWorkflow(
+        $services['imports'],
+        $services['assets'],
+        $services['log'],
+        new HostedImportVariantPlanner(),
+        [
+            'fallback' => $cdnStrategy,
+            'self_hosted' => new SelfHostedImportStrategy($services['storage']),
+        ]
+    );
+
+    $adapter = new HostedImportWorkflowStubAdapter([
+        hostedImportWorkflowRegularFace('https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2')
+    ]);
+
+    $result = $workflow->import(
+        new HostedImportRequest('Inter', ['regular'], 'cdn'),
+        $adapter
+    );
+
+    assertTrueValue($cdnStrategy->wasCalled, 'Workflow should select strategies by supports() when delivery mode key is not present.');
+    assertFalseValue(is_wp_error($result), 'Supports-based strategy selection should still import successfully.');
+    assertSameValue('saved', (string) ($result['status'] ?? ''), 'Supports-selected CDN strategy should keep the CDN saved status.');
+};
+
+$tests['workflow_returns_error_when_no_strategy_supports_mode_and_no_self_hosted_fallback_exists'] = static function (): void {
+    resetTestState();
+
+    $services = makeHostedImportWorkflowTestGraph();
+    $workflow = new HostedImportWorkflow(
+        $services['imports'],
+        $services['assets'],
+        $services['log'],
+        new HostedImportVariantPlanner(),
+        [
+            'cdn' => new CdnImportStrategy(),
+        ]
+    );
+
+    $adapter = new HostedImportWorkflowStubAdapter([
+        hostedImportWorkflowRegularFace('https://fonts.bunny.net/inter/files/inter-latin-400-normal.woff2')
+    ]);
+
+    $result = $workflow->import(
+        new HostedImportRequest('Inter', ['regular'], 'edge'),
+        $adapter
+    );
+
+    assertTrueValue(is_wp_error($result), 'Workflow should return WP_Error when no strategy supports the requested delivery mode.');
+    assertSameValue('tasty_fonts_delivery_strategy_unavailable', $result->get_error_code(), 'Workflow should return clear strategy-unavailable error code.');
 };
 
 $tests['workflow_works_with_test_double_strategy'] = static function (): void {

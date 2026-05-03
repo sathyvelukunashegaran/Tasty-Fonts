@@ -11,7 +11,7 @@ use TastyFonts\Repository\SettingsRepository;
 use WP_Error;
 
 /**
- * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type Payload array<array-key, mixed>
  */
 final class GoogleApiKeyActions
 {
