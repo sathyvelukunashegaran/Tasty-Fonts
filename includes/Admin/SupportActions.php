@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace TastyFonts\Admin;
 
-defined('ABSPATH') || exit;
-
 use TastyFonts\Maintenance\SupportBundleService;
 use TastyFonts\Repository\LogRepository;
 use WP_Error;
@@ -17,7 +15,7 @@ final class SupportActions
 {
     public function __construct(
         private readonly SupportBundleService $supportBundles,
-        private readonly LogRepository $log
+        private readonly AdminActionRunner $runner
     ) {
     }
 
@@ -27,41 +25,19 @@ final class SupportActions
      */
     public function buildBundle(array $advancedToolsPayload): array|WP_Error
     {
-        $bundle = $this->supportBundles->buildBundle($advancedToolsPayload);
+        return $this->runner->run(
+            function () use ($advancedToolsPayload): array {
+                $bundle = $this->supportBundles->buildBundle($advancedToolsPayload);
 
-        if (is_wp_error($bundle)) {
-            return $bundle;
-        }
-
-        $message = __('Support bundle created.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'support_bundle_created',
+                return ['bundle' => $bundle];
+            },
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'support_bundle_created',
                 'status_label' => __('Created', 'tasty-fonts'),
                 'source' => __('Support', 'tasty-fonts'),
+                'message' => __('Support bundle created.', 'tasty-fonts'),
             ]
-        ));
-
-        return [
-            'message' => $message,
-            'bundle' => $bundle,
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $meta
-     * @return array<string, mixed>
-     */
-    private function activityLogContext(string $category, string $event, array $meta = []): array
-    {
-        return array_merge(
-            [
-                'category' => $category,
-                'event' => $event,
-            ],
-            $meta
         );
     }
 }

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace TastyFonts\Admin;
 
-defined('ABSPATH') || exit;
-
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Maintenance\DeveloperToolsService;
 use TastyFonts\Maintenance\SnapshotService;
@@ -25,7 +23,8 @@ final class MaintenanceActions
         private readonly DeveloperToolsService $developerTools,
         private readonly SiteTransferService $siteTransfer,
         private readonly SnapshotService $snapshots,
-        private readonly LogRepository $log
+        private readonly LogRepository $log,
+        private readonly AdminActionRunner $runner
     ) {
     }
 
@@ -40,31 +39,20 @@ final class MaintenanceActions
             return $snapshot;
         }
 
-        $settings = $this->developerTools->resetPluginSettings();
-
-        if (is_wp_error($settings)) {
-            return $settings;
-        }
-
-        $message = __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'plugin_settings_reset',
+        return $this->runner->run(
+            fn(): array|WP_Error => $this->developerTools->resetPluginSettings(),
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'plugin_settings_reset',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Plugin settings reset to defaults. Font library preserved.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Preserved', 'tasty-fonts'), 'value' => __('Managed font library and files', 'tasty-fonts')],
                     ['label' => __('Reset', 'tasty-fonts'), 'value' => __('Settings, roles, access rules, and stored Google key data', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        );
     }
 
     /**
@@ -78,31 +66,20 @@ final class MaintenanceActions
             return $snapshot;
         }
 
-        $settings = $this->developerTools->resetFamilyFallbacksToGlobal();
-
-        if (is_wp_error($settings)) {
-            return $settings;
-        }
-
-        $message = __('Family fallback overrides reset to the current global fallback settings.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'family_fallbacks_reset_to_global',
+        return $this->runner->run(
+            fn(): array|WP_Error => $this->developerTools->resetFamilyFallbacksToGlobal(),
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'family_fallbacks_reset_to_global',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Family fallback overrides reset to the current global fallback settings.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Reset', 'tasty-fonts'), 'value' => __('Per-family fallback overrides', 'tasty-fonts')],
                     ['label' => __('Preserved', 'tasty-fonts'), 'value' => __('Global Heading, Body, and Monospace fallback settings', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        );
     }
 
     /**
@@ -116,31 +93,20 @@ final class MaintenanceActions
             return $snapshot;
         }
 
-        $settings = $this->developerTools->resetAllFallbacksToDefaults();
-
-        if (is_wp_error($settings)) {
-            return $settings;
-        }
-
-        $message = __('Fallback fonts reset to plugin defaults.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'fallbacks_reset_to_plugin_defaults',
+        return $this->runner->run(
+            fn(): array|WP_Error => $this->developerTools->resetAllFallbacksToDefaults(),
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'fallbacks_reset_to_plugin_defaults',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Fallback fonts reset to plugin defaults.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Reset', 'tasty-fonts'), 'value' => __('Global fallback settings and per-family fallback overrides', 'tasty-fonts')],
                     ['label' => __('Default', 'tasty-fonts'), 'value' => __('Modern system UI fallback stacks', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        );
     }
 
     /**
@@ -154,31 +120,21 @@ final class MaintenanceActions
             return $snapshot;
         }
 
-        $settings = $this->developerTools->wipeManagedFontLibrary();
-
-        if (is_wp_error($settings)) {
-            return $settings;
-        }
-
-        $message = __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'managed_font_library_wiped',
+        return $this->runner->run(
+            fn(): array|WP_Error => $this->developerTools->wipeManagedFontLibrary(),
             [
-                'outcome' => 'danger',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'managed_font_library_wiped',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'outcome' => 'danger',
+                'message' => __('Managed font library wiped. Storage reset to an empty scaffold.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Deleted', 'tasty-fonts'), 'value' => __('Managed font library and font storage files', 'tasty-fonts')],
                     ['label' => __('Recreated', 'tasty-fonts'), 'value' => __('Empty storage scaffold', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        );
     }
 
     /**
@@ -204,30 +160,28 @@ final class MaintenanceActions
         $exportCleanup = $this->siteTransfer->deleteAllExportBundles();
         $snapshotCleanup = $this->snapshots->deleteAllSnapshots();
 
-        $message = __('Plugin-managed files deleted. Storage reset to an empty scaffold.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'plugin_managed_files_deleted',
+        return $this->runner->run(
+            fn(): array => [
+                'settings' => $settings,
+                'deleted_export_bundles' => $this->intValue($exportCleanup, 'deleted_export_bundles'),
+                'deleted_export_files' => $this->intValue($exportCleanup, 'deleted_export_files'),
+                'deleted_snapshots' => $this->intValue($snapshotCleanup, 'deleted_snapshots'),
+                'deleted_snapshot_files' => $this->intValue($snapshotCleanup, 'deleted_snapshot_files'),
+            ],
             [
-                'outcome' => 'danger',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'plugin_managed_files_deleted',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'outcome' => 'danger',
+                'message' => __('Plugin-managed files deleted. Storage reset to an empty scaffold.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Transfer exports deleted', 'tasty-fonts'), 'value' => (string) $this->intValue($exportCleanup, 'deleted_export_bundles'), 'kind' => 'count'],
                     ['label' => __('Rollback snapshots deleted', 'tasty-fonts'), 'value' => (string) $this->intValue($snapshotCleanup, 'deleted_snapshots'), 'kind' => 'count'],
                     ['label' => __('Storage', 'tasty-fonts'), 'value' => __('Managed font files and generated CSS removed; scaffold recreated', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-            'deleted_export_bundles' => $this->intValue($exportCleanup, 'deleted_export_bundles'),
-            'deleted_export_files' => $this->intValue($exportCleanup, 'deleted_export_files'),
-            'deleted_snapshots' => $this->intValue($snapshotCleanup, 'deleted_snapshots'),
-            'deleted_snapshot_files' => $this->intValue($snapshotCleanup, 'deleted_snapshot_files'),
-        ];
+        );
     }
 
     /**
@@ -235,28 +189,28 @@ final class MaintenanceActions
      */
     public function clearPluginCachesAndRegenerateAssets(): array|WP_Error
     {
-        if (!$this->developerTools->clearPluginCachesAndRegenerateAssets()) {
-            return new WP_Error(
-                'tasty_fonts_maintenance_failed',
-                __('Plugin caches were cleared, but generated assets could not be rebuilt.', 'tasty-fonts')
-            );
-        }
+        return $this->runner->run(
+            function (): array|WP_Error {
+                if (!$this->developerTools->clearPluginCachesAndRegenerateAssets()) {
+                    return new WP_Error(
+                        'tasty_fonts_maintenance_failed',
+                        __('Plugin caches were cleared, but generated assets could not be rebuilt.', 'tasty-fonts')
+                    );
+                }
 
-        $message = __('Plugin caches cleared and generated assets refreshed.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'plugin_caches_refreshed',
+                return [];
+            },
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'plugin_caches_refreshed',
                 'status_label' => __('Refreshed', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Plugin caches cleared and generated assets refreshed.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Affected assets', 'tasty-fonts'), 'value' => __('Caches, generated CSS, and runtime assets', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return ['message' => $message];
+        );
     }
 
     /**
@@ -264,51 +218,52 @@ final class MaintenanceActions
      */
     public function regenerateCss(): array|WP_Error
     {
-        if (!$this->developerTools->regenerateCss()) {
-            return new WP_Error(
-                'tasty_fonts_regenerate_css_failed',
-                __('Generated CSS could not be rebuilt.', 'tasty-fonts')
-            );
-        }
+        return $this->runner->run(
+            function (): array|WP_Error {
+                if (!$this->developerTools->regenerateCss()) {
+                    return new WP_Error(
+                        'tasty_fonts_regenerate_css_failed',
+                        __('Generated CSS could not be rebuilt.', 'tasty-fonts')
+                    );
+                }
 
-        $message = __('Generated CSS regenerated.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'generated_css_regenerated',
+                return [];
+            },
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'generated_css_regenerated',
                 'status_label' => __('Regenerated', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Generated CSS regenerated.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Affected asset', 'tasty-fonts'), 'value' => __('Generated CSS', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return ['message' => $message];
+        );
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function rescanFontLibrary(): array
+    public function rescanFontLibrary(): array|WP_Error
     {
-        $this->assets->refreshGeneratedAssets(true, false);
-        $message = __('Fonts rescanned.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'font_library_rescanned',
+        return $this->runner->run(
+            function (): array {
+                $this->assets->refreshGeneratedAssets(true, false);
+
+                return [];
+            },
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'font_library_rescanned',
                 'status_label' => __('Rescanned', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Fonts rescanned.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Affected area', 'tasty-fonts'), 'value' => __('Font library and generated assets', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return ['message' => $message];
+        );
     }
 
     /**
@@ -316,71 +271,66 @@ final class MaintenanceActions
      */
     public function repairStorageScaffold(): array|WP_Error
     {
-        if (!$this->developerTools->ensureStorageScaffolding()) {
-            return new WP_Error(
-                'tasty_fonts_storage_scaffold_repair_failed',
-                __('Storage scaffold could not be repaired.', 'tasty-fonts')
-            );
-        }
+        return $this->runner->run(
+            function (): array|WP_Error {
+                if (!$this->developerTools->ensureStorageScaffolding()) {
+                    return new WP_Error(
+                        'tasty_fonts_storage_scaffold_repair_failed',
+                        __('Storage scaffold could not be repaired.', 'tasty-fonts')
+                    );
+                }
 
-        $message = __('Storage scaffold repaired.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'storage_scaffold_repaired',
+                return [];
+            },
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'storage_scaffold_repaired',
                 'status_label' => __('Repaired', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Storage scaffold repaired.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Affected area', 'tasty-fonts'), 'value' => __('Storage directories and index files', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return ['message' => $message];
+        );
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function resetIntegrationDetectionState(): array
+    public function resetIntegrationDetectionState(): array|WP_Error
     {
-        $settings = $this->developerTools->resetIntegrationDetectionState();
-        $message = __('Integration detection state reset.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'integration_detection_reset',
+        return $this->runner->run(
+            fn(): array => $this->developerTools->resetIntegrationDetectionState(),
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'integration_detection_reset',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Integration detection state reset.', 'tasty-fonts'),
             ]
-        ));
-
-        return [
-            'message' => $message,
-            'settings' => $settings,
-        ];
+        );
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function resetSuppressedNotices(): array
+    public function resetSuppressedNotices(): array|WP_Error
     {
-        $this->developerTools->resetSuppressedNotices();
-        $message = __('Suppressed notices reset. Hidden reminders can appear again.', 'tasty-fonts');
-        $this->log->add($message, $this->activityLogContext(
-            LogRepository::CATEGORY_MAINTENANCE,
-            'suppressed_notices_reset',
+        return $this->runner->run(
+            function (): array {
+                $this->developerTools->resetSuppressedNotices();
+
+                return [];
+            },
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'event' => 'suppressed_notices_reset',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
+                'message' => __('Suppressed notices reset. Hidden reminders can appear again.', 'tasty-fonts'),
             ]
-        ));
-
-        return ['message' => $message];
+        );
     }
 
     /**
@@ -416,21 +366,6 @@ final class MaintenanceActions
                 __('Unknown advanced tools action.', 'tasty-fonts')
             ),
         };
-    }
-
-    /**
-     * @param array<string, mixed> $meta
-     * @return array<string, mixed>
-     */
-    private function activityLogContext(string $category, string $event, array $meta = []): array
-    {
-        return array_merge(
-            [
-                'category' => $category,
-                'event' => $event,
-            ],
-            $meta
-        );
     }
 
     /**

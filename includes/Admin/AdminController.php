@@ -151,36 +151,39 @@ final class AdminController
         ?RoleFamilyCatalogBuilder $roleFamilyCatalogBuilder = null,
         private readonly ?GoogleApiKeyRepository $apiKeyRepo = null,
         private readonly ?RoleRepository $roleRepo = null,
+        ?AdminActionRunner $runner = null,
     ) {
         $this->renderer = new AdminPageRenderer($this->storage);
         $this->roleFamilyCatalogBuilder = $roleFamilyCatalogBuilder ?? new RoleFamilyCatalogBuilder();
         $this->adminAccess = $adminAccess ?? new AdminAccessService($this->settings);
+        $actionRunner = $runner ?? new AdminActionRunner($this->log);
         $this->maintenanceActions = $maintenanceActions ?? new MaintenanceActions(
             $this->storage,
             $this->assets,
             $this->developerTools,
             $this->siteTransfer,
             $this->snapshots,
-            $this->log
+            $this->log,
+            $actionRunner
         );
         $this->rollbackActions = $rollbackActions ?? new RollbackActions(
             $this->snapshots,
-            $this->log
+            $actionRunner
         );
         $this->siteTransferExportActions = $siteTransferExportActions ?? new SiteTransferExportActions(
             $this->siteTransfer,
-            $this->log
+            $actionRunner
         );
         $this->supportActions = $supportActions ?? new SupportActions(
             $this->supportBundles,
-            $this->log
+            $actionRunner
         );
         $this->googleApiKeyValidator = $googleApiKeyValidator ?? new GoogleApiKeyValidator($this->googleClient);
         $this->googleApiKeyActions = $googleApiKeyActions ?? new GoogleApiKeyActions(
             $this->settings,
             $this->apiKeyRepo ?? new GoogleApiKeyRepository(),
             $this->googleClient,
-            $this->log,
+            $actionRunner,
             $this->googleApiKeyValidator
         );
         $this->pageContextBuilder = new AdminPageContextBuilder(
@@ -1443,9 +1446,9 @@ final class AdminController
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function rescanFontLibrary(): array
+    public function rescanFontLibrary(): array|WP_Error
     {
         return $this->maintenanceActions->rescanFontLibrary();
     }
@@ -1459,17 +1462,17 @@ final class AdminController
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function resetIntegrationDetectionState(): array
+    public function resetIntegrationDetectionState(): array|WP_Error
     {
         return $this->maintenanceActions->resetIntegrationDetectionState();
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function resetSuppressedNotices(): array
+    public function resetSuppressedNotices(): array|WP_Error
     {
         return $this->maintenanceActions->resetSuppressedNotices();
     }
@@ -1523,9 +1526,9 @@ final class AdminController
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function deleteAllRollbackSnapshots(): array
+    public function deleteAllRollbackSnapshots(): array|WP_Error
     {
         return $this->rollbackActions->deleteAllSnapshots();
     }
@@ -2356,6 +2359,10 @@ final class AdminController
 
         $result = $this->rescanFontLibrary();
 
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
+
         $this->redirectWithSuccess($this->stringValue($result, 'message', __('Fonts rescanned.', 'tasty-fonts')));
     }
 
@@ -2518,6 +2525,11 @@ final class AdminController
         check_admin_referer('tasty_fonts_reset_integration_detection_state');
 
         $result = $this->resetIntegrationDetectionState();
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
+
         $this->redirectWithSuccess($this->stringValue($result, 'message'));
     }
 
@@ -2530,6 +2542,10 @@ final class AdminController
         check_admin_referer('tasty_fonts_reset_suppressed_notices');
 
         $result = $this->resetSuppressedNotices();
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
 
         $this->redirectWithSuccess($this->stringValue($result, 'message', __('Suppressed notices reset.', 'tasty-fonts')));
     }
@@ -2615,6 +2631,10 @@ final class AdminController
         check_admin_referer(self::ACTION_DELETE_ALL_ROLLBACK_SNAPSHOTS);
 
         $result = $this->deleteAllRollbackSnapshots();
+
+        if (is_wp_error($result)) {
+            $this->redirectWithError($result->get_error_message());
+        }
 
         $this->redirectWithSuccess($this->stringValue($result, 'message', __('All rollback snapshots deleted.', 'tasty-fonts')));
     }

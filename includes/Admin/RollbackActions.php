@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace TastyFonts\Admin;
 
-defined('ABSPATH') || exit;
-
 use TastyFonts\Maintenance\SnapshotService;
 use TastyFonts\Repository\LogRepository;
 use WP_Error;
@@ -19,7 +17,7 @@ final class RollbackActions
 
     public function __construct(
         private readonly SnapshotService $snapshots,
-        private readonly LogRepository $log
+        private readonly AdminActionRunner $runner
     ) {
     }
 
@@ -28,21 +26,27 @@ final class RollbackActions
      */
     public function createSnapshot(string $reason = 'manual'): array|WP_Error
     {
-        $result = $this->snapshots->createSnapshot($reason);
+        return $this->runner->run(
+            function () use ($reason): array|WP_Error {
+                $result = $this->snapshots->createSnapshot($reason);
 
-        if (is_wp_error($result)) {
-            return $result;
-        }
+                if (is_wp_error($result)) {
+                    return $result;
+                }
 
-        $snapshot = $result['snapshot'];
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot created.', 'tasty-fonts'));
-        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'rollback_snapshot_created'));
-
-        return [
-            'message' => $message,
-            'snapshot' => $snapshot,
-            'snapshots' => $this->snapshots->listSnapshots(),
-        ];
+                return [
+                    'snapshot' => $result['snapshot'],
+                    'snapshots' => $this->snapshots->listSnapshots(),
+                ];
+            },
+            [
+                'category' => LogRepository::CATEGORY_TRANSFER,
+                'event' => 'rollback_snapshot_created',
+                'status_label' => __('Created', 'tasty-fonts'),
+                'source' => __('Transfer', 'tasty-fonts'),
+                'message' => __('Rollback snapshot created.', 'tasty-fonts'),
+            ]
+        );
     }
 
     /**
@@ -70,21 +74,28 @@ final class RollbackActions
             return $safetySnapshot;
         }
 
-        $result = $this->snapshots->restoreSnapshot($snapshotId);
+        return $this->runner->run(
+            function () use ($snapshotId, $preview): array|WP_Error {
+                $result = $this->snapshots->restoreSnapshot($snapshotId);
 
-        if (is_wp_error($result)) {
-            return $result;
-        }
+                if (is_wp_error($result)) {
+                    return $result;
+                }
 
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot restored.', 'tasty-fonts'));
-        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'rollback_snapshot_restored'));
-
-        return array_merge(
-            $result,
+                return array_merge(
+                    $result,
+                    [
+                        'preview' => $preview,
+                        'snapshots' => $this->snapshots->listSnapshots(),
+                    ]
+                );
+            },
             [
-                'message' => $message,
-                'preview' => $preview,
-                'snapshots' => $this->snapshots->listSnapshots(),
+                'category' => LogRepository::CATEGORY_TRANSFER,
+                'event' => 'rollback_snapshot_restored',
+                'status_label' => __('Restored', 'tasty-fonts'),
+                'source' => __('Transfer', 'tasty-fonts'),
+                'message' => __('Rollback snapshot restored.', 'tasty-fonts'),
             ]
         );
     }
@@ -94,20 +105,27 @@ final class RollbackActions
      */
     public function renameSnapshot(string $snapshotId, string $label): array|WP_Error
     {
-        $result = $this->snapshots->renameSnapshot($snapshotId, $label);
+        return $this->runner->run(
+            function () use ($snapshotId, $label): array|WP_Error {
+                $result = $this->snapshots->renameSnapshot($snapshotId, $label);
 
-        if (is_wp_error($result)) {
-            return $result;
-        }
+                if (is_wp_error($result)) {
+                    return $result;
+                }
 
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot renamed.', 'tasty-fonts'));
-        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'rollback_snapshot_renamed'));
-
-        return [
-            'message' => $message,
-            'snapshot' => $result['snapshot'],
-            'snapshots' => $this->snapshots->listSnapshots(),
-        ];
+                return [
+                    'snapshot' => $result['snapshot'],
+                    'snapshots' => $this->snapshots->listSnapshots(),
+                ];
+            },
+            [
+                'category' => LogRepository::CATEGORY_TRANSFER,
+                'event' => 'rollback_snapshot_renamed',
+                'status_label' => __('Renamed', 'tasty-fonts'),
+                'source' => __('Transfer', 'tasty-fonts'),
+                'message' => __('Rollback snapshot renamed.', 'tasty-fonts'),
+            ]
+        );
     }
 
     /**
@@ -115,37 +133,51 @@ final class RollbackActions
      */
     public function deleteSnapshot(string $snapshotId): array|WP_Error
     {
-        $result = $this->snapshots->deleteSnapshot($snapshotId);
+        return $this->runner->run(
+            function () use ($snapshotId): array|WP_Error {
+                $result = $this->snapshots->deleteSnapshot($snapshotId);
 
-        if (is_wp_error($result)) {
-            return $result;
-        }
+                if (is_wp_error($result)) {
+                    return $result;
+                }
 
-        $message = $this->stringValue($result, 'message', __('Rollback snapshot deleted.', 'tasty-fonts'));
-        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'rollback_snapshot_deleted'));
-
-        return [
-            'message' => $message,
-            'snapshot' => $result['snapshot'],
-            'snapshots' => $this->snapshots->listSnapshots(),
-        ];
+                return [
+                    'snapshot' => $result['snapshot'],
+                    'snapshots' => $this->snapshots->listSnapshots(),
+                ];
+            },
+            [
+                'category' => LogRepository::CATEGORY_TRANSFER,
+                'event' => 'rollback_snapshot_deleted',
+                'status_label' => __('Deleted', 'tasty-fonts'),
+                'source' => __('Transfer', 'tasty-fonts'),
+                'message' => __('Rollback snapshot deleted.', 'tasty-fonts'),
+            ]
+        );
     }
 
     /**
-     * @return Payload
+     * @return Payload|WP_Error
      */
-    public function deleteAllSnapshots(): array
+    public function deleteAllSnapshots(): array|WP_Error
     {
-        $result = $this->snapshots->deleteAllSnapshots();
-        $message = __('All rollback snapshots deleted.', 'tasty-fonts');
-        $this->log->add($message, $this->logContext(LogRepository::CATEGORY_TRANSFER, 'rollback_snapshots_deleted_all'));
+        return $this->runner->run(
+            function (): array {
+                $result = $this->snapshots->deleteAllSnapshots();
 
-        return [
-            'message' => $message,
-            'snapshots' => $this->snapshots->listSnapshots(),
-            'deleted_snapshots' => $this->intValue($result, 'deleted_snapshots'),
-            'deleted_snapshot_files' => $this->intValue($result, 'deleted_snapshot_files'),
-        ];
+                return [
+                    'snapshots' => $this->snapshots->listSnapshots(),
+                    'deleted_snapshots' => $this->intValue($result, 'deleted_snapshots'),
+                    'deleted_snapshot_files' => $this->intValue($result, 'deleted_snapshot_files'),
+                ];
+            },
+            [
+                'category' => LogRepository::CATEGORY_TRANSFER,
+                'event' => 'rollback_snapshots_deleted_all',
+                'status_label' => __('Deleted', 'tasty-fonts'),
+                'source' => __('Transfer', 'tasty-fonts'),
+                'message' => __('All rollback snapshots deleted.', 'tasty-fonts'),
+            ]
+        );
     }
-
 }

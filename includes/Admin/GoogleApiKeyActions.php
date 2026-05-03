@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace TastyFonts\Admin;
 
-defined('ABSPATH') || exit;
-
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\GoogleApiKeyRepository;
@@ -25,7 +23,7 @@ final class GoogleApiKeyActions
         private readonly SettingsRepository $settings,
         private readonly GoogleApiKeyRepository $apiKeyRepo,
         private readonly GoogleFontsClient $googleClient,
-        private readonly LogRepository $log,
+        private readonly AdminActionRunner $runner,
         ?GoogleApiKeyValidator $validator = null
     ) {
         $this->validator = $validator ?? new GoogleApiKeyValidator($this->googleClient);
@@ -72,21 +70,20 @@ final class GoogleApiKeyActions
         );
 
         if (is_wp_error($validation)) {
-            $this->log->add(
-                __('Google Fonts API key validation failed.', 'tasty-fonts'),
-                $this->logContext(
-                    LogRepository::CATEGORY_SETTINGS,
-                    'google_api_key_validation_failed',
-                    [
-                        'outcome' => 'error',
-                        'status_label' => __('Validation failed', 'tasty-fonts'),
-                        'source' => __('Settings', 'tasty-fonts'),
-                        'details' => [
-                            ['label' => __('Google API key', 'tasty-fonts'), 'value' => __('Not saved', 'tasty-fonts')],
-                        ],
-                    ]
-                )
+            $this->runner->run(
+                fn() => $validation,
+                [
+                    'category' => LogRepository::CATEGORY_SETTINGS,
+                    'event' => 'google_api_key_validation_failed',
+                    'status_label' => __('Validation failed', 'tasty-fonts'),
+                    'source' => __('Settings', 'tasty-fonts'),
+                    'message' => __('Google Fonts API key validation failed.', 'tasty-fonts'),
+                    'details' => [
+                        ['label' => __('Google API key', 'tasty-fonts'), 'value' => __('Not saved', 'tasty-fonts')],
+                    ],
+                ]
             );
+
             return $validation;
         }
 
@@ -94,24 +91,23 @@ final class GoogleApiKeyActions
         $this->apiKeyRepo->saveStatus($validation['state'], $validation['message']);
         $this->googleClient->clearCatalogCache();
 
-        $message = __('Google Fonts API key validated.', 'tasty-fonts');
-        $this->log->add($message, $this->logContext(
-            LogRepository::CATEGORY_SETTINGS,
-            'google_api_key_validated',
+        return $this->runner->run(
+            function (): array {
+                return array_merge(
+                    $this->status(),
+                    ['message' => __('Google Fonts API key validated.', 'tasty-fonts')]
+                );
+            },
             [
-                'outcome' => 'success',
+                'category' => LogRepository::CATEGORY_SETTINGS,
+                'event' => 'google_api_key_validated',
                 'status_label' => __('Validated', 'tasty-fonts'),
                 'source' => __('Settings', 'tasty-fonts'),
+                'message' => __('Google Fonts API key validated.', 'tasty-fonts'),
                 'details' => [
                     ['label' => __('Google API key', 'tasty-fonts'), 'value' => __('Saved', 'tasty-fonts')],
                 ],
             ]
-        ));
-
-        return array_merge(
-            $this->status(),
-            ['message' => $message]
         );
     }
-
 }
