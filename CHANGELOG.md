@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.16.0-beta.3] - 2026-05-04
+
 ### Added
 
 - Added typed admin page view variables and preview-scene templates for editorial, card, reading, marketing, code, snippet, and interface previews.
