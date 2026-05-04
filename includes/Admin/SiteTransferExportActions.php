@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace TastyFonts\Admin;
 
 use TastyFonts\Maintenance\SiteTransferService;
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\ActivityLogVocabulary;
 use WP_Error;
 
 /**
@@ -47,7 +47,7 @@ final class SiteTransferExportActions
                 ];
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'site_transfer_export_renamed',
                 'status_label' => __('Renamed', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),
@@ -74,7 +74,7 @@ final class SiteTransferExportActions
                 ];
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'site_transfer_export_protection_changed',
                 'status_label' => $protected ? __('Protected', 'tasty-fonts') : __('Unprotected', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),
@@ -101,7 +101,7 @@ final class SiteTransferExportActions
                 ];
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'site_transfer_export_deleted',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),
@@ -128,7 +128,7 @@ final class SiteTransferExportActions
                 'export_bundles' => $this->siteTransfer->listExportBundles(),
             ],
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'site_transfer_exports_deleted_all',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),

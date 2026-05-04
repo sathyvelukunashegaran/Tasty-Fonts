@@ -6,7 +6,7 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\FamilyMetadataRepositoryInterface;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
@@ -52,7 +52,7 @@ final class LocalUploadService
         SettingsRepository $settings,
         private readonly LogRepository $log,
         private readonly UploadedFileValidatorInterface $uploadedFileValidator,
-        private readonly FamilyMetadataRepository $familyMetadataRepo,
+        private readonly FamilyMetadataRepositoryInterface $familyMetadataRepo,
     ) {
         unset($settings);
     }

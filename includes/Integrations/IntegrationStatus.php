@@ -52,6 +52,19 @@ final class IntegrationStatus
     }
 
     /**
+     * @param array<string, mixed> $state
+     */
+    public static function managedStylesLive(array $state): bool
+    {
+        $managedState = is_array($state['theme_styles'] ?? null) ? $state['theme_styles'] : $state;
+
+        $humanStatus = $managedState['human_status'] ?? null;
+
+        return (is_string($humanStatus) && $humanStatus === self::LIVE)
+            || (!empty($managedState['enabled']) && !empty($managedState['applied']) && !empty($managedState['sitewide_delivery']));
+    }
+
+    /**
      * @return array{available: bool, configured: bool, synced: bool, applied: bool, sitewide_delivery: bool, human_status: string}
      */
     public function toArray(): array

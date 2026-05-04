@@ -11,6 +11,7 @@ use TastyFonts\Admin\SettingsSaveFields;
 use TastyFonts\Admin\AdminController;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\VariantTokenService;
 use WP_Error;
 use WP_REST_Request;
 
@@ -55,10 +56,15 @@ final class RestController
     ];
 
     private readonly AdminAccessService $adminAccess;
+    private readonly VariantTokenService $variantTokens;
 
-    public function __construct(private readonly AdminController $admin, ?AdminAccessService $adminAccess = null)
-    {
+    public function __construct(
+        private readonly AdminController $admin,
+        ?AdminAccessService $adminAccess = null,
+        ?VariantTokenService $variantTokens = null
+    ) {
         $this->adminAccess = $adminAccess ?? new AdminAccessService(new SettingsRepository());
+        $this->variantTokens = $variantTokens ?? new VariantTokenService();
     }
 
     /**
@@ -503,7 +509,7 @@ final class RestController
         $variants = $request->get_param('variants');
 
         if (is_array($variants) && $variants !== []) {
-            return FontUtils::normalizeVariantTokens(
+            return $this->variantTokens->normalizeVariantTokens(
                 array_values(
                     array_map(
                         static fn (mixed $variant): string => is_scalar($variant) ? (string) $variant : '',
@@ -519,7 +525,7 @@ final class RestController
             return [];
         }
 
-        return FontUtils::normalizeVariantTokens(explode(',', $variantTokens));
+        return $this->variantTokens->normalizeVariantTokens(explode(',', $variantTokens));
     }
 
     /**

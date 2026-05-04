@@ -14,12 +14,10 @@ $settingsRepository = new \TastyFonts\Repository\SettingsRepository();
 $importRepository = new \TastyFonts\Repository\ImportRepository();
 $logRepository = new \TastyFonts\Repository\LogRepository();
 $adobeClient = new \TastyFonts\Adobe\AdobeProjectClient(
-    $settingsRepository,
     new \TastyFonts\Repository\AdobeProjectRepository(),
     new \TastyFonts\Adobe\AdobeCssParser()
 );
 $googleClient = new \TastyFonts\Google\GoogleFontsClient(
-    $settingsRepository,
     new \TastyFonts\Repository\GoogleApiKeyRepository()
 );
 $bunnyClient = new \TastyFonts\Bunny\BunnyFontsClient();

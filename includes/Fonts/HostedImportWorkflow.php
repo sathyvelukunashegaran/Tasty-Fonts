@@ -9,6 +9,7 @@ defined('ABSPATH') || exit;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\VariantTokenService;
 use WP_Error;
 
 /**
@@ -36,6 +37,8 @@ use WP_Error;
  */
 final class HostedImportWorkflow
 {
+    private readonly VariantTokenService $variantTokens;
+
     /**
      * @param array<string, DeliveryImportStrategy> $strategies
      */
@@ -44,8 +47,11 @@ final class HostedImportWorkflow
         private readonly AssetService $assets,
         private readonly LogRepository $log,
         private readonly HostedImportVariantPlanner $variantPlanner,
-        private readonly array $strategies
+        private readonly array $strategies,
+        ?VariantTokenService $variantTokens = null
     ) {
+        $this->variantTokens = $variantTokens ?? new VariantTokenService();
+
         if ($this->strategies === []) {
             throw new \InvalidArgumentException('Strategy map must include at least one DeliveryImportStrategy.');
         }
@@ -76,7 +82,7 @@ final class HostedImportWorkflow
         $effectiveDeliveryMode = $strategySelection['mode'];
         $strategy = $strategySelection['strategy'];
         $formatMode = $provider->normalizeFormatMode($request->formatMode);
-        $requestedVariants = FontUtils::normalizeVariantTokens($request->variants);
+        $requestedVariants = $this->variantTokens->normalizeVariantTokens($request->variants);
         $existingFamily = $this->imports->getFamily($familySlug);
         $existingProfile = FontUtils::findDeliveryProfile(
             $existingFamily,
@@ -326,7 +332,7 @@ final class HostedImportWorkflow
         $profile['variants'] = array_values(
             array_unique(
                 array_merge(
-                    FontUtils::normalizeVariantTokens($this->stringList($existingProfile['variants'] ?? [])),
+                    $this->variantTokens->normalizeVariantTokens($this->stringList($existingProfile['variants'] ?? [])),
                     $importedVariants
                 )
             )

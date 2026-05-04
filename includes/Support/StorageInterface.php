@@ -11,6 +11,7 @@ defined('ABSPATH') || exit;
  * @phpstan-type RelativePathList list<string>
  * @phpstan-type DirectoryList list<string>
  * @phpstan-type StorageFileMetadata array{relative_path: string, size: int, sha256: string}
+ * @phpstan-type StorageAbsoluteFileState array{exists: bool, size: int, last_modified: int, sha256: string}
  */
 interface StorageInterface
 {
@@ -56,6 +57,11 @@ interface StorageInterface
      * @return list<StorageFileMetadata>
      */
     public function listFileMetadata(?callable $include = null, bool $requireChecksum = false): array;
+
+    /**
+     * @return StorageAbsoluteFileState
+     */
+    public function getAbsoluteFileState(string $path): array;
 
     public function ensureDirectory(string $path): bool;
 

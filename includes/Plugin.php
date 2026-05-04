@@ -62,6 +62,7 @@ use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\VariantTokenService;
 use TastyFonts\Updates\GitHubUpdater;
 
 final class Plugin
@@ -129,9 +130,10 @@ final class Plugin
         $this->adminAccess = new AdminAccessService($this->settings);
         $this->imports = new ImportRepository();
         $this->log = new LogRepository();
-        $this->adobe = new AdobeProjectClient($this->settings, $adobeProjectRepo, $adobeCssParser);
+        $variantTokens = new VariantTokenService();
+        $this->adobe = new AdobeProjectClient($adobeProjectRepo, $adobeCssParser);
         $this->bunnyClient = new BunnyFontsClient();
-        $this->googleClient = new GoogleFontsClient($this->settings, $googleApiKeyRepo);
+        $this->googleClient = new GoogleFontsClient($googleApiKeyRepo);
         $localScanner = new LocalCatalogScanner($this->storage, $parser);
         $adobeAdapter = new AdobeCatalogAdapter($this->adobe);
         $catalogBuilder = new CatalogBuilder(
@@ -172,11 +174,12 @@ final class Plugin
             $this->imports,
             $this->assets,
             $this->log,
-            new HostedImportVariantPlanner(),
+            new HostedImportVariantPlanner($variantTokens),
             [
                 'cdn' => new CdnImportStrategy(),
                 'self_hosted' => new SelfHostedImportStrategy($this->storage),
-            ]
+            ],
+            $variantTokens
         );
         $this->library = new LibraryService(
             $this->storage,
@@ -327,7 +330,7 @@ final class Plugin
             $roleRepo,
             $actionRunner
         );
-        $this->rest = new RestController($this->admin, $this->adminAccess);
+        $this->rest = new RestController($this->admin, $this->adminAccess, $variantTokens);
     }
 
     public static function instance(): self

@@ -35,8 +35,10 @@ use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\AdobeProjectRepository;
 use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\FamilyMetadataRepositoryInterface;
 use TastyFonts\Repository\GoogleApiKeyRepository;
 use TastyFonts\Repository\RoleRepository;
+use TastyFonts\Repository\RoleRepositoryInterface;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
@@ -2403,8 +2405,8 @@ $tests['asset_service_refresh_generated_assets_invalidates_caches_and_queues_css
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
-    $google = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
+    $google = new GoogleFontsClient(new GoogleApiKeyRepository());
     $bunny = new BunnyFontsClient();
     $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
     $adobeAdapter = new AdobeCatalogAdapter($adobe);
@@ -6526,6 +6528,380 @@ $tests['asset_service_get_primary_font_preload_urls_returns_woff2_urls_for_appli
     assertContainsValue('Lora-400.woff2', implode(' ', $urls), 'getPrimaryFontPreloadUrls() should include the body font WOFF2 URL.');
 };
 
+$tests['runtime_asset_planner_get_primary_font_preload_urls_uses_in_memory_role_adapter'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-700.woff2'), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('lora/Lora-400.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['700'],
+            'faces' => [
+                ['family' => 'Inter', 'slug' => 'inter', 'source' => 'local', 'weight' => '700', 'style' => 'normal', 'files' => ['woff2' => 'inter/Inter-700.woff2'], 'paths' => ['woff2' => 'inter/Inter-700.woff2']],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Lora',
+        'lora',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                ['family' => 'Lora', 'slug' => 'lora', 'source' => 'local', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'lora/Lora-400.woff2'], 'paths' => ['woff2' => 'lora/Lora-400.woff2']],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings(['preload_primary_fonts' => '1']);
+
+    $inMemoryRoleRepo = new class() implements RoleRepositoryInterface {
+        public function __construct(
+            private array $roles = [],
+            private array $appliedRoles = []
+        ) {
+        }
+
+        public function getRoles(array $catalog): array
+        {
+            unset($catalog);
+
+            return $this->roles;
+        }
+
+        public function saveRoles(array $input, array $catalog): array
+        {
+            unset($catalog);
+            $this->roles = array_replace($this->roles, $input);
+
+            return $this->roles;
+        }
+
+        public function getAppliedRoles(array $catalog): array
+        {
+            unset($catalog);
+
+            return $this->appliedRoles;
+        }
+
+        public function ensureAppliedRolesInitialized(array $catalog): array
+        {
+            unset($catalog);
+
+            return $this->appliedRoles;
+        }
+
+        public function saveAppliedRoles(array $roles, array $catalog): array
+        {
+            unset($catalog);
+            $this->appliedRoles = array_replace($this->appliedRoles, $roles);
+
+            return $this->appliedRoles;
+        }
+
+        public function clearDisabledCapabilityRoleData(bool $clearVariableAxes, bool $clearMonospaceRole, array $catalog): array
+        {
+            unset($clearVariableAxes, $clearMonospaceRole, $catalog);
+
+            return ['roles' => $this->roles, 'applied_roles' => $this->appliedRoles];
+        }
+
+        public function setAutoApplyRoles(bool $enabled): array
+        {
+            unset($enabled);
+
+            return [];
+        }
+
+        public function previewImportedRoles(array $roles): array
+        {
+            return $roles;
+        }
+
+        public function replaceImportedRoles(array $roles): array
+        {
+            $this->roles = $roles;
+
+            return $this->roles;
+        }
+    };
+
+    $inMemoryRoleRepo->saveAppliedRoles(
+        ['heading' => 'Inter', 'body' => 'Lora', 'heading_weight' => '700', 'body_weight' => '400'],
+        []
+    );
+
+    $planner = new RuntimeAssetPlanner(
+        $services['catalog'],
+        $services['settings'],
+        [new GoogleStylesheetResolver($services['google']), new BunnyStylesheetResolver($services['bunny']), new AdobeStylesheetResolver($services['adobe'])],
+        $inMemoryRoleRepo,
+        $services['family_metadata_repo']
+    );
+
+    $urls = $planner->getPrimaryFontPreloadUrls();
+
+    assertSameValue(2, count($urls), 'RuntimeAssetPlanner preload URLs should resolve from the in-memory role adapter.');
+    assertContainsValue('Inter-700.woff2', implode(' ', $urls), 'RuntimeAssetPlanner preload URLs should include the in-memory heading role family.');
+    assertContainsValue('Lora-400.woff2', implode(' ', $urls), 'RuntimeAssetPlanner preload URLs should include the in-memory body role family.');
+};
+
+$tests['runtime_asset_planner_get_primary_font_preload_urls_respects_in_memory_role_changes'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-700.woff2'), 'font-data');
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('lora/Lora-400.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['700'],
+            'faces' => [
+                ['family' => 'Inter', 'slug' => 'inter', 'source' => 'local', 'weight' => '700', 'style' => 'normal', 'files' => ['woff2' => 'inter/Inter-700.woff2'], 'paths' => ['woff2' => 'inter/Inter-700.woff2']],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['imports']->saveProfile(
+        'Lora',
+        'lora',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['regular'],
+            'faces' => [
+                ['family' => 'Lora', 'slug' => 'lora', 'source' => 'local', 'weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'lora/Lora-400.woff2'], 'paths' => ['woff2' => 'lora/Lora-400.woff2']],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->setAutoApplyRoles(true);
+    $services['settings']->saveSettings(['preload_primary_fonts' => '1']);
+
+    $inMemoryRoleRepo = new class() implements RoleRepositoryInterface {
+        public array $appliedRoles = [
+            'heading' => 'Inter',
+            'body' => 'Lora',
+            'heading_weight' => '700',
+            'body_weight' => '400',
+        ];
+
+        public function getRoles(array $catalog): array
+        {
+            unset($catalog);
+
+            return $this->appliedRoles;
+        }
+
+        public function saveRoles(array $input, array $catalog): array
+        {
+            unset($catalog);
+            $this->appliedRoles = array_replace($this->appliedRoles, $input);
+
+            return $this->appliedRoles;
+        }
+
+        public function getAppliedRoles(array $catalog): array
+        {
+            unset($catalog);
+
+            return $this->appliedRoles;
+        }
+
+        public function ensureAppliedRolesInitialized(array $catalog): array
+        {
+            unset($catalog);
+
+            return $this->appliedRoles;
+        }
+
+        public function saveAppliedRoles(array $roles, array $catalog): array
+        {
+            unset($catalog);
+            $this->appliedRoles = array_replace($this->appliedRoles, $roles);
+
+            return $this->appliedRoles;
+        }
+
+        public function clearDisabledCapabilityRoleData(bool $clearVariableAxes, bool $clearMonospaceRole, array $catalog): array
+        {
+            unset($clearVariableAxes, $clearMonospaceRole, $catalog);
+
+            return ['roles' => $this->appliedRoles, 'applied_roles' => $this->appliedRoles];
+        }
+
+        public function setAutoApplyRoles(bool $enabled): array
+        {
+            unset($enabled);
+
+            return [];
+        }
+
+        public function previewImportedRoles(array $roles): array
+        {
+            return $roles;
+        }
+
+        public function replaceImportedRoles(array $roles): array
+        {
+            $this->appliedRoles = $roles;
+
+            return $this->appliedRoles;
+        }
+    };
+
+    $planner = new RuntimeAssetPlanner(
+        $services['catalog'],
+        $services['settings'],
+        [new GoogleStylesheetResolver($services['google']), new BunnyStylesheetResolver($services['bunny']), new AdobeStylesheetResolver($services['adobe'])],
+        $inMemoryRoleRepo,
+        $services['family_metadata_repo']
+    );
+
+    $initialUrls = $planner->getPrimaryFontPreloadUrls();
+    $inMemoryRoleRepo->appliedRoles['heading'] = '';
+    $updatedUrls = $planner->getPrimaryFontPreloadUrls();
+
+    assertSameValue(2, count($initialUrls), 'RuntimeAssetPlanner should preload both primary roles before the in-memory role adapter changes.');
+    assertSameValue(1, count($updatedUrls), 'RuntimeAssetPlanner should reflect in-memory role adapter changes immediately for preload output.');
+    assertContainsValue('Lora-400.woff2', implode(' ', $updatedUrls), 'RuntimeAssetPlanner should keep the body preload URL when only heading is cleared in-memory.');
+    assertNotContainsValue('Inter-700.woff2', implode(' ', $updatedUrls), 'RuntimeAssetPlanner should drop the heading preload URL when heading is cleared in-memory.');
+};
+
+$tests['asset_service_get_css_uses_in_memory_role_adapter'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+    $services['storage']->writeAbsoluteFile((string) $services['storage']->pathForRelativePath('inter/Inter-700.woff2'), 'font-data');
+    $services['imports']->saveProfile(
+        'Inter',
+        'inter',
+        [
+            'id' => 'local-self_hosted',
+            'label' => 'Self-hosted',
+            'provider' => 'local',
+            'type' => 'self_hosted',
+            'variants' => ['700'],
+            'faces' => [
+                ['family' => 'Inter', 'slug' => 'inter', 'source' => 'local', 'weight' => '700', 'style' => 'normal', 'files' => ['woff2' => 'inter/Inter-700.woff2'], 'paths' => ['woff2' => 'inter/Inter-700.woff2']],
+            ],
+        ],
+        'published',
+        true
+    );
+    $services['settings']->saveSettings(['auto_apply_roles' => '1']);
+
+    $inMemoryRoleRepo = new class() implements RoleRepositoryInterface {
+        public function getRoles(array $catalog): array
+        {
+            unset($catalog);
+
+            return ['heading' => 'Inter', 'body' => 'Inter', 'heading_weight' => '700', 'body_weight' => '700'];
+        }
+
+        public function saveRoles(array $input, array $catalog): array
+        {
+            unset($input, $catalog);
+
+            return $this->getRoles([]);
+        }
+
+        public function getAppliedRoles(array $catalog): array
+        {
+            unset($catalog);
+
+            return ['heading' => 'Inter', 'body' => 'Inter', 'heading_weight' => '700', 'body_weight' => '700'];
+        }
+
+        public function ensureAppliedRolesInitialized(array $catalog): array
+        {
+            unset($catalog);
+
+            return $this->getAppliedRoles([]);
+        }
+
+        public function saveAppliedRoles(array $roles, array $catalog): array
+        {
+            unset($roles, $catalog);
+
+            return $this->getAppliedRoles([]);
+        }
+
+        public function clearDisabledCapabilityRoleData(bool $clearVariableAxes, bool $clearMonospaceRole, array $catalog): array
+        {
+            unset($clearVariableAxes, $clearMonospaceRole, $catalog);
+
+            return ['roles' => $this->getRoles([]), 'applied_roles' => $this->getAppliedRoles([])];
+        }
+
+        public function setAutoApplyRoles(bool $enabled): array
+        {
+            unset($enabled);
+
+            return [];
+        }
+
+        public function previewImportedRoles(array $roles): array
+        {
+            return $roles;
+        }
+
+        public function replaceImportedRoles(array $roles): array
+        {
+            return $roles;
+        }
+    };
+
+    $planner = new RuntimeAssetPlanner(
+        $services['catalog'],
+        $services['settings'],
+        [new GoogleStylesheetResolver($services['google']), new BunnyStylesheetResolver($services['bunny']), new AdobeStylesheetResolver($services['adobe'])],
+        $inMemoryRoleRepo,
+        $services['family_metadata_repo']
+    );
+
+    $assets = new AssetService(
+        $services['storage'],
+        $services['catalog'],
+        $services['settings'],
+        new CssBuilder(),
+        $planner,
+        $services['log'],
+        $inMemoryRoleRepo
+    );
+
+    $css = $assets->getCss();
+
+    assertContainsValue('font-family:"Inter"', preg_replace('/\s+/', '', $css) ?? $css, 'Generated CSS should resolve role families through the in-memory role adapter.');
+    assertContainsValue('Inter-700.woff2', $css, 'Generated CSS should include face URLs selected through the in-memory role adapter.');
+};
+
 // ---------------------------------------------------------------------------
 // RuntimeAssetPlanner::getPreconnectOrigins
 // ---------------------------------------------------------------------------
@@ -7043,3 +7419,170 @@ $tests['runtime_service_inject_editor_font_presets_does_not_force_legacy_schema_
         'injectEditorFontPresets() should not inject a fallback schema version when the incoming theme JSON data omits one.'
     );
 };
+
+// ---------------------------------------------------------------------------
+// FamilyMetadataRepositoryInterface consumer test (in-memory adapter)
+// ---------------------------------------------------------------------------
+
+$tests['runtime_asset_planner_resolves_family_metadata_from_interface_adapter'] = static function (): void {
+    resetTestState();
+
+    global $optionStore;
+
+    $optionStore[SettingsRepository::OPTION_SETTINGS] = [
+        'auto_apply_roles' => false,
+        'css_delivery_mode' => 'file',
+        'font_display' => 'swap',
+        'family_fallbacks' => [],
+        'family_font_displays' => [],
+    ];
+    $optionStore[SettingsRepository::OPTION_ROLES] = [];
+
+    $services = makeServiceGraph();
+    $services['storage']->ensureRootDirectory();
+
+    $services['imports']->saveProfile(
+        'Roboto',
+        'roboto',
+        [
+            'id' => 'google-cdn',
+            'label' => 'Google CDN',
+            'provider' => 'google',
+            'type' => 'cdn',
+            'variants' => ['regular'],
+            'faces' => [
+                [
+                    'family' => 'Roboto',
+                    'slug' => 'roboto',
+                    'source' => 'google',
+                    'weight' => '400',
+                    'style' => 'normal',
+                    'files' => [],
+                    'paths' => [],
+                ],
+            ],
+        ],
+        'published',
+        true
+    );
+
+    $services['catalog']->invalidate();
+    $services['catalog']->getCatalog();
+
+    $inMemoryMetadata = new class() implements FamilyMetadataRepositoryInterface {
+        /** @var array<string, string> */
+        private array $displays = [];
+        /** @var array<string, string> */
+        private array $fallbacks = [];
+
+        public function getFallback(string $familySlug, string $default = 'sans-serif'): string
+        {
+            return $this->fallbacks[$familySlug] ?? $default;
+        }
+
+        /** @return array<string, string> */
+        public function saveFallback(string $familySlug, string $fallback): array
+        {
+            $this->fallbacks[$familySlug] = $fallback;
+
+            return $this->fallbacks;
+        }
+
+        public function getFontDisplay(string $familySlug, string $default = ''): string
+        {
+            return $this->displays[$familySlug] ?? $default;
+        }
+
+        /** @return array<string, string> */
+        public function saveFontDisplay(string $familySlug, string $display): array
+        {
+            $this->displays[$familySlug] = $display;
+
+            return $this->displays;
+        }
+
+        /** @return array<string, mixed> */
+        public function resetFallbacks(): array
+        {
+            $this->fallbacks = [];
+
+            return ['family_fallbacks' => []];
+        }
+
+        /** @return array<string, mixed> */
+        public function resetAll(): array
+        {
+            $this->fallbacks = [];
+            $this->displays = [];
+
+            return ['family_fallbacks' => [], 'family_font_displays' => []];
+        }
+    };
+
+    $inMemoryMetadata->saveFallback('Roboto', 'Georgia, serif');
+    $inMemoryMetadata->saveFontDisplay('Roboto', 'fallback');
+
+    $mockResolver = new class() implements ProviderStylesheetResolverInterface {
+        public function supports(string $provider, string $type): bool
+        {
+            return $provider === 'google' && $type === 'cdn';
+        }
+
+        /** @param array<string, mixed> $delivery */
+        public function buildStylesheetDescriptor(array $delivery, string $familyName, string $familySlug, string $displayOverride): ?array
+        {
+            return [
+                'handle' => 'google-font-' . $familySlug,
+                'url' => 'https://fonts.googleapis.com/css?family=' . urlencode($familyName) . '&display=' . $displayOverride,
+                'provider' => 'google',
+                'type' => 'cdn',
+            ];
+        }
+
+        public function preconnectOrigin(): ?string
+        {
+            return 'https://fonts.googleapis.com';
+        }
+
+        public function getProviderKey(): string
+        {
+            return 'google';
+        }
+    };
+
+    $planner = new RuntimeAssetPlanner(
+        $services['catalog'],
+        $services['settings'],
+        [$mockResolver],
+        new RoleRepository(),
+        $inMemoryMetadata
+    );
+
+    $editorFamilies = $planner->getEditorFontFamilies();
+    $stylesheets = $planner->getExternalStylesheets();
+
+    assertSameValue(
+        '"Roboto", Georgia, serif',
+        (string) ($editorFamilies[0]['fontFamily'] ?? ''),
+        'RuntimeAssetPlanner should resolve editor fallback stacks from the in-memory FamilyMetadataRepositoryInterface adapter.'
+    );
+
+    assertSameValue(
+        1,
+        count($stylesheets),
+        'RuntimeAssetPlanner should include one external stylesheet for the CDN family.'
+    );
+
+    assertContainsValue(
+        'display=fallback',
+        (string) ($stylesheets[0]['url'] ?? ''),
+        'RuntimeAssetPlanner should resolve font-display from the in-memory FamilyMetadataRepositoryInterface adapter.'
+    );
+
+    assertNotContainsValue(
+        'display=swap',
+        (string) ($stylesheets[0]['url'] ?? ''),
+        'RuntimeAssetPlanner should not fall back to the settings default when the in-memory adapter provides a saved value.'
+    );
+};
+

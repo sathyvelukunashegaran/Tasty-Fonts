@@ -7,7 +7,7 @@ namespace TastyFonts\Fonts;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\LogRepository;
-use TastyFonts\Support\Storage;
+use TastyFonts\Support\StorageInterface;
 
 /**
  * @phpstan-type GeneratedStylesheetState array{
@@ -28,7 +28,7 @@ final class GeneratedStylesheetFile
     private const VERSION_HASH_LENGTH = 16;
 
     public function __construct(
-        private readonly Storage $storage,
+        private readonly StorageInterface $storage,
         private readonly GeneratedCssCache $cssCache,
         private readonly LogRepository $log
     ) {
@@ -159,25 +159,23 @@ final class GeneratedStylesheetFile
      */
     private function buildStylesheetStateForPath(string $path, string $url): array
     {
-        if ($path !== '') {
-            clearstatcache(true, $path);
-        }
-
-        $exists = $path !== '' && file_exists($path);
+        $fileState = $path !== ''
+            ? $this->storage->getAbsoluteFileState($path)
+            : [
+                'exists' => false,
+                'size' => 0,
+                'last_modified' => 0,
+                'sha256' => '',
+            ];
 
         return [
             'path' => $path,
             'url' => $url,
-            'exists' => $exists,
-            'size' => $exists ? (int) filesize($path) : 0,
-            'last_modified' => $exists ? (int) filemtime($path) : 0,
-            'current_hash' => $exists ? $this->hashFile($path) : '',
+            'exists' => $fileState['exists'],
+            'size' => $fileState['size'],
+            'last_modified' => $fileState['last_modified'],
+            'current_hash' => $fileState['sha256'],
         ];
-    }
-
-    private function hashFile(string $path): string
-    {
-        return (string) hash_file('sha256', $path);
     }
 
     private function versionTokenFromHash(string $hash): string

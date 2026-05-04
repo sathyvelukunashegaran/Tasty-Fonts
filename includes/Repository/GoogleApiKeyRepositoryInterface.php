@@ -17,6 +17,18 @@ interface GoogleApiKeyRepositoryInterface
     public function has(): bool;
 
     /**
+     * Return the decrypted Google API key, or an empty string when none is stored.
+     */
+    public function getApiKey(): string;
+
+    /**
+     * Persist a Google API key and reset its validation status to unknown.
+     *
+     * @return GoogleApiKeyStatus
+     */
+    public function saveApiKey(string $apiKey): array;
+
+    /**
      * Get the current API key status.
      *
      * @return GoogleApiKeyStatus

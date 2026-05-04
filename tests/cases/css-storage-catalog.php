@@ -1689,7 +1689,7 @@ $tests['catalog_service_ignores_eot_and_svg_files_during_local_scan'] = static f
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
     $adobeAdapter = new AdobeCatalogAdapter($adobe);
     $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
@@ -1714,7 +1714,7 @@ $tests['catalog_service_local_scan_excludes_imported_roots_and_keeps_relative_pa
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
     $adobeAdapter = new AdobeCatalogAdapter($adobe);
     $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
@@ -1739,7 +1739,7 @@ $tests['catalog_service_only_includes_local_variable_fonts_when_the_feature_flag
     $settings = new SettingsRepository();
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
 
     $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
     $adobeAdapter = new AdobeCatalogAdapter($adobe);
@@ -1901,6 +1901,42 @@ $tests['storage_writes_absolute_files_via_wp_filesystem'] = static function (): 
     assertSameValue('font-data', (string) file_get_contents($targetPath), 'Storage writes should persist the provided file contents.');
     assertSameValue(true, is_dir(dirname($targetPath)), 'Storage writes should ensure missing parent directories exist before writing.');
     assertSameValue(1, count($wpFilesystemInitCalls), 'Storage writes should initialize the shared filesystem bridge once per write.');
+};
+
+$tests['storage_get_absolute_file_state_reports_existing_managed_file_metadata'] = static function (): void {
+    resetTestState();
+
+    $storage = new Storage();
+    $root = $storage->getRoot();
+    assertTrueValue(is_string($root) && $root !== '', 'Storage root should be available for file state tests.');
+
+    $path = trailingslashit((string) $root) . '.generated/tasty-fonts.css';
+    $written = $storage->writeAbsoluteFile($path, 'generated-css');
+    $state = $storage->getAbsoluteFileState($path);
+
+    assertSameValue(true, $written, 'Storage should write the managed file before state inspection.');
+    assertSameValue(true, $state['exists'], 'Storage file state should report managed files as existing.');
+    assertSameValue(strlen('generated-css'), $state['size'], 'Storage file state should expose managed file size.');
+    assertSameValue(hash('sha256', 'generated-css'), $state['sha256'], 'Storage file state should expose managed file checksum.');
+    assertTrueValue($state['last_modified'] > 0, 'Storage file state should expose managed file modification time.');
+};
+
+$tests['storage_get_absolute_file_state_rejects_traversal_outside_managed_root'] = static function (): void {
+    resetTestState();
+
+    $storage = new Storage();
+    $root = $storage->getRoot();
+    assertTrueValue(is_string($root) && $root !== '', 'Storage root should be available for traversal file state tests.');
+
+    $outsidePath = wp_normalize_path(dirname((string) $root) . '/outside-generated.css');
+    wp_mkdir_p(dirname($outsidePath));
+    file_put_contents($outsidePath, 'outside-css');
+
+    $traversalPath = trailingslashit((string) $root) . '../outside-generated.css';
+    $state = $storage->getAbsoluteFileState($traversalPath);
+
+    assertSameValue(false, $state['exists'], 'Storage file state should reject canonical paths outside the managed root.');
+    assertSameValue('', $state['sha256'], 'Rejected outside paths should not be hashed.');
 };
 
 $tests['storage_skips_wp_filesystem_when_direct_method_is_unavailable'] = static function (): void {

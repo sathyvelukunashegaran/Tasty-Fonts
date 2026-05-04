@@ -10,21 +10,25 @@ defined('ABSPATH') || exit;
  * @phpstan-type LogContext array<string, mixed>
  * @phpstan-type LogEntry array<string, string>
  * @phpstan-type LogEntryList list<LogEntry>
+ *
+ * Activity category and event constants live canonically on
+ * ActivityLogVocabulary. The aliases below remain on this concrete adapter for
+ * backward compatibility with older consumers and tests.
  */
 class LogRepository implements ActivityLogRepositoryInterface
 {
     public const OPTION_LOG = 'tasty_fonts_log';
-    public const CATEGORY_TRANSFER = 'transfer';
-    public const CATEGORY_SETTINGS = 'settings';
-    public const CATEGORY_ROLES = 'roles';
-    public const CATEGORY_LIBRARY = 'library';
-    public const CATEGORY_IMPORT = 'import';
-    public const CATEGORY_INTEGRATION = 'integration';
-    public const CATEGORY_MAINTENANCE = 'maintenance';
-    public const CATEGORY_UPDATE = 'update';
-    public const EVENT_SITE_TRANSFER_EXPORT = 'site_transfer_export';
-    public const EVENT_SITE_TRANSFER_IMPORT_SUCCESS = 'site_transfer_import_success';
-    public const EVENT_SITE_TRANSFER_IMPORT_FAILURE = 'site_transfer_import_failure';
+    public const CATEGORY_TRANSFER = ActivityLogVocabulary::CATEGORY_TRANSFER;
+    public const CATEGORY_SETTINGS = ActivityLogVocabulary::CATEGORY_SETTINGS;
+    public const CATEGORY_ROLES = ActivityLogVocabulary::CATEGORY_ROLES;
+    public const CATEGORY_LIBRARY = ActivityLogVocabulary::CATEGORY_LIBRARY;
+    public const CATEGORY_IMPORT = ActivityLogVocabulary::CATEGORY_IMPORT;
+    public const CATEGORY_INTEGRATION = ActivityLogVocabulary::CATEGORY_INTEGRATION;
+    public const CATEGORY_MAINTENANCE = ActivityLogVocabulary::CATEGORY_MAINTENANCE;
+    public const CATEGORY_UPDATE = ActivityLogVocabulary::CATEGORY_UPDATE;
+    public const EVENT_SITE_TRANSFER_EXPORT = ActivityLogVocabulary::EVENT_SITE_TRANSFER_EXPORT;
+    public const EVENT_SITE_TRANSFER_IMPORT_SUCCESS = ActivityLogVocabulary::EVENT_SITE_TRANSFER_IMPORT_SUCCESS;
+    public const EVENT_SITE_TRANSFER_IMPORT_FAILURE = ActivityLogVocabulary::EVENT_SITE_TRANSFER_IMPORT_FAILURE;
     private const MAX_ENTRIES = 100;
     private const MAX_DETAIL_ROWS = 16;
     private const MAX_DETAIL_VALUE_LENGTH = 1000;

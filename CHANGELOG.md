@@ -26,7 +26,10 @@ All notable changes to this project will be documented in this file.
 - Updated admin action helpers, REST, CLI, rollback, maintenance, support, and site-transfer actions to share consistent action payload typing.
 - Centralized hosted import face construction and provider stylesheet resolution to reduce strategy duplication across CDN and self-hosted imports.
 - Simplified HostedImportWorkflow so delivery-specific CDN and self-hosted face building is delegated to strategy implementations while preserving the existing import result shape.
-- Kept repository interface adoption intentionally type-level for this release, leaving consumer-by-consumer interface migration for follow-up slices.
+- Migrated Google Fonts and Adobe Fonts runtime clients off the settings facade so they now depend directly on their focused repository seams.
+- Migrated hosted import and REST variant-token handling to the extracted VariantTokenService instead of the FontUtils compatibility proxy.
+- Replaced remaining implicit admin renderer variable capture with explicit view arrays and removed generic template-scope extraction from admin rendering.
+- Moved runtime integration live-style checks into IntegrationStatus so RuntimeService no longer owns duplicated managed-state parsing.
 
 ### Fixed
 
@@ -37,6 +40,7 @@ All notable changes to this project will be documented in this file.
 - Fixed catalog-pipeline regression coverage for provider discovery, hydration, enrichment, cache validation, and family delivery metadata.
 - Fixed verification harness gaps for thrown-exception assertions, injected runtime integration tests, and typed admin view reconstruction.
 - Fixed PHPStan return-type issues across admin action flows and kept PHP syntax, PHP tests, PHPStan, and JS tests green for the current change set.
+- Fixed uninstall wiring to use the focused Google API key and Adobe project repository seams after client constructor cleanup.
 
 ## [1.16.0-beta.2] - 2026-05-02
 

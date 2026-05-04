@@ -10,13 +10,15 @@ use TastyFonts\Fonts\GoogleStylesheetResolver;
 use TastyFonts\Bunny\BunnyFontsClient;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Repository\AdobeProjectRepository;
+use TastyFonts\Repository\AdobeProjectRepositoryInterface;
 use TastyFonts\Repository\GoogleApiKeyRepository;
+use TastyFonts\Repository\GoogleApiKeyRepositoryInterface;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\TransientKey;
 
 $tests['google_fonts_client_builds_variable_css2_urls_when_axes_are_available'] = static function (): void {
     $settings = new SettingsRepository();
-    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
+    $client = new GoogleFontsClient(new GoogleApiKeyRepository());
 
     assertSameValue(
         'https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap',
@@ -39,7 +41,7 @@ $tests['google_fonts_client_builds_variable_css2_urls_when_axes_are_available'] 
 
 $tests['google_fonts_client_preserves_custom_axis_case_in_variable_css2_urls'] = static function (): void {
     $settings = new SettingsRepository();
-    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
+    $client = new GoogleFontsClient(new GoogleApiKeyRepository());
 
     assertSameValue(
         'https://fonts.googleapis.com/css2?family=AR+One+Sans:ARRR,wght@10..60,400..700&display=swap',
@@ -74,9 +76,9 @@ $tests['provider_stylesheet_resolvers_adapt_provider_clients_for_runtime_stylesh
 
     $settings = new SettingsRepository();
     $adobeProjectRepo = new AdobeProjectRepository();
-    $google = new GoogleStylesheetResolver(new GoogleFontsClient($settings, new GoogleApiKeyRepository()));
+    $google = new GoogleStylesheetResolver(new GoogleFontsClient(new GoogleApiKeyRepository()));
     $bunny = new BunnyStylesheetResolver(new BunnyFontsClient());
-    $adobe = new AdobeStylesheetResolver(new AdobeProjectClient($settings, $adobeProjectRepo, new AdobeCssParser()));
+    $adobe = new AdobeStylesheetResolver(new AdobeProjectClient($adobeProjectRepo, new AdobeCssParser()));
 
     $adobeProjectRepo->saveProject('abc123', true);
 
@@ -422,7 +424,7 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
     $settings = new SettingsRepository();
     $settings->saveSettings(['google_api_key' => 'api-key']);
     $settings->saveGoogleApiKeyStatus('valid', 'Ready');
-    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
+    $client = new GoogleFontsClient(new GoogleApiKeyRepository());
     $catalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
     $metadataUrl = 'https://fonts.google.com/metadata/fonts';
     $remoteGetResponses[$catalogUrl] = [
@@ -475,7 +477,7 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
 
     $results = $client->searchFamilies('int', 5);
     $resultsAgain = $client->searchFamilies('int', 5);
-    $family = (new GoogleFontsClient($settings, new GoogleApiKeyRepository()))->getFamily('Inter');
+    $family = (new GoogleFontsClient(new GoogleApiKeyRepository()))->getFamily('Inter');
 
     assertSameValue(
         [
@@ -542,6 +544,88 @@ $tests['google_fonts_client_uses_compact_catalog_cache_for_search_and_refetches_
     );
 };
 
+$tests['google_fonts_client_reads_key_status_through_interface_adapter'] = static function (): void {
+    resetTestState();
+
+    $inMemoryRepo = new class() implements GoogleApiKeyRepositoryInterface {
+        private int $nextCheckedAt = 0;
+        private array $status = ['state' => 'empty', 'message' => '', 'checked_at' => 0];
+        public function has(): bool { return $this->status['state'] !== 'empty'; }
+        public function getApiKey(): string { return $this->has() ? 'test-key' : ''; }
+        public function saveApiKey(string $apiKey): array { $this->status = ['state' => trim($apiKey) === '' ? 'empty' : 'unknown', 'message' => '', 'checked_at' => 0]; return $this->status; }
+        public function getStatus(): array { return $this->status; }
+        public function saveStatus(string $state, string $message = ''): array {
+            $this->status = ['state' => $state, 'message' => $message, 'checked_at' => $this->nextCheckedAt];
+            return $this->status;
+        }
+        public function setNextCheckedAt(int $checkedAt): void { $this->nextCheckedAt = $checkedAt; }
+        public function clear(): void { $this->status = ['state' => 'empty', 'message' => '', 'checked_at' => 0]; }
+    };
+
+    $settings = new SettingsRepository();
+    $client = new GoogleFontsClient($inMemoryRepo);
+
+    assertFalseValue($client->hasApiKey(), 'GoogleFontsClient should report no API key when the interface adapter says empty.');
+    assertFalseValue($client->canSearch(), 'GoogleFontsClient should disallow search when the interface adapter reports empty status.');
+
+    $inMemoryRepo->setNextCheckedAt(123);
+    $inMemoryRepo->saveStatus('valid', 'Ready');
+
+    assertTrueValue($client->hasApiKey(), 'GoogleFontsClient should report an API key when the interface adapter says valid.');
+    assertTrueValue($client->canSearch(), 'GoogleFontsClient should allow search when the interface adapter reports valid status.');
+
+    $status = $client->getApiKeyStatus();
+    assertSameValue('valid', (string) ($status['state'] ?? ''), 'GoogleFontsClient should read status state through the interface adapter.');
+    assertSameValue('Ready', (string) ($status['message'] ?? ''), 'GoogleFontsClient should read status message through the interface adapter.');
+    assertSameValue(123, (int) ($status['checked_at'] ?? 0), 'GoogleFontsClient should read status checked_at through the interface adapter.');
+
+    $inMemoryRepo->setNextCheckedAt(456);
+    $inMemoryRepo->saveStatus('invalid', 'Nope');
+
+    assertTrueValue($client->hasApiKey(), 'GoogleFontsClient should still report an API key when the interface adapter reports invalid status.');
+    assertFalseValue($client->canSearch(), 'GoogleFontsClient should disallow search when the interface adapter reports invalid status.');
+
+    $inMemoryRepo->setNextCheckedAt(789);
+    $inMemoryRepo->saveStatus('unknown', 'Later');
+
+    assertTrueValue($client->hasApiKey(), 'GoogleFontsClient should still report an API key when the interface adapter reports unknown status.');
+    assertFalseValue($client->canSearch(), 'GoogleFontsClient should disallow search when the interface adapter reports unknown status.');
+};
+
+$tests['google_fonts_client_revalidate_stored_api_key_status_through_interface_adapter'] = static function (): void {
+    resetTestState();
+
+    $inMemoryRepo = new class() implements GoogleApiKeyRepositoryInterface {
+        public array $writes = [];
+        private int $nextCheckedAt = 0;
+        private array $status = ['state' => 'empty', 'message' => '', 'checked_at' => 0];
+        public function has(): bool { return $this->status['state'] !== 'empty'; }
+        public function getApiKey(): string { return $this->has() ? 'test-key' : ''; }
+        public function saveApiKey(string $apiKey): array { $this->status = ['state' => trim($apiKey) === '' ? 'empty' : 'unknown', 'message' => '', 'checked_at' => 0]; return $this->status; }
+        public function getStatus(): array { return $this->status; }
+        public function saveStatus(string $state, string $message = ''): array {
+            $this->writes[] = ['state' => $state, 'message' => $message, 'checked_at' => $this->nextCheckedAt];
+            $this->status = ['state' => $state, 'message' => $message, 'checked_at' => $this->nextCheckedAt];
+            return $this->status;
+        }
+        public function setNextCheckedAt(int $checkedAt): void { $this->nextCheckedAt = $checkedAt; }
+        public function clear(): void { $this->status = ['state' => 'empty', 'message' => '', 'checked_at' => 0]; }
+    };
+
+    $inMemoryRepo->setNextCheckedAt(777);
+
+    $settings = new SettingsRepository();
+    $client = new GoogleFontsClient($inMemoryRepo);
+    $status = $client->revalidateStoredApiKeyStatus();
+
+    assertSameValue(
+        [['state' => 'empty', 'message' => '', 'checked_at' => 777]],
+        $inMemoryRepo->writes,
+        'GoogleFontsClient revalidate should write empty status through the interface adapter when no key is stored.'
+    );
+    assertSameValue(777, (int) ($status['checked_at'] ?? 0), 'GoogleFontsClient revalidate should return checked_at from the interface adapter write result.');
+};
+
 $tests['google_fonts_client_schedules_api_key_revalidation_when_status_is_stale'] = static function (): void {
     resetTestState();
 
@@ -554,7 +638,7 @@ $tests['google_fonts_client_schedules_api_key_revalidation_when_status_is_stale'
     $settings->saveGoogleApiKeyStatus('valid', 'Ready');
     $optionStore[SettingsRepository::OPTION_GOOGLE_API_KEY_DATA]['google_api_key_checked_at'] = time() - (2 * DAY_IN_SECONDS);
 
-    $client = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
+    $client = new GoogleFontsClient(new GoogleApiKeyRepository());
     $status = $client->getApiKeyStatus();
 
     assertSameValue('valid', (string) ($status['state'] ?? ''), 'Loading stale Google API key status should preserve the stored state while revalidation is queued.');
@@ -579,7 +663,7 @@ $tests['google_fonts_client_clears_catalog_cache'] = static function (): void {
     $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG)] = ['family' => 'Inter'];
     $transientStore[TransientKey::forSite(GoogleFontsClient::TRANSIENT_METADATA)] = ['inter' => ['family' => 'Inter', 'axes' => []]];
 
-    $client = new GoogleFontsClient(new SettingsRepository(), new GoogleApiKeyRepository());
+    $client = new GoogleFontsClient(new GoogleApiKeyRepository());
     $client->clearCatalogCache();
 
     assertSameValue(false, array_key_exists(TransientKey::forSite(GoogleFontsClient::TRANSIENT_CATALOG), $transientStore), 'Google catalog cache clearing should remove the cached catalog transient.');
@@ -610,9 +694,9 @@ $tests['provider_clients_apply_http_request_args_filters'] = static function ():
     );
 
     $settings = new SettingsRepository();
-    $google = new GoogleFontsClient($settings, new GoogleApiKeyRepository());
+    $google = new GoogleFontsClient(new GoogleApiKeyRepository());
     $bunny = new BunnyFontsClient();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $googleCatalogUrl = 'https://www.googleapis.com/webfonts/v1/webfonts?sort=popularity&key=api-key';
     $googleCssUrl = $google->buildCssUrl('Inter', ['regular']);
     $bunnyFamilyUrl = 'https://fonts.bunny.net/family/inter';
@@ -713,7 +797,7 @@ $tests['adobe_project_client_validates_project_and_reuses_cached_families'] = st
 CSS,
     ];
 
-    $client = new AdobeProjectClient(new SettingsRepository(), new AdobeProjectRepository(), new AdobeCssParser());
+    $client = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $validation = $client->validateProject('ABC-1234');
     $families = $client->getProjectFamilies($projectId);
 
@@ -740,10 +824,183 @@ $tests['adobe_project_client_maps_invalid_and_unknown_responses'] = static funct
     ];
     $remoteGetResponses[$unknownUrl] = new WP_Error('http_request_failed', 'Timed out');
 
-    $client = new AdobeProjectClient(new SettingsRepository(), new AdobeProjectRepository(), new AdobeCssParser());
+    $client = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $invalid = $client->validateProject('invalid01');
     $unknown = $client->validateProject('unknown01');
 
     assertSameValue('invalid', $invalid['state'], 'Adobe project validation should treat rejected project IDs as invalid.');
     assertSameValue('unknown', $unknown['state'], 'Adobe project validation should treat transport failures as unknown.');
+};
+
+$tests['adobe_project_client_reads_project_state_through_interface_seam'] = static function (): void {
+    resetTestState();
+
+    $state = ['enabled' => true, 'project_id' => 'abc123', 'status_state' => 'valid', 'status_message' => 'Ready', 'checked_at' => 1234567890];
+
+    $inMemoryRepo = new class($state) implements AdobeProjectRepositoryInterface {
+        /** @var array<string, mixed> */
+        private array $state;
+
+        /** @param array<string, mixed> $state */
+        public function __construct(array $state) { $this->state = $state; }
+
+        public function isEnabled(): bool { return !empty($this->state['enabled']); }
+
+        public function getProjectId(): string { return (string) ($this->state['project_id'] ?? ''); }
+
+        public function getStatus(): array {
+            return [
+                'state' => (string) ($this->state['status_state'] ?? 'empty'),
+                'message' => (string) ($this->state['status_message'] ?? ''),
+                'checked_at' => (int) ($this->state['checked_at'] ?? 0),
+            ];
+        }
+
+        public function saveProject(string $projectId, bool $enabled): array { return []; }
+
+        public function saveStatus(string $state, string $message = ''): array { return []; }
+
+        public function clear(): array { return []; }
+    };
+
+    $client = new AdobeProjectClient($inMemoryRepo, new AdobeCssParser());
+
+    assertSameValue(true, $client->isEnabled(), 'AdobeProjectClient should read enabled state through interface seam.');
+    assertSameValue('abc123', $client->getProjectId(), 'AdobeProjectClient should read project ID through interface seam.');
+    assertSameValue(true, $client->hasProjectId(), 'AdobeProjectClient should detect project ID presence through interface seam.');
+    assertSameValue('valid', $client->getProjectStatus()['state'], 'AdobeProjectClient should read status state through interface seam.');
+    assertSameValue('Ready', $client->getProjectStatus()['message'], 'AdobeProjectClient should read status message through interface seam.');
+    assertSameValue(1234567890, $client->getProjectStatus()['checked_at'], 'AdobeProjectClient should read status checked_at through interface seam.');
+    assertSameValue(true, $client->canEnqueue(), 'AdobeProjectClient should allow enqueue when interface reports valid project.');
+};
+
+$tests['adobe_project_client_validates_project_through_interface_seam'] = static function (): void {
+    resetTestState();
+
+    global $remoteGetResponses;
+
+    $projectId = 'seamtest';
+    $url = 'https://use.typekit.net/' . $projectId . '.css';
+    $remoteGetResponses[$url] = [
+        'response' => ['code' => 200],
+        'headers' => ['content-type' => 'text/css'],
+        'body' => '@font-face{font-family:"Seam Family";font-style:normal;font-weight:400;src:url(https://use.typekit.net/af/1.woff2) format("woff2");}',
+    ];
+
+    $writeLog = [];
+    $inMemoryRepo = new class($writeLog) implements AdobeProjectRepositoryInterface {
+        /** @var list<array{method: string, args: array<string, mixed>}> */
+        private array $writeLog;
+
+        /** @param list<array{method: string, args: array<string, mixed>}> $writeLog */
+        public function __construct(array &$writeLog) { $this->writeLog = &$writeLog; }
+
+        public function isEnabled(): bool { return false; }
+
+        public function getProjectId(): string { return ''; }
+
+        public function getStatus(): array { return ['state' => 'empty', 'message' => '', 'checked_at' => 0]; }
+
+        public function saveProject(string $projectId, bool $enabled): array { $this->writeLog[] = ['method' => 'saveProject', 'args' => ['project_id' => $projectId, 'enabled' => $enabled]]; return []; }
+
+        public function saveStatus(string $state, string $message = ''): array { $this->writeLog[] = ['method' => 'saveStatus', 'args' => ['state' => $state, 'message' => $message]]; return []; }
+
+        public function clear(): array { $this->writeLog[] = ['method' => 'clear', 'args' => []]; return []; }
+    };
+
+    $client = new AdobeProjectClient($inMemoryRepo, new AdobeCssParser());
+    $validation = $client->validateProject($projectId);
+
+    assertSameValue('valid', $validation['state'], 'AdobeProjectClient validation should succeed through interface seam when stylesheet is reachable.');
+    assertContainsValue('1 famil', (string) $validation['message'], 'AdobeProjectClient validation should report family count through interface seam.');
+    assertSameValue(0, count($writeLog), 'AdobeProjectClient validation should not trigger repository writes through the interface seam.');
+};
+
+$tests['adobe_project_client_rejects_enqueue_when_interface_reports_invalid_state'] = static function (): void {
+    resetTestState();
+
+    $inMemoryRepo = new class() implements AdobeProjectRepositoryInterface {
+        public function isEnabled(): bool { return true; }
+
+        public function getProjectId(): string { return 'abc123'; }
+
+        public function getStatus(): array { return ['state' => 'invalid', 'message' => 'Bad project', 'checked_at' => 1]; }
+
+        public function saveProject(string $projectId, bool $enabled): array { return []; }
+
+        public function saveStatus(string $state, string $message = ''): array { return []; }
+
+        public function clear(): array { return []; }
+    };
+
+    $client = new AdobeProjectClient($inMemoryRepo, new AdobeCssParser());
+
+    assertSameValue(false, $client->canEnqueue(), 'AdobeProjectClient should reject enqueue when interface reports invalid project state.');
+};
+
+$tests['adobe_project_client_enqueue_version_changes_with_interface_state'] = static function (): void {
+    resetTestState();
+
+    $state = ['enabled' => true, 'project_id' => 'abc123', 'checked_at' => 1000];
+
+    $inMemoryRepo = new class($state) implements AdobeProjectRepositoryInterface {
+        /** @var array<string, mixed> */
+        private array $state;
+
+        /** @param array<string, mixed> $state */
+        public function __construct(array $state) { $this->state = $state; }
+
+        public function isEnabled(): bool { return !empty($this->state['enabled']); }
+
+        public function getProjectId(): string { return (string) ($this->state['project_id'] ?? ''); }
+
+        public function getStatus(): array {
+            return [
+                'state' => 'valid',
+                'message' => '',
+                'checked_at' => (int) ($this->state['checked_at'] ?? 0),
+            ];
+        }
+
+        public function saveProject(string $projectId, bool $enabled): array { return []; }
+
+        public function saveStatus(string $state, string $message = ''): array { return []; }
+
+        public function clear(): array { return []; }
+    };
+
+    $client = new AdobeProjectClient($inMemoryRepo, new AdobeCssParser());
+    $versionA = $client->getEnqueueVersion();
+
+    $inMemoryRepo = new class(['enabled' => false, 'project_id' => 'abc123', 'checked_at' => 1000]) implements AdobeProjectRepositoryInterface {
+        /** @var array<string, mixed> */
+        private array $state;
+
+        /** @param array<string, mixed> $state */
+        public function __construct(array $state) { $this->state = $state; }
+
+        public function isEnabled(): bool { return !empty($this->state['enabled']); }
+
+        public function getProjectId(): string { return (string) ($this->state['project_id'] ?? ''); }
+
+        public function getStatus(): array {
+            return [
+                'state' => 'valid',
+                'message' => '',
+                'checked_at' => (int) ($this->state['checked_at'] ?? 0),
+            ];
+        }
+
+        public function saveProject(string $projectId, bool $enabled): array { return []; }
+
+        public function saveStatus(string $state, string $message = ''): array { return []; }
+
+        public function clear(): array { return []; }
+    };
+
+    $client = new AdobeProjectClient($inMemoryRepo, new AdobeCssParser());
+    $versionB = $client->getEnqueueVersion();
+
+    assertSameValue(true, $versionA !== '', 'AdobeProjectClient enqueue version should be non-empty through interface seam.');
+    assertSameValue(true, $versionA !== $versionB, 'AdobeProjectClient enqueue version should change when enabled state changes through interface seam.');
 };

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace TastyFonts\Admin;
 
 use TastyFonts\Maintenance\SupportBundleService;
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\ActivityLogVocabulary;
 use WP_Error;
 
 /**
@@ -32,7 +32,7 @@ final class SupportActions
                 return ['bundle' => $bundle];
             },
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'support_bundle_created',
                 'status_label' => __('Created', 'tasty-fonts'),
                 'source' => __('Support', 'tasty-fonts'),

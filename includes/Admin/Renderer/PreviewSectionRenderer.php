@@ -52,7 +52,14 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
     ): void
     {
         $template = self::SCENE_TEMPLATES[$key] ?? 'preview-editorial.php';
-        $this->renderTemplate($template, get_defined_vars());
+        $this->renderTemplate($template, [
+            'key' => $key,
+            'previewText' => $previewText,
+            'roles' => $roles,
+            'monospaceRoleEnabled' => $monospaceRoleEnabled,
+            'familyLabels' => $familyLabels,
+            'globalFallbackSettings' => $globalFallbackSettings,
+        ]);
     }
 
     /**
@@ -186,7 +193,12 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
      */
     public function renderSnippetPreviewScene(array $roles, bool $monospaceRoleEnabled, array $familyLabels = [], array $globalFallbackSettings = []): void
     {
-        $this->renderTemplate('preview-snippet.php', get_defined_vars());
+        $this->renderTemplate('preview-snippet.php', [
+            'roles' => $roles,
+            'monospaceRoleEnabled' => $monospaceRoleEnabled,
+            'familyLabels' => $familyLabels,
+            'globalFallbackSettings' => $globalFallbackSettings,
+        ]);
     }
 
     /**
@@ -196,7 +208,13 @@ final class PreviewSectionRenderer extends AbstractSectionRenderer
      */
     public function renderCodePreviewScene(string $previewText, array $roles, bool $monospaceRoleEnabled, array $familyLabels = [], array $globalFallbackSettings = []): void
     {
-        $this->renderTemplate('preview-code.php', get_defined_vars());
+        $this->renderTemplate('preview-code.php', [
+            'previewText' => $previewText,
+            'roles' => $roles,
+            'monospaceRoleEnabled' => $monospaceRoleEnabled,
+            'familyLabels' => $familyLabels,
+            'globalFallbackSettings' => $globalFallbackSettings,
+        ]);
     }
 
     /**

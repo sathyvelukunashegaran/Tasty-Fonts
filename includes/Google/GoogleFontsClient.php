@@ -6,14 +6,13 @@ namespace TastyFonts\Google;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Repository\GoogleApiKeyRepository;
-use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Repository\GoogleApiKeyRepositoryInterface;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
 
 /**
- * @phpstan-import-type AdobeProjectStatus from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type GoogleApiKeyStatus from \TastyFonts\Repository\GoogleApiKeyRepositoryInterface
  * @phpstan-type CatalogItem array<string, mixed>
  * @phpstan-type CatalogIndex array<string, CatalogItem>
  * @phpstan-type MetadataIndex array<string, array<string, mixed>>
@@ -44,8 +43,7 @@ final class GoogleFontsClient
     private ?array $metadataIndex = null;
 
     public function __construct(
-        private readonly SettingsRepository $settings,
-        private readonly GoogleApiKeyRepository $apiKeyRepo,
+        private readonly GoogleApiKeyRepositoryInterface $apiKeyRepo,
     ) {
     }
 
@@ -139,7 +137,7 @@ final class GoogleFontsClient
     }
 
     /**
-     * @return AdobeProjectStatus
+     * @return GoogleApiKeyStatus
      */
     public function revalidateStoredApiKeyStatus(): array
     {
@@ -459,7 +457,7 @@ final class GoogleFontsClient
 
     private function getApiKey(): string
     {
-        return $this->stringValue($this->settings->getSettings(), 'google_api_key');
+        return $this->apiKeyRepo->getApiKey();
     }
 
     /**

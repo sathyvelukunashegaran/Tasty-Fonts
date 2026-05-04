@@ -7,7 +7,7 @@ namespace TastyFonts\Fonts;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Repository\LogRepository;
-use TastyFonts\Repository\RoleRepository;
+use TastyFonts\Repository\RoleRepositoryInterface;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
 
@@ -58,7 +58,7 @@ final class AssetService
         CssBuilder $cssBuilder,
         private readonly RuntimeAssetPlanner $planner,
         LogRepository $log,
-        RoleRepository $roleRepo,
+        RoleRepositoryInterface $roleRepo,
     ) {
         $this->cssCache = new GeneratedCssCache(
             $catalog,

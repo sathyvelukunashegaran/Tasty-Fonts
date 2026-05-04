@@ -154,6 +154,7 @@ use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
+use TastyFonts\Support\VariantTokenService;
 use TastyFonts\Updates\GitHubUpdater;
 
 if (!class_exists('WP_Error')) {
@@ -1999,9 +2000,10 @@ function makeServiceGraph(): array
     );
     $imports = new ImportRepository();
     $log = new LogRepository();
-    $adobe = new AdobeProjectClient($settings, $adobeProjectRepo, new AdobeCssParser());
+    $variantTokens = new VariantTokenService();
+    $adobe = new AdobeProjectClient($adobeProjectRepo, new AdobeCssParser());
     $bunny = new BunnyFontsClient();
-    $google = new GoogleFontsClient($settings, $googleApiKeyRepo);
+    $google = new GoogleFontsClient($googleApiKeyRepo);
     $localScanner = new LocalCatalogScanner($storage, new FontFilenameParser());
     $adobeAdapter = new AdobeCatalogAdapter($adobe);
     $builder = new CatalogBuilder($imports, $localScanner, $adobeAdapter);
@@ -2021,11 +2023,12 @@ function makeServiceGraph(): array
         $imports,
         $assets,
         $log,
-        new HostedImportVariantPlanner(),
+        new HostedImportVariantPlanner($variantTokens),
         [
             'cdn' => new CdnImportStrategy(),
             'self_hosted' => new SelfHostedImportStrategy($storage),
-        ]
+        ],
+        $variantTokens
     );
     $library = new LibraryService($storage, $catalog, $imports, $assets, $log, $settings, $roleRepo);
     $capabilityCleanup = new CapabilityDisableCleanupService($storage, $imports, $catalog, $log);
@@ -2123,7 +2126,7 @@ function makeServiceGraph(): array
         $roleRepo,
         $actionRunner
     );
-    $rest = new RestController($controller, $adminAccess);
+    $rest = new RestController($controller, $adminAccess, $variantTokens);
     $runtime = new RuntimeService(
         $planner,
         $assets,

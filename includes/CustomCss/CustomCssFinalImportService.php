@@ -9,9 +9,10 @@ defined('ABSPATH') || exit;
 use TastyFonts\Fonts\HostedImportSupport;
 use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\CatalogCache;
-use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\ActivityLogRepositoryInterface;
+use TastyFonts\Repository\ActivityLogVocabulary;
+use TastyFonts\Repository\FamilyMetadataRepositoryInterface;
 use TastyFonts\Repository\ImportRepository;
-use TastyFonts\Repository\LogRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\Storage;
 use WP_Error;
@@ -34,10 +35,10 @@ final class CustomCssFinalImportService
     public function __construct(
         private readonly Storage $storage,
         private readonly ImportRepository $imports,
-        private readonly FamilyMetadataRepository $familyMetadata,
+        private readonly FamilyMetadataRepositoryInterface $familyMetadata,
         private readonly CatalogCache $catalog,
         private readonly AssetService $assets,
-        private readonly LogRepository $log,
+        private readonly ActivityLogRepositoryInterface $log,
         private readonly ?CustomCssFontValidator $validator = null
     ) {
     }
@@ -272,7 +273,7 @@ final class CustomCssFinalImportService
             );
 
         $this->log->add($message, [
-            'category' => LogRepository::CATEGORY_IMPORT,
+            'category' => ActivityLogVocabulary::CATEGORY_IMPORT,
             'event' => 'custom_css_self_hosted_import',
             'outcome' => $status === 'imported' ? 'success' : 'warning',
             'status_label' => $status === 'imported' ? __('Imported', 'tasty-fonts') : __('Partial', 'tasty-fonts'),
@@ -476,7 +477,7 @@ final class CustomCssFinalImportService
             );
 
         $this->log->add($message, [
-            'category' => LogRepository::CATEGORY_IMPORT,
+            'category' => ActivityLogVocabulary::CATEGORY_IMPORT,
             'event' => 'custom_css_remote_import',
             'outcome' => $status === 'imported' ? 'success' : 'warning',
             'status_label' => $status === 'imported' ? __('Imported', 'tasty-fonts') : __('Partial', 'tasty-fonts'),

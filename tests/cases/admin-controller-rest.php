@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use TastyFonts\Admin\AdminController;
+use TastyFonts\Admin\AdminActionRunner;
 use TastyFonts\Admin\AdminPageViewBuilder;
+use TastyFonts\Admin\GoogleApiKeyActions;
 use TastyFonts\Admin\GoogleApiKeyValidationClient;
 use TastyFonts\Admin\GoogleApiKeyValidator;
 use TastyFonts\Admin\SettingsSaveFields;
@@ -14,6 +16,7 @@ use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Google\GoogleFontsClient;
 use TastyFonts\Plugin;
 use TastyFonts\Repository\GoogleApiKeyRepository;
+use TastyFonts\Repository\GoogleApiKeyRepositoryInterface;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -3105,7 +3108,7 @@ $tests['google_api_key_validator_preserves_empty_success_messages'] = static fun
             return ['state' => 'valid'];
         }
     };
-    $validator = new GoogleApiKeyValidator(new GoogleFontsClient($settings, new GoogleApiKeyRepository()), $validationClient);
+    $validator = new GoogleApiKeyValidator(new GoogleFontsClient(new GoogleApiKeyRepository()), $validationClient);
     $result = $validator->validate(
         'valid-key',
         'tasty_fonts_google_api_key_invalid',
@@ -5666,4 +5669,101 @@ $tests['rest_controller_settings_disabling_variable_and_monospace_capabilities_u
     assertSameValue('before_capability_disable', (string) ($snapshots[0]['reason'] ?? ''), 'Combined capability disable should use the capability-disable snapshot reason.');
     assertSameValue(true, is_array($data['capability_cleanup']['variable_fonts'] ?? null), 'Combined capability disable should report variable cleanup details in the settings response payload.');
     assertSameValue(true, !empty($data['capability_cleanup']['monospace_role']['role_data_cleared']), 'Combined capability disable should report monospace cleanup details in the settings response payload.');
+};
+
+$tests['google_api_key_actions_status_payload_through_interface_adapter'] = static function (): void {
+    resetTestState();
+
+    $inMemoryRepo = new class() implements GoogleApiKeyRepositoryInterface {
+        private array $status = ['state' => 'empty', 'message' => '', 'checked_at' => 0];
+        public function has(): bool { return $this->status['state'] !== 'empty'; }
+        public function getApiKey(): string { return $this->has() ? 'test-key' : ''; }
+        public function saveApiKey(string $apiKey): array { $this->status = ['state' => trim($apiKey) === '' ? 'empty' : 'unknown', 'message' => '', 'checked_at' => 0]; return $this->status; }
+        public function getStatus(): array { return $this->status; }
+        public function saveStatus(string $state, string $message = ''): array {
+            $this->status = ['state' => $state, 'message' => $message, 'checked_at' => 1];
+            return $this->status;
+        }
+        public function clear(): void { $this->status = ['state' => 'empty', 'message' => '', 'checked_at' => 0]; }
+    };
+
+    $settings = new SettingsRepository();
+    $googleClient = new GoogleFontsClient($inMemoryRepo);
+    $runner = new AdminActionRunner(new LogRepository());
+    $actions = new GoogleApiKeyActions($inMemoryRepo, $googleClient, $runner);
+
+    $emptyPayload = $actions->status();
+    assertSameValue(false, (bool) ($emptyPayload['has_google_api_key'] ?? true), 'GoogleApiKeyActions status should report no key through the interface adapter.');
+    assertSameValue('Google Fonts API key is not stored.', (string) ($emptyPayload['message'] ?? ''), 'GoogleApiKeyActions status should expose the literal not-stored message through the interface adapter.');
+    assertSameValue('empty', (string) ($emptyPayload['google_api_key_status'] ?? ''), 'GoogleApiKeyActions status should report empty state through the interface adapter.');
+    assertSameValue(0, (int) ($emptyPayload['google_api_key_checked_at'] ?? -1), 'GoogleApiKeyActions status should expose checked_at for empty state through the interface adapter.');
+
+    $inMemoryRepo->saveStatus('valid', 'Ready');
+
+    $validPayload = $actions->status();
+    assertSameValue(true, (bool) ($validPayload['has_google_api_key'] ?? false), 'GoogleApiKeyActions status should report has key through the interface adapter.');
+    assertSameValue('Google Fonts API key is stored.', (string) ($validPayload['message'] ?? ''), 'GoogleApiKeyActions status should expose the literal stored message through the interface adapter.');
+    assertSameValue('valid', (string) ($validPayload['google_api_key_status'] ?? ''), 'GoogleApiKeyActions status should report valid state through the interface adapter.');
+    assertSameValue('Ready', (string) ($validPayload['google_api_key_status_message'] ?? ''), 'GoogleApiKeyActions status should report status message through the interface adapter.');
+    assertSameValue(1, (int) ($validPayload['google_api_key_checked_at'] ?? 0), 'GoogleApiKeyActions status should expose checked_at for valid state through the interface adapter.');
+
+    $inMemoryRepo->saveStatus('invalid', 'Rejected');
+
+    $invalidPayload = $actions->status();
+    assertSameValue(true, (bool) ($invalidPayload['has_google_api_key'] ?? false), 'GoogleApiKeyActions status should keep has key true for invalid interface-adapter status.');
+    assertSameValue('invalid', (string) ($invalidPayload['google_api_key_status'] ?? ''), 'GoogleApiKeyActions status should report invalid state through the interface adapter.');
+    assertSameValue('Rejected', (string) ($invalidPayload['google_api_key_status_message'] ?? ''), 'GoogleApiKeyActions status should report invalid status message through the interface adapter.');
+    assertSameValue(1, (int) ($invalidPayload['google_api_key_checked_at'] ?? 0), 'GoogleApiKeyActions status should expose checked_at for invalid state through the interface adapter.');
+
+    $inMemoryRepo->saveStatus('unknown', 'Retry later');
+
+    $unknownPayload = $actions->status();
+    assertSameValue(true, (bool) ($unknownPayload['has_google_api_key'] ?? false), 'GoogleApiKeyActions status should keep has key true for unknown interface-adapter status.');
+    assertSameValue('unknown', (string) ($unknownPayload['google_api_key_status'] ?? ''), 'GoogleApiKeyActions status should report unknown state through the interface adapter.');
+    assertSameValue('Retry later', (string) ($unknownPayload['google_api_key_status_message'] ?? ''), 'GoogleApiKeyActions status should report unknown status message through the interface adapter.');
+    assertSameValue(1, (int) ($unknownPayload['google_api_key_checked_at'] ?? 0), 'GoogleApiKeyActions status should expose checked_at for unknown state through the interface adapter.');
+};
+
+$tests['google_api_key_actions_save_persists_validation_status_through_interface_adapter'] = static function (): void {
+    resetTestState();
+
+    $inMemoryRepo = new class() implements GoogleApiKeyRepositoryInterface {
+        public array $writes = [];
+        private array $status = ['state' => 'empty', 'message' => '', 'checked_at' => 0];
+        public function has(): bool { return $this->status['state'] !== 'empty'; }
+        public function getApiKey(): string { return $this->has() ? 'test-key' : ''; }
+        public function saveApiKey(string $apiKey): array { $this->status = ['state' => trim($apiKey) === '' ? 'empty' : 'unknown', 'message' => '', 'checked_at' => 0]; return $this->status; }
+        public function getStatus(): array { return $this->status; }
+        public function saveStatus(string $state, string $message = ''): array {
+            $this->writes[] = ['state' => $state, 'message' => $message];
+            $this->status = ['state' => $state, 'message' => $message, 'checked_at' => 1];
+            return $this->status;
+        }
+        public function clear(): void { $this->status = ['state' => 'empty', 'message' => '', 'checked_at' => 0]; }
+    };
+
+    $settings = new SettingsRepository();
+    $googleClient = new GoogleFontsClient($inMemoryRepo);
+    $validationClient = new class implements GoogleApiKeyValidationClient {
+        /**
+         * @return array<string, mixed>
+         */
+        public function validateApiKey(string $apiKey): array
+        {
+            unset($apiKey);
+            return ['state' => 'valid', 'message' => 'Fake valid.'];
+        }
+    };
+    $validator = new GoogleApiKeyValidator($googleClient, $validationClient);
+    $runner = new AdminActionRunner(new LogRepository());
+    $actions = new GoogleApiKeyActions($inMemoryRepo, $googleClient, $runner, $validator);
+
+    $result = $actions->save('test-key');
+
+    assertFalseValue(is_wp_error($result), 'GoogleApiKeyActions save with a fake valid validator should succeed.');
+    assertSameValue(
+        [['state' => 'valid', 'message' => 'Fake valid.']],
+        $inMemoryRepo->writes,
+        'GoogleApiKeyActions save should persist valid validation status through the interface adapter.'
+    );
 };

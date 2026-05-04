@@ -12,7 +12,9 @@ use TastyFonts\Fonts\CatalogHydrator;
 use TastyFonts\Fonts\FontFilenameParser;
 use TastyFonts\Fonts\LocalCatalogScanner;
 use TastyFonts\Repository\AdobeProjectRepository;
+use TastyFonts\Repository\AdobeProjectRepositoryInterface;
 use TastyFonts\Repository\ImportRepository;
+use TastyFonts\Repository\ImportRepositoryInterface;
 use TastyFonts\Repository\LogRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\Storage;
@@ -29,7 +31,7 @@ $tests['catalog_builder_build_returns_empty_map_for_empty_sources'] = static fun
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder(
         $imports,
         new LocalCatalogScanner($storage, new FontFilenameParser()),
@@ -46,7 +48,7 @@ $tests['catalog_builder_build_includes_import_based_families'] = static function
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder(
         $imports,
         new LocalCatalogScanner($storage, new FontFilenameParser()),
@@ -87,7 +89,7 @@ $tests['catalog_builder_build_merges_local_scanner_synthetic_families'] = static
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder(
         $imports,
         new LocalCatalogScanner($storage, new FontFilenameParser()),
@@ -132,7 +134,7 @@ $tests['catalog_builder_build_merges_same_slug_local_synthetic_family_when_files
     ]);
 
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder(
         $imports,
         new LocalCatalogScanner($storage, new FontFilenameParser()),
@@ -174,7 +176,7 @@ $tests['catalog_builder_build_keeps_same_slug_families_separate_when_files_do_no
     ]);
 
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder(
         $imports,
         new LocalCatalogScanner($storage, new FontFilenameParser()),
@@ -232,7 +234,7 @@ $tests['catalog_builder_build_merges_adobe_profile_when_import_family_name_match
     $builder = new CatalogBuilder(
         $imports,
         new LocalCatalogScanner($storage, new FontFilenameParser()),
-        new AdobeCatalogAdapter(new AdobeProjectClient($settings, $adobeRepo, new AdobeCssParser()))
+        new AdobeCatalogAdapter(new AdobeProjectClient($adobeRepo, new AdobeCssParser()))
     );
 
     $raw = $builder->build();
@@ -242,6 +244,73 @@ $tests['catalog_builder_build_merges_adobe_profile_when_import_family_name_match
     assertTrueValue(isset($raw['Adobe Merge']['delivery_profiles']['adobe-adobe_hosted']), 'Merged family should include Adobe synthetic delivery profile.');
 };
 
+$tests['catalog_builder_build_merges_adobe_profile_through_in_memory_adobe_project_repository_interface'] = static function (): void {
+    resetTestState();
+
+    global $transientStore;
+
+    $storage = new Storage();
+    $imports = new ImportRepository();
+    $settings = new SettingsRepository();
+    $inMemoryAdobeRepo = new class() implements AdobeProjectRepositoryInterface {
+        public function isEnabled(): bool { return true; }
+
+        public function getProjectId(): string { return 'def456'; }
+
+        public function getStatus(): array { return ['state' => 'valid', 'message' => 'ok', 'checked_at' => 1]; }
+
+        public function saveProject(string $projectId, bool $enabled): array { return []; }
+
+        public function saveStatus(string $state, string $message = ''): array { return ['state' => $state, 'message' => $message, 'checked_at' => 1]; }
+
+        public function clear(): array { return []; }
+    };
+
+    $transientStore[TransientKey::forSite(AdobeProjectClient::TRANSIENT_PREFIX . md5('def456'))] = [
+        'project_id' => 'def456',
+        'stylesheet_url' => 'https://use.typekit.net/def456.css',
+        'families' => [
+            [
+                'family' => 'Adobe Merge',
+                'slug' => 'adobe-merge',
+                'faces' => [
+                    ['weight' => '400', 'style' => 'normal'],
+                ],
+            ],
+        ],
+        'fetched_at' => time(),
+    ];
+
+    $imports->saveFamily([
+        'family' => 'Adobe Merge',
+        'slug' => 'adobe-merge',
+        'publish_state' => 'published',
+        'delivery_profiles' => [
+            'google_cdn' => [
+                'id' => 'google_cdn',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'faces' => [
+                    ['weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'https://fonts.gstatic.com/adobe-merge.woff2']],
+                ],
+            ],
+        ],
+    ]);
+
+    $builder = new CatalogBuilder(
+        $imports,
+        new LocalCatalogScanner($storage, new FontFilenameParser()),
+        new AdobeCatalogAdapter(new AdobeProjectClient($inMemoryAdobeRepo, new AdobeCssParser()))
+    );
+
+    $raw = $builder->build();
+
+    assertSameValue(['Adobe Merge'], array_keys($raw), 'CatalogBuilder should merge matching import and Adobe families through the Adobe repository interface seam.');
+    assertTrueValue(isset($raw['Adobe Merge']['delivery_profiles']['google_cdn']), 'Merged family should keep the import delivery profile when Adobe state comes from the interface seam.');
+    assertTrueValue(isset($raw['Adobe Merge']['delivery_profiles']['adobe-adobe_hosted']), 'Merged family should include the Adobe synthetic delivery profile from the interface seam.');
+    assertSameValue('adobe', $raw['Adobe Merge']['delivery_profiles']['adobe-adobe_hosted']['provider'] ?? '', 'Adobe synthetic profile should preserve provider metadata through the interface seam.');
+};
+
 $tests['catalog_builder_prune_undeliverable_families_removes_families_with_zero_profiles'] = static function (): void {
     resetTestState();
 
@@ -249,7 +318,7 @@ $tests['catalog_builder_prune_undeliverable_families_removes_families_with_zero_
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder(
         $imports,
         new LocalCatalogScanner($storage, new FontFilenameParser()),
@@ -266,6 +335,137 @@ $tests['catalog_builder_prune_undeliverable_families_removes_families_with_zero_
     $raw = $builder->build();
 
     assertSameValue([], $raw, 'CatalogBuilder should prune families with no delivery profiles.');
+};
+
+$tests['catalog_builder_build_works_with_in_memory_import_repository_interface'] = static function (): void {
+    resetTestState();
+
+    $inMemoryImports = new class() implements ImportRepositoryInterface {
+        /** @var array<string, array<string, mixed>> */
+        private array $library = [];
+
+        public function all(): array { return $this->library; }
+        public function allFamilies(): array { return $this->library; }
+        public function get(string $slug): ?array { return $this->library[$slug] ?? null; }
+        public function getFamily(string $slug): ?array { return $this->get($slug); }
+        public function upsert(array $family): void { $this->saveFamily($family); }
+        public function saveFamily(array $family): void { $slug = (string) ($family['slug'] ?? ''); if ($slug !== '') { $this->library[$slug] = $family; } }
+        public function delete(string $slug): void { unset($this->library[$slug]); }
+        public function deleteFamily(string $slug): void { $this->delete($slug); }
+        public function ensureFamily(string $familyName, ?string $familySlug = null, string $defaultPublishState = 'published', ?string $activeDeliveryId = null, ?string $defaultManualPublishState = null): array { return []; }
+        public function saveProfile(string $familyName, string $familySlug, array $profile, string $defaultPublishState = 'library_only', bool $activate = false): array { return []; }
+        public function deleteProfile(string $familySlug, string $deliveryId): ?array { return null; }
+        public function setActiveDelivery(string $familySlug, string $deliveryId, ?string $publishState = null): ?array { return null; }
+        public function setPublishState(string $familySlug, string $publishState): ?array { return null; }
+        public function clearLibrary(): void { $this->library = []; }
+        public function replaceLibrary(array $library): array { $this->library = $library; return $this->library; }
+        public function replaceLibraryPreview(array $library): array { return $library; }
+    };
+
+    $inMemoryImports->saveFamily([
+        'family' => 'Inter',
+        'slug' => 'inter',
+        'publish_state' => 'library_only',
+        'active_delivery_id' => 'google_cdn',
+        'delivery_profiles' => [
+            'google_cdn' => [
+                'id' => 'google_cdn',
+                'provider' => 'google',
+                'type' => 'cdn',
+                'format' => 'static',
+                'variants' => ['400', '700'],
+                'meta' => ['category' => 'Sans Serif', 'subsets' => ['latin', 'latin-ext']],
+                'faces' => [
+                    [
+                        'weight' => '400',
+                        'style' => 'normal',
+                        'files' => [
+                            'woff2' => 'https://fonts.gstatic.com/inter-400.woff2',
+                            'woff' => 'https://fonts.gstatic.com/inter-400.woff',
+                        ],
+                    ],
+                ],
+            ],
+            'bunny_cdn' => [
+                'id' => 'bunny_cdn',
+                'provider' => 'bunny',
+                'type' => 'cdn',
+                'format' => 'static',
+                'variants' => ['700'],
+                'meta' => ['category' => 'Sans Serif'],
+                'faces' => [
+                    ['weight' => '700', 'style' => 'normal', 'files' => ['woff2' => 'https://fonts.bunny.net/inter-700.woff2']],
+                ],
+            ],
+        ],
+    ]);
+
+    foreach (
+        [
+            'Inter Published' => ['slug' => 'inter-published', 'publish_state' => 'published'],
+            'Inter Role' => ['slug' => 'inter-role', 'publish_state' => 'role_active'],
+            'Inter Invalid' => ['slug' => 'inter-invalid', 'publish_state' => 'legacy'],
+        ] as $familyName => $stateFixture
+    ) {
+        $inMemoryImports->saveFamily([
+            'family' => $familyName,
+            'slug' => $stateFixture['slug'],
+            'publish_state' => $stateFixture['publish_state'],
+            'active_delivery_id' => 'google_cdn',
+            'delivery_profiles' => [
+                'google_cdn' => [
+                    'id' => 'google_cdn',
+                    'provider' => 'google',
+                    'type' => 'cdn',
+                    'faces' => [
+                        ['weight' => '400', 'style' => 'normal', 'files' => ['woff2' => 'https://fonts.gstatic.com/' . $stateFixture['slug'] . '-400.woff2']],
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    $storage = new Storage();
+    $settings = new SettingsRepository();
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
+    $builder = new CatalogBuilder(
+        $inMemoryImports,
+        new LocalCatalogScanner($storage, new FontFilenameParser()),
+        new AdobeCatalogAdapter($adobe)
+    );
+
+    $raw = $builder->build();
+
+    assertSameValue(['Inter', 'Inter Invalid', 'Inter Published', 'Inter Role'], array_keys($raw), 'CatalogBuilder should read all seeded families through ImportRepositoryInterface.');
+    assertSameValue('inter', $raw['Inter']['slug'], 'CatalogBuilder should preserve slug from in-memory adapter.');
+    assertSameValue('library_only', $raw['Inter']['publish_state'], 'CatalogBuilder should preserve library_only publish state from in-memory adapter.');
+    assertSameValue('published', $raw['Inter Published']['publish_state'], 'CatalogBuilder should preserve published state from in-memory adapter.');
+    assertSameValue('role_active', $raw['Inter Role']['publish_state'], 'CatalogBuilder should preserve role_active state from in-memory adapter.');
+    assertSameValue('published', $raw['Inter Invalid']['publish_state'], 'CatalogBuilder should normalize unknown publish states to published.');
+    assertSameValue('google_cdn', $raw['Inter']['active_delivery_id'], 'CatalogBuilder should preserve active_delivery_id from in-memory adapter.');
+    assertSameValue(['google_cdn', 'bunny_cdn'], array_keys($raw['Inter']['delivery_profiles']), 'CatalogBuilder should preserve multiple delivery profile ids from in-memory adapter.');
+
+    $googleProfile = $raw['Inter']['delivery_profiles']['google_cdn'] ?? [];
+    assertSameValue('google_cdn', $googleProfile['id'] ?? '', 'CatalogBuilder should preserve delivery profile id.');
+    assertSameValue('google', $googleProfile['provider'] ?? '', 'CatalogBuilder should preserve delivery profile provider.');
+    assertSameValue('cdn', $googleProfile['type'] ?? '', 'CatalogBuilder should preserve delivery profile type.');
+    assertSameValue('static', $googleProfile['format'] ?? '', 'CatalogBuilder should preserve delivery profile format.');
+    assertSameValue(['400', '700'], $googleProfile['variants'] ?? [], 'CatalogBuilder should preserve delivery profile variants.');
+    assertSameValue(['category' => 'Sans Serif', 'subsets' => ['latin', 'latin-ext']], $googleProfile['meta'] ?? [], 'CatalogBuilder should preserve delivery profile metadata.');
+    assertSameValue(
+        [
+            [
+                'weight' => '400',
+                'style' => 'normal',
+                'files' => [
+                    'woff2' => 'https://fonts.gstatic.com/inter-400.woff2',
+                    'woff' => 'https://fonts.gstatic.com/inter-400.woff',
+                ],
+            ],
+        ],
+        $googleProfile['faces'] ?? [],
+        'CatalogBuilder should preserve nested face payloads from the in-memory adapter.'
+    );
 };
 
 // ---------------------------------------------------------------------------
@@ -770,7 +970,7 @@ $tests['catalog_cache_getCatalog_returns_cached_catalog_on_transient_hit'] = sta
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -787,7 +987,7 @@ $tests['catalog_cache_getCatalog_builds_fresh_catalog_when_transient_is_expired'
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -832,7 +1032,7 @@ $tests['catalog_cache_getCatalog_rebuilds_when_cached_data_fails_schema_validati
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -871,7 +1071,7 @@ $tests['catalog_cache_getCatalog_applies_catalog_filter_and_recomputes_counts_fr
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -934,7 +1134,7 @@ $tests['catalog_cache_getCatalog_rejects_cached_families_without_deleting_matchi
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -979,7 +1179,7 @@ $tests['catalog_cache_getCatalog_rejects_cached_families_with_malformed_shape_ev
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -1052,7 +1252,7 @@ $tests['catalog_cache_getCatalog_rejects_cached_catalog_with_malformed_counts_pa
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -1088,7 +1288,7 @@ $tests['catalog_cache_invalidate_deletes_transient'] = static function (): void 
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -1104,7 +1304,7 @@ $tests['catalog_cache_getCounts_returns_correct_counts'] = static function (): v
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 
@@ -1146,7 +1346,7 @@ $tests['catalog_cache_maybeInvalidateFromAttachment_invalidate_only_for_font_att
     $imports = new ImportRepository();
     $log = new LogRepository();
     $settings = new SettingsRepository();
-    $adobe = new AdobeProjectClient($settings, new AdobeProjectRepository(), new AdobeCssParser());
+    $adobe = new AdobeProjectClient(new AdobeProjectRepository(), new AdobeCssParser());
     $builder = new CatalogBuilder($imports, new LocalCatalogScanner($storage, new FontFilenameParser()), new AdobeCatalogAdapter($adobe));
     $cache = new CatalogCache($builder, new CatalogHydrator($storage), new CatalogEnricher(), $storage, $log);
 

@@ -39,7 +39,18 @@ abstract class AbstractSectionRenderer
         }
 
         $this->trainingWheelsOff = !empty($view['trainingWheelsOff']);
-        extract($view, EXTR_SKIP);
+
+        foreach ($view as $templateVariable => $templateValue) {
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $templateVariable) !== 1) {
+                continue;
+            }
+
+            if (isset(${$templateVariable})) {
+                continue;
+            }
+
+            ${$templateVariable} = $templateValue;
+        }
 
         require __DIR__ . '/templates/' . $template;
     }

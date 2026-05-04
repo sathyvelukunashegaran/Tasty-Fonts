@@ -48,6 +48,37 @@ final class GoogleApiKeyRepository implements GoogleApiKeyRepositoryInterface
     }
 
     /**
+     * Return the decrypted Google API key, or an empty string when none is stored.
+     */
+    public function getApiKey(): string
+    {
+        $googleApiKeyData = $this->getGoogleApiKeyDataFromOptions();
+
+        return $this->stringValue($googleApiKeyData, 'google_api_key');
+    }
+
+    /**
+     * Persist a Google API key and reset its validation status to unknown.
+     *
+     * @return GoogleApiKeyStatus
+     */
+    public function saveApiKey(string $apiKey): array
+    {
+        $googleApiKeyData = $this->persistGoogleApiKeyData([
+            'google_api_key' => trim(sanitize_text_field($apiKey)),
+            'google_api_key_status' => 'unknown',
+            'google_api_key_status_message' => '',
+            'google_api_key_checked_at' => 0,
+        ]);
+
+        return [
+            'state' => $googleApiKeyData['google_api_key_status'],
+            'message' => $googleApiKeyData['google_api_key_status_message'],
+            'checked_at' => $googleApiKeyData['google_api_key_checked_at'],
+        ];
+    }
+
+    /**
      * Get the current API key status.
      *
      * @return GoogleApiKeyStatus

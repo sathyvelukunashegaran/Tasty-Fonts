@@ -6,7 +6,7 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Repository\RoleRepository;
+use TastyFonts\Repository\RoleRepositoryInterface;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
@@ -26,7 +26,7 @@ final class GeneratedCssCache
         private readonly SettingsRepository $settings,
         private readonly CssBuilder $cssBuilder,
         private readonly RuntimeAssetPlanner $planner,
-        private readonly RoleRepository $roleRepo,
+        private readonly RoleRepositoryInterface $roleRepo,
         private readonly string $cssTransientKey,
         private readonly string $hashTransientKey
     ) {

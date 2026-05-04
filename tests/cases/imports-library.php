@@ -2236,6 +2236,101 @@ $tests['local_upload_service_imports_verified_font_uploads'] = static function (
     assertSameValue('library_only', (string) ($family['publish_state'] ?? ''), 'New direct uploads should start in the library instead of being published immediately.');
 };
 
+$tests['local_upload_service_applies_default_fallback_through_family_metadata_interface_adapter'] = static function (): void {
+    resetTestState();
+
+    global $uploadedFilePaths;
+
+    $services = makeServiceGraph();
+    $tmpName = uniqueTestDirectory('tmp-upload-interface-fallback') . '/inter-400-normal.woff2';
+    mkdir(dirname($tmpName), FS_CHMOD_DIR, true);
+    file_put_contents($tmpName, "wOF2test-font");
+    $uploadedFilePaths[] = $tmpName;
+
+    $inMemoryMetadata = new class() implements \TastyFonts\Repository\FamilyMetadataRepositoryInterface {
+        /** @var array<string, string> */
+        private array $displays = [];
+        /** @var array<string, string> */
+        private array $fallbacks = [];
+
+        public function getFallback(string $familySlug, string $default = 'sans-serif'): string
+        {
+            return $this->fallbacks[$familySlug] ?? $default;
+        }
+
+        /** @return array<string, string> */
+        public function saveFallback(string $familySlug, string $fallback): array
+        {
+            $this->fallbacks[$familySlug] = $fallback;
+
+            return $this->fallbacks;
+        }
+
+        public function getFontDisplay(string $familySlug, string $default = ''): string
+        {
+            return $this->displays[$familySlug] ?? $default;
+        }
+
+        /** @return array<string, string> */
+        public function saveFontDisplay(string $familySlug, string $display): array
+        {
+            $this->displays[$familySlug] = $display;
+
+            return $this->displays;
+        }
+
+        /** @return array<string, mixed> */
+        public function resetFallbacks(): array
+        {
+            $this->fallbacks = [];
+
+            return ['family_fallbacks' => []];
+        }
+
+        /** @return array<string, mixed> */
+        public function resetAll(): array
+        {
+            $this->fallbacks = [];
+            $this->displays = [];
+
+            return ['family_fallbacks' => [], 'family_font_displays' => []];
+        }
+    };
+
+    $localUpload = new \TastyFonts\Fonts\LocalUploadService(
+        $services['storage'],
+        $services['catalog'],
+        $services['imports'],
+        $services['assets'],
+        $services['settings'],
+        $services['log'],
+        new StubUploadedFileValidator(),
+        $inMemoryMetadata
+    );
+
+    $result = $localUpload->uploadRows([
+        [
+            'family' => 'Inter',
+            'weight' => '400',
+            'style' => 'normal',
+            'fallback' => '   ',
+            'file' => [
+                'name' => 'inter-400-normal.woff2',
+                'tmp_name' => $tmpName,
+                'error' => UPLOAD_ERR_OK,
+                'size' => filesize($tmpName),
+            ],
+        ],
+    ]);
+
+    assertSameValue(1, (int) ($result['summary']['imported'] ?? 0), 'Uploads should still succeed with an interface-backed metadata adapter.');
+    assertSameValue(
+        'sans-serif',
+        $inMemoryMetadata->getFallback('Inter', 'serif'),
+        'LocalUploadService should persist the normalized fallback through FamilyMetadataRepositoryInterface when upload rows leave fallback blank.'
+    );
+};
+
 $tests['local_upload_service_reuses_orphaned_existing_upload_files'] = static function (): void {
     resetTestState();
 

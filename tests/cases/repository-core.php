@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use TastyFonts\Repository\ActivityLogRepositoryInterface;
+use TastyFonts\Repository\ActivityLogVocabulary;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\ImportRepositoryInterface;
 use TastyFonts\Repository\LogRepository;
@@ -24,6 +25,8 @@ $tests['repository_interfaces_core_contracts_cover_import_log_and_storage'] = st
     assertTrueValue($importRepository instanceof ImportRepositoryInterface, 'ImportRepository should implement ImportRepositoryInterface.');
     assertTrueValue($logRepository instanceof ActivityLogRepositoryInterface, 'LogRepository should implement ActivityLogRepositoryInterface.');
     assertTrueValue($storage instanceof StorageInterface, 'Storage should implement StorageInterface.');
+    assertSameValue(ActivityLogVocabulary::CATEGORY_MAINTENANCE, LogRepository::CATEGORY_MAINTENANCE, 'LogRepository should keep compatibility aliases for activity vocabulary constants.');
+    assertSameValue(ActivityLogVocabulary::EVENT_SITE_TRANSFER_EXPORT, LogRepository::EVENT_SITE_TRANSFER_EXPORT, 'LogRepository should keep compatibility aliases for activity event constants.');
 
     $logDouble = new class() implements ActivityLogRepositoryInterface {
         /** @var list<array<string, string>> */
@@ -164,6 +167,15 @@ $tests['repository_interfaces_core_contracts_cover_import_log_and_storage'] = st
             }
 
             return $metadata;
+        }
+        public function getAbsoluteFileState(string $path): array
+        {
+            $relativePath = $this->relativePath($path);
+            $contents = $this->files[$relativePath] ?? null;
+
+            return is_string($contents)
+                ? ['exists' => true, 'size' => strlen($contents), 'last_modified' => 1, 'sha256' => hash('sha256', $contents)]
+                : ['exists' => false, 'size' => 0, 'last_modified' => 0, 'sha256' => ''];
         }
         public function ensureDirectory(string $path): bool { $this->directories[$path] = true; return true; }
         public function writeAbsoluteFile(string $path, string $contents): bool { $this->files[$this->relativePath($path)] = $contents; return true; }

@@ -11,6 +11,7 @@ defined('ABSPATH') || exit;
  * @phpstan-type RelativePathList list<string>
  * @phpstan-type DirectoryList list<string>
  * @phpstan-type StorageFileMetadata array{relative_path: string, size: int, sha256: string}
+ * @phpstan-type StorageAbsoluteFileState array{exists: bool, size: int, last_modified: int, sha256: string}
  */
 class Storage implements StorageInterface
 {
@@ -261,6 +262,46 @@ class Storage implements StorageInterface
         return $files;
     }
 
+    /**
+     * @return StorageAbsoluteFileState
+     */
+    public function getAbsoluteFileState(string $path): array
+    {
+        $path = wp_normalize_path($path);
+        $root = $this->getRoot();
+
+        if ($path === '' || !is_string($root) || $root === '') {
+            return $this->emptyFileState();
+        }
+
+        clearstatcache(true, $path);
+
+        $realRoot = realpath($root);
+        $realPath = realpath($path);
+
+        if (!is_string($realRoot) || !is_string($realPath)) {
+            return $this->emptyFileState();
+        }
+
+        $realRoot = wp_normalize_path($realRoot);
+        $realPath = wp_normalize_path($realPath);
+
+        if (!$this->canonicalPathIsWithinRoot($realPath, $realRoot) || !is_file($realPath)) {
+            return $this->emptyFileState();
+        }
+
+        $size = filesize($realPath);
+        $modified = filemtime($realPath);
+        $checksum = is_readable($realPath) ? hash_file('sha256', $realPath) : '';
+
+        return [
+            'exists' => true,
+            'size' => is_int($size) ? $size : 0,
+            'last_modified' => is_int($modified) ? $modified : 0,
+            'sha256' => is_string($checksum) ? $checksum : '',
+        ];
+    }
+
     public function ensureDirectory(string $path): bool
     {
         $this->clearFilesystemError();
@@ -489,6 +530,27 @@ class Storage implements StorageInterface
             return false;
         }
 
+        $path = wp_normalize_path($path);
+        $root = wp_normalize_path($root);
+
+        return $path === $root || str_starts_with($path, trailingslashit($root));
+    }
+
+    /**
+     * @return StorageAbsoluteFileState
+     */
+    private function emptyFileState(): array
+    {
+        return [
+            'exists' => false,
+            'size' => 0,
+            'last_modified' => 0,
+            'sha256' => '',
+        ];
+    }
+
+    private function canonicalPathIsWithinRoot(string $path, string $root): bool
+    {
         $path = wp_normalize_path($path);
         $root = wp_normalize_path($root);
 

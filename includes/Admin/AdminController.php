@@ -32,8 +32,10 @@ use TastyFonts\Maintenance\DeveloperToolsService;
 use TastyFonts\Maintenance\SnapshotService;
 use TastyFonts\Maintenance\SiteTransferService;
 use TastyFonts\Maintenance\SupportBundleService;
+use TastyFonts\Repository\ActivityLogRepositoryInterface;
+use TastyFonts\Repository\ActivityLogVocabulary;
 use TastyFonts\Repository\GoogleApiKeyRepository;
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\GoogleApiKeyRepositoryInterface;
 use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -117,7 +119,7 @@ final class AdminController
     public function __construct(
         private readonly Storage $storage,
         private readonly SettingsRepository $settings,
-        private readonly LogRepository $log,
+        private readonly ActivityLogRepositoryInterface $log,
         private readonly CatalogCache $catalog,
         private readonly AssetService $assets,
         private readonly LibraryService $library,
@@ -149,7 +151,7 @@ final class AdminController
         ?GoogleApiKeyActions $googleApiKeyActions = null,
         ?GoogleApiKeyValidator $googleApiKeyValidator = null,
         ?RoleFamilyCatalogBuilder $roleFamilyCatalogBuilder = null,
-        private readonly ?GoogleApiKeyRepository $apiKeyRepo = null,
+        private readonly ?GoogleApiKeyRepositoryInterface $apiKeyRepo = null,
         private readonly ?RoleRepository $roleRepo = null,
         ?AdminActionRunner $runner = null,
     ) {
@@ -180,7 +182,6 @@ final class AdminController
         );
         $this->googleApiKeyValidator = $googleApiKeyValidator ?? new GoogleApiKeyValidator($this->googleClient);
         $this->googleApiKeyActions = $googleApiKeyActions ?? new GoogleApiKeyActions(
-            $this->settings,
             $this->apiKeyRepo ?? new GoogleApiKeyRepository(),
             $this->googleClient,
             $actionRunner,
@@ -956,7 +957,7 @@ final class AdminController
         $this->log->add(
             $message,
             $this->buildActivityLogContext(
-                LogRepository::CATEGORY_ROLES,
+                ActivityLogVocabulary::CATEGORY_ROLES,
                 'roles_saved',
                 [
                     'outcome' => 'success',
@@ -1052,7 +1053,7 @@ final class AdminController
         $this->log->add(
             $message,
             $this->buildActivityLogContext(
-                LogRepository::CATEGORY_ROLES,
+                ActivityLogVocabulary::CATEGORY_ROLES,
                 'roles_published',
                 [
                     'outcome' => 'success',
@@ -1257,7 +1258,7 @@ final class AdminController
             $this->log->add(
                 __('Google Fonts API key removed.', 'tasty-fonts'),
                 $this->buildActivityLogContext(
-                    LogRepository::CATEGORY_SETTINGS,
+                    ActivityLogVocabulary::CATEGORY_SETTINGS,
                     'google_api_key_removed',
                     [
                         'outcome' => 'warning',
@@ -1296,7 +1297,7 @@ final class AdminController
                 $this->log->add(
                     __('Google Fonts API key validated.', 'tasty-fonts'),
                     $this->buildActivityLogContext(
-                        LogRepository::CATEGORY_SETTINGS,
+                        ActivityLogVocabulary::CATEGORY_SETTINGS,
                         'google_api_key_validated',
                         [
                             'outcome' => 'success',
@@ -1323,7 +1324,7 @@ final class AdminController
             $this->log->add(
                 __('Google Fonts API key validation failed.', 'tasty-fonts'),
                 $this->buildActivityLogContext(
-                    LogRepository::CATEGORY_SETTINGS,
+                    ActivityLogVocabulary::CATEGORY_SETTINGS,
                     'google_api_key_validation_failed',
                     [
                         'outcome' => 'error',
@@ -1365,7 +1366,7 @@ final class AdminController
         $this->log->add(
             $settingsMessage,
             $this->buildActivityLogContext(
-                LogRepository::CATEGORY_SETTINGS,
+                ActivityLogVocabulary::CATEGORY_SETTINGS,
                 'settings_saved',
                 [
                     'outcome' => 'success',
@@ -1929,7 +1930,7 @@ final class AdminController
         $this->log->add(
             $message,
             $this->buildTransferLogContext(
-                LogRepository::EVENT_SITE_TRANSFER_IMPORT_SUCCESS,
+                ActivityLogVocabulary::EVENT_SITE_TRANSFER_IMPORT_SUCCESS,
                 [
                     'outcome' => 'success',
                     'status_label' => __('Imported', 'tasty-fonts'),
@@ -2735,7 +2736,7 @@ final class AdminController
             $this->log->add(
                 $this->formatSiteTransferStatusForActivityLog($status),
                 $this->buildTransferLogContext(
-                    LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE,
+                    ActivityLogVocabulary::EVENT_SITE_TRANSFER_IMPORT_FAILURE,
                     [
                         'outcome' => 'error',
                         'status_label' => __('Failed', 'tasty-fonts'),
@@ -2813,7 +2814,7 @@ final class AdminController
                 $this->stringValue($result, 'fallback', $fallback)
             ),
             $this->buildActivityLogContext(
-                LogRepository::CATEGORY_SETTINGS,
+                ActivityLogVocabulary::CATEGORY_SETTINGS,
                 'family_fallback_saved',
                 [
                     'outcome' => 'success',
@@ -3023,7 +3024,7 @@ final class AdminController
         $this->log->add(
             $message,
             $this->buildActivityLogContext(
-                LogRepository::CATEGORY_ROLES,
+                ActivityLogVocabulary::CATEGORY_ROLES,
                 $actionType === 'apply' ? 'roles_published' : ($actionType === 'disable' ? 'roles_sitewide_disabled' : 'roles_saved'),
                 [
                     'outcome' => $actionType === 'disable' ? 'warning' : 'success',
@@ -3099,7 +3100,7 @@ final class AdminController
         $size = is_file($path) ? (int) filesize($path) : 0;
         $this->log->add(
             __('Exported a site transfer bundle.', 'tasty-fonts'),
-            $this->buildTransferLogContext(LogRepository::EVENT_SITE_TRANSFER_EXPORT)
+            $this->buildTransferLogContext(ActivityLogVocabulary::EVENT_SITE_TRANSFER_EXPORT)
         );
 
         header('Content-Type: ' . $contentType);
@@ -4152,7 +4153,7 @@ final class AdminController
                 'value' => $liveRoles === [] ? __('Not applied sitewide', 'tasty-fonts') : $this->buildRoleTextSummary($liveRoles, $settings),
             ],
             [
-                'label' => __('Apply Sitewide', 'tasty-fonts'),
+                'label' => __('Sitewide delivery', 'tasty-fonts'),
                 'value' => $sitewideEnabled ? __('On', 'tasty-fonts') : __('Off', 'tasty-fonts'),
             ],
         ];
@@ -6373,7 +6374,7 @@ final class AdminController
         $this->log->add(
             $this->formatSiteTransferStatusForActivityLog($status),
             $this->buildTransferLogContext(
-                LogRepository::EVENT_SITE_TRANSFER_IMPORT_FAILURE,
+                ActivityLogVocabulary::EVENT_SITE_TRANSFER_IMPORT_FAILURE,
                 [
                     'outcome' => 'error',
                     'status_label' => __('Failed', 'tasty-fonts'),
@@ -6573,7 +6574,7 @@ final class AdminController
      */
     private function buildTransferLogContext(string $event, array $meta = []): array
     {
-        return $this->buildActivityLogContext(LogRepository::CATEGORY_TRANSFER, $event, $meta);
+        return $this->buildActivityLogContext(ActivityLogVocabulary::CATEGORY_TRANSFER, $event, $meta);
     }
 
     /**

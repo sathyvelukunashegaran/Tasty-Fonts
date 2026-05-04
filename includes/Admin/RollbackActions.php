@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace TastyFonts\Admin;
 
 use TastyFonts\Maintenance\SnapshotService;
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\ActivityLogVocabulary;
 use WP_Error;
 
 /**
@@ -40,7 +40,7 @@ final class RollbackActions
                 ];
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'rollback_snapshot_created',
                 'status_label' => __('Created', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),
@@ -91,7 +91,7 @@ final class RollbackActions
                 );
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'rollback_snapshot_restored',
                 'status_label' => __('Restored', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),
@@ -119,7 +119,7 @@ final class RollbackActions
                 ];
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'rollback_snapshot_renamed',
                 'status_label' => __('Renamed', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),
@@ -147,7 +147,7 @@ final class RollbackActions
                 ];
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'rollback_snapshot_deleted',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),
@@ -172,7 +172,7 @@ final class RollbackActions
                 ];
             },
             [
-                'category' => LogRepository::CATEGORY_TRANSFER,
+                'category' => ActivityLogVocabulary::CATEGORY_TRANSFER,
                 'event' => 'rollback_snapshots_deleted_all',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Transfer', 'tasty-fonts'),

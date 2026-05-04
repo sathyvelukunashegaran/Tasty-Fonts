@@ -15,7 +15,7 @@ use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\EditorIntegrationInterface;
 use TastyFonts\Integrations\IntegrationStatus;
 use TastyFonts\Integrations\OxygenIntegrationService;
-use TastyFonts\Repository\RoleRepository;
+use TastyFonts\Repository\RoleRepositoryInterface;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 use WP_Theme_JSON_Data;
@@ -46,7 +46,7 @@ final class RuntimeService
         private readonly CssBuilder $cssBuilder,
         private readonly AdobeProjectClient $adobe,
         private readonly SettingsRepository $settings,
-        private readonly RoleRepository $roleRepo,
+        private readonly RoleRepositoryInterface $roleRepo,
         private readonly AcssIntegrationService $acssIntegration,
         private readonly BricksIntegrationService $bricksIntegration,
         private readonly OxygenIntegrationService $oxygenIntegration,
@@ -940,11 +940,7 @@ JS;
                 continue;
             }
 
-            if ($integration === $this->oxygenIntegration) {
-                continue;
-            }
-
-            if (!$this->integrationManagedStylesLive($integration->readState($settings))) {
+            if (!IntegrationStatus::managedStylesLive($integration->readState($settings))) {
                 continue;
             }
 
@@ -967,7 +963,7 @@ JS;
                 continue;
             }
 
-            if (!$this->integrationManagedStylesLive($integration->readState($settings))) {
+            if (!IntegrationStatus::managedStylesLive($integration->readState($settings))) {
                 continue;
             }
 
@@ -975,18 +971,6 @@ JS;
         }
 
         return $styles;
-    }
-
-    /**
-     * @param array<string, mixed> $state
-     */
-    private function integrationManagedStylesLive(array $state): bool
-    {
-        $managedState = is_array($state['theme_styles'] ?? null) ? $state['theme_styles'] : $state;
-        $humanStatus = $managedState['human_status'] ?? null;
-
-        return (is_string($humanStatus) && $humanStatus === IntegrationStatus::LIVE)
-            || (!empty($managedState['enabled']) && !empty($managedState['applied']) && !empty($managedState['sitewide_delivery']));
     }
 
     private function hasManagedAcssRuntimeMapping(): bool

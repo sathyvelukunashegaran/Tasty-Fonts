@@ -6,14 +6,13 @@ namespace TastyFonts\Adobe;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Repository\AdobeProjectRepository;
-use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Repository\AdobeProjectRepositoryInterface;
 use TastyFonts\Support\FontUtils;
 use TastyFonts\Support\TransientKey;
 use WP_Error;
 
 /**
- * @phpstan-import-type AdobeProjectStatus from \TastyFonts\Repository\SettingsRepository
+ * @phpstan-import-type AdobeProjectStatus from \TastyFonts\Repository\AdobeProjectRepositoryInterface
  * @phpstan-type ProjectFamily array<string, mixed>
  * @phpstan-type ProjectFamilyList list<ProjectFamily>
  * @phpstan-type ProjectData array{
@@ -45,11 +44,9 @@ final class AdobeProjectClient
     private const REQUEST_TIMEOUT = 20;
 
     public function __construct(
-        SettingsRepository $settings,
-        private readonly AdobeProjectRepository $adobeRepo,
+        private readonly AdobeProjectRepositoryInterface $adobeRepo,
         private readonly AdobeCssParser $parser
     ) {
-        unset($settings);
     }
 
     public function isEnabled(): bool

@@ -19,7 +19,8 @@ use TastyFonts\Integrations\AcssIntegrationService;
 use TastyFonts\Integrations\BricksIntegrationService;
 use TastyFonts\Integrations\OxygenIntegrationService;
 use TastyFonts\Maintenance\HealthCheckService;
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\ActivityLogRepositoryInterface;
+use TastyFonts\Repository\ActivityLogVocabulary;
 use TastyFonts\Repository\RoleRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -64,7 +65,7 @@ final class AdminPageContextBuilder
         private readonly Storage $storage,
         private readonly SettingsRepository $settings,
         private readonly RoleRepository $roleRepo,
-        private readonly LogRepository $log,
+        private readonly ActivityLogRepositoryInterface $log,
         private readonly CatalogCache $catalog,
         private readonly AssetService $assets,
         private readonly CssBuilder $cssBuilder,
@@ -1677,14 +1678,14 @@ final class AdminPageContextBuilder
         }
 
         return match ($category) {
-            LogRepository::CATEGORY_TRANSFER => __('Transfer & Recovery', 'tasty-fonts'),
-            LogRepository::CATEGORY_SETTINGS => __('Settings', 'tasty-fonts'),
-            LogRepository::CATEGORY_ROLES => __('Roles', 'tasty-fonts'),
-            LogRepository::CATEGORY_LIBRARY => __('Library', 'tasty-fonts'),
-            LogRepository::CATEGORY_IMPORT => __('Import', 'tasty-fonts'),
-            LogRepository::CATEGORY_INTEGRATION => __('Integration', 'tasty-fonts'),
-            LogRepository::CATEGORY_MAINTENANCE => __('Developer', 'tasty-fonts'),
-            LogRepository::CATEGORY_UPDATE => __('Updates', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_TRANSFER => __('Transfer & Recovery', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_SETTINGS => __('Settings', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_ROLES => __('Roles', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_LIBRARY => __('Library', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_IMPORT => __('Import', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_INTEGRATION => __('Integration', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_MAINTENANCE => __('Developer', 'tasty-fonts'),
+            ActivityLogVocabulary::CATEGORY_UPDATE => __('Updates', 'tasty-fonts'),
             default => ucwords(str_replace('_', ' ', $category)),
         };
     }
@@ -1837,7 +1838,7 @@ final class AdminPageContextBuilder
     {
         $category = strtolower($this->stringValue($entry, 'category'));
 
-        if ($category === LogRepository::CATEGORY_TRANSFER) {
+        if ($category === ActivityLogVocabulary::CATEGORY_TRANSFER) {
             return true;
         }
 

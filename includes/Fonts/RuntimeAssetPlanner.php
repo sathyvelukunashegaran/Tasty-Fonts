@@ -6,8 +6,8 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Repository\FamilyMetadataRepository;
-use TastyFonts\Repository\RoleRepository;
+use TastyFonts\Repository\FamilyMetadataRepositoryInterface;
+use TastyFonts\Repository\RoleRepositoryInterface;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
 
@@ -30,8 +30,8 @@ final class RuntimeAssetPlanner
         private readonly SettingsRepository $settings,
         /** @var list<ProviderStylesheetResolverInterface> */
         private readonly array $stylesheetResolvers,
-        private readonly RoleRepository $roleRepo,
-        private readonly FamilyMetadataRepository $familyMetadataRepo,
+        private readonly RoleRepositoryInterface $roleRepo,
+        private readonly FamilyMetadataRepositoryInterface $familyMetadataRepo,
     ) {
     }
 
@@ -234,7 +234,15 @@ final class RuntimeAssetPlanner
      */
     private function resolveFamilyFallback(array $family): string
     {
-        return FallbackResolver::familyFallback($family, $this->settings->getSettings());
+        $settings = $this->settings->getSettings();
+        $default = FallbackResolver::familyFallback($family, $settings);
+        $familyName = trim($this->familyStringValue($family, 'family'));
+
+        if ($familyName === '') {
+            return $default;
+        }
+
+        return $this->familyMetadataRepo->getFallback($familyName, $default);
     }
 
     /**

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace TastyFonts\Admin;
 
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\ActivityLogRepositoryInterface;
 use WP_Error;
 
 /**
@@ -23,7 +23,7 @@ use WP_Error;
 final class AdminActionRunner
 {
     public function __construct(
-        private readonly LogRepository $log
+        private readonly ActivityLogRepositoryInterface $log
     ) {
     }
 

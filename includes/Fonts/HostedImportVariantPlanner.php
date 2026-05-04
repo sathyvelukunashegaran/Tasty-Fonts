@@ -7,6 +7,7 @@ namespace TastyFonts\Fonts;
 defined('ABSPATH') || exit;
 
 use TastyFonts\Support\FontUtils;
+use TastyFonts\Support\VariantTokenService;
 
 /**
  * Pure planner for hosted import variant deltas.
@@ -15,6 +16,13 @@ use TastyFonts\Support\FontUtils;
  */
 final class HostedImportVariantPlanner
 {
+    private readonly VariantTokenService $variantTokens;
+
+    public function __construct(?VariantTokenService $variantTokens = null)
+    {
+        $this->variantTokens = $variantTokens ?? new VariantTokenService();
+    }
+
     /**
      * @param array<int|string, mixed> $requestedVariants
      * @param array<string, mixed>|null $existingProfile
@@ -77,6 +85,6 @@ final class HostedImportVariantPlanner
             $normalized[] = (string) $variant;
         }
 
-        return FontUtils::normalizeVariantTokens($normalized);
+        return $this->variantTokens->normalizeVariantTokens($normalized);
     }
 }

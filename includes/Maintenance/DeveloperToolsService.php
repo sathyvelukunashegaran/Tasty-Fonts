@@ -13,7 +13,7 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Fonts\BlockEditorFontLibraryService;
 use TastyFonts\Fonts\CatalogCache;
 use TastyFonts\Google\GoogleFontsClient;
-use TastyFonts\Repository\FamilyMetadataRepository;
+use TastyFonts\Repository\FamilyMetadataRepositoryInterface;
 use TastyFonts\Repository\ImportRepository;
 use TastyFonts\Repository\SettingsRepository;
 use TastyFonts\Support\FontUtils;
@@ -53,7 +53,7 @@ HTACCESS;
         private readonly AssetService $assets,
         private readonly BlockEditorFontLibraryService $blockEditorFontLibrary,
         private readonly GoogleFontsClient $googleClient,
-        private readonly FamilyMetadataRepository $familyMetadataRepo,
+        private readonly FamilyMetadataRepositoryInterface $familyMetadataRepo,
     ) {
         unset($catalog);
     }

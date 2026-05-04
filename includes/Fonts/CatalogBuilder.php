@@ -6,7 +6,7 @@ namespace TastyFonts\Fonts;
 
 defined('ABSPATH') || exit;
 
-use TastyFonts\Repository\ImportRepository;
+use TastyFonts\Repository\ImportRepositoryInterface;
 use TastyFonts\Support\FontUtils;
 
 /**
@@ -20,12 +20,12 @@ final class CatalogBuilder
     use CatalogRecordHelpers;
 
     /**
-     * @param ImportRepository $imports Repository for stored imported family records.
+     * @param ImportRepositoryInterface $imports Repository for stored imported family records.
      * @param LocalCatalogScanner $localScanner Scanner for locally-uploaded font files.
      * @param AdobeCatalogAdapter $adobeAdapter Adapter for Adobe Fonts project families.
      */
     public function __construct(
-        private readonly ImportRepository $imports,
+        private readonly ImportRepositoryInterface $imports,
         private readonly LocalCatalogScanner $localScanner,
         private readonly AdobeCatalogAdapter $adobeAdapter,
     ) {

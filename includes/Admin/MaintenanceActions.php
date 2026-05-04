@@ -8,7 +8,8 @@ use TastyFonts\Fonts\AssetService;
 use TastyFonts\Maintenance\DeveloperToolsService;
 use TastyFonts\Maintenance\SnapshotService;
 use TastyFonts\Maintenance\SiteTransferService;
-use TastyFonts\Repository\LogRepository;
+use TastyFonts\Repository\ActivityLogRepositoryInterface;
+use TastyFonts\Repository\ActivityLogVocabulary;
 use TastyFonts\Support\Storage;
 use WP_Error;
 
@@ -23,7 +24,7 @@ final class MaintenanceActions
         private readonly DeveloperToolsService $developerTools,
         private readonly SiteTransferService $siteTransfer,
         private readonly SnapshotService $snapshots,
-        private readonly LogRepository $log,
+        private readonly ActivityLogRepositoryInterface $log,
         private readonly AdminActionRunner $runner
     ) {
     }
@@ -42,7 +43,7 @@ final class MaintenanceActions
         return $this->runner->run(
             fn(): array|WP_Error => $this->developerTools->resetPluginSettings(),
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'plugin_settings_reset',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -69,7 +70,7 @@ final class MaintenanceActions
         return $this->runner->run(
             fn(): array|WP_Error => $this->developerTools->resetFamilyFallbacksToGlobal(),
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'family_fallbacks_reset_to_global',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -96,7 +97,7 @@ final class MaintenanceActions
         return $this->runner->run(
             fn(): array|WP_Error => $this->developerTools->resetAllFallbacksToDefaults(),
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'fallbacks_reset_to_plugin_defaults',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -123,7 +124,7 @@ final class MaintenanceActions
         return $this->runner->run(
             fn(): array|WP_Error => $this->developerTools->wipeManagedFontLibrary(),
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'managed_font_library_wiped',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -169,7 +170,7 @@ final class MaintenanceActions
                 'deleted_snapshot_files' => $this->intValue($snapshotCleanup, 'deleted_snapshot_files'),
             ],
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'plugin_managed_files_deleted',
                 'status_label' => __('Deleted', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -201,7 +202,7 @@ final class MaintenanceActions
                 return [];
             },
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'plugin_caches_refreshed',
                 'status_label' => __('Refreshed', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -230,7 +231,7 @@ final class MaintenanceActions
                 return [];
             },
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'generated_css_regenerated',
                 'status_label' => __('Regenerated', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -254,7 +255,7 @@ final class MaintenanceActions
                 return [];
             },
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'font_library_rescanned',
                 'status_label' => __('Rescanned', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -283,7 +284,7 @@ final class MaintenanceActions
                 return [];
             },
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'storage_scaffold_repaired',
                 'status_label' => __('Repaired', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -303,7 +304,7 @@ final class MaintenanceActions
         return $this->runner->run(
             fn(): array => $this->developerTools->resetIntegrationDetectionState(),
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'integration_detection_reset',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),
@@ -324,7 +325,7 @@ final class MaintenanceActions
                 return [];
             },
             [
-                'category' => LogRepository::CATEGORY_MAINTENANCE,
+                'category' => ActivityLogVocabulary::CATEGORY_MAINTENANCE,
                 'event' => 'suppressed_notices_reset',
                 'status_label' => __('Reset', 'tasty-fonts'),
                 'source' => __('Developer', 'tasty-fonts'),

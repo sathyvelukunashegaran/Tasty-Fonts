@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace TastyFonts\Admin;
 
 use TastyFonts\Google\GoogleFontsClient;
-use TastyFonts\Repository\LogRepository;
-use TastyFonts\Repository\GoogleApiKeyRepository;
-use TastyFonts\Repository\SettingsRepository;
+use TastyFonts\Repository\ActivityLogVocabulary;
+use TastyFonts\Repository\GoogleApiKeyRepositoryInterface;
 use WP_Error;
 
 /**
@@ -20,8 +19,7 @@ final class GoogleApiKeyActions
     private readonly GoogleApiKeyValidator $validator;
 
     public function __construct(
-        private readonly SettingsRepository $settings,
-        private readonly GoogleApiKeyRepository $apiKeyRepo,
+        private readonly GoogleApiKeyRepositoryInterface $apiKeyRepo,
         private readonly GoogleFontsClient $googleClient,
         private readonly AdminActionRunner $runner,
         ?GoogleApiKeyValidator $validator = null
@@ -73,7 +71,7 @@ final class GoogleApiKeyActions
             $this->runner->run(
                 fn() => $validation,
                 [
-                    'category' => LogRepository::CATEGORY_SETTINGS,
+                    'category' => ActivityLogVocabulary::CATEGORY_SETTINGS,
                     'event' => 'google_api_key_validation_failed',
                     'status_label' => __('Validation failed', 'tasty-fonts'),
                     'source' => __('Settings', 'tasty-fonts'),
@@ -87,7 +85,7 @@ final class GoogleApiKeyActions
             return $validation;
         }
 
-        $this->settings->saveSettings(['google_api_key' => $googleApiKey]);
+        $this->apiKeyRepo->saveApiKey($googleApiKey);
         $this->apiKeyRepo->saveStatus($validation['state'], $validation['message']);
         $this->googleClient->clearCatalogCache();
 
@@ -99,7 +97,7 @@ final class GoogleApiKeyActions
                 );
             },
             [
-                'category' => LogRepository::CATEGORY_SETTINGS,
+                'category' => ActivityLogVocabulary::CATEGORY_SETTINGS,
                 'event' => 'google_api_key_validated',
                 'status_label' => __('Validated', 'tasty-fonts'),
                 'source' => __('Settings', 'tasty-fonts'),

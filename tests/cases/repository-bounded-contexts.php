@@ -31,6 +31,8 @@ $tests['repository_interfaces_bounded_contexts_support_contract_checks_and_in_me
 
     $googleDouble = new class() implements GoogleApiKeyRepositoryInterface {
         public function has(): bool { return true; }
+        public function getApiKey(): string { return 'test-key'; }
+        public function saveApiKey(string $apiKey): array { return ['state' => trim($apiKey) === '' ? 'empty' : 'unknown', 'message' => '', 'checked_at' => 0]; }
         public function getStatus(): array { return ['state' => 'valid', 'message' => 'ok', 'checked_at' => 1]; }
         public function saveStatus(string $state, string $message = ''): array { return ['state' => $state, 'message' => $message, 'checked_at' => 1]; }
         public function clear(): void {}

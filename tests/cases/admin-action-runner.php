@@ -3,7 +3,38 @@
 declare(strict_types=1);
 
 use TastyFonts\Admin\AdminActionRunner;
+use TastyFonts\Admin\MaintenanceActions;
+use TastyFonts\Repository\ActivityLogRepositoryInterface;
 use TastyFonts\Repository\LogRepository;
+
+function makeInMemoryActivityLogRepositoryDouble(): ActivityLogRepositoryInterface
+{
+    return new class() implements ActivityLogRepositoryInterface {
+        /** @var list<array<string, string>> */
+        private array $entries = [];
+
+        public function add(string $message, array $context = []): void
+        {
+            $entry = ['message' => $message];
+            foreach ($context as $key => $value) {
+                if (is_string($value)) {
+                    $entry[$key] = $value;
+                }
+            }
+            array_unshift($this->entries, $entry);
+        }
+
+        public function all(): array
+        {
+            return $this->entries;
+        }
+
+        public function clear(): void
+        {
+            $this->entries = [];
+        }
+    };
+}
 
 $tests['admin_action_runner_successful_callable_returns_payload_with_message'] = static function (): void {
     resetTestState();
@@ -261,4 +292,58 @@ $tests['admin_action_runner_preserves_numeric_top_level_result_keys'] = static f
         $result,
         'Array payloads should preserve numeric and string top-level keys using the legacy union behavior.'
     );
+};
+
+$tests['admin_action_runner_runs_through_activity_log_repository_interface_seam'] = static function (): void {
+    resetTestState();
+
+    $fakeLog = makeInMemoryActivityLogRepositoryDouble();
+
+    $runner = new AdminActionRunner($fakeLog);
+
+    $result = $runner->run(
+        fn(): array => ['key' => 'value'],
+        [
+            'category' => 'test_category',
+            'event' => 'test_event',
+            'status_label' => 'Test',
+            'source' => 'Test',
+            'message' => 'Interface seam message.',
+        ]
+    );
+
+    assertSameValue(['message' => 'Interface seam message.', 'key' => 'value'], $result, 'Runner should return payload when using an in-memory ActivityLogRepositoryInterface adapter.');
+
+    $entries = $fakeLog->all();
+    assertTrueValue(count($entries) === 1, 'In-memory adapter should record exactly one entry.');
+    assertSameValue('Interface seam message.', $entries[0]['message'] ?? '', 'In-memory adapter entry should contain the correct message.');
+    assertSameValue('test_event', $entries[0]['event'] ?? '', 'In-memory adapter entry should contain the correct event.');
+    assertSameValue('test_category', $entries[0]['category'] ?? '', 'In-memory adapter entry should contain the correct category.');
+    assertSameValue('success', $entries[0]['outcome'] ?? '', 'In-memory adapter entry should contain success outcome.');
+};
+
+$tests['maintenance_actions_delete_all_history_uses_activity_log_repository_interface_seam'] = static function (): void {
+    resetTestState();
+
+    $services = makeServiceGraph();
+    $fakeLog = makeInMemoryActivityLogRepositoryDouble();
+    $fakeLog->add('Older entry.');
+    $fakeLog->add('Newer entry.');
+    $runner = new AdminActionRunner($fakeLog);
+
+    $actions = new MaintenanceActions(
+        $services['storage'],
+        $services['assets'],
+        $services['developer_tools'],
+        $services['site_transfer'],
+        $services['snapshots'],
+        $fakeLog,
+        $runner
+    );
+
+    $result = $actions->deleteAllHistory();
+
+    assertSameValue('Activity history deleted.', $result['message'] ?? '', 'MaintenanceActions should return the shared history deletion message.');
+    assertSameValue(2, $result['deleted_history_entries'] ?? null, 'MaintenanceActions should count entries from the injected ActivityLogRepositoryInterface adapter.');
+    assertSameValue([], $fakeLog->all(), 'MaintenanceActions should clear the injected ActivityLogRepositoryInterface adapter.');
 };
